@@ -143,6 +143,30 @@
     }
 
     // Clamp value to slider range, quantised to step
+    // A log-scale slider (Brush Size, 2026-10-07) moves by ratios: the noise
+    // is a factor, and the result keeps three significant digits instead of
+    // the mut step (0.1 turned every fine size into 0). A value already below
+    // the mut band keeps the slider's whole fine end to move in, so a fine
+    // brush is never lifted to the band's 0.1 just because a mutation
+    // touched it; one inside the band stays inside it, as before.
+    function clampLog(schema, value, current) {
+        var reg = window.ParamRegistry;
+        var sl = reg && reg.SLIDERS && reg.SLIDERS[schema.id];
+        var hardMin = (sl && sl.hard && sl.hard.min > 0) ? sl.hard.min : schema.min;
+        var lo = (typeof current === 'number' && current < schema.min) ? hardMin : schema.min;
+        var v = Math.max(lo, Math.min(schema.max, value));
+        v = +v.toPrecision(3);
+        if (reg && reg.clampSlider) {
+            var held = reg.clampSlider(schema.id, v);
+            if (held !== null) v = held;
+        }
+        return v;
+    }
+    function logStep(schema, current, sigmas) {
+        var span = Math.log(schema.max / schema.min);
+        return Math.max(current, 1e-9) * Math.exp(sigmas * span);
+    }
+
     function clampToSchema(schema, value) {
         var clamped = Math.max(schema.min, Math.min(schema.max, value));
         if (schema.step >= 1) clamped = Math.round(clamped);
@@ -275,9 +299,14 @@
         var s = pool[Math.floor(Math.random() * pool.length)];
         var mag = Math.max(s.step, (s.max - s.min) * 0.1 * Math.max(strength, 0.3));
         var dir = Math.random() < 0.5 ? -1 : 1;
-        var v = clampToSchema(s, out.sliders[s.id] + dir * mag);
+        var cur = out.sliders[s.id];
+        var push = function (d) {
+            return s.log ? clampLog(s, logStep(s, cur, d * 0.1 * Math.max(strength, 0.3)), cur)
+                         : clampToSchema(s, cur + d * mag);
+        };
+        var v = push(dir);
         // Clamped into no-op at a range edge — push the other way.
-        if (v === out.sliders[s.id]) v = clampToSchema(s, out.sliders[s.id] - dir * mag);
+        if (v === cur) v = push(-dir);
         out.sliders[s.id] = v;
     }
 
@@ -350,15 +379,22 @@
                 if (scope === 'basic' && schema.scope !== 'basic') return;
                 if (out.sliders[schema.id] === undefined) return;
 
+                var cur = out.sliders[schema.id];
                 if (delta && delta.sliders && delta.sliders[schema.id] !== undefined) {
-                    out.sliders[schema.id] = clampToSchema(schema, delta.sliders[schema.id]);
+                    out.sliders[schema.id] = schema.log
+                        ? clampLog(schema, delta.sliders[schema.id], cur)
+                        : clampToSchema(schema, delta.sliders[schema.id]);
                     return;
                 }
                 if (!gateOpen(out, schema.id)) return;
 
+                if (schema.log) {
+                    out.sliders[schema.id] = clampLog(schema, logStep(schema, cur, gaussRandom() * strength * 0.3), cur);
+                    return;
+                }
                 var range = schema.max - schema.min;
                 var noise = gaussRandom() * strength * range * 0.3;
-                out.sliders[schema.id] = clampToSchema(schema, out.sliders[schema.id] + noise);
+                out.sliders[schema.id] = clampToSchema(schema, cur + noise);
             });
         }
 

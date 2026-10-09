@@ -911,11 +911,14 @@ function queueDab(xNorm, yNorm, dxAbs, dyAbs, radius, share, k) {
     // Shares go in significant digits, not decimals: a fine stroke at low Time
     // carries k around 0.002 per dab and less (05d0 / 05j time share), which
     // three decimals rounded to 0 — and a receiver reads 0 as "no k", i.e. a
-    // FULL push per dab.
+    // FULL push per dab. The radius too (2026-10-07): it is Brush Size / 1000,
+    // so five decimals sent everything under size 0.005 as 0, and peers
+    // painted those strokes at their OWN size; up to 0.05 it rounded by up to
+    // ±50%.
     _dabQueue.push([
         +xNorm.toFixed(4), +yNorm.toFixed(4),
         +dxAbs.toFixed(3), +dyAbs.toFixed(3),
-        +(radius || 0).toFixed(5),
+        +(radius || 0).toPrecision(4),
         +s.toPrecision(4), +kk.toPrecision(3),
         Math.max(0, now - _dabQueueT0)
     ]);
@@ -1473,7 +1476,10 @@ function handleRemoteSplat(data, from, to) {
                     // against their own stroke. This bound only guards fp16.
                     const ddx = Math.max(-DAB_VEL_ABS_MAX, Math.min(DAB_VEL_ABS_MAX, sanitizeRemoteNum(d[2], 0)));
                     const ddy = Math.max(-DAB_VEL_ABS_MAX, Math.min(DAB_VEL_ABS_MAX, sanitizeRemoteNum(d[3], 0)));
-                    const r = (typeof d[4] === 'number' && isFinite(d[4]) && d[4] > 0)
+                    // Only a MISSING radius means "use the message's". A 0 is
+                    // a fine brush an older build rounded away (queueDab), so
+                    // it lands at the smallest size, never at this client's.
+                    const r = (typeof d[4] === 'number' && isFinite(d[4]))
                         ? Math.max(_rb.min, Math.min(_rb.max, d[4]))
                         : normalizedRadius;
                     // Per-dab shares (see queueDab). Applied in THIS client's flow
@@ -1633,7 +1639,9 @@ function broadcastReplayStroke(events) {
             dy: +(+ev.dy || 0).toFixed(4),
             color: (ev.color || [1, 1, 1]).map(c => +(+c).toFixed(3)),
             mult: ev.mult || 1,
-            radius: +(+ev.radius || 0.01).toFixed(5)
+            // Significant digits, as queueDab: five decimals sent a fine
+            // brush's replay as radius 0, which paints nothing.
+            radius: +(+ev.radius || (window.config && window.config.SPLAT_RADIUS) || 0.01).toPrecision(4)
         };
         // The footprint the dab was painted with. Dropping these here was why
         // a broadcast replay of a shaped stroke came out gaussian on peers
@@ -1649,6 +1657,9 @@ function broadcastReplayStroke(events) {
         // same class of gap the footprint fields above close. The receiver's
         // emitReplayDab range-checks the value (05d).
         if (ev.mir) o.mir = ev.mir | 0;
+        // The Limit flow each dab painted with (05d pushStrokeEvent). Only
+        // below full; an older peer ignores it and paints at full flow.
+        if (typeof ev.gf === 'number' && isFinite(ev.gf) && ev.gf < 1) o.gf = +Math.max(0, ev.gf).toPrecision(4);
         // Stroke boundary (05d deepCopyEvent). Without it a peer's replay
         // interpolator draws across the gap between two strokes of a Time
         // replay, held back only by the pause/distance guards. Sent only

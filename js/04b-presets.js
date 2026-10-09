@@ -255,11 +255,13 @@
 
             const freezeBtn = document.getElementById('freezeBtn');
 
-            // State lives in the .active class (button shows a constant 🛑 icon)
+            // State lives in the .active class (the button always reads "Stop"
+            // and lights while the fluid is stopped; 20 names it)
 
             const isUnfreezing = freezeBtn.classList.contains('active');
 
-            freezeBtn.title = isUnfreezing ? 'Freeze fluid motion (Space)' : 'Unfreeze fluid motion (Space)';
+            freezeBtn.title = isUnfreezing ? 'Stop the fluid where it is; you can still paint (Space)' : 'Stopped: click or press Space to let it move again';
+            freezeBtn.setAttribute('aria-pressed', isUnfreezing ? 'false' : 'true');
 
             if (isUnfreezing) {
 

@@ -276,7 +276,8 @@ class SettingsManager {
         // It used to keep only preset.*, so this "settings" reset deleted
         // every saved animation while saying the presets were kept.
         const KEEP = ['preset.', 'recPreset.', 'animSlots', 'brush.presets', 'brush.shapes',
-            'text.overlays', 'branding.overlays', 'palettes.custom', 'palettes.user', 'hotkeys.'];
+            'text.overlays', 'branding.overlays', 'palettes.custom', 'palettes.user', 'palettes.order',
+            'palettes.recent', 'hotkeys.'];
         const keep = (rest) => KEEP.some((k) => k.endsWith('.') ? rest.startsWith(k) : rest === k);
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {

@@ -760,6 +760,7 @@
             uniform float hfFloorDyeWall; // ...within a few texels of a collider or the canvas
                                           // edge; above hfFloorDye only under Laminar (05j)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
+            uniform float dyeRoundNearest; // 1 = round the dye to the nearest half float before the store (Color Blend on)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
             uniform float obsFlowKeep; // 1 = spare MOVING dye from the wall drain (0 = legacy)
             uniform float obsDrainRate;   // per-frame wall-interior dye drain (0 = off)
@@ -1132,6 +1133,22 @@
                              + max( floorDrain.y, 0.0) * (1.0 - smoothstep(0.0, floorBand.y, 1.0 - vUv.y))
                              + max(-floorDrain.y, 0.0) * (1.0 - smoothstep(0.0, floorBand.y, vUv.y));
                     color *= max(0.0, 1.0 - fk * dt * 60.0);
+                }
+                // Color Blend on (COLOR_BLEND_HOLD_PAINT, 2026-10-06): round to
+                // the nearest half float here, so the store has nothing left to
+                // round. A GPU that TRUNCATES on the store (the 4090 under
+                // ANGLE/D3D11) takes half a step off every channel that is not
+                // already exact, and bilinear reads of dye that is not flat are
+                // never exact. The blend leaves no dye flat (smooth ramps, and
+                // its own dithered rounding), so stirred paint at Blend 1 lost
+                // 0.030% a step to this store against 0.008% at 0, and went dark
+                // and brown within seconds. Off, the store is as it always was.
+                if (isDensity == 1 && dyeRoundNearest > 0.0) {
+                    vec3 a = max(abs(color.rgb), vec3(6.103515625e-5));
+                    vec3 e = floor(log2(a));
+                    e += step(exp2(e + 1.0), a) - (1.0 - step(exp2(e), a)); // log2 can miss by one at a power of two
+                    vec3 ulp = exp2(e - 10.0);
+                    color.rgb = round(color.rgb / ulp) * ulp;
                 }
                 fragColor = color;
             }
@@ -1932,9 +1949,13 @@
         // Color Blend (2026-09-29): colours travel through the paint and mix,
         // while the fluid (velocity, pressure) is untouched. Colour travels
         // far: each texel takes on the paint-weighted average colour of its
-        // neighbourhood at its own amount of paint (r+g+b). That average is a
-        // Gaussian of the dye divided by its own r+g+b, so one separable blur
-        // carries both, and more paint pulls harder on the colour. The amount
+        // neighbourhood at its own brightness (its largest channel; r+g+b with
+        // uKeepValue off). That average is a Gaussian of the dye divided by
+        // its own largest channel, so one separable blur carries both, and
+        // more paint pulls harder on the colour. Brightness, not r+g+b
+        // (2026-10-06): at a fixed r+g+b a red texel taking orange came out
+        // brown and a yellow one came out past the Gate ceiling, which
+        // clipped it, so every mix went darker and duller. The amount
         // of paint evens out too, but only locally (paintFlux): where two
         // fills meet, the thinner paint along the line between them fills in,
         // so they overlap instead of standing either side of a seam, while
@@ -1942,8 +1963,12 @@
         // no colour and takes no paint, so nothing bleeds off the paint.
         //
         // How far colour travels is set like wet paint's: this step's
-        // variance is v = uVarPerStir x (wet x (stir + uStirRest) + dry x
-        // uDryStir x stir), with wet the paint's wetness (the Drying map: a
+        // variance is v = uVarPerStir x (wet x (s² stir + uStirRest) + dry x
+        // uDryStir x s² stir), with s = uStirLength (2026-10-06: a whisker
+        // of the contact's reach. The stir counts every motion, a swirl that
+        // only turns included, so at any real reach it fogged whatever moved:
+        // at the full reach every streak finer than ~25 dye texels at Blend 1
+        // went to haze under Pressure) and wet the paint's wetness (the Drying map: a
         // stroke wets it, it dries at the Dry Time half-life). uStirRest is
         // CONTACT mixing: wet colours that touch run into each other, moving
         // or not, and stop as the paint sets, so a blend zone forms where
@@ -2090,6 +2115,8 @@
             uniform float uPaintShare;   // how far paint evens out, as a share of the stable flux (0-1)
             uniform float uSeed;         // new every step: the dither for pass 2's rounding
             uniform vec2 uStirStep;      // spacing of stirAt's 4x4 taps, in UV; 0 = one tap
+            uniform float uStirLength;   // the stir's mixing length, as a share of the contact's
+            uniform int uKeepValue;      // 1 = a blended texel keeps its largest channel, 0 = its r+g+b
             const float SIGMA_MAX = 16.0;         // half-res texels per step for the stir: 24 tap pairs a side
             const float SIGMA_MAX_SQUEEZED = 24.0; // ...and where the squeeze is the stir: 36 pairs. A pressed
                                                    // front re-sharpens as fast as a step spreads it, so its
@@ -2169,7 +2196,8 @@
             // raw the blend starved exactly where it was needed.
             float blendVar(vec2 uv, vec2 st) {
                 float wet = clamp(texture(uWetness, uv).r / max(uWetFull, 1e-3), 0.0, 1.0);
-                float v = uVarPerStir * (wet * (st.r + uStirRest) + (1.0 - wet) * uDryStir * st.r);
+                float stir = st.r * uStirLength * uStirLength;
+                float v = uVarPerStir * (wet * (stir + uStirRest) + (1.0 - wet) * uDryStir * stir);
                 if (hasObstacle == 1) v *= 1.0 - solidity(uv);
                 return v;
             }
@@ -2213,11 +2241,18 @@
                         fragColor = d;
                         return;
                     }
-                    // Colour: toward the spread's, at this texel's own amount
-                    // of paint. Then the paint flux changes the amount.
+                    // Colour: toward the spread's, at this texel's own
+                    // brightness (or r+g+b). Then the paint flux changes the
+                    // amount.
                     vec3 near = src(vUv);
                     float nearInk = near.r + near.g + near.b;
-                    vec3 blended = (nearInk > 1e-6) ? near * (ink / nearInk) : d.rgb;
+                    vec3 blended = d.rgb;
+                    if (uKeepValue == 1) {
+                        float nearMax = max(near.r, max(near.g, near.b));
+                        if (nearMax > 1e-6) blended = near * (max(dc.r, max(dc.g, dc.b)) / nearMax);
+                    } else if (nearInk > 1e-6) {
+                        blended = near * (ink / nearInk);
+                    }
                     vec3 outc = mix(d.rgb, blended, min(v, 1.0));
                     float rate = paintRate(vUv, ink);
                     if (rate > 0.0) {
@@ -2227,7 +2262,10 @@
                         // colour of its own takes the neighbourhood's.
                         outc = max(outc, vec3(0.0));
                         float outInk = outc.r + outc.g + outc.b;
-                        float newInk = max(0.0, ink + paintFlux(ink, rate));
+                        // Kept brightness moves r+g+b, so the flux lands on
+                        // what the colour step left; the paint is then
+                        // conserved across the exchange either way.
+                        float newInk = max(0.0, (uKeepValue == 1 ? outInk : ink) + paintFlux(ink, rate));
                         if (outInk > 1e-6) outc *= newInk / outInk;
                         else if (nearInk > 1e-6) outc = near * (newInk / nearInk);
                     }

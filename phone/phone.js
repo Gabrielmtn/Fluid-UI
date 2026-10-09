@@ -150,6 +150,11 @@
     var r3 = function (v) { return Math.round(v * 1e3) / 1e3; };
     var r4 = function (v) { return Math.round(v * 1e4) / 1e4; };
     var r5 = function (v) { return Math.round(v * 1e5) / 1e5; };
+    // A brush radius (Brush Size / 1000) in significant digits: five decimals
+    // sent anything under size 0.005 as 0, and the room painted it at its own
+    // size. MIN_RADIUS is the app's slider floor (size 0.001).
+    var sig4 = function (v) { return +(+v).toPrecision(4); };
+    var MIN_RADIUS = 0.000001;
     function num(v, lo, hi, dflt) {
         return (typeof v === 'number' && isFinite(v)) ? clamp(v, lo, hi) : dflt;
     }
@@ -409,7 +414,7 @@
             h: num(p.h, 64, 16384, 900),
             gate: p.gate === true,
             flow: num(p.flow, 0, 1, 1),
-            radius: num(p.radius, 0.00001, 0.1, 0.011),
+            radius: num(p.radius, MIN_RADIUS, 0.1, 0.011),
             mult: Math.round(num(p.mult, 1, 8, 1)),
             sym: (typeof p.sym === 'string' && /^[A-Za-z]{1,24}$/.test(p.sym)) ? p.sym : 'radial',
             tip: Math.round(num(p.tip, 0, 16, 0)),
@@ -451,7 +456,7 @@
             w: num(p.w, 64, 16384, 1600),
             h: num(p.h, 64, 16384, 900),
             color: (typeof p.color === 'string' && HEX.test(p.color)) ? p.color.toLowerCase() : null,
-            radius: num(p.radius, 0.00001, 0.1, 0.011),
+            radius: num(p.radius, MIN_RADIUS, 0.1, 0.011),
             can: p.can !== false,
             why: (typeof p.why === 'string') ? p.why.slice(0, 140) : '',
             people: Math.round(num(p.people, 0, 99, 0)),
@@ -676,7 +681,7 @@
                 x: r4(p.u), y: r4(p.v), dx: 0, dy: 0,
                 color: baked(base, clamp(m.flow, 0, 1), m.gate).map(r4),
                 mult: i ? i.mult : 1,
-                radius: r5(m.r),
+                radius: sig4(m.r),
                 sym: i ? i.sym : 'radial',
                 down: true
             }, brushFields()),
@@ -685,7 +690,7 @@
     }
 
     function queueDab(x, y, vx, vy, m, sh, at) {
-        queue.push({ at: at, d: [r4(x / VW()), r4(y / VH()), r3(vx), r3(vy), r5(m.r), r4(sh.share), r3(sh.k)] });
+        queue.push({ at: at, d: [r4(x / VW()), r4(y / VH()), r3(vx), r3(vy), sig4(m.r), r4(sh.share), r3(sh.k)] });
         trailAt(x / VW(), y / VH(), m, false);
         if (queue.length >= DAB_MAX_PER_MSG) flushDabs(true);
         else if (!flushTimer) flushTimer = setTimeout(function () { flushTimer = 0; flushDabs(false); }, DAB_FLUSH_MS);

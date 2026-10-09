@@ -400,7 +400,20 @@
             detectDisplayHz(nowMs);
             // FPS Cap: skip frame if interval hasn't elapsed (with epsilon tolerance)
             const cap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 0;
-            if (cap > 0) {
+            if (cap > 0 && window.__fpsCapLocked && displayHz > 0) {
+                // A whole fraction of the screen's rate (05d snapped it): draw
+                // on every k-th refresh. Half a refresh of slack absorbs vsync
+                // jitter and a panel running a hair off its nominal rate (a
+                // "144" that is really 143.86), and the clock locks to the
+                // refresh it actually drew on, so the beat can never drift into
+                // an extra one: the drift-aligned stepping below would, on a
+                // rate even slightly off, every few hundred frames.
+                if (nowMs - lastDrawTimeMs < 1000 / cap - 500 / displayHz) {
+                    requestAnimationFrame(update);
+                    return;
+                }
+                lastDrawTimeMs = nowMs;
+            } else if (cap > 0) {
                 const desiredMs = 1000 / cap;
                 if (nowMs - lastDrawTimeMs < desiredMs - 0.5) {
                     requestAnimationFrame(update);
@@ -698,10 +711,14 @@
                         const _hdx = (_hx - _steadyFrom.x) * 10, _hdy = (_hy - _steadyFrom.y) * 10;
                         if (recEnabled && typeof recRecordInteraction === 'function'
                             && config.BRUSH_TARGET !== 'sketch' && (_hdx * _hdx + _hdy * _hdy) >= 1.0) {
-                            recRecordInteraction(_hx, _hy, _hdx, _hdy, pointer.color);
+                            recRecordInteraction(_hx, _hy, _hdx, _hdy, pointer.color,
+                                window.__recLiveFlow ? window.__recLiveFlow() : 1);
                         }
                     }
-                    const _steadyHead = window.BrushEngine.head ? window.BrushEngine.head() : null;
+                    // On the landing frame head() is already null; the hose still
+                    // owes the stretch the head covered this frame (05d0 landedAt).
+                    const _steadyHead = (window.BrushEngine.head ? window.BrushEngine.head() : null)
+                        || (_steadyLanded && window.BrushEngine.landedAt ? window.BrushEngine.landedAt() : null);
                     // D1 brush engine: drain this frame's dab train (distance-
                     // parameterized spacing + stabilizer + gap-fill, built in
                     // 05d0). Replaces the legacy one-splat-per-frame path —
@@ -744,7 +761,10 @@
                         // slower than Time 1) and each dab carries _paceShare of
                         // the dye: the same paint per simulated second, the Time-1
                         // number of dabs.
-                        if ((pointer.down || _steadyReel) && window.BrushEngine.isActive()) {
+                        // The landing frame pours too: the head moved this frame
+                        // before it settled, and once it coasts in at speed into a
+                        // release tail (05d0) that stretch is a visible gap.
+                        if ((pointer.down || _steadyReel) && (window.BrushEngine.isActive() || _steadyLanded)) {
                             _dabs = [];
                             // Interval -> rate. The control is an interval so its slider reads
                             // like Spacing (minimum = finest); the clock below wants a rate.
@@ -868,7 +888,8 @@
                                 // pointermove handler (same gate as 05d's).
                                 if (recEnabled && typeof recRecordInteraction === 'function'
                                     && ((cx - px) * (cx - px) + (cy - py) * (cy - py)) < 0.01) {
-                                    recRecordInteraction(cx, cy, 0, 0, pointer.color);
+                                    recRecordInteraction(cx, cy, 0, 0, pointer.color,
+                                        window.__recLiveFlow ? window.__recLiveFlow() : 1);
                                 }
                             } else {
                                 window.__contFlowCredit = _credit;
@@ -1006,10 +1027,13 @@
                         // Handed over raw: velocity is additive in the shader, so
                         // the compensation is a plain multiply (no Gate branch).
                         window.__splatVelK = (typeof d.k === 'number' && d.k > 0) ? d.k : 1;
+                        // The Limit flow this dab paints with, for the replay
+                        // (read before the reset below; 1 under Limit Off).
+                        const _dabGateFlow = window.__splatFlow;
                         multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, window.__lastPaintRadius);
                         window.__splatFlow = 1; // reset so programmatic/press splats stay full-flow
                         window.__splatVelK = 1; // ...and so they keep a full push share
-                        pushStrokeEvent(d.x, d.y, d.dx, d.dy, col);
+                        pushStrokeEvent(d.x, d.y, d.dx, d.dy, col, _dabGateFlow);
                         // 1.3 parity: queue THIS dab (own velocity, own ramped
                         // radius) for peers instead of letting them reconstruct
                         // the stroke from one sampled splat per 33ms.
@@ -1090,7 +1114,11 @@
                 // rate, and at Time 0.25 it takes four times as long to lay down
                 // instead of stamping its whole length into a fluid that has
                 // barely moved (what riding depositCredit used to do in steps).
-                if (splatOutActive) {
+                // A tail armed by a Steady landing this frame waits one: the
+                // hose already laid the head's last stretch (05d splatTailWait).
+                const _tailWait = splatTailWait;
+                splatTailWait = false;
+                if (splatOutActive && !_tailWait) {
                     splatTailT += frameDt * 1000 / TAIL_FRAME_MS;
                     const tailU = Math.min(1, splatTailT / splatTailN);
                     const tailE = 1 - (1 - tailU) * (1 - tailU) * (1 - tailU);
@@ -1822,7 +1850,17 @@
                 // floor's share.
                 // colorBlendEff, not the fader: a move back toward 0 brings the
                 // floor in on the ease above.
-                const _laminar = Math.max(0, Math.min(1, -colorBlendEff));
+                //
+                // Blend (the right half) takes the same crisp transport, full
+                // from COLOR_BLEND_CRISP_FROM up (2026-10-06): with the blend
+                // on, the blend is what mixes, and the transport's own smear
+                // only fogged whatever moved. Settled red and yellow stirred
+                // with Pressure at Blend 1 kept a fine-detail score of 3.3 with
+                // the old transport and 17.6 with this one (Laminar 19.1, Blend
+                // 0 4.6), while wet colours still blended where they touched.
+                const _cbCrispFrom = (typeof config.COLOR_BLEND_CRISP_FROM === 'number') ? config.COLOR_BLEND_CRISP_FROM : 0.25;
+                const _laminar = Math.max(0, Math.min(1, Math.max(-colorBlendEff,
+                    (_cbCrispFrom > 0 && colorBlendEff > 0) ? colorBlendEff / _cbCrispFrom : 0)));
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 // P15-1: bind the (freshly advected) wetness field to unit 4 for
                 // all three dye passes. Bound unconditionally — dyeMobility()
@@ -1958,6 +1996,12 @@
                 const _dyeCeil = config.BLOOM_CEILING || 0.0;
                 gl.uniform1f(advectionProg.uniforms.dissipation, _dyeDiss);
                 gl.uniform1f(advectionProg.uniforms.bloomCeiling, _dyeCeil);
+                // Color Blend on: round the store to the nearest half float, so
+                // a truncating GPU does not drain the paint the blend keeps
+                // smooth (advectionFrag, COLOR_BLEND_HOLD_PAINT). The eased
+                // value, so it holds while a blend eases in or out.
+                gl.uniform1f(advectionProg.uniforms.dyeRoundNearest,
+                    (colorBlendEff > 0 && config.COLOR_BLEND_HOLD_PAINT !== false) ? 1 : 0);
                 // Pigment memory + Ignite restore (see advectionFrag). memDiss
                 // 1.0 would make memory immortal; the default half-life lets
                 // work you deliberately let go stay gone.
@@ -2108,8 +2152,9 @@
                 // leaves the dye bit-identical.
                 //
                 // How far colour travels is a diffusion, like wet paint's: D =
-                // l² × (wet × (stir + COLOR_BLEND_CONTACT) + dry ×
-                // COLOR_BLEND_DRY_STIR × stir), where l = COLOR_BLEND ×
+                // l² × (wet × (s² stir + COLOR_BLEND_CONTACT) + dry ×
+                // COLOR_BLEND_DRY_STIR × s² stir), s = COLOR_BLEND_STIR_LENGTH
+                // (stirring mixes over a whisker of the reach), where l = COLOR_BLEND ×
                 // COLOR_BLEND_LENGTH of the canvas's short side and wet is the
                 // Drying map (7c). Wet colours that touch run into each other,
                 // moving or not, and settle as the paint dries at Dry Time, so
@@ -2212,6 +2257,9 @@
                         gl.uniform2f(colorBlendProg.uniforms.uStirStep,
                             _cbStirOn ? Math.max(2 / simTexWidth, 1 / _cbHalfW) : 0,
                             _cbStirOn ? Math.max(2 / simTexHeight, 1 / _cbHalfH) : 0);
+                        gl.uniform1f(colorBlendProg.uniforms.uStirLength,
+                            (typeof config.COLOR_BLEND_STIR_LENGTH === 'number') ? Math.max(0, config.COLOR_BLEND_STIR_LENGTH) : 0.05);
+                        gl.uniform1i(colorBlendProg.uniforms.uKeepValue, config.COLOR_BLEND_KEEP_VALUE === false ? 0 : 1);
                         colorBlendSeed = (colorBlendSeed + 1) % 16777216;
                         gl.uniform1f(colorBlendProg.uniforms.uSeed, colorBlendSeed);
                         // Every sampler bound on every pass, none of them the

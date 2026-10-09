@@ -207,6 +207,11 @@
             /* In transparent mode, let areas outside UI/canvas be see-through */
             background: transparent;
         }
+        /* Display → Background Transparency is the see-through of Transparent
+           Background, so it is only on screen while that is ticked. */
+        body:not(.transparent-mode) .bg-transparency-group {
+            display: none !important;
+        }
 
         #canvas-area {
             flex: 1;
@@ -973,10 +978,13 @@
             cursor: none !important;
         }
 
-        /* Brush Ghost Opacity greys out with Show Brush Ghost off (31 sets
+        /* Brush Ghost's opacity greys out with its checkbox off (31 sets
            :disabled). Keyed on the input so it survives the layout move,
-           which wipes the row's inline style. */
-        .control-group:has(#brushGhostOpacity:disabled) { opacity: 0.4; }
+           which wipes the row's inline style. The slider and its readout
+           only: the checkbox shares the row (2026-10-07) and has to stay
+           readable to be turned back on. */
+        #brushGhostOpacity:disabled,
+        .control-group:has(#brushGhostOpacity:disabled) #brushGhostOpacityValue { opacity: 0.4; }
         
         /* Recorded Layers Drawer (full-width, slide-up) */
         .rec-drawer {

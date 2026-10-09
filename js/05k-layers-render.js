@@ -35,11 +35,12 @@
         // (click anywhere that is not those two), and the state reads off a
         // caret on the top border instead of a button competing for the same
         // space. o.visTarget is 'sim' or the layer index.
-        // A layer row (not the Sim's) also carries a trash button, shown only
-        // while the row is collapsed: an open row has Delete in its body, and
-        // a closed one had no way to delete at all (user test 3). It sits
-        // outside the show/hide column so that column stays one box wide and
-        // lines up with the Feather value of an open row.
+        // A layer row (not the Sim's) also carries a trash button. It is the
+        // ONLY delete, open or collapsed (2026-10-09): a Delete in the body sat
+        // beside Transform at the same weight, and a closed row had no way to
+        // delete at all (user test 3). It sits outside the show/hide column so
+        // that column stays one box wide and lines up with the readouts of an
+        // open row.
         const LAYER_TRASH_SVG = '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">' +
             '<path d="M2 3.4h8M4.6 3.4V2.1h2.8v1.3M3.2 3.4l.5 6.5h4.6l.5-6.5M5 5.2v3M7 5.2v3" fill="none" ' +
             'stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -48,7 +49,7 @@
                 ? ' readonly'
                 : ` onchange="updateLayerTitle(${o.index}, this.value)"`;
             const trash = o.readonly ? '' :
-                `<button type="button" class="btn--ghost btn--icon layer-head-delete" title="Delete this layer. Ctrl+Z brings it back." aria-label="Delete layer">${LAYER_TRASH_SVG}</button>`;
+                `<button type="button" class="btn--ghost btn--icon layer-head-delete layer-delete-btn" title="Delete this layer. Ctrl+Z brings it back." aria-label="Delete layer">${LAYER_TRASH_SVG}</button>`;
             return `<div class="layer-item-header">
                                 <span class="layer-collapse-caret" aria-hidden="true"></span>
                                 <div class="layer-thumbnail"${o.thumbStyle ? ` style="${o.thumbStyle}"` : ''}>${o.thumbText || ''}</div>
@@ -92,6 +93,109 @@
         function setClipSourceOn(layer, value) {
             if (window.ClipSources) window.ClipSources.set(layer, value || null);
             else layer.clipMaskId = value === '' ? null : parseInt(value, 10);
+        }
+        // ── Row bodies (2026-10-09) ──
+        // Every row type is built from the same parts in the same order:
+        //   1. setting rows: caption | control | readout. One caption column
+        //      and one readout column for the whole list, so Opacity, Blend,
+        //      Feather, Mode... line up down every row;
+        //   2. one row of buttons, equal widths, always filling the row (two
+        //      to a line when the sidebar is narrow);
+        //   3. a framed group for what SHAPES the layer — its mask, or its
+        //      wall — headed by that thing's own on/off check, and built the
+        //      same way inside: settings first, its buttons last.
+        // Delete is not in the body: the header's bin does it, open or shut,
+        // so the one verb you can't take back never sits beside Transform.
+        function sliderRowHTML(cls, label, value, title) {
+            return `<div class="layer-threshold layer-prop ${cls}"${title ? ` title="${title}"` : ''}>
+                                <span class="layer-prop-label">${label}</span>
+                                <div class="layer-slider-host"></div>
+                                <span class="layer-slider-value">${value}</span>
+                            </div>`;
+        }
+        function fieldRowHTML(cls, label, controlHTML, title) {
+            return `<div class="collision-row layer-prop ${cls}">
+                                <label class="collision-label layer-prop-label"${title ? ` title="${title}"` : ''}>${label}</label>
+                                ${controlHTML}
+                            </div>`;
+        }
+        function invertToggleHTML(cls, on) {
+            return `<label class="layer-check layer-check-inline" title="Clip to everything OUTSIDE the shape instead"><input type="checkbox" class="${cls}"${on ? ' checked' : ''}><span class="layer-vis-box"></span><span class="layer-check-text">Inv</span></label>`;
+        }
+        function clipRowHTML(layer, selectCls, invertCls) {
+            return fieldRowHTML('layer-row-clip', 'Clip', `<select class="${selectCls}">
+                                    <option value="">None</option>
+                                    ${clipSourceOptions(layer)}
+                                </select>
+                                ${invertToggleHTML(invertCls, layer.clipInvert)}`);
+        }
+        // Mount a fader in a row's host and keep the row's drag handle down
+        // while it is held, so dragging the thumb never starts a reorder.
+        function mountLayerSlider(element, rowCls, opts, onInput) {
+            const host = element.querySelector('.' + rowCls + ' .layer-slider-host');
+            if (!host) return null;
+            const slider = buildEncapsulatedRange(Object.assign({ step: 1, className: 'encapsulated-slider' }, opts));
+            host.appendChild(slider);
+            const valueEl = element.querySelector('.' + rowCls + ' .layer-slider-value');
+            const headerEl = element.querySelector('.layer-item-header');
+            slider.addEventListener('input', () => onInput(slider, valueEl));
+            const hold = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; element.dataset.sliderActive = '1'; };
+            const release = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; delete element.dataset.sliderActive; };
+            ['pointerdown','mousedown','touchstart'].forEach(evt => slider.addEventListener(evt, hold, { passive: true }));
+            ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => slider.addEventListener(evt, release, { passive: true }));
+            return slider;
+        }
+        // Checkboxes and dropdowns in a row body keep their presses to
+        // themselves, so the row's drag guards never see them.
+        function keepPresses(...els) {
+            const stop = (ev) => ev.stopPropagation();
+            els.forEach((el) => {
+                if (!el) return;
+                ['click','mousedown','pointerdown','touchstart'].forEach(evt => el.addEventListener(evt, stop));
+            });
+        }
+        // Opacity, on picture and paint layers. A paint layer composites in
+        // the GL canvas and reads layer.opacity there (05l collectSlots). A
+        // picture layer is a div, so its opacity is the div's own — which is
+        // what export (24 captureCompositeFrame) and Flatten (05l) already
+        // read back, so neither needed to learn about it. Colliders keep
+        // their fixed film (23 COLLIDER_FILM_OPACITY): that is a guide to
+        // where the wall is, not artwork.
+        function layerOpacityOf(layer) {
+            return (typeof layer.opacity === 'number') ? Math.max(0, Math.min(1, layer.opacity)) : 1;
+        }
+        window.applyLayerOpacity = function applyLayerOpacity(layer) {
+            if (!layer || layer.isRaster || layer.isCollision) return;
+            const div = document.getElementById('layer' + layer.index);
+            if (!div) return;
+            const o = layerOpacityOf(layer);
+            div.style.opacity = o < 1 ? String(o) : '';
+        };
+        function wireOpacitySlider(element, layer) {
+            let before = null;
+            const slider = mountLayerSlider(element, 'layer-row-opacity',
+                { min: 0, max: 100, value: Math.round(layerOpacityOf(layer) * 100) },
+                (s, valueEl) => {
+                    if (before === null) before = layerOpacityOf(layer);
+                    layer.opacity = parseInt(s.value, 10) / 100;
+                    window.applyLayerOpacity(layer);
+                    if (valueEl) valueEl.textContent = s.value + '%';
+                });
+            if (!slider) return;
+            // One Ctrl+Z step per drag, recorded when it is let go.
+            slider.addEventListener('change', () => {
+                const from = before, to = layerOpacityOf(layer);
+                before = null;
+                if (from === null || from === to) return;
+                const H = window.__layerHistory;
+                if (!H || H.isApplying()) return;
+                const set = (v) => {
+                    layer.opacity = v;
+                    window.applyLayerOpacity(layer);
+                    if (layers.includes(layer)) renderLayers();
+                };
+                H.push({ label: 'layer opacity', undo: () => set(from), redo: () => set(to) });
+            });
         }
         function renderLayers() {
             // Ensure all layers have mask property
@@ -170,6 +274,8 @@
                         const rOpacity = (typeof layer.opacity === 'number') ? layer.opacity : 1;
                         const isActiveRaster = !!(window.rasterLayers && window.rasterLayers.activeId() === layer.index);
                         if (isActiveRaster) element.classList.add('raster-active');
+                        // Settings, then the one verb (paint here), then the
+                        // Mask group — a paint layer's only shaping is Clip.
                         element.innerHTML = `
                             ${layerHeaderHTML({
                                 title: layer.title, index: layer.index, visTarget: layer.index,
@@ -177,50 +283,25 @@
                                 thumbStyle: `background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}'); background-size: cover;`
                             })}
                             <div class="layer-item-body">
-                                <div class="layer-action-row">
-                                    <button class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer (the brush's 'Paint Into: Sketch' route lands here)">Paint</button>
-                                    <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
-                                </div>
-                                <div class="layer-threshold">
-                                    <span>Opacity:</span>
-                                    <div class="raster-opacity-host"></div>
-                                    <span class="raster-opacity-val">${Math.round(rOpacity * 100)}%</span>
-                                </div>
-                                <div class="collision-row" style="margin-top:4px;">
-                                    <label class="collision-label">Blend</label>
-                                    <select class="raster-blend-select">
+                                ${sliderRowHTML('layer-row-opacity', 'Opacity', Math.round(rOpacity * 100) + '%')}
+                                ${fieldRowHTML('layer-row-blend', 'Blend', `<select class="raster-blend-select">
                                         <option value="normal" ${(!layer.blendMode || layer.blendMode === 'normal') ? 'selected' : ''}>Normal</option>
                                         <option value="multiply" ${layer.blendMode === 'multiply' ? 'selected' : ''}>Multiply</option>
                                         <option value="screen" ${layer.blendMode === 'screen' ? 'selected' : ''}>Screen</option>
                                         <option value="add" ${layer.blendMode === 'add' ? 'selected' : ''}>Add</option>
-                                    </select>
+                                    </select>`)}
+                                <div class="layer-action-row">
+                                    <button type="button" class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer (the brush's 'Paint Into: Sketch' route lands here)">Paint into this layer</button>
                                 </div>
-                                <div class="collision-row" style="margin-top:4px;">
-                                    <label class="collision-label">Clip</label>
-                                    <select class="raster-clip-select">
-                                        <option value="">None</option>
-                                        ${clipSourceOptions(layer)}
-                                    </select>
-                                    <label class="collision-toggle"><input type="checkbox" class="raster-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
+                                <div class="layer-group">
+                                    <div class="layer-group-head"><span class="layer-group-title">Mask</span></div>
+                                    ${clipRowHTML(layer, 'raster-clip-select', 'raster-clip-invert')}
                                 </div>
                             </div>
                         `;
                         const headerElR = element.querySelector('.layer-item-header');
                         if (headerElR) headerElR.draggable = true;
-                        const oHost = element.querySelector('.raster-opacity-host');
-                        const oVal = element.querySelector('.raster-opacity-val');
-                        if (oHost) {
-                            const oSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round(rOpacity * 100), step: 1, className: 'encapsulated-slider' });
-                            oHost.appendChild(oSlider);
-                            oSlider.addEventListener('input', () => {
-                                layer.opacity = parseInt(oSlider.value, 10) / 100;
-                                if (oVal) oVal.textContent = oSlider.value + '%';
-                            });
-                            const disR = () => { isLayerSliderActive = true; if (headerElR) headerElR.draggable = false; };
-                            const enR = () => { isLayerSliderActive = false; if (headerElR) headerElR.draggable = true; };
-                            ['pointerdown','mousedown','touchstart'].forEach(evt => oSlider.addEventListener(evt, disR, { passive: true }));
-                            ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => oSlider.addEventListener(evt, enR, { passive: true }));
-                        }
+                        wireOpacitySlider(element, layer);
                         const bSel = element.querySelector('.raster-blend-select');
                         if (bSel) {
                             bSel.addEventListener('change', (e) => { e.stopPropagation(); layer.blendMode = e.target.value; });
@@ -237,49 +318,114 @@
                         }
                         const cInv = element.querySelector('.raster-clip-invert');
                         if (cInv) {
-                            const stopP = (ev) => ev.stopPropagation();
-                            ['click', 'mousedown', 'pointerdown', 'touchstart'].forEach(evt => cInv.addEventListener(evt, stopP));
+                            keepPresses(cInv, cInv.closest('label'));
                             cInv.addEventListener('change', () => { layer.clipInvert = cInv.checked; });
                         }
                     } else {
                     if (layer.active) {
                         element.classList.add('active-layer');
                     }
+                    const isCol = !!layer.isCollision;
+                    if (isCol) element.dataset.collision = '1';  // 44-recipes layerRows
+                    const painted = !!(isCol && window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer));
                     const hasMask = layer.mask?.shapes?.length > 0;
+                    // A collider cut from a depth map carries its Threshold and
+                    // Invert on that shape; one cut by hand has nothing for them
+                    // to act on, so they only show when the shape is there.
+                    const depthShape = isCol ? layer.mask?.shapes?.find(s => s.type === 'depth-mask') : null;
                     // Whether the mask (or, on a collision layer, the collider)
                     // is switched on is STATE, not an action — so it is the same
-                    // checkbox the header uses for show/hide, captioned, and it
-                    // leads its row the way the header's does. It used to be a
-                    // button that turned blue, sitting among Edit/Clear as if it
-                    // were a third verb.
+                    // checkbox the header uses for show/hide, captioned. It heads
+                    // the group it switches, the way the header's heads the row.
+                    // It used to be a button that turned blue, sitting among
+                    // Edit/Clear as if it were a third verb.
                     const maskOn = !!layer.mask?.enabled;
-                    const maskToggle = `<label class="layer-check" title="${layer.isCollision ? (maskOn ? 'Collision ON — uncheck to disable this collider' : 'Collision OFF — check to enable') : (hasMask ? (maskOn ? 'Mask on — uncheck to show the whole layer' : 'Mask off — check to apply it') : 'No mask defined yet')}">
-                                <input type="checkbox" class="layer-mask-check" data-layer="${layer.index}"${maskOn ? ' checked' : ''}${(hasMask || layer.isCollision) ? '' : ' disabled'}>
+                    const maskToggle = `<label class="layer-check" title="${isCol ? (maskOn ? 'Collision ON — uncheck to disable this collider' : 'Collision OFF — check to enable') : (maskOn ? 'Mask on — uncheck to show the whole layer' : 'Mask off — check to apply it')}">
+                                <input type="checkbox" class="layer-mask-check" data-layer="${layer.index}"${maskOn ? ' checked' : ''}>
                                 <span class="layer-vis-box"></span>
-                                <span class="layer-check-label">${layer.isCollision ? 'Collision' : 'Mask'}</span>
+                                <span class="layer-check-label">${isCol ? 'Collision' : 'Mask'}</span>
                             </label>`;
-                    // Neither of these belongs on a collision layer, and both are
-                    // gated on the one flag — isPaintedColliderLayer requires it
-                    // too, so painted and generated colliders are covered alike.
+                    const shapeCount = hasMask ? layer.mask.shapes.length : 0;
+                    // A picture with no mask has nothing to switch yet: the
+                    // group is headed by its name instead of a dead checkbox.
+                    const groupHead = `<div class="layer-group-head">
+                                ${(isCol || hasMask) ? maskToggle : '<span class="layer-group-title">Mask</span>'}
+                                ${(hasMask && !painted) ? `<span class="layer-group-meta">${shapeCount} shape${shapeCount !== 1 ? 's' : ''}</span>` : ''}
+                            </div>`;
+                    // The threshold slider is mask-shaped either way — Feather
+                    // once there is a mask, a brightness cut-off before — so it
+                    // lives in the group, not up beside Opacity.
+                    const keyRow = sliderRowHTML('layer-row-key', hasMask ? 'Feather' : 'Threshold', layer.threshold + '%',
+                        hasMask ? 'Softens the mask’s edge' : 'Hides the darker parts of the picture: everything below this brightness goes');
+                    // The row's verbs. Fluidize and Collider don't belong on a
+                    // collision layer:
                     //
                     // Fluidize pours a layer's picture into the dye and hides the
                     // layer. A collider is the thing dye flows AROUND, so there it is
                     // either a no-op or actively wrong: a painted collider has no
                     // image to pour (05m says so out loud, 'Could not fluidize that
                     // layer'), and an imported-image one dumps its picture into the
-                    // sim and switches the wall off as a side effect.
-                    //
-                    // Layer from Visible cuts the masked region out as a new picture
-                    // layer. A collider's mask is its WALL, not artwork — the
-                    // cut-out is a silhouette of the shape you are flowing around,
-                    // which is not a thing anyone reaches for that button to get.
-                    //
-                    // Built as a list because a collider now contributes nothing to
-                    // this row, and an empty div would still hold its margin.
+                    // sim and switches the wall off as a side effect. A collider
+                    // made from a collider is the same wall twice.
                     const actionBtns = [
-                        (hasMask && !layer.isCollision) ? `<button class="layer-btn" onclick="window.layerFromVisible && layerFromVisible(${layer.index})" title="Cut out what this mask is showing as a new layer of its own. The original keeps its mask, so you can carry on slicing pieces off it.">Layer from Visible</button>` : '',
-                        layer.isCollision ? '' : `<button class="layer-btn" onclick="window.splatLayerToSim && splatLayerToSim(${layer.index})" title="${hasMask ? 'Turn what this mask is showing into fluid' : 'Turn this whole picture into fluid'} — it becomes dye in its own colours and the flow takes it from there. The layer hides itself once poured; unhide it to pour again. Not undoable: it dissolves on its own.">Fluidize</button>`
-                    ].filter(Boolean).join('');
+                        `<button type="button" class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">Transform</button>`,
+                        isCol ? '' : `<button type="button" class="layer-btn" onclick="window.splatLayerToSim && splatLayerToSim(${layer.index})" title="${hasMask ? 'Turn what this mask is showing into fluid' : 'Turn this whole picture into fluid'} — it becomes dye in its own colours, as strong as the layer’s Opacity, and the flow takes it from there. The layer hides itself once poured; unhide it to pour again. Not undoable: it dissolves on its own.">Fluidize</button>`,
+                        isCol ? '' : `<button type="button" class="layer-btn" onclick="collisionFromMask(${layer.index})" title="Make a collider from this picture: ${hasMask ? 'what its mask shows' : 'what its Threshold leaves'} becomes a wall the paint flows around. The picture stays as it is.">Collider</button>`
+                    ].join('');
+                    // Mask group (picture). Layer from Visible cuts the masked
+                    // region out as a new picture layer, so it only exists once
+                    // there is a mask — and never on a collider, whose mask is
+                    // its WALL, not artwork.
+                    const maskGroup = `
+                        <div class="layer-group">
+                            ${groupHead}
+                            ${keyRow}
+                            ${clipRowHTML(layer, 'img-clip-select', 'img-clip-invert')}
+                            ${hasMask ? `
+                            <div class="layer-action-row layer-mask-controls">
+                                <button type="button" class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">Edit Mask</button>
+                                <button type="button" class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">Clear Mask</button>
+                            </div>
+                            <div class="layer-action-row">
+                                <button type="button" class="layer-btn" onclick="window.layerFromVisible && layerFromVisible(${layer.index})" title="Cut out what this mask is showing as a new layer of its own. The original keeps its mask, so you can carry on slicing pieces off it.">Layer from Visible</button>
+                            </div>
+                            ` : `
+                            <div class="layer-action-row layer-mask-controls">
+                                <button type="button" class="mask-control-btn mask-create-btn" onclick="editImageLayerMask(${layer.index})" title="Create Mask">Create Mask</button>
+                            </div>
+                            `}
+                        </div>`;
+                    // Collision group: how the wall behaves, then its buttons.
+                    // A painted collider is drawn, not derived from a depth map,
+                    // so it has no Threshold / Invert / Refresh.
+                    const collisionGroup = `
+                        <div class="layer-group">
+                            ${groupHead}
+                            <div class="collision-controls" data-collision-layer="${layer.index}">
+                                ${fieldRowHTML('layer-row-mode', 'Mode', `<select class="collision-mode-select" title="Block: a wall the flow piles up against and paint goes around. Deflect: a smooth wall the flow slides around. Slow: no wall at all — fluid and paint enter and thicken, like syrup.">
+                                        <option value="block" ${(!layer.collisionMode || layer.collisionMode === 'block') ? 'selected' : ''}>Block</option>
+                                        <option value="deflect" ${layer.collisionMode === 'deflect' ? 'selected' : ''}>Deflect</option>
+                                        <option value="slow" ${layer.collisionMode === 'slow' ? 'selected' : ''}>Slow</option>
+                                    </select>`, 'What the fluid does when it meets this shape')}
+                                ${sliderRowHTML('layer-row-strength', 'Strength', (layer.collisionStrength || 0.7).toFixed(2),
+                                    'Block / Deflect: how solid the wall is — low values leak flow and take some paint, 1 is rigid. Slow: how thick the syrup is — from a faint drag to stopping dead.')}
+                                ${(painted || !depthShape) ? '' : `
+                                ${sliderRowHTML('layer-row-cthresh', 'Threshold', depthShape.threshold || 128)}
+                                ${fieldRowHTML('layer-row-invert', 'Invert', `<label class="layer-vis" title="Swap which side of the threshold is wall"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${depthShape?.invert ? 'checked' : ''}><span class="layer-vis-box"></span></label>`)}
+                                `}
+                                ${keyRow}
+                            </div>
+                            <div class="layer-action-row layer-mask-controls">
+                            ${painted ? `
+                                <button type="button" class="mask-control-btn" onclick="window.enterColliderMaskMode(${layer.index})" title="Draw and erase this collider's walls over the artwork">Edit Collider</button>
+                            ` : `
+                                ${hasMask ? `<button type="button" class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">Edit Mask</button>
+                                <button type="button" class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">Clear Mask</button>`
+                                : `<button type="button" class="mask-control-btn mask-create-btn" onclick="editImageLayerMask(${layer.index})" title="Create Mask">Create Mask</button>`}
+                                <button type="button" class="collision-refresh-btn" data-cref="${layer.index}" title="Re-run depth estimation">Refresh</button>
+                            `}
+                            </div>
+                        </div>`;
                     element.innerHTML = `
                         ${layerHeaderHTML({
                             title: layer.title, index: layer.index, visTarget: layer.index,
@@ -287,100 +433,18 @@
                             thumbStyle: `background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}')`
                         })}
                         <div class="layer-item-body">
-                        <div class="layer-threshold">
-                            <span>${hasMask ? 'Feather' : 'Mask'}</span>
-                            <div class="layer-slider-host"></div>
-                            <span class="layer-slider-value">${layer.threshold}%</span>
-                        </div>
-                        <div class="layer-action-row">
-                            <button class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">Transform</button>
-                            <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
-                        </div>
-                        ${actionBtns ? `<div class="layer-action-row">${actionBtns}</div>` : ''}
-                        <div class="layer-group">
-                        <div class="layer-group-title">${layer.isCollision ? 'Collision' : 'Masks'}</div>
-                        ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? `
-                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
-                            ${maskToggle}
-                            <button class="mask-control-btn" onclick="window.enterColliderMaskMode(${layer.index})" title="Draw and erase this collider's walls over the artwork">Edit Collider</button>
-                        </div>
-                        ` : hasMask ? `
-                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
-                            ${maskToggle}
-                            <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
-                            <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">Edit Mask</button>
-                            <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">Clear Mask</button>
-                        </div>
-                        ` : `
-                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
-                            <button class="mask-control-btn mask-create-btn" onclick="editImageLayerMask(${layer.index})" title="Create Mask">Create Mask</button>
-                        </div>
-                        `}
-                        ${!layer.isCollision ? `
-                        <div class="collision-row" style="margin-top:4px;">
-                            <label class="collision-label">Clip</label>
-                            <select class="img-clip-select">
-                                <option value="">None</option>
-                                ${clipSourceOptions(layer)}
-                            </select>
-                            <label class="collision-toggle"><input type="checkbox" class="img-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
-                        </div>
-                        ` : ''}
-                        ${!layer.isCollision ? `
-                        <div style="margin-bottom:6px;">
-                            <button class="mask-control-btn" onclick="collisionFromMask(${layer.index})" title="Generate collision layer from current mask or threshold" style="width:100%;background:rgba(255,160,60,0.13);border-color:rgba(255,160,60,0.35);text-align:center;">Generate Collision Layer</button>
-                        </div>
-                        ` : ''}
-                        ${layer.isCollision ? `
-                        <div class="collision-controls" data-collision-layer="${layer.index}">
-                            <div class="collision-row">
-                                <label class="collision-label" title="What the fluid does when it meets this shape">Mode</label>
-                                <select class="collision-mode-select" title="Block: a wall the flow piles up against and paint goes around. Deflect: a smooth wall the flow slides around. Slow: no wall at all — fluid and paint enter and thicken, like syrup.">
-                                    <option value="block" ${(!layer.collisionMode || layer.collisionMode === 'block') ? 'selected' : ''}>Block</option>
-                                    <option value="deflect" ${layer.collisionMode === 'deflect' ? 'selected' : ''}>Deflect</option>
-                                    <option value="slow" ${layer.collisionMode === 'slow' ? 'selected' : ''}>Slow</option>
-                                </select>
-                            </div>
-                            <div class="collision-row">
-                                <label class="collision-label" title="Block / Deflect: how solid the wall is — low values leak flow and take some paint, 1 is rigid. Slow: how thick the syrup is — from a faint drag to stopping dead.">Strength</label>
-                                <div class="collision-slider-host" data-cs="${layer.index}"></div>
-                                <span class="collision-strength-val">${(layer.collisionStrength || 0.7).toFixed(2)}</span>
-                            </div>
-                            ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? '' : `
-                            <div class="collision-row">
-                                <label class="collision-label">Threshold</label>
-                                <div class="collision-slider-host" data-ct="${layer.index}"></div>
-                                <span class="collision-threshold-val">${layer.mask?.shapes?.[0]?.threshold || 128}</span>
-                            </div>
-                            <div class="collision-row">
-                                <label class="collision-toggle"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${layer.mask?.shapes?.[0]?.invert ? 'checked' : ''}> Invert</label>
-                                <button type="button" class="collision-refresh-btn" data-cref="${layer.index}" title="Re-run depth estimation">Refresh</button>
-                            </div>
-                            `}
-                        </div>
-                        ` : ''}
-                        </div>
+                        ${isCol ? '' : sliderRowHTML('layer-row-opacity', 'Opacity', Math.round(layerOpacityOf(layer) * 100) + '%')}
+                        <div class="layer-action-row">${actionBtns}</div>
+                        ${isCol ? collisionGroup : maskGroup}
                         </div>
                     `;
-                    // Create encapsulated slider in host
-                    const host = element.querySelector('.layer-slider-host');
-                    const valueEl = element.querySelector('.layer-slider-value');
                     const headerEl = element.querySelector('.layer-item-header');
                     if (headerEl) headerEl.draggable = true;
-                    if (host && valueEl) {
-                        const slider = buildEncapsulatedRange({ min: 0, max: 100, value: layer.threshold, step: 1, className: 'encapsulated-slider' });
-                        host.appendChild(slider);
-                        slider.addEventListener('input', () => {
-                            valueEl.textContent = slider.value + '%';
-                            updateLayerThreshold(layer.index, slider.value);
-                        });
-                        // Temporarily disable parent draggable while interacting with slider to avoid HTML5 DnD starting
-                        const itemEl = element; // .layer-item
-                        const disable = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; if (itemEl) itemEl.dataset.sliderActive = '1'; };
-                        const enable = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; if (itemEl) delete itemEl.dataset.sliderActive; };
-                        ['pointerdown','mousedown','touchstart'].forEach(evt => slider.addEventListener(evt, disable, { passive: true }));
-                        ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => slider.addEventListener(evt, enable, { passive: true }));
-                    }
+                    if (!isCol) wireOpacitySlider(element, layer);
+                    mountLayerSlider(element, 'layer-row-key', { min: 0, max: 100, value: layer.threshold }, (s, valueEl) => {
+                        if (valueEl) valueEl.textContent = s.value + '%';
+                        updateLayerThreshold(layer.index, s.value);
+                    });
                     // D3-3: image-layer Clip dropdown + Inv (mirrors the raster clip wiring).
                     // stopPropagation on pointer/mouse events so the layer drag guards don't eat them.
                     const clipSel = element.querySelector('.img-clip-select');
@@ -394,15 +458,14 @@
                     }
                     const clipInv = element.querySelector('.img-clip-invert');
                     if (clipInv) {
-                        const stopP = (ev) => ev.stopPropagation();
-                        ['click','mousedown','pointerdown','touchstart'].forEach(evt => clipInv.addEventListener(evt, stopP));
+                        keepPresses(clipInv, clipInv.closest('label'));
                         clipInv.addEventListener('change', () => {
                             layer.clipInvert = clipInv.checked;
                             if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
                         });
                     }
                     // Wire collision controls if present
-                    if (layer.isCollision) {
+                    if (isCol) {
                         // Mode select
                         const modeSelect = element.querySelector('.collision-mode-select');
                         if (modeSelect) {
@@ -413,56 +476,30 @@
                             });
                             modeSelect.addEventListener('mousedown', (e) => e.stopPropagation());
                         }
-                        // Strength slider
-                        const strengthHost = element.querySelector('[data-cs="' + layer.index + '"]');
-                        const strengthVal = element.querySelector('.collision-strength-val');
-                        if (strengthHost) {
-                            const sSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round((layer.collisionStrength || 0.7) * 100), step: 1, className: 'encapsulated-slider' });
-                            strengthHost.appendChild(sSlider);
-                            sSlider.addEventListener('input', () => {
-                                const v = parseInt(sSlider.value) / 100;
+                        mountLayerSlider(element, 'layer-row-strength',
+                            { min: 0, max: 100, value: Math.round((layer.collisionStrength || 0.7) * 100) },
+                            (s, valueEl) => {
+                                const v = parseInt(s.value, 10) / 100;
                                 layer.collisionStrength = v;
-                                if (strengthVal) strengthVal.textContent = v.toFixed(2);
+                                if (valueEl) valueEl.textContent = v.toFixed(2);
                                 scheduleObstacleUpdate(); // 7.6: debounced during drag
                             });
-                            const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };
-                            const en = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; };
-                            ['pointerdown','mousedown','touchstart'].forEach(evt => sSlider.addEventListener(evt, dis, { passive: true }));
-                            ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => sSlider.addEventListener(evt, en, { passive: true }));
-                        }
-                        // Threshold slider
-                        const threshHost = element.querySelector('[data-ct="' + layer.index + '"]');
-                        const threshVal = element.querySelector('.collision-threshold-val');
-                        if (threshHost) {
-                            const depthShape = layer.mask?.shapes?.find(s => s.type === 'depth-mask');
-                            const tSlider = buildEncapsulatedRange({ min: 0, max: 255, value: depthShape?.threshold || 128, step: 1, className: 'encapsulated-slider' });
-                            threshHost.appendChild(tSlider);
-                            tSlider.addEventListener('input', () => {
-                                const v = parseInt(tSlider.value);
-                                if (threshVal) threshVal.textContent = v;
+                        const tSlider = mountLayerSlider(element, 'layer-row-cthresh',
+                            { min: 0, max: 255, value: depthShape?.threshold || 128 },
+                            (s, valueEl) => {
+                                const v = parseInt(s.value, 10);
+                                if (valueEl) valueEl.textContent = v;
                                 if (depthShape) depthShape.threshold = v;
                                 scheduleObstacleUpdate(); // 7.6: debounced during drag
                             });
-                            // Refresh the visible mask preview on release (full-res redraw is too heavy per input tick)
-                            tSlider.addEventListener('change', () => {
-                                layer.__maskDirty = true; // 7.6: reorder-reapply memo
-                                if (layer.visible && typeof window.applyLayerMask === 'function') window.applyLayerMask(layer.index);
-                            });
-                            const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };
-                            const en = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; };
-                            ['pointerdown','mousedown','touchstart'].forEach(evt => tSlider.addEventListener(evt, dis, { passive: true }));
-                            ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => tSlider.addEventListener(evt, en, { passive: true }));
-                        }
-                        // Invert checkbox — stop propagation on all pointer/click events
-                        // to prevent parent drag handlers from eating the interaction
+                        // Refresh the visible mask preview on release (full-res redraw is too heavy per input tick)
+                        if (tSlider) tSlider.addEventListener('change', () => {
+                            layer.__maskDirty = true; // 7.6: reorder-reapply memo
+                            if (layer.visible && typeof window.applyLayerMask === 'function') window.applyLayerMask(layer.index);
+                        });
                         const invertCb = element.querySelector('.collision-invert-cb');
-                        const invertLabel = element.querySelector('.collision-toggle');
                         if (invertCb) {
-                            const stopProp = (ev) => ev.stopPropagation();
-                            ['click', 'mousedown', 'pointerdown', 'touchstart'].forEach(evt => {
-                                invertCb.addEventListener(evt, stopProp);
-                                if (invertLabel) invertLabel.addEventListener(evt, stopProp);
-                            });
+                            keepPresses(invertCb, invertCb.closest('label'));
                             invertCb.addEventListener('change', () => {
                                 const depthShape = layer.mask?.shapes?.find(s => s.type === 'depth-mask');
                                 if (depthShape) depthShape.invert = invertCb.checked;
@@ -797,8 +834,14 @@
             input.value = String(value);
             input.className = className || '';
             input.setAttribute('draggable', 'false');
-            // Prevent bubbling into layer drag/resize
-            const stop = (ev) => { ev.stopPropagation(); };
+            // Prevent bubbling into layer drag/resize — except Ctrl/Cmd+Z/Y,
+            // which must reach the undo hotkeys (05n): a slider keeps focus
+            // after a drag, and Ctrl+Z right then is how you take it back.
+            const stop = (ev) => {
+                if ((ev.type === 'keydown' || ev.type === 'keyup') && (ev.ctrlKey || ev.metaKey)
+                    && (ev.key === 'z' || ev.key === 'Z' || ev.key === 'y' || ev.key === 'Y')) return;
+                ev.stopPropagation();
+            };
             const stopAndPrevent = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
             ['mousedown','mouseup','click','dblclick','pointerdown','pointerup','pointermove','touchstart','touchmove','touchend','wheel','dragstart','contextmenu','keydown','keyup'].forEach(evt => {
                 input.addEventListener(evt, evt === 'wheel' || evt === 'dragstart' ? stopAndPrevent : stop, { passive: false });
@@ -827,6 +870,10 @@
                             // updateLayerPosition or this stomps its skew on
                             // every reorder/visibility pass.
                             layerDiv.style.transform = window.LayerXform.cssTransform(layer);
+                            // Opacity rides every pass too: a slot freed by a
+                            // collider (film at 0.3) or by a faded layer must
+                            // not hand its opacity to whatever takes it next.
+                            window.applyLayerOpacity(layer);
                             // Apply active class
                             if (layer.active) {
                                 layerDiv.classList.add('active');

@@ -280,7 +280,8 @@
             const pick = pickerHex();
             openPalMenu(hex, [
                 { label: 'Paint with this colour', fn: () => window.setColor(hex) },
-                pick !== hex ? { label: 'Replace with the picker colour', fn: () => replacePaletteColor(hex, pick) } : null,
+                window.ColourPicker ? { label: 'Change colour…', fn: () => window.ColourPicker.openInline({ mode: 'edit', hex }) } : null,
+                pick !== hex ? { label: 'Replace with the brush colour', fn: () => replacePaletteColor(hex, pick) } : null,
                 { label: 'Remove', cls: 'danger', fn: () => window.removeColorFromPalette(hex) }
             ], x, y, hex);
         }
@@ -304,13 +305,21 @@
             applyPalette(curatedPalettes.length - 1);
             return curatedPalettes.length - 1;
         }
-        // + New starts a palette with the colour in the picker, named
-        // "Untitled", and puts its name up for editing in its tag. (Procreate's
-        // + sits at the end of the list too; Duplicate is in each palette's menu.)
+        // New palette → With the brush colour starts a palette with the brush
+        // colour, named "Untitled", and puts its name up for editing.
+        // Duplicate is in each palette's menu.
         function newPalette() {
             const idx = addOwnPalette(freeName('Untitled'), [pickerHex()]);
             renameInline(idx);
         }
+        // Palette from an image or the canvas (65-palette-from-image) saves
+        // through here: a palette of your own, painted with at once. The name
+        // comes from the file, so it isn't put up for editing.
+        window.addPaletteFromColours = function (name, colours) {
+            const list = uniqueColors((colours || []).map(hexToFull)).filter(h => /^#[0-9A-F]{6}$/.test(h));
+            if (!list.length) return -1;
+            return addOwnPalette(freeName(String(name || 'From image').trim() || 'From image'), list);
+        };
         function duplicatePalette(idx) {
             const colors = getPaletteColorsForIndex(idx);
             const i = addOwnPalette(freeName(getPaletteName(idx)), colors.length ? colors : [pickerHex()]);
@@ -348,24 +357,35 @@
             renderPalettePreview(currentPaletteIndex);
             return true;
         }
-        // The tag's name becomes a text field: Enter keeps it, Escape or a
-        // click elsewhere leaves the name as it was.
+        // The palette's name becomes a text field where it shows: in the open
+        // list, or in the dropdown when it is the palette in use. Enter keeps
+        // it, Escape leaves the name as it was, a click elsewhere keeps it.
         function renameInline(idx) {
-            refreshPaletteCarousel();
-            const carousel = document.getElementById('paletteCarousel');
-            const tag = carousel && carousel.querySelector('.palette-tag[data-index="' + idx + '"]');
             const p = curatedPalettes[idx];
-            if (!tag || !p) return;
-            tag.classList.add('editing');
-            tag.onclick = null;
+            if (!p) return;
+            let nameEl = null;
+            if (paletteListEl) {
+                renderPaletteList();
+                nameEl = paletteListEl.querySelector('.palette-option[data-index="' + idx + '"] .palette-option-name');
+            }
+            if (!nameEl && idx === currentPaletteIndex) {
+                refreshPaletteCarousel();
+                nameEl = document.querySelector('#paletteSelect .palette-select-name');
+            }
+            if (!nameEl) {
+                openPaletteList();
+                nameEl = paletteListEl && paletteListEl.querySelector('.palette-option[data-index="' + idx + '"] .palette-option-name');
+            }
+            if (!nameEl) return;
+            const owner = nameEl.closest('.palette-option, .palette-select-trigger');
+            if (owner) owner.classList.add('editing');
             const input = document.createElement('input');
             input.type = 'text';
-            input.className = 'palette-tag-input';
+            input.className = 'palette-name-input';
             input.value = p.name;
             input.setAttribute('aria-label', 'Palette name');
-            input.style.width = Math.max(6, p.name.length + 1) + 'ch';
-            tag.innerHTML = '';
-            tag.appendChild(input);
+            nameEl.innerHTML = '';
+            nameEl.appendChild(input);
             let done = false;
             const finish = (keep) => {
                 if (done) return;
@@ -373,7 +393,8 @@
                 if (keep) renamePalette(idx, input.value);   // a taken name says so and keeps the old one
                 refreshPaletteCarousel();
             };
-            input.addEventListener('input', () => { input.style.width = Math.max(6, input.value.length + 1) + 'ch'; });
+            input.addEventListener('pointerdown', (e) => e.stopPropagation());
+            input.addEventListener('click', (e) => e.stopPropagation());
             input.addEventListener('keydown', (e) => {
                 e.stopPropagation();
                 if (e.key === 'Enter') { e.preventDefault(); finish(true); }
@@ -392,36 +413,219 @@
             else renderPalettePreview(currentPaletteIndex);
         }
 
+        // ── The palettes: one dropdown (2026-10-08) ──
+        // They were a wrapping row of tags with "+ New" trailing after the
+        // last one, every tag as heavy as the buttons around it. Now the
+        // palette in use is a dropdown; its list shows each palette as its
+        // name over its colours, with New palette at the top of the list.
+        // Right-click a palette (or the dropdown) to rename, duplicate,
+        // reset or delete it; drag one in the list to move it. The trigger
+        // and the options are divs, not buttons: they look like a field and
+        // a list, and the button system (01-buttons) owns button colours.
+        let paletteListEl = null;
+        function paletteTrigger() { return document.getElementById('paletteSelect'); }
+
         function refreshPaletteCarousel() {
             const carousel = document.getElementById('paletteCarousel');
             if (!carousel) return;
             carousel.innerHTML = '';
+            const unsaved = trayIsUnsaved();
+            const trig = document.createElement('div');
+            trig.id = 'paletteSelect';
+            trig.className = 'palette-select-trigger' + (paletteListEl ? ' open' : '');
+            trig.tabIndex = 0;
+            trig.setAttribute('role', 'combobox');
+            trig.setAttribute('aria-haspopup', 'listbox');
+            trig.setAttribute('aria-expanded', paletteListEl ? 'true' : 'false');
+            trig.setAttribute('aria-label', 'Palette');
+            const name = document.createElement('span');
+            name.className = 'palette-select-name';
+            name.textContent = unsaved ? 'Unsaved colours' : getPaletteName(currentPaletteIndex);
+            const chev = document.createElement('span');
+            chev.className = 'palette-select-chev';
+            chev.setAttribute('aria-hidden', 'true');
+            trig.appendChild(name);
+            trig.appendChild(chev);
+            trig.title = 'Your palettes, and New palette. Ctrl+Shift+← → switches palette; right-click to rename, duplicate or delete this one.';
+            trig.addEventListener('click', () => {
+                if (trig.classList.contains('editing')) return;
+                if (paletteListEl) closePaletteList(); else openPaletteList();
+            });
+            trig.addEventListener('keydown', (e) => {
+                if (trig.classList.contains('editing')) return;
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (!paletteListEl) openPaletteList();
+                }
+            });
+            trig.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (!unsaved) openPaletteMenu(currentPaletteIndex, getPaletteName(currentPaletteIndex), e.clientX, e.clientY);
+            });
+            carousel.appendChild(trig);
+            if (paletteListEl) renderPaletteList();
+        }
+
+        function openPaletteList() {
+            const trig = paletteTrigger();
+            if (!trig || !trig.getBoundingClientRect().width) return;
+            closePaletteMenu();
+            if (paletteListEl) closePaletteList();
+            const list = document.createElement('div');
+            list.className = 'palette-list';
+            list.setAttribute('role', 'listbox');
+            list.setAttribute('aria-label', 'Palettes');
+            const grp = trig.closest('[data-group]');
+            list.dataset.group = grp ? grp.dataset.group : 'core';
+            // Hotkeys leave it alone (01a isTypingTarget): the arrows move here.
+            list.setAttribute('data-owns-keys', '');
+            document.body.appendChild(list);
+            paletteListEl = list;
+            trig.classList.add('open');
+            trig.setAttribute('aria-expanded', 'true');
+            renderPaletteList();
+            placePaletteList();
+            const act = list.querySelector('.palette-option.active') || list.querySelector('.palette-option');
+            if (act) { act.focus({ preventScroll: true }); act.scrollIntoView({ block: 'nearest' }); }
+            setTimeout(() => {
+                if (paletteListEl !== list) return;
+                document.addEventListener('pointerdown', onPaletteListOutside, true);
+            }, 0);
+            document.addEventListener('keydown', onPaletteListKey, true);
+            window.addEventListener('resize', placePaletteList);
+        }
+        window.openPaletteList = openPaletteList;
+        function closePaletteList(keepFocus) {
+            const list = paletteListEl;
+            if (!list) return;
+            paletteListEl = null;
+            document.removeEventListener('pointerdown', onPaletteListOutside, true);
+            document.removeEventListener('keydown', onPaletteListKey, true);
+            window.removeEventListener('resize', placePaletteList);
+            const hadFocus = list.contains(document.activeElement);
+            list.remove();
+            const trig = paletteTrigger();
+            if (trig) {
+                trig.classList.remove('open');
+                trig.setAttribute('aria-expanded', 'false');
+                if (hadFocus && keepFocus !== false) trig.focus({ preventScroll: true });
+            }
+        }
+        window.closePaletteList = closePaletteList;
+        function placePaletteList() {
+            const list = paletteListEl, trig = paletteTrigger();
+            if (!list || !trig) return;
+            const r = trig.getBoundingClientRect();
+            if (!r.width) { closePaletteList(false); return; }
+            const w = Math.max(r.width, 240);
+            list.style.width = w + 'px';
+            list.style.maxHeight = '';
+            const want = list.scrollHeight;
+            const below = window.innerHeight - r.bottom - 12, above = r.top - 12;
+            const down = below >= Math.min(want, 260) || below >= above;
+            const room = Math.max(140, down ? below : above);
+            const h = Math.min(want, room);
+            list.style.maxHeight = room + 'px';
+            list.style.top = (down ? r.bottom + 4 : r.top - 4 - h) + 'px';
+            list.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+        }
+        function onPaletteListOutside(e) {
+            const t = e.target;
+            if (!paletteListEl) return;
+            if (paletteListEl.contains(t)) return;
+            const trig = paletteTrigger();
+            if (trig && trig.contains(t)) return;
+            // Its right-click menu, and the delete dialog it opens, belong to it.
+            if (t.closest && t.closest('.palette-menu')) return;
+            closePaletteList(false);
+        }
+        function onPaletteListKey(e) {
+            const list = paletteListEl;
+            if (!list) return;
+            if (e.target && e.target.tagName === 'INPUT') return;   // renaming
+            const items = Array.prototype.slice.call(list.querySelectorAll('.palette-new-btns button, .palette-option'));
+            const at = items.indexOf(document.activeElement);
+            const go = (i) => { const n = items[Math.max(0, Math.min(items.length - 1, i))]; if (n) { n.focus({ preventScroll: true }); n.scrollIntoView({ block: 'nearest' }); } };
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePaletteList(); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); go(at < 0 ? 0 : at + 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); go(at < 0 ? items.length - 1 : at - 1); }
+            else if (e.key === 'Home') { e.preventDefault(); go(0); }
+            else if (e.key === 'End') { e.preventDefault(); go(items.length - 1); }
+            else if (e.key === 'Tab') { closePaletteList(false); }
+        }
+        function choosePalette(idx) {
+            closePaletteList();
+            applyPalette(idx);
+        }
+        function renderPaletteList() {
+            const list = paletteListEl;
+            if (!list) return;
+            const keep = list.scrollTop;
+            list.innerHTML = '';
+            const unsaved = trayIsUnsaved();
+            // New palette, first: where the colours come from (Procreate's
+            // + offers Camera / File / Photos the same way).
+            const PFI = window.PaletteFromImage;
+            const newRow = document.createElement('div');
+            newRow.className = 'palette-new-row';
+            const cap = document.createElement('div');
+            cap.className = 'palette-new-cap';
+            cap.textContent = '+ New palette';
+            newRow.appendChild(cap);
+            const btns = document.createElement('div');
+            btns.className = 'palette-new-btns btn-sm';
+            [
+                { id: 'paletteNewBtn', label: 'Brush colour', title: 'A new palette that starts with the brush colour', fn: newPalette },
+                PFI ? { label: 'Image…', title: 'A new palette from a picture. You can also drop one on the Palettes section.', fn: () => PFI.pickFile() } : null,
+                PFI ? { label: 'Canvas', title: 'A new palette from what you have painted', fn: () => PFI.openCanvas() } : null
+            ].forEach((o) => {
+                if (!o) return;
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn--ghost';
+                if (o.id) b.id = o.id;
+                b.textContent = o.label;
+                b.title = o.title;
+                b.addEventListener('click', () => { closePaletteList(false); o.fn(); });
+                btns.appendChild(b);
+            });
+            newRow.appendChild(btns);
+            list.appendChild(newRow);
             curatedPalettes.forEach((p, idx) => {
-                const tag = document.createElement('div');
-                tag.className = 'palette-tag';
-                tag.dataset.index = String(idx);
-                if (idx === currentPaletteIndex) tag.classList.add('active');
-                tag.title = p.name + '. Click to paint with it, drag to move it, right-click to rename, duplicate or delete it.';
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = p.name;
-                tag.appendChild(nameSpan);
-                tag.onclick = () => applyPalette(idx);
-                wireTagDrag(tag, idx);
-                tag.addEventListener('contextmenu', (e) => {
+                const on = idx === currentPaletteIndex && !unsaved;
+                const opt = document.createElement('div');
+                opt.className = 'palette-option' + (on ? ' active' : '');
+                opt.dataset.index = String(idx);
+                opt.tabIndex = -1;
+                opt.setAttribute('role', 'option');
+                opt.setAttribute('aria-selected', on ? 'true' : 'false');
+                opt.title = p.name + '. Click to use it, drag to move it, right-click to rename, duplicate or delete it.';
+                const nm = document.createElement('div');
+                nm.className = 'palette-option-name';
+                nm.textContent = p.name;
+                const strip = document.createElement('div');
+                strip.className = 'palette-option-strip';
+                getPaletteColorsForIndex(idx).forEach((h) => {
+                    const s = document.createElement('span');
+                    s.style.background = h;
+                    strip.appendChild(s);
+                });
+                opt.appendChild(nm);
+                opt.appendChild(strip);
+                opt.addEventListener('click', () => { if (!opt.classList.contains('editing')) choosePalette(idx); });
+                opt.addEventListener('keydown', (e) => {
+                    if (opt.classList.contains('editing')) return;
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choosePalette(idx); }
+                });
+                opt.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     openPaletteMenu(idx, p.name, e.clientX, e.clientY);
                 });
-                carousel.appendChild(tag);
+                wireTagDrag(opt, idx);
+                list.appendChild(opt);
             });
-            const add = document.createElement('button');
-            add.type = 'button';
-            add.className = 'palette-new btn--ghost';   // the button system's colours, not a tag's
-            add.id = 'paletteNewBtn';
-            add.textContent = '+ New';
-            add.title = 'A new palette, starting with the colour in the picker';
-            add.addEventListener('click', newPalette);
-            carousel.appendChild(add);
+            list.scrollTop = keep;
         }
 
         function setPaletteColorsForIndex(index, colors) {
@@ -477,20 +681,63 @@
             }
             if (typeof window.pinArmSteps === 'function') window.pinArmSteps();
         }
+        // Feedback about the colour row goes UNDER the row, next to the
+        // [+], and rings the colour it is about. It went to the status by the
+        // "Palettes" heading, well away from the [+], and pushed the key
+        // badges onto a second line. When the section isn't on screen
+        // (Shift+S with the sidebar shut) it falls back to a toast.
+        function activeColourList() {
+            return trayIsUnsaved() ? uniqueColors(savedColors.map(hexToFull)) : getPaletteColorsForIndex(currentPaletteIndex);
+        }
+        window.paletteActiveColours = activeColourList;
+        function ringPaletteChip(hex) {
+            const h = hexToFull(hex);
+            document.querySelectorAll('#palettePreview .palette-chip-wrap').forEach((w) => {
+                const on = w.dataset.hex === h;
+                w.classList.toggle('is-match', on);
+            });
+        }
+        window.ringPaletteChip = ringPaletteChip;
+        function paletteNote(text, hex) {
+            const el = document.getElementById('paletteNote');
+            const row = document.getElementById('palettePreview');
+            ringPaletteChip(hex || '');
+            if (!el || !row || !row.offsetParent) {
+                if (typeof window.showToast === 'function') window.showToast(text);
+                else flashPaletteStatus(text, true);
+            } else {
+                el.textContent = text;
+                el.hidden = false;
+            }
+            clearTimeout(paletteNote._t);
+            paletteNote._t = setTimeout(() => {
+                if (el) { el.hidden = true; el.textContent = ''; }
+                if (!window.ColourPicker || !window.ColourPicker.inlineOpen()) ringPaletteChip('');
+            }, 2600);
+        }
+        window.paletteNote = paletteNote;
         window.addColorToPalette = function (hex) {
             const h = hexToFull(hex || pickerHex());
+            let added = false;
             editActiveColors((list) => {
-                if (list.includes(h)) { flashPaletteStatus('Already in this palette'); return null; }
+                if (list.includes(h)) { paletteNote('Already in this palette', h); return null; }
+                added = true;
                 return list.concat([h]);
             });
+            if (added) {
+                const w = document.querySelector('#palettePreview .palette-chip-wrap[data-hex="' + h + '"]');
+                if (w) { w.classList.add('is-added'); setTimeout(() => w.classList.remove('is-added'), 900); }
+            }
+            return added;
         };
         window.removeColorFromPalette = function (hex) {
             const h = hexToFull(hex || pickerHex());
             editActiveColors((list) => {
-                if (!list.includes(h)) { flashPaletteStatus('That colour isn\'t in this palette'); return null; }
+                if (!list.includes(h)) { paletteNote('That colour isn\'t in this palette'); return null; }
                 return list.filter(c => c !== h);
             });
         };
+        window.replacePaletteColour = function (oldHex, newHex) { replacePaletteColor(oldHex, newHex); };
         function replacePaletteColor(oldHex, newHex) {
             const o = hexToFull(oldHex), n = hexToFull(newHex);
             editActiveColors((list) => list.includes(n) ? list.filter(c => c !== o) : list.map(c => c === o ? n : c));
@@ -508,6 +755,8 @@
         const PALETTE_DRAG = 'application/x-swirl-palette';
         function dropSide(e, el) {
             const r = el.getBoundingClientRect();
+            // The palette list stacks its palettes: above or below.
+            if (el.classList.contains('palette-option')) return (e.clientY - r.top) < r.height / 2 ? 'before' : 'after';
             return (e.clientX - r.left) < r.width / 2 ? 'before' : 'after';
         }
         function clearDropMarks(root) {
@@ -608,15 +857,17 @@
         window.movePalette = movePalette;
         window.movePaletteColour = moveColour;
 
+        // The dropdown names the palette now; this line only speaks up for
+        // colours a look or preset brought that match none of your palettes.
         function renderActiveHead(unsaved) {
             const head = document.getElementById('paletteActiveHead');
             if (!head) return;
             head.innerHTML = '';
-            const name = document.createElement('span');
-            name.className = 'palette-active-name';
-            name.textContent = unsaved ? 'Unsaved colours' : getPaletteName(currentPaletteIndex);
-            head.appendChild(name);
             if (unsaved) {
+                const name = document.createElement('span');
+                name.className = 'palette-active-name';
+                name.textContent = 'These came with a look.';
+                head.appendChild(name);
                 name.title = 'These came with a look or preset and match none of your palettes';
                 const keep = document.createElement('button');
                 keep.type = 'button';
@@ -638,11 +889,13 @@
             list.forEach(hex => {
                 const wrap = document.createElement('div');
                 wrap.className = 'palette-chip-wrap';
+                wrap.dataset.hex = hexToFull(hex);
                 const chip = document.createElement('div');
                 chip.className = 'palette-chip';
                 chip.style.backgroundColor = hex;
-                chip.title = hex + '. Click to paint with it, drag to move it, right-click to replace or remove it.';
+                chip.title = hex + '. Click to paint with it, double-click to change it, drag to move it, right-click for more.';
                 chip.onclick = () => window.setColor(hex);
+                chip.ondblclick = () => { if (window.ColourPicker) window.ColourPicker.openInline({ mode: 'edit', hex: hex }); };
                 chip.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -652,34 +905,44 @@
                 wireChipDrag(wrap, hex);
                 el.appendChild(wrap);
             });
+            // [+] opens a picker right here, starting from the brush colour,
+            // so the colour to add can be chosen on the spot (Shift+S still
+            // adds the brush colour as it is).
             const add = document.createElement('button');
             add.type = 'button';
             add.id = 'paletteAddChip';
-            add.className = 'palette-add btn--ghost';
+            add.className = 'palette-add';   // a dashed slot on the panel's plate
             add.textContent = '+';
-            add.title = 'Add the colour in the picker to this palette (Shift+S)';
-            add.addEventListener('click', () => window.addColorToPalette());
+            add.title = 'Add a colour to this palette. Shift+S adds the brush colour as it is.';
+            add.addEventListener('click', () => {
+                if (window.ColourPicker && window.ColourPicker.openInline({ mode: 'add' })) return;
+                window.addColorToPalette();
+            });
             el.appendChild(add);
+            updatePaletteStepIndicator();
+            if (window.ColourPicker) window.ColourPicker.onPaletteRender();
         }
 
+        // The colour the next stroke paints is marked IN the row (it was a
+        // separate "Next ■ 2/5" line under it): in Palette mode the next
+        // palette colour, in One mode the brush colour when the palette has
+        // it. Random's next colour is a surprise, so nothing is marked.
+        // Everything that moves the brush colour calls this (05g, 05n, 12).
         function updatePaletteStepIndicator() {
             const el = document.getElementById('paletteStepIndicator');
-            if (!el) return;
-            const stepEl = document.getElementById('stepPalette');
-            const list = getStepColorList();
-            if (stepEl && stepEl.checked && list.length > 0) {
-                const nextIdx = paletteStepIndex % list.length;
-                const nextHex = list[nextIdx];
-                el.style.display = 'flex';
-                el.innerHTML = `
-                    <span>Next</span>
-                    <div class="chip" style="background:${nextHex}"></div>
-                    <span>${nextIdx + 1}/${list.length}</span>
-                `;
-            } else {
-                el.style.display = 'none';
-                el.innerHTML = '';
-            }
+            if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+            const cp = document.getElementById('colorPicker');
+            const a0 = (window.multiArmColors || [])[0];
+            const random = a0 ? a0.mode === 'random' : !!document.getElementById('randomColor')?.checked;
+            const now = cp && !random ? hexToFull(cp.value) : '';
+            document.querySelectorAll('#palettePreview .palette-chip-wrap').forEach((w) => {
+                const on = !!now && w.dataset.hex === now;
+                w.classList.toggle('is-active', on);
+                if (w.firstChild) {
+                    if (on) w.firstChild.setAttribute('aria-current', 'true');
+                    else w.firstChild.removeAttribute('aria-current');
+                }
+            });
         }
 
         function getCurrentPaletteHexList() {
@@ -693,7 +956,13 @@
             return getCurrentPaletteHexList();
         }
 
-        function applyPalette(index) {
+        // opts.boot: the palette the app starts on. It selects the palette and
+        // nothing else: no Palette mode, no picker colour. Picking a palette
+        // by hand turns Palette mode on, and doing that at boot made Palette
+        // win over the default Rnd whenever autoload was off, and put a
+        // half-booted state under Ctrl+Z.
+        function applyPalette(index, opts) {
+            const boot = !!(opts && opts.boot);
             const i = parseInt(index, 10);
             if (isNaN(i) || !curatedPalettes[i]) return;
             currentPaletteIndex = i;
@@ -701,6 +970,15 @@
             // paletteStepIndex is the colour IN the picker: the one the next
             // stroke paints (advance = increment, then load; 05g/05n).
             paletteStepIndex = 0;
+            // A preset, look link, Mutate card or room restore has already
+            // put the snapshot's colour in the picker, and in Palette mode
+            // that is the NEXT colour. Keep the counter on it, or the first
+            // stroke paints it and the second skips colour 0.
+            if (window.__brushColorRestoring) {
+                const cpNow = document.getElementById('colorPicker');
+                const k = cpNow ? list.indexOf(hexToFull(cpNow.value)) : -1;
+                if (k >= 0) paletteStepIndex = k;
+            }
             // The tray first: the step switch below fires 'change', and what it
             // runs reads the tray (getStepColorList). Written after, a palette
             // picked with the nav toggle off painted the PREVIOUS palette
@@ -717,7 +995,7 @@
             // and step mode come FROM the snapshot and are already applied — the
             // palette must not overwrite them. Picking a palette by hand still
             // behaves exactly as before.
-            if (cp && !window.__brushColorRestoring) {
+            if (cp && !window.__brushColorRestoring && !boot) {
                 cp.value = list[0] || '#FFFFFF';
                 const stepEl = document.getElementById('stepPalette');
 
@@ -741,6 +1019,7 @@
         let pendingDeleteIndex = -1;
         
         window.showDeleteModal = function(idx, name) {
+            closePaletteList(false);   // the list sits above the dialog
             pendingDeleteIndex = idx;
             const modal = document.getElementById('deletePaletteModal');
             const msg = document.getElementById('deleteModalMessage');
@@ -789,7 +1068,7 @@
             // Apply first palette on load if autoload is not enabled
             const autoload = window.settingsManager?.get('settings.autoload');
             if (!autoload && curatedPalettes.length > 0) {
-                applyPalette(currentPaletteIndex || 0);
+                applyPalette(currentPaletteIndex || 0, { boot: true });
             }
         }
 
@@ -926,7 +1205,7 @@
             if (!len) return;
             const last = parseInt(localStorage.getItem('curatedPaletteIndex') || '-1', 10);
             const next = (isNaN(last) || last < 0) ? Math.floor(Math.random() * len) : (last + 1) % len;
-            applyPalette(next);
+            applyPalette(next, { boot: true });
         }
 
         window.addCustomPalettes = function(list) {

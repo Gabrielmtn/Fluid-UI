@@ -318,6 +318,19 @@
                 }
             });
         }
+        // Under Transparent Background the painting area around the canvas is
+        // as see-through as the canvas's own empty field, so the frame never
+        // shows as a darker or lighter box. The empty field is black at alpha
+        // 1 − Background Transparency when Empty Alpha Locked is on (opaque
+        // when it is off; displayFrag in 05a), times Canvas Opacity.
+        function paintAreaBackdrop() {
+            if (!canvasArea || !document.body.classList.contains('transparent-mode')) return;
+            const op = parseFloat(canvas.style.opacity);
+            const field = window.preserveFluidOpacity ? 1 - (window.backgroundTransparency || 0) : 1;
+            const a = (Number.isFinite(op) ? op : 1) * field;
+            canvasArea.style.backgroundColor = 'rgba(0, 0, 0, ' + a.toFixed(3) + ')';
+        }
+        window.paintAreaBackdrop = paintAreaBackdrop;
         // Canvas opacity slider (for layer visibility)
         const canvasOpacitySlider = document.getElementById('canvasOpacity');
         const opacityValueDisplay = document.getElementById('opacityValue');
@@ -327,6 +340,7 @@
                 const opacity = value / 100;
                 canvas.style.opacity = opacity;
                 opacityValueDisplay.textContent = `${value}%`;
+                paintAreaBackdrop();
             });
         }
         // Preserve fluid opacity checkbox ("Empty Alpha Locked")
@@ -335,6 +349,7 @@
         if (preserveFluidOpacityCheckbox) {
             preserveFluidOpacityCheckbox.addEventListener('change', (e) => {
                 window.preserveFluidOpacity = e.target.checked;
+                paintAreaBackdrop();
             });
         }
         // Display shading (Pavel-style pseudo-normal lighting)
@@ -386,7 +401,8 @@
                 if (shadeGlossValue) shadeGlossValue.textContent = v.toFixed(2);
             });
         }
-        // Capture dimming slider (controls background transparency)
+        // Capture dimming slider (controls background transparency). Only on
+        // screen under Transparent Background (styles.css .bg-transparency-group).
         window.backgroundTransparency = 0.8; // Default 80%
         const captureDimmingSlider = document.getElementById('captureDimming');
         const dimmingValueDisplay = document.getElementById('dimmingValue');
@@ -395,6 +411,7 @@
                 const value = parseInt(e.target.value);
                 window.backgroundTransparency = value / 100; // Convert to 0-1 range
                 dimmingValueDisplay.textContent = `${value}%`;
+                paintAreaBackdrop();
             });
         }
         // Multiplier slider

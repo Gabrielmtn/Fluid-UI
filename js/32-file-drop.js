@@ -51,6 +51,9 @@
     // visible frame), not the whole padded area.
     function zoneFor(el) {
         if (!el || !el.closest) return null;
+        // An image dropped on the palettes becomes a palette (65).
+        var pal = el.closest('[data-palette-drop]');
+        if (pal && window.PaletteFromImage) return { kind: 'palette', hl: pal };
         var shapes = el.closest('.brush-shapes-area');
         if (shapes) return { kind: 'shape', hl: shapes };
         var layersPanel = el.closest('#layersPanel');
@@ -105,7 +108,9 @@
         if (!z) return;
         var files = imageFiles(e);
         if (!files.length) return;
-        if (z.kind === 'shape') {
+        if (z.kind === 'palette') {
+            window.PaletteFromImage.openFile(files[0]);
+        } else if (z.kind === 'shape') {
             if (window.BrushShapes && typeof window.BrushShapes.beginImportFile === 'function') {
                 window.BrushShapes.beginImportFile(files[0]);
             }

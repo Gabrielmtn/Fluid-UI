@@ -34,14 +34,33 @@
         return c ? { w: c.width, h: c.height } : null;
     }
 
+    // A GIF is scaled down to the exporter's max width (24 exportGIF, same
+    // math), so on most canvases it does NOT come out at the canvas size;
+    // the Export line says so (agent usertest 2026-10-07: "Comes out
+    // 1008 × 646" over a 640 × 410 GIF).
+    function gifMaxW() {
+        var fe = window.fluidExport;
+        var cfg = fe && typeof fe.getConfig === 'function' ? fe.getConfig() : null;
+        return (cfg && cfg.gifMaxWidth) || 640;
+    }
+    var lastMax = -1;
+
     function refresh(force) {
         var s = current();
         if (!s) return;
-        if (!force && s.w === lastW && s.h === lastH) return;
-        lastW = s.w; lastH = s.h;
+        var maxW = gifMaxW();
+        if (!force && s.w === lastW && s.h === lastH && maxW === lastMax) return;
+        lastW = s.w; lastH = s.h; lastMax = maxW;
         var t = sizeText(s.w, s.h);
         if (barVal) barVal.textContent = t;
-        if (exportEl) exportEl.textContent = 'Comes out ' + t;
+        if (exportEl) {
+            var out = 'Comes out ' + t;
+            var gw = s.w, gh = s.h;
+            if (gw > maxW) { gh = Math.round(gh * (maxW / gw)); gw = maxW; }
+            gw = gw & ~1; gh = gh & ~1;   // and even sides, as 24 does
+            if (gw !== s.w || gh !== s.h) out += ' (GIF ' + gw + ' × ' + gh + ')';
+            exportEl.textContent = out;
+        }
     }
 
     // On the underbar after the quality pills, before Reset app and the clock.
@@ -76,8 +95,9 @@
         if (!exportEl) {
             exportEl = document.createElement('div');
             exportEl.className = 'export-size-readout';
-            exportEl.title = 'Video, GIF and pictures come out at the canvas size. A video rounds an odd side ' +
-                'down by one pixel, and a GIF is scaled to 640 wide.';
+            exportEl.title = 'Video and pictures come out at the canvas size; a video rounds an odd side ' +
+                'down by one pixel. A GIF is at most ' + gifMaxW() + ' px wide, with even sides; when that makes it ' +
+                'smaller, its size is in brackets.';
         }
         if (exportEl.parentElement !== row.parentElement) row.parentElement.insertBefore(exportEl, row);
         return true;

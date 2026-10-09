@@ -167,7 +167,9 @@
             h: cv ? cv.height : 0,
             gate: !!cfg.COLOR_GATE,
             flow: (typeof cfg.BRUSH_FLOW === 'number') ? +cfg.BRUSH_FLOW.toFixed(3) : 1,
-            radius: (typeof cfg.SPLAT_RADIUS === 'number') ? +cfg.SPLAT_RADIUS.toFixed(6) : 0.011,
+            // Significant digits: SPLAT_RADIUS is Brush Size / 1000, and six
+            // decimals rounded the fine end (size 0.0015 went out as 0.002).
+            radius: (typeof cfg.SPLAT_RADIUS === 'number') ? +cfg.SPLAT_RADIUS.toPrecision(4) : 0.011,
             mult: mult,
             sym: cfg.SYMMETRY_MODE || 'radial',
             tip: cfg.BRUSH_TIP | 0,

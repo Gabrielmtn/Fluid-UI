@@ -405,124 +405,171 @@ html.boot-fade.booting #canvas-area {
     justify-content: center;
 }
 
-/* Titled group holding everything mask-shaped, so the layer reads as two
-   parts: what you do TO the layer, and the mask that shapes it. */
+/* ── Layer row bodies (05k "Row bodies", 2026-10-09) ──
+   Every row is built the same way: setting rows, then one row of buttons,
+   then a framed group (Mask / Collision) built the same way inside. Two
+   shared columns hold it together: --layer-cap-col for every caption
+   (Opacity, Blend, Feather, Mode...) and --layer-ctl-col for every readout,
+   which is also the width of the header's show/hide box. The body has no
+   side padding of its own, so its readouts sit in that same column. */
+#sidebar-right .layer-item {
+    --layer-cap-col: 60px;
+    --layer-ctl-col: 40px;
+}
+#sidebar-right .layer-item-collapsible .layer-item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 9px 0 2px;
+    /* the small button size, set once for every button in the body */
+    --btn-size: 11px;
+    --btn-pad-y: 5px;
+    --btn-pad-x: 8px;
+    container-type: inline-size;
+}
+
+/* Setting row: caption | fader or dropdown | readout. */
+#sidebar-right .layer-prop {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    opacity: 1;
+    min-height: 24px;
+}
+/* The unified fader is a 44px box around a ~22px track. Pull a fader row in
+   by 6px top and bottom so the tracks keep the same rhythm as the dropdowns
+   between them; 6px stays inside the 7px gap, so the input's hit area never
+   reaches the control next to it. */
+#sidebar-right .layer-threshold.layer-prop {
+    margin: -6px 0;
+}
+#sidebar-right .layer-prop .layer-prop-label {
+    flex: 0 0 var(--layer-cap-col);
+    width: var(--layer-cap-col);
+    min-width: 0;
+    margin: 0;
+    font-size: calc(9px * var(--ui-scale));
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: rgba(255, 255, 255, 0.5);
+    opacity: 1;
+    white-space: nowrap;
+}
+#sidebar-right .layer-prop .layer-slider-host {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+#sidebar-right .layer-prop select {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 24px;
+    font-size: calc(10px * var(--ui-scale));
+    padding: 2px 4px;
+}
+#sidebar-right .layer-slider-value {
+    font-family: 'Courier New', monospace;
+    font-size: calc(10px * var(--ui-scale));
+    width: var(--layer-ctl-col);
+    min-width: var(--layer-ctl-col);
+    flex-shrink: 0;
+    margin: 0;
+    text-align: center;
+    color: var(--ink-100, #f2f3f5);
+    font-weight: 600;
+}
+/* A setting whose control is a single checkbox (collider Invert). */
+#sidebar-right .layer-prop .layer-vis {
+    padding: 2px 0;
+}
+
+/* The row of buttons: equal widths that always fill the row; when the
+   sidebar is too narrow for them all, they wrap and the last ones share
+   the next line, still edge to edge. */
+#sidebar-right .layer-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0;
+}
+#sidebar-right .layer-action-row > button {
+    flex: 1 1 0;
+    min-width: max-content;
+    margin: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* The group: what shapes the layer (its mask, or its wall), headed by that
+   thing's own on/off check — or by its name, while there is nothing yet. */
 #sidebar-right .layer-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
     border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 5px;
-    padding: 7px 7px 3px;
-    margin-top: 8px;
+    border-radius: 6px;
+    padding: 6px 7px 7px;
+    margin: 2px 0 0;
     background: rgba(255, 255, 255, 0.015);
+}
+#sidebar-right .layer-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-height: 22px;
 }
 #sidebar-right .layer-group-title {
     font-size: calc(9px * var(--ui-scale));
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: rgba(255, 255, 255, 0.4);
-    margin-bottom: 6px;
+    margin: 0;
 }
-#sidebar-right .layer-group > .layer-mask-controls:last-child,
-#sidebar-right .layer-group > div:last-child {
-    margin-bottom: 0;
+#sidebar-right .layer-group-meta {
+    font-size: calc(10px * var(--ui-scale));
+    color: rgba(255, 255, 255, 0.45);
+    white-space: nowrap;
 }
-
-/* Action buttons row inside layer body (moved out of header) */
-#sidebar-right .layer-action-row {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-    margin-bottom: 6px;
+#sidebar-right .layer-check {
+    font-size: calc(10px * var(--ui-scale));
 }
-
-/* Compact layer buttons with clearer styling */
-#sidebar-right .layer-btn {
-    min-width: auto;
+#sidebar-right .layer-check-inline {
+    flex: 0 0 auto;
+}
+.layer-check-text {
     line-height: 1.2;
+    white-space: nowrap;
 }
-/* Mask control buttons */
-#sidebar-right .layer-mask-controls {
-    padding: 0;
-}
-/* Threshold / Feather slider row — sits directly under the header, so the
-   thumbnail/name/checkbox block and this read as one unit. */
-#sidebar-right .layer-threshold {
-    font-size: calc(10px * var(--ui-scale));
-    gap: 6px;
-    opacity: 0.85;
-    margin-bottom: 8px;
-}
-#sidebar-right .layer-threshold .layer-slider-host {
-    flex: 1;
-    display: flex;
-    align-items: center;
-}
-#sidebar-right .layer-threshold span:first-child,
-#sidebar-right .layer-threshold .layer-slider-value {
-    margin-top: 0; /* unified fader: label/value center against the 44px box */
-}
-/* (The old !important border/shadow strip for the retired bezel look was
-   removed — the unified fader's track ring is an inset box-shadow and
-   must survive in the sidebar.) */
-#sidebar-right .layer-threshold span:first-child {
-    font-size: calc(9px * var(--ui-scale));
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    opacity: 0.6;
-    min-width: 42px;
-    flex-shrink: 0;
-}
-#sidebar-right .layer-slider-value {
-    font-family: 'Courier New', monospace;
-    font-size: calc(10px * var(--ui-scale));
-    /* Same column as the header's checkbox, centred in it — the two stay
-       aligned whether the value reads 0% or 100%. */
-    width: var(--layer-ctl-col, 40px);
-    min-width: var(--layer-ctl-col, 40px);
-    flex-shrink: 0;
-    text-align: center;
-    color: var(--ink-100, #f2f3f5);
-    font-weight: 600;
-}
-
-/* Collision controls - cleaner layout */
+/* The collider's settings sit straight in its group — no second box. */
 #sidebar-right .collision-controls {
-    padding: 6px 8px;
-    background: rgba(255, 160, 60, 0.04);
-    border: 1px solid rgba(255, 160, 60, 0.1);
-    border-radius: 6px;
-}
-#sidebar-right .collision-row {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-    padding: 6px 0; /* Space for slider thumb overflow */
+    flex-direction: column;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
 }
-#sidebar-right .collision-row:last-child {
-    margin-bottom: 0;
-}
-#sidebar-right .collision-label {
-    font-size: calc(9px * var(--ui-scale));
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    opacity: 0.55;
-    min-width: 52px;
-    flex-shrink: 0;
-}
-#sidebar-right .collision-mode-select {
-    flex: 1;
-    height: 24px;
-    font-size: calc(10px * var(--ui-scale));
-    padding: 2px 4px;
-}
-#sidebar-right .collision-strength-val,
-#sidebar-right .collision-threshold-val {
-    font-family: 'Courier New', monospace;
-    font-size: calc(10px * var(--ui-scale));
-    min-width: 28px;
-    text-align: right;
-    color: rgba(255, 170, 80, 0.85);
-    font-weight: 600;
+/* The sidebar drags down to 220px, where a 60px caption beside a fader and
+   its readout leaves the fader a sliver. Below 200px of row, each caption
+   goes above its control instead, and the control gets the full width.
+   (After the rules above on purpose: same specificity, so order decides.) */
+@container (max-width: 200px) {
+    #sidebar-right .layer-prop {
+        flex-wrap: wrap;
+        row-gap: 0;
+    }
+    #sidebar-right .layer-prop .layer-prop-label {
+        flex: 0 0 100%;
+        width: 100%;
+    }
+    #sidebar-right .layer-prop select {
+        flex: 1 1 0;
+    }
 }
 
 /* Drop zone polish — the two reorder targets are permanent fixtures, but

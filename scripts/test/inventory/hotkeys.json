@@ -308,9 +308,9 @@
     {
       "keys": "Ctrl+ArrowLeft",
       "event": { "key": "ArrowLeft", "code": "ArrowLeft", "ctrlKey": true, "shiftKey": false, "altKey": false },
-      "guard": "typing target; ctrl or meta",
-      "effect": "window.cyclePalette(-1): previous curated palette — CLAMPS at index 0, does not wrap (js/01-config.js:449-455); pushes UI undo",
-      "assertion": "bare-global currentPaletteIndex decrements by 1 (unchanged when already 0)",
+      "guard": "typing target; ctrl or meta, no shift or alt",
+      "effect": "stepPaletteColour(-1): the palette's previous colour. Palette mode moves paletteStepIndex (stepPaletteOnce); One / Random make it the brush colour (2026-10-08; switched palette before)",
+      "assertion": "#colorPicker.value becomes the previous colour of getStepColorList()",
       "source": "js/05n-hotkeys-init.js:432-436",
       "sheet": "index.html:1118"
     },
@@ -318,10 +318,28 @@
       "keys": "Ctrl+ArrowRight",
       "event": { "key": "ArrowRight", "code": "ArrowRight", "ctrlKey": true, "shiftKey": false, "altKey": false },
       "guard": "same as Ctrl+ArrowLeft",
-      "effect": "window.cyclePalette(1): next palette, clamps at last index",
-      "assertion": "currentPaletteIndex increments by 1 (unchanged at the end)",
+      "effect": "stepPaletteColour(1): the palette's next colour (see Ctrl+ArrowLeft)",
+      "assertion": "#colorPicker.value becomes the next colour of getStepColorList()",
       "source": "js/05n-hotkeys-init.js:432-436",
       "sheet": "index.html:1118"
+    },
+    {
+      "keys": "Ctrl+Shift+ArrowLeft",
+      "event": { "key": "ArrowLeft", "code": "ArrowLeft", "ctrlKey": true, "shiftKey": true, "altKey": false },
+      "guard": "typing target; ctrl or meta + shift",
+      "effect": "window.cyclePalette(-1): previous palette, clamps at 0, turns Palette mode on; pushes UI undo (2026-10-08; was Ctrl+ArrowLeft)",
+      "assertion": "currentPaletteIndex decrements by 1 (unchanged when already 0)",
+      "source": "js/05n-hotkeys-init.js (palette keys block)",
+      "sheet": "index.html (Colors & Palettes)"
+    },
+    {
+      "keys": "Ctrl+Shift+ArrowRight",
+      "event": { "key": "ArrowRight", "code": "ArrowRight", "ctrlKey": true, "shiftKey": true, "altKey": false },
+      "guard": "same as Ctrl+Shift+ArrowLeft",
+      "effect": "window.cyclePalette(1): next palette, clamps at the end",
+      "assertion": "currentPaletteIndex increments by 1 (unchanged at the end)",
+      "source": "js/05n-hotkeys-init.js (palette keys block)",
+      "sheet": "index.html (Colors & Palettes)"
     },
     {
       "keys": "Alt+ArrowUp",

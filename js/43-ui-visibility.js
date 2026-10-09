@@ -126,11 +126,17 @@
             var kids = (window.StripMore && typeof window.StripMore.stripChildren === 'function'
                         && window.StripMore.stripChildren())
                     || Array.prototype.slice.call(strip.children);
-            kids.forEach(function (el) {
-                if (el.classList.contains('mixer-divider')) return;
-                var k = el.dataset && el.dataset.uiKey;
-                if (!k) return;                         // unlabelled child: leave it alone
-                items.push({ key: 'strip:' + k, kind: 'strip', label: el.dataset.uiLabel || k, el: el });
+            kids.forEach(function (child) {
+                if (child.classList.contains('mixer-divider')) return;
+                // 20's right-hand stack holds Presets, Help and Transport in
+                // two rows: list the cells inside it, not the stack.
+                var cells = child.classList.contains('mixer-stack')
+                    ? Array.prototype.slice.call(child.querySelectorAll('[data-ui-key]')) : [child];
+                cells.forEach(function (el) {
+                    var k = el.dataset && el.dataset.uiKey;
+                    if (!k) return;                     // unlabelled child: leave it alone
+                    items.push({ key: 'strip:' + k, kind: 'strip', label: el.dataset.uiLabel || k, el: el });
+                });
             });
         }
         // Both sidebars' sections (the left one holds the brush's own).
@@ -164,6 +170,11 @@
                 if (it.kind === 'chrome') barFlipped = true;
                 if (hide && onHidden(it)) sectionCollapsed = true;
             }
+        });
+        // A stack shows while any cell in it does, so the divider and
+        // empty-bar checks below can treat it as one cell.
+        Array.prototype.forEach.call(document.querySelectorAll('#mixer-strip .mixer-stack'), function (s) {
+            s.classList.toggle('ui-hidden', !s.querySelector('[data-ui-key]:not(.ui-hidden)'));
         });
         fixDividers();
         fixEmptyStrip();
@@ -212,7 +223,7 @@
     // Same for a section: an expanded body that is now invisible still counts
     // as "open" to the accordion, so collapse it. Returns true when a section
     // was collapsed here (the caller persists that).
-    var POPUP_TRIGGERS = '.ch-label.active, .ch-tip-swatch.active, #multiplierValue.active, #mixerPresetsTrigger.active';
+    var POPUP_TRIGGERS = '.ch-label.active, #multiplierValue.active, #mixerPresetsTrigger.active';
     function onHidden(it) {
         if (it.kind === 'strip') {
             Array.prototype.forEach.call(it.el.querySelectorAll(POPUP_TRIGGERS), function (t) {

@@ -128,16 +128,38 @@
                 // Compare before writing: the 2s fallback interval otherwise
                 // invalidates style/layout every tick even when nothing
                 // changed (UI audit Stage 1 — no-op DOM writes aren't free).
-                // Fine tips (down to 0.001) need 3 decimals or the readout
-                // reads a flat "0.0" across the whole detail range.
+                // The size as it stands on THIS canvas now, in px: the e^-1
+                // diameter, 2·√(SPLAT_RADIUS × stamp scale) × canvas height
+                // (05d0 brushDiameterPx). It changes with the window and
+                // differs per peer; the stored size stays canvas-relative.
+                // Pixels only since 2026-10-09: the raw slider value beside
+                // them ("0.346 · 44 px") read as unclear. Before the canvas
+                // has a buffer there is no px yet, so the raw value.
                 var n = parseFloat(brushSlider.value);
-                var v = (n < 1) ? n.toFixed(3) : n.toFixed(1);
+                var cv = document.getElementById('canvas');
+                var c = window.config || {};
+                var v;
+                if (cv && cv.height > 0) {
+                    var px = 2 * Math.sqrt(n / 1000 * (c.STAMP_RADIUS_SCALE || 1)) * cv.height;
+                    v = (px < 10 ? px.toFixed(1) : String(Math.round(px))) + ' px';
+                } else {
+                    v = (n < 0.01) ? n.toFixed(4) : (n < 1) ? n.toFixed(3) : n.toFixed(1);
+                }
                 if (brushDisplay.textContent !== v) brushDisplay.textContent = v;
             }
             brushSlider.addEventListener('input', syncBrush);
             brushSlider.addEventListener('change', syncBrush);
-            // Slow fallback for programmatic value changes (2s instead of 300ms)
-            setInterval(syncBrush, 2000);
+            // The px part follows the canvas buffer. A window or sidebar change
+            // moves the CSS box, which the observer sees at once; a render
+            // scale change (the boot ramp, the governor) moves only the
+            // buffer, which the poll catches. At 2s the readout, and a radial
+            // wedge copied from it, sat a size behind after every boot.
+            var brushCanvas = document.getElementById('canvas');
+            if (brushCanvas && 'ResizeObserver' in window) new ResizeObserver(function () { syncBrush(); }).observe(brushCanvas);
+            // Fallback for programmatic value changes and buffer-only resizes,
+            // on the canvas readout's (62) cadence. syncBrush writes nothing
+            // unless the text changed, so a tick costs two property reads.
+            setInterval(syncBrush, 500);
             syncBrush();
         }
 
@@ -342,48 +364,6 @@
         }
     }
 
-    // One shared disclosure affordance (user-test 2026-08-15): Brush Size,
-    // Fluid, and Multi-Brush each hid extra controls behind a DIFFERENT
-    // secret handshake — a clickable label with an 8px chevron, a select
-    // disguised as a label, a clickable value cell. None read as
-    // interactive. Every channel with more-settings now also carries an
-    // explicit gear button in its header; the original triggers stay
-    // clickable for muscle memory.
-    function makeChGear(title) {
-        var g = document.createElement('button');
-        g.type = 'button';
-        g.className = 'ch-gear';
-        g.title = title;
-        // U+2699 + VS15 forces the monochrome TEXT gear glyph (no emoji
-        // coloring), so currentColor styling applies like any icon font.
-        g.textContent = '⚙︎';
-        return g;
-    }
-
-    // Delegate the gear to an existing trigger element and mirror its
-    // active state (set/cleared by the panel handlers AND the outside-click
-    // closers — a MutationObserver keeps the gear honest either way). The
-    // delegated .click() raises a fresh event targeting the trigger, which
-    // every outside-click closer already exempts.
-    function wireGearToTrigger(gear, trigger) {
-        if (!trigger) { gear.disabled = true; return; }
-        // The gear and the trigger are two doors onto ONE popup, so an
-        // outside-click closer has to treat them as the same element: a press
-        // on the gear is a press on the trigger. Without this the closer
-        // dismisses the panel on the gear's pointerdown and the gear's own
-        // click re-opens it, and the gear could never close anything.
-        trigger.__chGear = gear;
-        gear.addEventListener('click', function (e) {
-            e.stopPropagation();
-            trigger.click();
-        });
-        try {
-            new MutationObserver(function () {
-                gear.classList.toggle('active', trigger.classList.contains('active'));
-            }).observe(trigger, { attributes: true, attributeFilter: ['class'] });
-        } catch (_) {}
-    }
-
     // ─── BRUSH TIP: one vocabulary, two doors ────────────────────
     // These five glyphs are the app's whole visual language for the splat
     // stamp. The brush drawer's Tip row and the square swatch beside the
@@ -397,12 +377,9 @@
         { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring — thin dye band, hollow center' }
     ];
 
-    // The drawer owns the tip's commit path (config + persistence + the
-    // Texture slider's enabled state + preset-dirty). The strip swatch is a
-    // second DOOR onto those setters, never a second copy of them.
-    var BrushTipCtl = null;     // {setTip, markDirty, openImport} — set by buildBrushPanel
-    var tipSwatchSync = null;   // set by buildTipSwatch — repaints the swatch (+ an open menu)
-    function syncTipSwatch() { if (tipSwatchSync) tipSwatchSync(); }
+    // The Brush panel's preset-dirty flag, for the shape tiles (renderShapeTiles
+    // is built outside it). Set by buildBrushPanel.
+    var markBrushDirty = null;
 
     function activeShapeEntry() {
         if (!window.BrushShapes) return null;
@@ -575,9 +552,8 @@
         });
     }
 
-    // Custom stamp swatches (33-brush-shapes) + the import tiles, shared by
-    // the drawer's shapes row and the strip's tip menu — one renderer, so a
-    // shape selects, deletes and highlights identically wherever it's clicked.
+    // Custom stamp swatches (33-brush-shapes) + the import tiles of the Brush
+    // panel's shapes row.
     function renderShapeTiles(row, opts) {
         opts = opts || {};
         row.innerHTML = '';
@@ -600,8 +576,7 @@
             b.addEventListener('click', function () {
                 if (!window.BrushShapes) return;
                 window.BrushShapes.setActive(window.BrushShapes.activeId() === s.id ? null : s.id);
-                if (BrushTipCtl) BrushTipCtl.markDirty();
-                if (opts.onPick) opts.onPick();
+                if (markBrushDirty) markBrushDirty();
             });
             b.addEventListener('contextmenu', function (e) {
                 e.preventDefault();
@@ -624,173 +599,8 @@
         pasteB.className = 'brush-tip-btn brush-shape-paste';
         pasteB.textContent = 'Clipboard';
         pasteB.title = 'New brush shape from the clipboard — takes the image you last copied and opens the same cut-out editor as ＋.';
-        pasteB.addEventListener('click', function () {
-            // The caller closes its popup first: the mask editor takes the
-            // screen from here, exactly as it does for ＋.
-            if (opts.onImportClose) opts.onImportClose();
-            importShapeFromClipboard();
-        });
+        pasteB.addEventListener('click', importShapeFromClipboard);
         row.appendChild(pasteB);
-    }
-
-    // The square appended to the Brush Size fader: it SHOWS the tip you are
-    // painting with (built-in glyph, or the custom stamp's own thumbnail) and
-    // opens a tip menu. Until now the tip lived only inside the brush drawer —
-    // nothing anywhere on screen said which tip was loaded, and changing it
-    // meant opening a drawer from the fader that sets its size.
-    function buildTipSwatch() {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'ch-tip-swatch';
-
-        // The stamp thumbnail rides an inner span so the button's own
-        // background stays free for the hover/active fills.
-        var face = document.createElement('span');
-        face.className = 'ch-tip-face';
-        btn.appendChild(face);
-
-        var menu = document.createElement('div');
-        menu.className = 'arm-colors-panel brush-tip-menu';
-        // Popovers are portaled to <body>, so they carry the paint surface's tint
-        // with them rather than inheriting the app-root system fallback.
-        menu.dataset.group = 'core';
-        menu.style.display = 'none';
-        menu.style.position = 'fixed';   // the strip is overflow-x:auto — a popup inside it would clip
-        document.body.appendChild(menu);
-        menu.addEventListener('click', function (e) { e.stopPropagation(); });
-
-        var head = document.createElement('div');
-        head.className = 'arm-colors-header';
-        head.textContent = 'Brush Tip';
-        menu.appendChild(head);
-
-        var list = document.createElement('div');
-        list.className = 'brush-tip-menu-list';
-        menu.appendChild(list);
-
-        var itemBtns = [];
-        BRUSH_TIPS.forEach(function (t) {
-            var it = document.createElement('button');
-            it.type = 'button';
-            it.className = 'brush-tip-item';
-            it.dataset.tip = String(t.v);
-            it.title = t.title;
-            var g = document.createElement('span');
-            g.className = 'brush-tip-item-glyph';
-            g.textContent = t.glyph;
-            var n = document.createElement('span');
-            n.className = 'brush-tip-item-name';
-            n.textContent = t.name;
-            it.appendChild(g);
-            it.appendChild(n);
-            it.addEventListener('click', function () {
-                // Same order as the drawer's tip row: a built-in tip dismisses
-                // any custom shape override first, then commits.
-                if (window.BrushShapes && window.BrushShapes.activeId()) window.BrushShapes.setActive(null);
-                if (BrushTipCtl) { BrushTipCtl.setTip(t.v); BrushTipCtl.markDirty(); }
-                closeMenu();
-            });
-            itemBtns.push(it);
-            list.appendChild(it);
-        });
-
-        var shapesLabel = document.createElement('label');
-        shapesLabel.className = 'brush-section-label';
-        shapesLabel.textContent = 'Shapes';
-        menu.appendChild(shapesLabel);
-
-        var shapesRow = document.createElement('div');
-        // brush-shapes-area is 32-file-drop's hook: dropping an image on the
-        // menu's shapes row imports it, exactly as it does on the drawer's.
-        shapesRow.className = 'brush-tip-row brush-shapes-row brush-shapes-area';
-        menu.appendChild(shapesRow);
-
-        function renderTiles() {
-            renderShapeTiles(shapesRow, {
-                onImport: function () {
-                    closeMenu();  // the mask editor takes the screen from here
-                    if (BrushTipCtl) BrushTipCtl.openImport();
-                },
-                onImportClose: closeMenu,   // same, for the clipboard tile
-                onPick: closeMenu
-            });
-        }
-
-        function positionMenu() {
-            // Fixed left/top are read in the --ui-scale zoomed space: measure in
-            // screen px, divide by zoom (same math as the arm-colors popup).
-            var z = window.UIScale ? window.UIScale.get() : 1;
-            var rect = btn.getBoundingClientRect();
-            var w = 172;
-            var left = rect.left + rect.width / 2 - (w * z) / 2;
-            left = Math.max(4, Math.min(left, window.innerWidth - w * z - 4));
-            menu.style.left = (left / z) + 'px';
-            menu.style.top = ((rect.bottom + 4) / z) + 'px';
-            menu.style.width = w + 'px';
-            menu.style.maxHeight = Math.max(180, (window.innerHeight - rect.bottom - 16) / z) + 'px';
-            menu.style.overflowY = 'auto';
-        }
-
-        function openMenu() {
-            renderTiles();
-            positionMenu();   // position BEFORE it paints
-            menu.style.display = 'block';
-            btn.classList.add('active');
-        }
-        function closeMenu() {
-            menu.style.display = 'none';
-            btn.classList.remove('active');
-        }
-
-        function refresh() {
-            var entry = activeShapeEntry();
-            var tip = (window.config && window.config.BRUSH_TIP) | 0;
-            if (tip < 0 || tip >= BRUSH_TIPS.length) tip = 0;
-            if (entry) {
-                // A custom stamp overrides the built-in tip — show the stamp.
-                face.textContent = '';
-                face.style.backgroundImage = 'url("' + entry.dataURL + '")';
-                btn.title = 'Brush tip: ' + entry.name + ' (custom shape) — click to change · right-click to edit or delete';
-            } else {
-                face.style.backgroundImage = '';
-                face.textContent = BRUSH_TIPS[tip].glyph;
-                btn.title = 'Brush tip: ' + BRUSH_TIPS[tip].name + ' — click to change';
-            }
-            itemBtns.forEach(function (b) {
-                b.classList.toggle('active', !entry && parseInt(b.dataset.tip, 10) === tip);
-            });
-            if (menu.style.display !== 'none') renderTiles();
-        }
-        tipSwatchSync = refresh;
-
-        // No stopPropagation on the swatch: letting the click bubble lets the
-        // brush drawer's own outside-click closer retire the drawer, so the
-        // two never sit stacked on top of each other.
-        btn.addEventListener('click', function () {
-            if (menu.style.display === 'none') openMenu(); else closeMenu();
-        });
-        // Right-click is the SAME door as a shape tile's. The swatch is the one
-        // place the loaded shape is always on screen, so right-clicking it was
-        // the obvious way to edit or delete that shape — and it was the one
-        // place that answered with the browser's own context menu instead.
-        // Built-in tips have nothing to edit, so they keep the default menu.
-        btn.addEventListener('contextmenu', function (e) {
-            var entry = activeShapeEntry();
-            if (!entry) return;
-            e.preventDefault();
-            e.stopPropagation();
-            openShapeMenu(entry, e.clientX, e.clientY);
-        });
-        document.addEventListener('click', function (e) {
-            if (menu.style.display !== 'none' && !menu.contains(e.target)
-                && e.target !== btn && !btn.contains(e.target)) closeMenu();
-        });
-        window.addEventListener('resize', function () {
-            if (menu.style.display !== 'none') positionMenu();
-        });
-
-        refresh();
-        return btn;
     }
 
     // ─── MIXER STRIP ─────────────────────────────────────────────
@@ -811,32 +621,14 @@
         var brushSec = makeSection('Brush', 'core', false);
         buildBrushPanel(brushSec.body);
         pendingLeftSections.unshift(brushSec.sec);
-        // The tip swatch rides the FADER row, not the header: tip and size are
-        // the two halves of one answer to "what am I painting with", and the
-        // header already carries the label, the value and the gear.
-        var sizeFaderRow = sizeChannel.querySelector('.ch-fader');
-        if (sizeFaderRow) {
-            sizeFaderRow.appendChild(buildTipSwatch());
-            sizeChannel.classList.add('ch-has-tip');   // buys the fader back its width
-        }
+        // No tip swatch on the fader row since 2026-10-09: the Brush section's
+        // Tip row right below already shows and picks the tip.
         strip.appendChild(sizeChannel);
 
-        var fluidChannel = faderChannel('Fluid', 'blue', 'curl', 'curlValue');
-        // The Fluid gear opens the material picker (the disguised
-        // #materialMode select). showPicker needs Chromium 121+; older
-        // builds at least get focus so the arrow keys work.
-        var fluidGear = makeChGear('Material mode — Swirl / Gloss Paint (Wetness or Thickness)');
-        fluidGear.addEventListener('click', function (e) {
-            e.stopPropagation();
-            var sel = document.getElementById('materialMode');
-            if (!sel) return;
-            if (typeof sel.showPicker === 'function') {
-                try { sel.showPicker(); return; } catch (_) {}
-            }
-            sel.focus();
-        });
-        fluidChannel.querySelector('.ch-header').appendChild(fluidGear);
-        strip.appendChild(fluidChannel);
+        // The label is the material picker (#materialMode, with its ▼). Its
+        // ⚙ was a second door to the same menu and pushed the value off the
+        // track's right edge; it went 2026-10-07.
+        strip.appendChild(faderChannel('Fluid', 'blue', 'curl', 'curlValue'));
 
         // Real viscosity since 2026-09-21. Until then this fader drove the
         // display sharpen amount (#sharpness, now Ridge Strength in Surface
@@ -869,18 +661,24 @@
 
         strip.appendChild(divider());
 
-        // Quick actions
-        strip.appendChild(buildActionsChannel(controls));
-
-        strip.appendChild(divider());
-
-        // Presets
-        strip.appendChild(buildPresetsChannel(controls));
-
+        // The right-hand stack (2026-10-07): Presets and Help on top, Clear ·
+        // Pause · Stop under them, two rows at the colour cluster's height.
+        // It used to be three cells side by side; stacked, the bar keeps that
+        // width free for a section to come. The cells keep their own
+        // data-ui-key, so 43 lists and hides each one (it looks inside
+        // .mixer-stack), and 44's recipes find them with a descendant query.
+        const stack = document.createElement('div');
+        stack.className = 'mixer-stack';
+        const stackTop = document.createElement('div');
+        stackTop.className = 'mixer-stack-top';
+        stackTop.appendChild(buildPresetsChannel(controls));
         // Help: the one visible way into "How do I…" (js/44-recipes.js) on
         // desktop; the '/' key is the other. Pinned by 43-ui-visibility so
         // Simple mode keeps it — it is the way to find what Simple hid.
-        strip.appendChild(buildHelpChannel());
+        stackTop.appendChild(buildHelpChannel());
+        stack.appendChild(stackTop);
+        stack.appendChild(buildActionsChannel(controls));
+        strip.appendChild(stack);
 
         return strip;
     }
@@ -902,8 +700,8 @@
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Brush Size': 'Brush size for painting fluid. The brush settings and presets are right under it, in Brush',
-        'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
+        'Brush Size': 'Brush size for painting fluid; the readout gives it in px on this canvas. Fine lines soften as the paint moves: Stop (Space) or a layer keeps them. The brush settings and presets are right under it, in Brush',
+        'Fluid': 'Material type (Fluid, Paint (Wet) or Paint (Thick)) and its amount. Click the name to pick the material.',
         'Viscosity': 'How thick the fluid is — 0 flows like water, higher smooths the swirls into broad ribbons',
         // User test 3: Isolation's tip had been wrong since June, and Density and
         // Velocity read backwards for faders where right means lasts longer.
@@ -963,6 +761,21 @@
     // back. Ranges come from the element so the curve can never drift from
     // the DOM/registry pair the way a copied constant would.
     const FADER_CURVES = {
+        // Brush Size (2026-10-07) on the radial menu's log scale (58
+        // LOG_SLIDERS): value = min × (max/min)^p, i.e. 0.001 × 10^(5p) on
+        // 0.001–100. Each fifth of the travel is ×10 in size (×3.16 in
+        // width); 1.3 sits at 62%. Linear, every size up to 1 was squeezed
+        // into the bottom 1% of the fader.
+        brushSize: {
+            toCanonical: function (p, el) {
+                const min = parseFloat(el.min), max = parseFloat(el.max);
+                return min * Math.pow(max / min, p);
+            },
+            fromCanonical: function (v, el) {
+                const min = parseFloat(el.min), max = parseFloat(el.max);
+                return Math.log(Math.max(min, v) / min) / Math.log(max / min);
+            }
+        },
         densityDissipation: {
             toCanonical: function (p, el) {
                 const a = curveCfg('DENSITY_FADER_HOLD_A', 0.86);
@@ -1135,9 +948,14 @@
         // control row above the fader.
         const matSel = (sliderId === 'curl') ? document.getElementById('materialMode') : null;
         if (matSel) {
-            // Its options are phrases, not one-word channel names — .ch-material
-            // buys the row the width the longest one needs (20-mixer-strip.css).
+            // Its options are phrases, not one-word channel names. The bar's
+            // fader cells never shrink below their header (min-width:
+            // max-content, 20-mixer-strip.css), so the longest one fits;
+            // .ch-material is kept as a hook.
             ch.classList.add('ch-material');
+            // Named for what the picker chooses, not for one of its choices
+            // (Settings → Interface, hotkey binds, the More list).
+            ch.dataset.uiLabel = 'Material Type';
             matSel.style.cssText = '';
             lbl.appendChild(matSel);
             // Re-fit the select to its text in the strip's font — deferred a
@@ -1195,7 +1013,7 @@
         // modes / ignite) and drove the strip's height.
         const picker = document.getElementById('colorPicker');
 
-        // --- Toggle row: [Rnd|Cycle segmented switch] + gap + [Cap] ---
+        // --- Toggle row: [One|Random|Palette switch] + gap + [Limit] ---
         // Rnd/Step/Rainbow are mutually exclusive -> ONE gapless segmented
         // switch; Gate is an independent toggle drawn separately with its own
         // border (design handoff Task 6: touching cells mean pick one,
@@ -1223,30 +1041,41 @@
             var a0 = (window.multiArmColors || [])[0];
             return a0 ? a0.mode : 'main';
         }
+        // One · Random · Palette: where each stroke's colour comes from, as
+        // one three-way choice in words (2026-10-08). It was two toggles,
+        // "Rnd" and "Palette", that read as stackable switches, with "one
+        // colour" only reachable by switching the lit one off; testers
+        // found "Rnd" cryptic. Every app we studied treats these as one
+        // choice of colour source. Clicking the lit one keeps it.
         function makeColorModeChip(labelText, modeKey, dataKey, title, initActive) {
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'ch-text-toggle' + (initActive ? ' active' : '');
             btn.textContent = labelText;
             btn.dataset.brushMode = dataKey;
+            btn.setAttribute('aria-pressed', initActive ? 'true' : 'false');
             if (title) btn.title = title;
             btn.addEventListener('click', function () {
-                var next = (arm0Mode() === modeKey) ? 'fixed' : modeKey;
                 if (typeof window.setActiveBrushColorMode === 'function') {
-                    window.setActiveBrushColorMode(next);
+                    window.setActiveBrushColorMode(modeKey);
                 }
             });
             segWrap.appendChild(btn);
             return btn;
         }
+        segWrap.setAttribute('role', 'group');
+        segWrap.setAttribute('aria-label', 'Colour of each stroke');
 
+        var a0m = arm0Mode();
+        makeColorModeChip('One', 'fixed', 'one', 'One colour: every stroke paints the colour in the dot',
+            !(rnd && rnd.checked) && !(stepEl && stepEl.checked) && a0m !== 'random' && a0m !== 'step');
         // Hidden native checkboxes stay in the DOM as derived reflections
         // (save/load, palette auto-step, updatePaletteStepIndicator read them).
         if (rnd) {
             rnd.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             ch.appendChild(rnd);
-            makeColorModeChip('Rnd', 'random', 'rnd', 'Random — a new colour each stroke',
-                rnd.checked || arm0Mode() === 'random');
+            makeColorModeChip('Random', 'random', 'rnd', 'Random: a new colour each stroke (R)',
+                rnd.checked || a0m === 'random');
         }
         if (stepEl) {
             stepEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
@@ -1255,34 +1084,63 @@
             // advances one palette colour per stroke. The mode key/checkbox
             // id stay 'step'; the carousel label became 'Palettes' to
             // disambiguate.
-            makeColorModeChip('Palette', 'step', 'step', 'Palette mode — advance one palette colour each stroke',
-                stepEl.checked || arm0Mode() === 'step');
+            var palChip = makeColorModeChip('Palette', 'step', 'step', '',
+                stepEl.checked || a0m === 'step');
+            // The tooltip names the palette it steps through, and right-click
+            // opens the colour dot's picker, which lists the palettes: the
+            // way to switch palette in the Simple layout, where the Palettes
+            // section is hidden.
+            var palTitle = function () {
+                var name = '';
+                try { name = (window.curatedPalettes || [])[window.currentPaletteIndex].name; } catch (_) {}
+                palChip.title = 'Palette: the next colour of ' + (name || 'the palette') + ' each stroke (A). '
+                    + 'Right-click, or click the colour dot, to choose the palette.';
+            };
+            palTitle();
+            palChip.addEventListener('mouseenter', palTitle);
+            palChip.addEventListener('focus', palTitle);
+            palChip.addEventListener('contextmenu', function (e) {
+                e.preventDefault();
+                if (picker && window.ColourPicker) window.ColourPicker.openFor(picker);
+            });
         }
         // Rainbow chip removed 2026-08-15 (photosensitivity: a new random
         // colour every splat strobes while painting). Stale saved 'rainbow'
         // modes coerce to 'fixed' at every ingest (05g allowlist + 12's
         // preset/autoload sanitizers).
 
-        // Cap Color chip (renamed from 'Gate' 2026-08-15 — user-test copy
-        // pass; the id colorGate and all persisted keys stay). Independent of
-        // Rnd/Cycle exclusivity: clamps dye at the stroke's own color so
-        // repeated paint can't overflow into white.
+        // Limit (was 'Gate', then 'Cap'). Independent of the colour choice:
+        // clamps dye at the stroke's own colour so repeated paint can't
+        // overflow into white. 2026-10-08: the button names the state it is
+        // in. "Limit On" is the default (the clamp at work) and is NOT
+        // pressed; pressing it turns the limit off, so the pressed state
+        // reads "Limit Off". The id colorGate, checked = clamped, and every
+        // persisted key stay as they were.
         var gateEl = document.getElementById('colorGate');
         if (gateEl) {
             gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             var gateBtn = document.createElement('button');
             gateBtn.type = 'button';
-            gateBtn.className = 'ch-text-toggle ch-gate-toggle' + (gateEl.checked ? ' active' : '');
-            gateBtn.textContent = 'Cap';
-            gateBtn.title = 'Cap Color — lock the max at the stroke\'s original color so repeated strokes can\'t blow out to white';
+            gateBtn.className = 'ch-text-toggle ch-gate-toggle';
+            // The text is "Limit" in both states, so a key bound to it (49)
+            // finds it either way and is named "Limit". On / Off is drawn by
+            // css/20 (.gate-state), both words in one cell, so the button
+            // keeps the width of "Off" instead of jumping when it flips.
+            gateBtn.innerHTML = 'Limit<span class="gate-state"></span>';
+            var syncGate = function () {
+                var off = !gateEl.checked;
+                gateBtn.classList.toggle('active', off);
+                gateBtn.title = off
+                    ? 'Limit Off: paint keeps stacking, so repeated strokes build toward white. Click to turn the limit back on.'
+                    : 'Limit On: each stroke stops at its own colour, so repeated strokes can\'t blow out to white. Click to turn it off.';
+            };
+            syncGate();
             gateBtn.addEventListener('click', function () {
                 gateEl.checked = !gateEl.checked;
                 gateEl.dispatchEvent(new Event('change', { bubbles: true }));
-                gateBtn.classList.toggle('active', gateEl.checked);
+                syncGate();
             });
-            gateEl.addEventListener('change', function () {
-                gateBtn.classList.toggle('active', gateEl.checked);
-            });
+            gateEl.addEventListener('change', syncGate);
             ch.appendChild(gateEl);
             toggleRow.appendChild(gateBtn);
         }
@@ -1307,7 +1165,7 @@
         igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
         igniteBtnColor.textContent = 'Ignite';
         igniteBtnColor.title = 'Hold to perk the fluid up — faded dye is pulled back to the colour it was '
-            + 'painted at, past even the Cap Color limit. Slide right onto the lock to keep it on. '
+            + 'painted at, past even Limit On. Slide right onto the lock to keep it on. '
             + 'Your density decay setting is untouched.';
 
         // Latch cell (Task 7): permanently visible so the second mode is
@@ -1315,7 +1173,9 @@
         // fills white-on-accent when latched. Click toggles the latch; the
         // old drag-onto-it gesture still arms it mid-hold.
         var igniteLock = document.createElement('div');
-        igniteLock.className = 'ch-ignite-lock';
+        // .btn: the same plate as the buttons around it; .active (with
+        // .latched) is the shared pressed state.
+        igniteLock.className = 'ch-ignite-lock btn btn--icon';
         igniteLock.title = 'Ignite latch — click to keep Ignite on hands-free';
         var igniteDot = document.createElement('span');
         igniteDot.className = 'ch-ignite-dot';
@@ -1332,7 +1192,7 @@
             if (window.DyeNudge) window.DyeNudge.release();
             igniteBtnColor.classList.remove('active', 'locked');
             nudgeRow.classList.remove('holding', 'armed');
-            igniteLock.classList.remove('armed', 'latched');
+            igniteLock.classList.remove('armed', 'latched', 'active');
         }
         function setArmed(v) {
             if (v === lockArmed) return;
@@ -1374,7 +1234,7 @@
                 igniteLocked = true;
                 setArmed(false);
                 igniteBtnColor.classList.add('locked');
-                igniteLock.classList.add('latched');
+                igniteLock.classList.add('latched', 'active');
                 nudgeRow.classList.add('holding');
                 return;
             }
@@ -1393,7 +1253,7 @@
             igniteEngage();
             igniteLocked = true;
             igniteBtnColor.classList.add('locked');
-            igniteLock.classList.add('latched');
+            igniteLock.classList.add('latched', 'active');
         });
 
         // The swatch leads the second row: row 1 is the four colour toggles
@@ -1401,7 +1261,7 @@
         if (picker) {
             picker.className = 'ch-color-input';
             picker.style.cssText = '';
-            picker.title = 'Fluid colour — click to pick';
+            picker.title = 'Brush colour: the colour of the next stroke. Click to pick, with the palette. Alt+click the canvas to pick from it.';
             nudgeRow.appendChild(picker);
         }
         nudgeRow.appendChild(igniteBtnColor);
@@ -1416,9 +1276,18 @@
         wrap.className = 'mixer-actions';
         wrap.dataset.uiKey = 'Transport';   // 43-ui-visibility
 
-        // Transport: pause + freeze are compact icon buttons sharing one row;
-        // Clear spans the full width below. Two rows instead of three keeps the
-        // block close to the fader height. Styling/state via .mixer-actions CSS.
+        // One row (2026-10-07): Clear, then Pause and Stop side by side.
+        // Stop was a 🛑 glyph, which every usertest agent read as Record;
+        // the word says what it does, and it lights like any pressed
+        // button while the fluid is stopped. Styling/state via .mixer-actions CSS.
+        const clearBtn = controls.querySelector('button[onclick*="clearCanvas"]');
+        if (clearBtn) {
+            clearBtn.style.cssText = '';
+            clearBtn.textContent = 'Clear';
+            clearBtn.title = 'Clear the canvas';
+            wrap.appendChild(clearBtn);
+        }
+
         const transportRow = document.createElement('div');
         transportRow.className = 'transport-row';
 
@@ -1427,26 +1296,20 @@
             pauseBtn.style.cssText = '';
             pauseBtn.textContent = '⏸';
             pauseBtn.title = 'Pause / resume simulation (Shift+Space)';
+            pauseBtn.setAttribute('aria-pressed', pauseBtn.classList.contains('active') ? 'true' : 'false');
             transportRow.appendChild(pauseBtn);
         }
 
         const freezeBtn = document.getElementById('freezeBtn');
         if (freezeBtn) {
             freezeBtn.style.cssText = '';
-            freezeBtn.textContent = '🛑';
-            freezeBtn.title = 'Freeze / unfreeze fluid motion (Space)';
+            freezeBtn.textContent = 'Stop';
+            freezeBtn.title = 'Stop the fluid where it is; you can still paint (Space)';
+            freezeBtn.setAttribute('aria-pressed', freezeBtn.classList.contains('active') ? 'true' : 'false');
             transportRow.appendChild(freezeBtn);
         }
 
         wrap.appendChild(transportRow);
-
-        const clearBtn = controls.querySelector('button[onclick*="clearCanvas"]');
-        if (clearBtn) {
-            clearBtn.style.cssText = '';
-            clearBtn.textContent = 'Clear';
-            clearBtn.title = 'Clear the canvas';
-            wrap.appendChild(clearBtn);
-        }
 
         return wrap;
     }
@@ -1639,6 +1502,28 @@
             triggerLabel.textContent = name || 'Presets';
             triggerLabel.classList.toggle('has-preset', !!name);
         }
+        // The saved preset you are on, so a row rebuilt later (the list
+        // re-renders on every open) comes back lit. A built-in click clears it.
+        var currentUserPreset = null;
+        function markUserPresetRows(name) {
+            document.querySelectorAll('.mixer-user-preset-btn, .user-preset-btn').forEach(function (b) {
+                const n = b.querySelector('.preset-name');
+                b.classList.toggle('active', !!name && (n ? n.textContent : b.textContent) === name);
+            });
+        }
+        // The saved preset you are on, or none (null): the trigger's label,
+        // the lit row, and no built-in lit with it. Reset app, a Mutate look
+        // and a look link put you on none; saving or loading a preset puts
+        // you on it. The label used to keep the last preset's name through
+        // all of those (agent usertest 2026-10-07). A slider nudge leaves it:
+        // the name then says which preset you started from.
+        window.setCurrentPreset = function (name) {
+            currentUserPreset = name || null;
+            setTriggerLabel(name || null);
+            if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+            markUserPresetRows(name || null);
+        };
+        window.getCurrentPreset = function () { return currentUserPreset; };
 
         // Popup: header + scrollable list + sticky footer (footer is a
         // non-scrolling sibling of the list, so it is ALWAYS visible).
@@ -1681,6 +1566,8 @@
                     child.title = label;
                     child.addEventListener('click', function (e) {
                         var n = e.currentTarget.querySelector('.preset-name');
+                        currentUserPreset = null;
+                        markUserPresetRows(null);
                         setTriggerLabel(n ? n.textContent : e.currentTarget.textContent.trim());
                     });
                     builtinBtns.push(child);
@@ -1864,16 +1751,12 @@
                 nm.textContent = name;
                 btn.appendChild(nm);
                 btn.title = 'Load "' + name + '"';
+                if (name === currentUserPreset) btn.classList.add('active');
                 btn.addEventListener('click', function () {
                     const snapshot = presets[name];
                     if (snapshot && typeof window.applyPresetSnapshotFull === 'function') window.applyPresetSnapshotFull(snapshot);
                     else if (snapshot && typeof window.applyPresetSnapshot === 'function') window.applyPresetSnapshot(snapshot);
-                    if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
-                    document.querySelectorAll('.mixer-user-preset-btn, .user-preset-btn').forEach(function (b) {
-                        const n = b.querySelector('.preset-name');
-                        b.classList.toggle('active', (n ? n.textContent : b.textContent) === name);
-                    });
-                    setTriggerLabel(name);
+                    window.setCurrentPreset(name);
                 });
                 r.appendChild(btn);
                 const more = document.createElement('button');
@@ -2071,7 +1954,10 @@
             var rect = trigger.getBoundingClientRect();
             var left = rect.left + rect.width / 2 - (PANEL_W * z) / 2;
             left = Math.max(4, Math.min(left, window.innerWidth - PANEL_W * z - 4));
-            var top = rect.bottom + 6;
+            // Under the whole stack, not the trigger: the trigger is its top
+            // row now, and opening right under it covered Clear · ⏸ · Stop.
+            var under = (trigger.closest('.mixer-stack') || trigger).getBoundingClientRect();
+            var top = under.bottom + 6;
             var maxH = window.innerHeight - top - 8;
             if (maxH < 260) {
                 top = Math.max(8, window.innerHeight - 8 - Math.min(window.innerHeight - 16, 560));
@@ -2100,6 +1986,26 @@
             }
         });
         panel.addEventListener('click', function (e) { e.stopPropagation(); });
+        // Escape closes a preset's "…" menu first, then the popup (agent
+        // usertest 2026-10-07: only a click outside did). Capture, and the key
+        // stops here, so 05n's panic Escape (stop recording and playback)
+        // doesn't also fire for a key that meant "close this". The save
+        // form's and group rename's inputs keep their own Escape (cancel the
+        // form), and a confirm on top (delete preset) answers its own.
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape' || e.defaultPrevented) return;
+            if (panel.style.display === 'none' && !menuEl) return;
+            if (document.querySelector('.delete-modal.show')) return;
+            var t = e.target;
+            if (t && t.closest && t.closest('.mixer-presets-panel') && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (menuEl) { closePresetMenu(); return; }
+            var inside = panel.contains(document.activeElement);
+            panel.style.display = 'none';
+            trigger.classList.remove('active');
+            if (inside) { try { trigger.focus(); } catch (_) {} }
+        }, true);
         window.addEventListener('resize', function () {
             if (panel.style.display !== 'none') positionPanel();
         });
@@ -2162,9 +2068,12 @@
             var ok = typeof window.saveUserPreset === 'function'
                 ? window.saveUserPreset(name, snapshot)
                 : window.Settings.savePreset(name, snapshot);
-            void ok;
             cancelSave();
             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+            // You are on the preset you just saved (unless the save failed:
+            // storage full). The lists re-render on the next frame (12's
+            // refreshAllPresetLists) and light its row from currentUserPreset.
+            if (ok !== false) window.setCurrentPreset(name);
         }
 
         setTimeout(renderMixerUserPresets, 500);
@@ -2176,7 +2085,7 @@
     // ─── SIDEBAR ─────────────────────────────────────────────────
     // ── LEFT SIDEBAR ──────────────────────────────────────────────────────
     // Brush Size leaves the top bar for the head of a left column, moved
-    // WHOLE (the .mixer-channel and its fader, value and tip swatch), so
+    // WHOLE (the .mixer-channel and its fader and value), so
     // everything that reads it by structure keeps working: the radial menu,
     // 49's valueTextOf, the oscillator. The bar folds sideways to a 32px rail
     // that keeps the size in view; « and » flip it, and the state is kept
@@ -2968,10 +2877,10 @@
                 var info = null;
                 try { info = thumbs.paint(j.cnv, variant); } catch (e) { console.warn('[Mutation] thumbnail failed:', e); }
                 if (!info) return;
-                // What the picture can't say. Rnd and Palette: the colour
+                // What the picture can't say. Random and Palette: the colour
                 // shown is only the next stroke's. Kaleido: the fold's name
                 // and count.
-                var tagText = info.colorMode === 'random' ? 'Rnd' : info.colorMode === 'step' ? 'Palette' : '';
+                var tagText = info.colorMode === 'random' ? 'Random' : info.colorMode === 'step' ? 'Palette' : '';
                 if (tagText) thumbTag(j.cnv.parentNode, tagText, '');
                 if (info.kaleido) {
                     thumbTag(j.cnv.parentNode, optionText('kaleidoMode', info.kaleido.mode) + ' ' + info.kaleido.segments,
@@ -3000,7 +2909,7 @@
         // label. Kaleido's count is named as its slider is in that mode (05f).
         var CHANGE_NAMES = {
             'color.brush': 'Brush colour', 'color.background': 'Background', 'color.arms': 'Arm colours',
-            randomColor: 'Rnd', stepPalette: 'Palette mode', palette: 'Palette',
+            randomColor: 'Random colour', stepPalette: 'Palette mode', palette: 'Palette',
             multiplier: 'Multi-Brush', brushSize: 'Brush Size',
             kaleidoToggle: 'Kaleido', kaleidoMode: 'Kaleido Mode', kAngle: 'Kaleido Angle',
             kTwist: 'Kaleido Twist', kZoom: 'Kaleido Zoom', kBlend: 'Kaleido Opacity',
@@ -3055,7 +2964,10 @@
             if (typeof v === 'number') {
                 var reg = window.ParamRegistry && window.ParamRegistry.SLIDERS && window.ParamRegistry.SLIDERS[d.param];
                 var dec = (reg && typeof reg.decimals === 'number') ? reg.decimals : (Math.abs(v) >= 10 ? 0 : 2);
-                return v.toFixed(dec) + (CHANGE_UNITS[d.param] || '');
+                var txt = v.toFixed(dec);
+                // A fine Brush Size reads "0.0" at its one decimal; say it.
+                if (v !== 0 && parseFloat(txt) === 0) txt = String(+v.toPrecision(2));
+                return txt + (CHANGE_UNITS[d.param] || '');
             }
             if (d.type === 'select' && document.getElementById(d.param)) return optionText(d.param, v);
             return v === undefined || v === null ? '' : String(v);
@@ -3187,6 +3099,8 @@
                 MUTATE_SKIP[sec].forEach(function (k) { delete s[sec][k]; });
             });
             window.applyPresetSnapshot(s);
+            // A mutation is a look of its own, not the preset it came from.
+            if (typeof window.setCurrentPreset === 'function') window.setCurrentPreset(null);
         }
 
         // Apply a specific variant
@@ -3330,30 +3244,29 @@
         const { sec, body, header } = makeSection('Layers', 'core', true);
         sec.classList.add('section-layers');
 
-        // Toolbar (2026-10-06): "Visible to layer" centred on its own row,
-        // Import / Flatten / Collider beneath it — words, not emoji. The old
-        // ✏️ path-layer button went: Path Layers' own "+ New Path" does it.
+        // Toolbar: words, not emoji, in a 2×2 grid of equal buttons
+        // (2026-10-09; one centred button over three thirds before). The top
+        // pair both make a picture layer — from a file, from the canvas — and
+        // the bottom pair are the collider and the merge. The old ✏️
+        // path-layer button went: Path Layers' own "+ New Path" does it.
         const actions = document.createElement('div');
         actions.className = 'section-header-actions';
-        const mainRow = document.createElement('div');
-        mainRow.className = 'layers-toolbar-main';
-        actions.appendChild(mainRow);
         const row = document.createElement('div');
-        row.className = 'layers-toolbar-row';
+        row.className = 'layers-toolbar-grid';
         actions.appendChild(row);
-        const captureBtn = document.getElementById('captureBtn');
-        if (captureBtn) {
-            captureBtn.style.cssText = '';
-            captureBtn.textContent = 'Visible to layer';
-            captureBtn.title = 'Copy what is on the canvas into a new layer (Right Shift+Enter)';
-            mainRow.appendChild(captureBtn);
-        }
         const uploadBtn = document.getElementById('uploadBtn');
         if (uploadBtn) {
             uploadBtn.style.cssText = '';
             uploadBtn.textContent = 'Import';
             uploadBtn.title = 'Import a picture as a new layer';
             row.appendChild(uploadBtn);
+        }
+        const captureBtn = document.getElementById('captureBtn');
+        if (captureBtn) {
+            captureBtn.style.cssText = '';
+            captureBtn.textContent = 'Visible to layer';
+            captureBtn.title = 'Copy what is on the canvas into a new layer (Right Shift+Enter)';
+            row.appendChild(captureBtn);
         }
 
         var flattenBtn = document.createElement('button');
@@ -4285,10 +4198,9 @@
 
         // Toggles
         moveCheckboxGroup('cursorToggle', body);
-        moveCheckboxGroup('brushGhostToggle', body);
-        // Ghost Opacity moved to the Brush panel (buildBrushPanel) 2026-09-24
-        // — it tunes the brush's own preview, so it lives with the brush.
-        // The Show toggle stays here with the other Show rows.
+        // Show Brush Ghost is no longer here: it is the checkbox on the Brush
+        // Ghost row in Brush (buildBrushPanel), with the opacity it switches
+        // (2026-10-07). The opacity went over first, on 2026-09-24.
         moveCheckboxGroup('showCanvasHandles', body);
         moveCheckboxGroup('lockCanvasBorders', body);
         moveCheckboxGroup('statsToggle', body);
@@ -5221,16 +5133,25 @@
         }
 
         // ── Presets: named brush states, quick-switch chips ──
+        // A labelled section with its add button at the bottom right
+        // (2026-10-07, Gabriel), where a list's "new" sits; naming one puts
+        // the field to the button's left. With no presets, "None saved yet"
+        // holds the button's row, so the empty state costs no height.
+        sLabel('Presets');
         var chipsWrap = document.createElement('div');
         chipsWrap.className = 'brush-presets-chips';
         panel.appendChild(chipsWrap);
 
         var saveRow = document.createElement('div');
         saveRow.className = 'brush-presets-save-row';
+        var emptyNote = document.createElement('span');
+        emptyNote.className = 'brush-presets-empty';
+        emptyNote.textContent = 'None saved yet';
+        var SAVE_LABEL = '+ New Brush Preset';
         var saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'mixer-preset-save';
-        saveBtn.textContent = 'Brush Preset +';
+        saveBtn.textContent = SAVE_LABEL;
         saveBtn.title = 'Save the current brush as a preset';
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
@@ -5240,9 +5161,14 @@
         nameInput.spellcheck = false;
         nameInput.autocomplete = 'off';
         nameInput.style.display = 'none';
-        saveRow.appendChild(saveBtn);
+        saveRow.appendChild(emptyNote);
         saveRow.appendChild(nameInput);
+        saveRow.appendChild(saveBtn);
         panel.appendChild(saveRow);
+        // The note shows only with nothing saved and no name being typed.
+        function syncEmptyNote() {
+            emptyNote.style.display = (!loadBrushPresets().length && nameInput.style.display === 'none') ? '' : 'none';
+        }
 
         function loadBrushPresets() {
             try {
@@ -5269,6 +5195,9 @@
                 stabilizer: num(c.BRUSH_STABILIZER, 0),
                 steady: num(c.BRUSH_STEADY, 0),
                 spacing: num(c.BRUSH_SPACING, 0.35),
+                // Constant's twin of Spacing; presets saved before 2026-10-07
+                // have none and keep the Interval you have.
+                dabInterval: num(c.BRUSH_DAB_INTERVAL_MS, 8),
                 jitter: num(c.BRUSH_JITTER, 0),
                 splatMode: c.BRUSH_CONTINUOUS ? 'constant' : 'move',
                 velOnly: !!c.BRUSH_VELOCITY_ONLY,
@@ -5293,7 +5222,7 @@
                 }
                 if (SETTERS.target) SETTERS.target(p.target);
                 if (SETTERS.tip) SETTERS.tip(p.tip | 0);
-                ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'steady', 'spacing', 'jitter',
+                ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'steady', 'spacing', 'dabInterval', 'jitter',
                  'eraser', 'splatMode', 'velMode', 'velStrength', 'velOnly', 'shape'
                 ].forEach(function (k) {
                     if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
@@ -5322,8 +5251,9 @@
         function renderPresetChips() {
             chipsWrap.innerHTML = '';
             var list = loadBrushPresets();
-            // (empty state intentionally renders nothing — the helper text
-            // added a scrollbar's worth of height for most screens)
+            syncEmptyNote();
+            // (no chips = no row: the empty note rides the button's row, since
+            // a helper line of its own cost a scrollbar's worth of height)
             if (!list.length) return;
             list.forEach(function (p) {
                 var chip = document.createElement('button');
@@ -5353,7 +5283,8 @@
         function cancelPresetSave() {
             nameInput.style.display = 'none';
             nameInput.value = '';
-            saveBtn.textContent = 'Brush Preset +';
+            saveBtn.textContent = SAVE_LABEL;
+            syncEmptyNote();
         }
         function doSaveBrushPreset() {
             var name = (nameInput.value || '').trim();
@@ -5370,6 +5301,7 @@
             if (nameInput.style.display === 'none') {
                 nameInput.style.display = '';
                 nameInput.value = '';
+                syncEmptyNote();
                 nameInput.focus();
                 saveBtn.textContent = 'Save ✓';
             } else {
@@ -5399,8 +5331,15 @@
         // 'pressure' a BRUSH_TARGET would strand it outside every
         // target === 'fluid' test in the paint path.
         sLabel('Paint Into').title = 'Tab switches between Fluid, Pressure and Collider; Shift+Tab goes back.';
+        // Drawn as the radio group it is (2026-10-07, Gabriel: it "just looks
+        // like three buttons"): one track, a ring in front of each choice, the
+        // chosen ring filled (01-buttons.css .brush-radio-row). Still buttons
+        // underneath, lit by .active, so Tab (59), BrushType and the tours
+        // (44) are unchanged; role/aria-checked say "radio" to a screen reader.
         var targetRow = document.createElement('div');
-        targetRow.className = 'brush-mode-row';
+        targetRow.className = 'brush-mode-row brush-radio-row';
+        targetRow.setAttribute('role', 'radiogroup');
+        targetRow.setAttribute('aria-label', 'Paint into');
         var fluidBtn = document.createElement('button');
         fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
         fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
@@ -5419,6 +5358,20 @@
         targetRow.appendChild(pressureBtn);
         targetRow.appendChild(colliderBtn);
         panel.appendChild(targetRow);
+        var TYPE_BTNS = [['fluid', fluidBtn], ['pressure', pressureBtn], ['collider', colliderBtn]];
+        TYPE_BTNS.forEach(function (p) { p[1].setAttribute('role', 'radio'); });
+        // Arrow keys move the choice, as in any radio group.
+        targetRow.addEventListener('keydown', function (e) {
+            var d = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1
+                : (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0;
+            if (!d) return;
+            var i = TYPE_BTNS.map(function (p) { return p[0]; }).indexOf(brushType());
+            var next = TYPE_BTNS[((i < 0 ? 0 : i + d) + TYPE_BTNS.length) % TYPE_BTNS.length];
+            e.preventDefault();
+            e.stopPropagation();
+            chooseBrushType(next[0]);
+            next[1].focus();
+        });
         // Sections that only mean anything to a DYE stroke. Collected as they
         // are built further down and hidden wholesale under Pressure, which is
         // why sLabel returns its element.
@@ -5487,6 +5440,9 @@
             // 'mask' IS collider painting; 'sketch' (entered from the Layers
             // panel's per-layer paint button) lights none of the three here.
             colliderBtn.classList.toggle('active', !on && t === 'mask');
+            [fluidBtn, pressureBtn, colliderBtn].forEach(function (b) {
+                b.setAttribute('aria-checked', b.classList.contains('active') ? 'true' : 'false');
+            });
             pressureWrap.style.display = on ? '' : 'none';
             dyeOnlyEls.forEach(function (e) { if (e) e.style.display = on ? 'none' : ''; });
             Object.keys(pModeBtns).forEach(function (k) {
@@ -5580,8 +5536,63 @@
             setBrushTarget(savedTarget);
         } catch (_) { setBrushTarget('fluid'); }
 
+        // ── Brush Ghost: the print of the tip under the cursor (31) ──
+        // Its switch and its opacity are one row of index.html, re-parented
+        // here: the opacity came over from Display on 2026-09-24 (Gabriel:
+        // "move ghost opacity into the brush settings menu, instead of
+        // display"), the switch joined it as the row's checkbox on 2026-10-07
+        // and the row moved above Tip. js/31-brush-cursor.js owns both and
+        // keeps them viewer-local (localStorage), never as brush preset keys.
+        // Not in dyeOnlyEls: Pressure still draws the ghost (a white print).
+        moveControlGroup('brushGhostOpacity', panel);
+
         // ── Tip: the splat-shader stamp shapes as brush tips (D1) ──
-        dyeOnlyEls.push(sLabel('Tip'));
+        // Folds away under its heading (2026-10-07, Gabriel: "collapsable
+        // brushtips"): tips, your shapes, Texture and Angle are the panel's
+        // tallest block, and the one you leave alone once a brush is set.
+        // Folded, the heading names the tip you are on. Open until you fold
+        // it; the fold is a viewing choice (ui.brush.tipOpen), not part of a
+        // brush, so presets and Reset leave it be. 44 opens it for a tour.
+        var TIP_OPEN_KEY = 'ui.brush.tipOpen';
+        var tipFold = document.createElement('div');
+        tipFold.className = 'brush-fold';
+        var tipHead = document.createElement('button');
+        tipHead.type = 'button';
+        tipHead.className = 'brush-fold-head btn--ghost';
+        tipHead.innerHTML = '<span class="brush-fold-chev" aria-hidden="true">▾</span>'
+            + '<span class="brush-section-label">Tip</span><span class="brush-fold-sum"></span>';
+        var tipSum = tipHead.querySelector('.brush-fold-sum');
+        var tipBody = document.createElement('div');
+        tipBody.className = 'brush-fold-body';
+        tipBody.id = 'brushTipFoldBody';
+        tipHead.setAttribute('aria-controls', tipBody.id);
+        tipFold.appendChild(tipHead);
+        tipFold.appendChild(tipBody);
+        panel.appendChild(tipFold);
+        dyeOnlyEls.push(tipFold);
+        function setTipOpen(open, keep) {
+            tipFold.classList.toggle('collapsed', !open);
+            tipHead.setAttribute('aria-expanded', open ? 'true' : 'false');
+            tipHead.title = open ? 'Fold the tip settings away' : 'Show the tip settings';
+            if (keep) { try { if (window.settingsManager) window.settingsManager.set(TIP_OPEN_KEY, !!open); } catch (_) {} }
+        }
+        tipFold.__setOpen = function (open) { setTipOpen(!!open, true); };
+        tipHead.addEventListener('click', function () {
+            setTipOpen(tipFold.classList.contains('collapsed'), true);
+        });
+        (function restoreTipOpen() {
+            var saved = null;
+            try { saved = window.settingsManager && window.settingsManager.get(TIP_OPEN_KEY); } catch (_) {}
+            setTipOpen(saved !== false, false);
+        })();
+        // What the folded heading says: the custom shape's name, or the tip's.
+        function syncTipSummary() {
+            var sh = activeShapeEntry();
+            var cur = (window.config && window.config.BRUSH_TIP) | 0;
+            var t = null;
+            BRUSH_TIPS.forEach(function (x) { if (x.v === cur) t = x; });
+            tipSum.textContent = sh ? (sh.name || 'Custom shape') : (t ? t.name : '');
+        }
         var tipRow = document.createElement('div');
         tipRow.className = 'brush-tip-row';
         var tipBtns = [];
@@ -5597,6 +5608,7 @@
             tipBtns.forEach(function (b) {
                 b.classList.toggle('active', !act && parseInt(b.dataset.tip, 10) === cur);
             });
+            syncTipSummary();
         }
         function setBrushTip(v) {
             v = v | 0;
@@ -5604,7 +5616,6 @@
             if (window.config) window.config.BRUSH_TIP = v;
             syncTipActive();
             syncTexState();
-            syncTipSwatch();   // the strip swatch is the other face of this control
             try { if (window.settingsManager) window.settingsManager.set('brush.tip', v); } catch (_) {}
         }
         SETTERS.tip = setBrushTip;
@@ -5624,8 +5635,7 @@
             tipBtns.push(b);
             tipRow.appendChild(b);
         });
-        panel.appendChild(tipRow);
-        dyeOnlyEls.push(tipRow);
+        tipBody.appendChild(tipRow);
 
         // ── Custom shapes: user-authored stamp textures (33-brush-shapes).
         // Import → the mask editor opens in adhoc mode (full stamp suite +
@@ -5636,8 +5646,7 @@
         var shapesRow = document.createElement('div');
         shapesRow.className = 'brush-tip-row brush-shapes-row';
         shapesArea.appendChild(shapesRow);
-        panel.appendChild(shapesArea);
-        dyeOnlyEls.push(shapesArea);
+        tipBody.appendChild(shapesArea);
         var shapeFileInput = document.createElement('input');
         shapeFileInput.type = 'file';
         shapeFileInput.accept = 'image/png,image/jpeg,image/jpg,image/webp';
@@ -5648,14 +5657,7 @@
             if (f && window.BrushShapes) window.BrushShapes.beginImportFile(f);
             shapeFileInput.value = '';
         });
-        // Hand the strip's tip swatch this drawer's commit path — it must not
-        // grow its own copy of the tip setter, the preset-dirty flag or the
-        // import flow (the file input lives here).
-        BrushTipCtl = {
-            setTip: setBrushTip,
-            markDirty: markDirty,
-            openImport: function () { shapeFileInput.click(); }
-        };
+        markBrushDirty = markDirty;
         function renderBrushShapes() {
             renderShapeTiles(shapesRow, { onImport: function () { shapeFileInput.click(); } });
         }
@@ -5667,7 +5669,6 @@
             renderBrushShapes();
             syncTipActive();   // an active stamp overrides the built-in tips
             syncTexState();
-            syncTipSwatch();
             // The per-button alternate-brush pickers draw from the SAME shape
             // library, so an import or a delete has to reach them too — a slot
             // still pointing at a deleted stamp would silently fall back to the
@@ -5676,7 +5677,7 @@
         };
         renderBrushShapes();
         var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
-        dyeOnlyEls.push(texGroup);
+        tipBody.appendChild(texGroup);
         function syncTexState() {
             // Texture (stamp grain/blend) shapes blob/chisel/streak — and
             // custom shape stamps, which run the same grain in the shader
@@ -5697,20 +5698,9 @@
         var angleGroup = pSlider('brushAngle', 'Angle', 0, 360, 1, 'BRUSH_ANGLE',
             function (v) { return Math.round(v) + '°'; }, 'angle');
         angleGroup.title = 'Rotate the brush tip (chisel/streak/custom shapes). The brush ghost shows the angle.';
-        dyeOnlyEls.push(angleGroup);
-        // Ghost Opacity: the brush-ghost slider from index.html, re-parented
-        // here (2026-09-24, Gabriel: "move ghost opacity into the brush
-        // settings menu, instead of display"). It sits under Angle because the
-        // ghost IS the tip at that angle. Not a pSlider: js/31-brush-cursor.js
-        // owns it and persists it viewer-local (localStorage), never as a
-        // brush preset key. Not in dyeOnlyEls either — Pressure mode still
-        // draws the ghost (a white print), so the slider stays useful there.
-        moveControlGroup('brushGhostOpacity', panel);
+        tipBody.appendChild(angleGroup);
 
-        // ── Flow + stroke feel ──
-        // Flow scales DYE, so a Pressure stroke has nothing for it to scale.
-        var flowGroup = pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
-        dyeOnlyEls.push(flowGroup);
+        // ── Stroke feel ──
         sLabel('Stroke');
         // Stabilizer slider removed 2026-07-30 (Gabriel): panel-length trim.
         // config.BRUSH_STABILIZER stays at its default; brush presets that
@@ -5841,6 +5831,12 @@
                 }, 0);
             });
         })();
+        // Flow: how much dye each dab lays. Under Stroke since 2026-10-07: it
+        // sat after Angle, so with Tip folded it hung under the Tip heading.
+        // Here it is the other half of the rate Spacing/Interval set. Flow
+        // scales DYE, so a Pressure stroke has nothing for it to scale.
+        var flowGroup = pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
+        dyeOnlyEls.push(flowGroup);
         // Steady: the pulled string (05d0, 2026-10-04). Gabriel: "the mouse
         // moves so fast sometimes, we need to let the user tone it down". One
         // slider for the whole feel — slack, pull and top speed all rise
@@ -5849,13 +5845,14 @@
         // actually stabilization"). Only the words changed: the id, the
         // config key and the preset key stay 'steady', so saved presets,
         // look links and hotkey binds keep finding it.
+        // At zero it reads 0%, not "Off" (2026-10-09: clearer as a number).
         var steadyGroup = pSlider('brushSteady', 'Stabilization', 0, 1, 0.01, 'BRUSH_STEADY',
-            function (v) { return v > 0.001 ? Math.round(v * 100) + '%' : 'Off'; }, 'steady');
+            function (v) { return Math.round(v * 100) + '%'; }, 'steady');
         steadyGroup.title = 'The brush follows your hand on a string. Small wobbles stay inside the slack, '
             + 'corners round off, and a fast drag is laid down at a calm, even pace. Higher = a longer, '
             + 'lazier string. It moves with Time too: slow Time, slower brush. When you let go, the brush '
             + 'finishes the line to where you lifted, or to the edge if you let go off the canvas. '
-            + 'Off = the brush sits on the cursor.';
+            + 'At 0% the brush sits on the cursor.';
         // Hide guide: paint without the line and the hand ring (31). Only
         // shown while Steady is on — with Steady off there is no guide.
         // A viewing preference, not part of the brush: no preset key.
@@ -6631,14 +6628,14 @@
         // and the brush tip at once (textOverlays.makeBrush). Its own row: at
         // 280px a fourth button in the row above would crush all four labels.
         // The label says it worked for a moment, since the only other sign is
-        // the tip swatch at the end of the Size fader changing.
+        // the Brush section's Tip row changing.
         var brushBtn = document.createElement('button');
         brushBtn.type = 'button';
         brushBtn.id = 'textOverlayMakeBrush';
         brushBtn.textContent = 'Convert to brush';
         brushBtn.title = 'Paint with these letters: the text becomes a brush shape and your brush tip right away, with clean edges. ' +
             'It keeps the font, weight, case and spacing; the background box, shadow and rotation are left out. ' +
-            'The text itself stays where it is. Find the shape again in the brush tip menu.';
+            'The text itself stays where it is. Find the shape again under Tip in the Brush section.';
         brushBtn.style.cssText = 'width:100%;cursor:pointer;margin-bottom:10px;';
         var brushBtnTimer = null;
         brushBtn.addEventListener('click', function () {
@@ -8175,6 +8172,7 @@
                 nm.textContent = name;
                 btn.appendChild(nm);
                 btn.title = 'Load "' + name + '"';
+                if (typeof window.getCurrentPreset === 'function' && window.getCurrentPreset() === name) btn.classList.add('active');
                 btn.addEventListener('click', function() {
                     // Full-state apply — see 12-save-load: a preset click must
                     // land on a complete deterministic state.
@@ -8183,8 +8181,13 @@
                     } else if (typeof window.applyPresetSnapshot === 'function') {
                         window.applyPresetSnapshot(presets[name]);
                     }
-                    presetList.querySelectorAll('.user-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-                    btn.classList.add('active');
+                    // The Presets button names it, its rows in every list
+                    // light, and no built-in stays lit beside it.
+                    if (typeof window.setCurrentPreset === 'function') window.setCurrentPreset(name);
+                    else {
+                        presetList.querySelectorAll('.user-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+                        btn.classList.add('active');
+                    }
                 });
 
                 var overwriteBtn = document.createElement('button');
@@ -8876,9 +8879,9 @@
             // all of #canvas-area — the entire region the panel floats over, empty
             // letterbox included — so nearly every click that looked like "outside
             // the dropdown" was inside the exemption and nothing happened. And it
-            // listened for a BUBBLED click, which half the strip never delivers:
-            // every ⚙ stops propagation (wireGearToTrigger), so opening another
-            // channel's popup left this one hanging open behind it.
+            // listened for a BUBBLED click, which half the strip never delivered:
+            // the channel gears (since removed) stopped propagation, so opening
+            // another channel's popup left this one hanging open behind it.
             //
             // pointerdown in the CAPTURE phase fixes the second: document capture
             // runs before any handler in the tree, so nothing can swallow it. The
@@ -8888,10 +8891,8 @@
                 if (!isShown()) return;
                 var t = e.target;
                 if (t && panel.contains(t)) return;
-                // The trigger and its gear own the open/close toggle themselves.
+                // The trigger owns the open/close toggle itself.
                 if (t === toggle || (t && toggle.contains(t))) return;
-                var gear = toggle.__chGear;
-                if (gear && (t === gear || gear.contains(t))) return;
                 if (t && t.closest && t.closest('#canvas, #canvas-wrapper')) return;
                 closePanel();
             }, true);

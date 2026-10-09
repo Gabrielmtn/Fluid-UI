@@ -862,13 +862,27 @@
                 for (var i = 0; i < chips.length; i++) {
                     var bm = chips[i].getAttribute('data-brush-mode');
                     var on = (bm === 'rnd' && m === 'random')
-                          || (bm === 'step' && m === 'step');
+                          || (bm === 'step' && m === 'step')
+                          || (bm === 'one' && (m === 'fixed' || m === 'main'));
                     chips[i].classList.toggle('active', on);
+                    chips[i].setAttribute('aria-pressed', on ? 'true' : 'false');
                 }
                 // Picker shows the fixed swatch (no 'input' dispatch).
                 if ((m === 'fixed' || m === 'main') && a0.color) {
                     var cp = document.getElementById('colorPicker');
                     if (cp && cp.value !== a0.color) cp.value = a0.color;
+                }
+                // In Palette mode the picker always holds a palette colour:
+                // the one the next stroke paints. A restore (preset, Mutate
+                // card, look link) can leave it on a colour the palette
+                // doesn't have, and the first stroke then painted that.
+                if (m === 'step' && typeof getStepColorList === 'function') {
+                    var stepList = getStepColorList();
+                    var cpStep = document.getElementById('colorPicker');
+                    if (stepList.length && cpStep && stepList.indexOf(String(cpStep.value).toUpperCase()) < 0) {
+                        var si = ((paletteStepIndex % stepList.length) + stepList.length) % stepList.length;
+                        cpStep.value = stepList[si];
+                    }
                 }
                 if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
                 // Panel arm-0 row: rebuild only when open, and not when the

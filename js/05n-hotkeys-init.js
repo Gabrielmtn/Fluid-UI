@@ -126,10 +126,15 @@
                 if (cp) { cp.value = s.colorPickerValue || cp.value; }
                 if (typeof updateColor === 'function') updateColor();
                 const brushEl = document.getElementById('brushSize');
-                if (brushEl) { 
-                    brushEl.value = String(s.brushSize); 
+                if (brushEl) {
+                    brushEl.value = String(s.brushSize);
                     brushEl.style.setProperty('--val', s.brushSize);
-                    config.SPLAT_RADIUS = s.brushSize / 1000; 
+                    config.SPLAT_RADIUS = s.brushSize / 1000;
+                    // Like adjustBrush: the readout and the fader's thumb follow
+                    // now, not on their poll (agent usertest 2026-10-07: undo
+                    // moved the fader and left the number behind). pushUndo
+                    // ignores this input while applyingState is set.
+                    brushEl.dispatchEvent(new Event('input', { bubbles: true }));
                 }
                 if (visualSel) { visualSel.value = String(s.visualRes); visualSel.dispatchEvent(new Event('change')); }
                 if (physSel) { physSel.value = String(s.physicsRes); physSel.dispatchEvent(new Event('change')); }
@@ -226,18 +231,44 @@
             el.checked = !el.checked;
             el.dispatchEvent(new Event('change'));
         }
+        // [ ] walk a ladder of round sizes, ten to a decade (1, 1.2, 1.5, 2,
+        // 2.5, 3, 4, 5, 6, 8 × 10^k): about ×1.26 in size per press, ~12% in
+        // stroke width, at every scale. Shift ({ }) takes three rungs (×2).
+        // The old ±1 went 1.3 → 0.3 → the floor in two presses, and Shift
+        // never fired, because Shift+[ is '{'. (2026-10-07)
+        const BRUSH_RUNGS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
+        function brushLadder(min, max) {
+            const out = [];
+            for (let k = Math.floor(Math.log10(min)); k <= Math.ceil(Math.log10(max)); k++) {
+                for (const r of BRUSH_RUNGS) {
+                    const v = +(r * Math.pow(10, k)).toPrecision(3);
+                    if (v >= min - 1e-12 && v <= max + 1e-12) out.push(v);
+                }
+            }
+            return out;
+        }
         function adjustBrush(delta, coarse=false) {
             const el = document.getElementById('brushSize');
             if (!el) return;
-            const step = coarse ? 5 : 1;
-            let v = parseFloat(el.value || '11');
-            const min = parseFloat(el.min || '1');
-            const max = parseFloat(el.max || '30');
-            v = Math.min(max, Math.max(min, v + delta * step));
+            const v = parseFloat(el.value || '1.3');
+            const min = parseFloat(el.min || '0.001');
+            const max = parseFloat(el.max || '100');
+            const ladder = brushLadder(min, max);
+            // The rung we are on, or the one just past us in this direction,
+            // so a size between rungs steps onto the next round one.
+            let i;
+            if (delta > 0) { i = ladder.findIndex(r => r > v * 1.0001); if (i < 0) i = ladder.length - 1; }
+            else { i = -1; for (let j = ladder.length - 1; j >= 0; j--) { if (ladder[j] < v * 0.9999) { i = j; break; } } if (i < 0) i = 0; }
+            if (coarse) i = Math.max(0, Math.min(ladder.length - 1, i + 2 * Math.sign(delta)));
+            const next = ladder[i];
+            if (next === v) return;
             pushUndo();
-            el.value = String(v);
-            el.style.setProperty('--val', v);
-            config.SPLAT_RADIUS = v / 1000;
+            el.value = String(next);
+            el.style.setProperty('--val', next);
+            // Like a drag: 05h's binding sets SPLAT_RADIUS, and the readout,
+            // the fader's thumb and a preset's "changed" mark all follow now
+            // instead of on their slow polls.
+            el.dispatchEvent(new Event('input', { bubbles: true }));
         }
         function stepPaletteOnce(forward=true) {
             if (typeof getStepColorList !== 'function') return;
@@ -268,6 +299,28 @@
             if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
         }
         window.stepPaletteOnce = stepPaletteOnce;
+        // Ctrl+← → and N / Shift+N: the palette's next or previous colour.
+        // In Palette mode that moves the counter (the next stroke paints
+        // it). In One or Random it picks that colour for the brush: N used
+        // to move the dot in One mode while the paint stayed the colour you
+        // had picked. A brush colour the palette doesn't have starts from
+        // its first (or, going back, its last) colour.
+        function stepPaletteColour(dir) {
+            const a0 = (window.multiArmColors || [])[0];
+            if (a0 && a0.mode === 'step') { stepPaletteOnce(dir > 0); return; }
+            if (typeof getStepColorList !== 'function') return;
+            const list = getStepColorList();
+            if (!list || !list.length) return;
+            const cp = document.getElementById('colorPicker');
+            const len = list.length;
+            const k = cp ? list.indexOf(String(cp.value).toUpperCase()) : -1;
+            const i = k < 0 ? (dir > 0 ? 0 : len - 1) : (k + (dir > 0 ? 1 : -1) + len) % len;
+            paletteStepIndex = i;
+            if (typeof window.setActiveBrushColorMode === 'function') window.setActiveBrushColorMode('fixed', { color: list[i] });
+            else if (cp) cp.value = list[i];
+            if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
+        }
+        window.stepPaletteColour = stepPaletteColour;
         // Step a numeric-valued select toward a HIGHER (dir=+1) or LOWER
         // (dir=-1) value. Deliberately value-based, not index-based: the
         // resolution lists are ordered high→low, so index stepping ran
@@ -494,9 +547,9 @@
                     if (mutBtn) mutBtn.click();
                     return;
                 }
-                if (key === '[') { adjustBrush(-1, e.shiftKey); return; }
-                if (key === ']') { adjustBrush(1, e.shiftKey); return; }
-                if (lower === 'n') { stepPaletteOnce(!e.shiftKey); return; }
+                if (key === '[' || key === '{') { adjustBrush(-1, key === '{' || e.shiftKey); return; }
+                if (key === ']' || key === '}') { adjustBrush(1, key === '}' || e.shiftKey); return; }
+                if (lower === 'n') { stepPaletteColour(e.shiftKey ? -1 : 1); return; }
                 if (e.shiftKey && lower === 's' && typeof window.saveColor === 'function') { e.preventDefault(); pushUndo(); window.saveColor(); return; }
                 if (e.shiftKey && lower === 'x' && typeof window.clearColors === 'function') { e.preventDefault(); pushUndo(); window.clearColors(); return; }
             }
@@ -513,10 +566,17 @@
                     return;
                 }
             }
-            // Palette cycling
-            if (ctrlOrMeta && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+            // Palettes (2026-10-08): Ctrl+Shift+← → switches palette, Ctrl+← →
+            // steps through the palette's colours. Ctrl+← → used to switch
+            // palette, with the colours on N / Shift+N only.
+            if (ctrlOrMeta && !e.altKey && (key === 'ArrowLeft' || key === 'ArrowRight')) {
                 e.preventDefault();
-                if (typeof window.cyclePalette === 'function') { pushUndo(); window.cyclePalette(key === 'ArrowLeft' ? -1 : 1); }
+                const dir = key === 'ArrowLeft' ? -1 : 1;
+                if (e.shiftKey) {
+                    if (typeof window.cyclePalette === 'function') { pushUndo(); window.cyclePalette(dir); }
+                } else {
+                    stepPaletteColour(dir);
+                }
                 return;
             }
             // Resolution cycling
@@ -531,8 +591,12 @@
                 }
             }
         });
-        // Seed initial undo state after UI init
-        try { pushUndo(); } catch (e) { /* noop */ }
+        // No boot seed. Every caller pushes the state BEFORE its change, so
+        // the first change already records where it started. A seed taken
+        // here caught the half-booted state (before autoload, with the boot
+        // palette's Step ticked), and fluid strokes push nothing, so Ctrl+Z
+        // after painting jumped back to it: Rnd became Palette and the brush
+        // size reverted (agent user test 2026-10-07).
         // Initialize layer order with sim at the top
         layerOrder = [{ type: 'sim' }];
         // Expose layer system for collision module and other integrations

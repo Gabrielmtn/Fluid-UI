@@ -153,13 +153,14 @@
         }
       ]
     },
-    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|hfFloorDyeWall|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelToUv|uVelocity": {
+    "bloomCeiling|decayDt|dissipation|dt|dyeRoundNearest|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|hfFloorDyeWall|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelToUv|uVelocity": {
       "name": "advection",
       "uniforms": [
         "bloomCeiling",
         "decayDt",
         "dissipation",
         "dt",
+        "dyeRoundNearest",
         "edgeAbsorb",
         "edgeAbsorbBand",
         "floorBand",
@@ -361,13 +362,14 @@
         "uVelocity"
       ]
     },
-    "hasObstacle|uDryStir|uDye|uDyeTexel|uObstacle|uPaintShare|uPass|uSeed|uSource|uSrcMax|uSrcScale|uStepUv|uStir|uStirRest|uStirStep|uVarPerStir|uWetFull|uWetness": {
+    "hasObstacle|uDryStir|uDye|uDyeTexel|uKeepValue|uObstacle|uPaintShare|uPass|uSeed|uSource|uSrcMax|uSrcScale|uStepUv|uStir|uStirLength|uStirRest|uStirStep|uVarPerStir|uWetFull|uWetness": {
       "name": "colorBlend",
       "uniforms": [
         "hasObstacle",
         "uDryStir",
         "uDye",
         "uDyeTexel",
+        "uKeepValue",
         "uObstacle",
         "uPaintShare",
         "uPass",
@@ -377,6 +379,7 @@
         "uSrcScale",
         "uStepUv",
         "uStir",
+        "uStirLength",
         "uStirRest",
         "uStirStep",
         "uVarPerStir",

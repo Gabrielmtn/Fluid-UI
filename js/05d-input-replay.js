@@ -68,6 +68,7 @@
         let splatTailN = 1;         // duration in 60 Hz frames of the sim clock
         let splatTailT = 0;         // elapsed, same unit (05j advances it)
         let splatTailE = 0;         // eased progress at the last dab
+        let splatTailWait = false;  // armed by a Steady landing mid-frame: first step next frame
         const moveTrail = [];       // { x, y, t } of the live stroke, canvas px / ms
         function noteStrokeMove(x, y) {
             const t = performance.now();
@@ -119,6 +120,10 @@
             splatTailN = frames;
             splatTailT = 0;
             splatTailE = 0;
+            // A Steady head lands inside 05j's drain, and the hose pours its
+            // last stretch on that same frame; stepping the tail then too laid
+            // two frames of travel in one (a 2.4x jump at the hand-off).
+            splatTailWait = !!at;
             splatOutDx = v.dx;
             splatOutDy = v.dy;
             splatOutColor = pointer.color.slice();
@@ -262,6 +267,14 @@
         function pressFlowMul() {
             return (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
         }
+        // The flow a recorder sample of the RAW pointer colour plays back at:
+        // Flow and the splat-in ramp, as the dabs it stands for were laid.
+        // Samples whose colour already went through applyPaintFlow hand the
+        // recorder __splatFlow instead (1 under Limit Off, where it is baked).
+        function recLiveFlow() {
+            return pressFlowMul() * splatInFlowMul();
+        }
+        window.__recLiveFlow = recLiveFlow;
         let strokeArchived = false;
         // The history entry the live stroke was archived into. A stroke goes on
         // painting after the lift — the drain's last dabs, a Steady brush
@@ -287,7 +300,11 @@
             strokeStartTime = Date.now();
             strokeArchived = false;
         }
-        function pushStrokeEvent(x, y, dx, dy, color) {
+        // gateFlow: the convergence this dab painted with under Limit (the
+        // __splatFlow its splat read). The colour stays true under Limit, so
+        // without it a replay laid every dab at full Flow. Under Limit Off the
+        // flow is already in the colour and this is 1.
+        function pushStrokeEvent(x, y, dx, dy, color, gateFlow) {
             if (isReplayActive) return; // Don't record during replay
             const t = Date.now() - strokeStartTime;
             // Per-arm Pressure, captured with the dab for the same reason the
@@ -371,6 +388,10 @@
                 // not carry it would come back as half the mark that was made.
                 // Omitted at 0, the common case.
                 mir: (window.__strokeMirrorPin | 0) || undefined,
+                // The Limit flow the dab painted with (see above). Omitted at
+                // full flow, so an ordinary dab is the size it was.
+                gf: (typeof gateFlow === 'number' && isFinite(gateFlow) && gateFlow >= 0 && gateFlow < 0.9995)
+                    ? +gateFlow.toPrecision(4) : undefined,
                 rnd: _rnd,
                 fm: _fm,
                 ra: _ra
@@ -388,7 +409,7 @@
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(), cw: ev.cw, ch: ev.ch,
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
-                     ap: ev.ap, mir: ev.mir, rnd: ev.rnd, fm: ev.fm, ra: ev.ra };
+                     ap: ev.ap, mir: ev.mir, gf: ev.gf, rnd: ev.rnd, fm: ev.fm, ra: ev.ra };
         }
         // Preserve Randomness: an event whose colour was rolled by random mode
         // carries rnd:1 (+ fm, the flow factor baked into its recorded colour).
@@ -586,6 +607,10 @@
                     // set; an older peer ignores it and sees the unmirrored
                     // half, which is the honest degradation.
                     if (ev.mir) o.mir = ev.mir | 0;
+                    // The Limit flow each dab painted with, so the room's
+                    // replay lands as thin as the painter's. Sent only below
+                    // full; an older peer ignores it and paints at full flow.
+                    if (typeof ev.gf === 'number' && ev.gf < 1) o.gf = ev.gf;
                     // Stroke boundary, so the receiver's interpolation keeps the
                     // gaps of a Time replay instead of painting across them.
                     // Sent only where true; a peer on an older build ignores it
@@ -597,17 +622,107 @@
             }
         }
         // FPS Cap dropdown (supports numeric values + 'native' for display-matched)
+        //
+        // ── On the screen's own beat (2026-10-09) ──
+        // A frame can only reach the screen on one of its refreshes, so a limit
+        // that doesn't divide the refresh rate can't be even: 60 on a 144 Hz
+        // panel drew 2, 3, 2, 3, 2 refreshes apart (14 and 21 ms), and fast
+        // paint read as a stutter no brush setting could touch (Gabriel; gone
+        // the moment he switched to 144). A limit now snaps to a whole fraction
+        // of whatever this screen runs at (144 → 72, 165 → 55, 240 → 60,
+        // 60 → 60), the list offers this screen's own rates, and 05j draws on
+        // every k-th refresh. The stored value stays what was picked, so a move
+        // to another monitor snaps it again there. Until the refresh rate is
+        // known (05i; the rAF probe takes ~1 s where Electron can't say) the
+        // raw number runs on the old pacing.
+        const FPS_MIN_RATE = 24;    // slower fractions of the refresh are not offered
+        let fpsCapRequest = '60';   // what was picked: a number, 'native' or '0' (uncapped)
+        function fpsScreenHz() {
+            return (window.__displayHzKnown && window.__displayHz > 0) ? window.__displayHz : 0;
+        }
+        // The fractions the list offers: the full rate, half of it, and the ones
+        // nearest 60 (Standard) and 30 (Battery Saver), nearest by ratio.
+        function fpsScreenRates(hz) {
+            const nearest = (target) => {
+                let best = hz, bd = Infinity;
+                for (let k = 1; k <= 16 && hz / k >= FPS_MIN_RATE; k++) {
+                    const d = Math.abs(Math.log(hz / k / target));
+                    if (d < bd - 1e-9) { bd = d; best = hz / k; }
+                }
+                return best;
+            };
+            const std = nearest(60), save = nearest(30);
+            const rates = [hz];
+            for (const r of [hz / 2, std, save]) {
+                if (r >= FPS_MIN_RATE && !rates.some(x => Math.abs(x - r) < 1e-6)) rates.push(r);
+            }
+            rates.sort((a, b) => a - b);
+            return { rates: rates, std: std, save: save };
+        }
+        // The offered rate nearest (by ratio) to a requested number.
+        function snapFpsRate(req, hz) {
+            const rates = fpsScreenRates(hz).rates;
+            let best = hz, bd = Infinity;
+            for (const r of rates) {
+                const d = Math.abs(Math.log(r / req));
+                if (d < bd - 1e-9) { bd = d; best = r; }
+            }
+            return best;
+        }
+        function fpsRateText(r) { return String(Math.round(r * 10) / 10); }
+        // The option a request shows as on this screen.
+        function fpsOptionFor(req, hz) {
+            if (req === 'native' || req === '0') return req;
+            const r = snapFpsRate(parseFloat(req) || 60, hz);
+            return (r >= hz - 1e-6) ? 'native' : fpsRateText(r);
+        }
+        // Rebuild the list from the screen's rates, and show where the request
+        // landed. Before the rate is known the HTML's list stays.
+        function buildFpsCapOptions(sel) {
+            const hz = fpsScreenHz();
+            if (!sel || !hz) return;
+            const sr = fpsScreenRates(hz);
+            const rows = [];
+            for (const r of sr.rates) {
+                if (r >= hz - 1e-6) continue;   // that one is Native
+                let label = fpsRateText(r) + ' fps';
+                if (Math.abs(r - sr.std) < 1e-6) label += ' — Standard';
+                else if (Math.abs(r - sr.save) < 1e-6) label += ' — Battery Saver';
+                rows.push([fpsRateText(r), label]);
+            }
+            rows.push(['native', 'Native (' + fpsRateText(hz) + ' Hz)']);
+            rows.push(['0', 'Uncapped']);
+            sel.textContent = '';
+            for (const row of rows) {
+                const o = document.createElement('option');
+                o.value = row[0]; o.textContent = row[1];
+                sel.appendChild(o);
+            }
+            sel.value = fpsOptionFor(fpsCapRequest, hz);
+        }
         function applyFpsCap(val) {
+            fpsCapRequest = String(val);
+            window.__fpsCapLocked = false;
             if (val === 'native') {
                 // 0 = uncapped; the render loop will run at display Hz naturally
                 window.fpsCap = 0;
                 window.__fpsCapMode = 'native';
             } else {
-                const num = parseInt(val, 10);
-                window.fpsCap = Number.isFinite(num) ? num : 60;
+                let num = parseFloat(val);
+                if (!Number.isFinite(num) || num < 0) num = 60;
                 window.__fpsCapMode = 'fixed';
+                const hz = fpsScreenHz();
+                if (num > 0 && hz > 0) {
+                    const r = snapFpsRate(num, hz);
+                    // The full rate is no limit at all: every refresh draws.
+                    window.fpsCap = (r >= hz - 1e-6) ? 0 : r;
+                    window.__fpsCapLocked = window.fpsCap > 0;
+                } else {
+                    window.fpsCap = num;
+                }
             }
-            console.log('[FPS Cap] set to', window.fpsCap, '(' + window.__fpsCapMode + ')');
+            console.log('[FPS Cap] set to', window.fpsCap, '(' + window.__fpsCapMode +
+                (window.__fpsCapLocked ? ', every ' + Math.round(fpsScreenHz() / window.fpsCap) + ' refreshes of ' + fpsScreenHz() + ' Hz' : '') + ')');
         }
         function initFpsCapControl() {
             const fpsCapSel = document.getElementById('fpsCap');
@@ -630,13 +745,13 @@
                 console.log('[FPS Cap] persisted uncapped mode reset to 60 at boot (sim feel is tuned for 60 Hz stepping)');
                 savedVal = '60';
             }
+            // Any positive number is a request (a rate offered on another
+            // screen — "72" — need not be in this list); anything else is 60.
+            if (!(parseFloat(savedVal) > 0)) savedVal = '60';
             fpsCapSel.value = savedVal;
-            // If the saved value doesn't match any option, fall back to '60'
-            if (fpsCapSel.value !== savedVal) {
-                fpsCapSel.value = '60';
-                savedVal = '60';
-            }
+            if (fpsCapSel.value !== savedVal) fpsCapSel.value = '60';
             applyFpsCap(savedVal);
+            buildFpsCapOptions(fpsCapSel);
             fpsCapSel.addEventListener('change', (e) => {
                 const val = e.target.value;
                 applyFpsCap(val);
@@ -646,21 +761,12 @@
                     }
                 } catch (_) {}
             });
-            // Update "Native" label when display Hz is detected
-            const nativeOpt = fpsCapSel.querySelector('option[value="native"]');
-            function updateNativeLabel() {
-                if (nativeOpt) {
-                    nativeOpt.textContent = 'Native (' + (window.__displayHz || 60) + ' Hz)';
-                }
-            }
-            // Update immediately if already detected, and register for future changes
-            updateNativeLabel();
-            window.__onDisplayHzChanged = function(hz) {
-                updateNativeLabel();
-                // If user has "native" selected, update the effective cap too
-                if (fpsCapSel.value === 'native') {
-                    window.fpsCap = 0; // 0 = uncapped, runs at display Hz
-                }
+            // The refresh rate arrived or changed (05i: Electron at load or on a
+            // move to another monitor, else the rAF probe): this screen's list,
+            // and the request snapped again to it.
+            window.__onDisplayHzChanged = function () {
+                applyFpsCap(fpsCapRequest);
+                buildFpsCapOptions(fpsCapSel);
             };
         }
         initFpsCapControl();
@@ -739,7 +845,13 @@
             // compensation that is exact for it: additive is linear, so the
             // colour scales; Gate is a convergence, idempotent at full flow, so
             // it correctly does not scale at all.
-            var col = (k < 1) ? applyPaintFlow(ev.color, normalizePaintFlow(1, k)) : ev.color;
+            // The dab's own Limit flow (gf, pushStrokeEvent) rides the same
+            // helper, so a stroke painted at Flow 30% replays at 30% whatever
+            // the slider says now. Under Limit Off it scales the colour, as
+            // the live brush would have at that Flow.
+            var gf = (typeof ev.gf === 'number' && isFinite(ev.gf)) ? Math.max(0, Math.min(1, ev.gf)) : 1;
+            var share = normalizePaintFlow(gf, k);
+            var col = (share < 1) ? applyPaintFlow(ev.color, share) : ev.color;
             // Preserve Randomness rolls for the random arms past the first
             // (resolveReplayRandomness), pinned over their live cache for this
             // dab only. A partial dab scales them the way it scales arm 0's
@@ -749,8 +861,7 @@
             var armPin = null;
             if (ev.ac && typeof ev.ac === 'object') {
                 armPin = ev.ac;
-                if (k < 1 && !config.COLOR_GATE) {
-                    var share = normalizePaintFlow(1, k);
+                if (share < 1 && !config.COLOR_GATE) {
                     armPin = {};
                     for (var ak in ev.ac) {
                         var ac = ev.ac[ak];
@@ -780,9 +891,11 @@
                     // it timeline playback sees a different colour on every
                     // dab and its stroke-grouping heuristic rolls confetti.
                     window.__recRndPin = ev.rnd ? 1 : 0;
-                    window.__recFmPin = (config.COLOR_GATE ? 1 : k) *
+                    window.__recFmPin = (config.COLOR_GATE ? 1 : share) *
                         ((typeof ev.fm === 'number' && isFinite(ev.fm)) ? ev.fm : 1);
-                    try { recRecordInteraction(x, y, dx, dy, col); } catch(_){}
+                    // Under Limit the share is still to apply (the colour is
+                    // true); under Limit Off it is already in col.
+                    try { recRecordInteraction(x, y, dx, dy, col, config.COLOR_GATE ? share : 1); } catch(_){}
                     window.__recRndPin = null;
                     window.__recFmPin = null;
                 }
@@ -979,6 +1092,11 @@
         // Allow multiplayer to schedule a stroke replay with normalized events
         window.scheduleStrokeReplay = function(normalizedEvents, senderId, meta) {
             if (window.__roomTrace) window.__roomTrace.note('recv', 'replay', senderId, normalizedEvents);   // 61 room report
+            // The brush slider's own bounds. An older peer sends a fine brush
+            // as radius 0 (five decimals), and a zero-width dab paints nothing,
+            // so 0 lands at the smallest size; only a missing radius is ours.
+            var _rb = (window.ParamRegistry && window.ParamRegistry.CONFIG_BOUNDS
+                       && window.ParamRegistry.CONFIG_BOUNDS.SPLAT_RADIUS) || { min: 0.000001, max: 0.1 };
             var remoteEvents = (normalizedEvents || []).map(ev => ({
                 t: ev.t || 0,
                 x: (ev.x || 0) * canvas.width,
@@ -987,7 +1105,8 @@
                 dy: (ev.dy || 0) * canvas.height,
                 color: Array.isArray(ev.color) ? ev.color.slice() : pointer.color.slice(),
                 mult: Math.max(1, Math.round(ev.mult || 1)),
-                radius: (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS,
+                radius: (typeof ev.radius === 'number' && isFinite(ev.radius))
+                    ? Math.max(_rb.min, Math.min(_rb.max, ev.radius)) : config.SPLAT_RADIUS,
                 // The sender's footprint. processReplay pins these per event
                 // and checks BrushShapes.has(), which counts a peer's cached
                 // stamp — so a relayed replay keeps the brush it was painted
@@ -1012,7 +1131,9 @@
                 // emitReplayDab range-checks the value, and does it for local
                 // events too, so there is exactly one place that decides what
                 // a legal mirror code is.
-                mir: (typeof ev.mir === 'number' && isFinite(ev.mir)) ? (ev.mir | 0) : undefined
+                mir: (typeof ev.mir === 'number' && isFinite(ev.mir)) ? (ev.mir | 0) : undefined,
+                // The painter's Limit flow per dab; emitReplayDab clamps it.
+                gf: (typeof ev.gf === 'number' && isFinite(ev.gf)) ? ev.gf : undefined
             }));
             if (!remoteEvents.length) return;
             peerReplays.set(senderId != null ? String(senderId) : '?',
@@ -1229,8 +1350,8 @@
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
                 const _pcol = applyPaintFlow(pointer.color, pressFlowMul() * splatInFlowMul());
-                pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol);
-                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcol);
+                pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol, window.__splatFlow);
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcol, window.__splatFlow);
                 multiSplatWithRadius(pointer.x, pointer.y, 0, 0, _pcol, config.SPLAT_RADIUS * inMult);
                 window.__splatFlow = 1; // reset so the engine/tail/programmatic splats stay full-flow
             }
@@ -1348,7 +1469,7 @@
                 // A Steady stroke records its HEAD's path from 05j instead (the
                 // hand is not where the paint went).
                 const _stdy = !!(window.BrushEngine && window.BrushEngine.steadyActive && window.BrushEngine.steadyActive());
-                if (!_skT && !_stdy && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                if (!_skT && !_stdy && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color, recLiveFlow());
                 // 1.3 parity: when the brush engine drives the stroke it
                 // broadcasts its real dab train from 05j (queueDab/flushDabs).
                 // Sampling here too would double-paint every peer.
@@ -1782,14 +1903,19 @@
                     const s = document.getElementById('brushSize');
                     if (!s) return;
                     let v = size0 * (m.dist / Math.max(1, dist0));
-                    v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max), Math.round(v * 10) / 10));
+                    // Three significant digits on the slider's grid: rounding
+                    // to 0.1 snapped every fine size to the floor, and from
+                    // there size0 × ratio could never pinch back out.
+                    const grid = parseFloat(s.step) || 0.0001;
+                    v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max),
+                        +(Math.round(+v.toPrecision(3) / grid) * grid).toFixed(4)));
                     s.value = v;
                     s.style.setProperty('--val', v);
                     // Drive it like a user drag (matches the brush-preset apply
                     // idiom): 05h's input binding sets SPLAT_RADIUS and the strip
                     // label updates instantly instead of on its 2s fallback poll.
                     s.dispatchEvent(new Event('input', { bubbles: true }));
-                    toast('🖌 Brush ' + v.toFixed(1));
+                    toast('🖌 Brush ' + (v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : v.toFixed(1)));
                 } else {
                     let v = Math.round(period0 + (cy0 - m.cy) / 25); // drag up = longer
                     v = Math.max(1, Math.min(60, v));
@@ -1887,7 +2013,7 @@
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
                 const _pcolT = applyPaintFlow(pointer.color, pressFlowMul());
-                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcolT);
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcolT, window.__splatFlow);
                 multiSplatWithRadius(pointer.x, pointer.y, 0, 0, _pcolT, config.SPLAT_RADIUS * inMult);
                 window.__splatFlow = 1; // reset so the engine/tail/programmatic splats stay full-flow
             }
@@ -1928,7 +2054,7 @@
                 pointer.moved = true;
                 const _skTT = config.BRUSH_TARGET === 'sketch';
                 const _stdyT = !!(window.BrushEngine && window.BrushEngine.steadyActive && window.BrushEngine.steadyActive());
-                if (!_skTT && !_stdyT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                if (!_skTT && !_stdyT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color, recLiveFlow());
                 if (!_skTT && !window.BrushEngine && typeof broadcastSplat === 'function') {
                     const now = Date.now();
                     if (!canvas._lastTouchBroadcast || now - canvas._lastTouchBroadcast > 50) {

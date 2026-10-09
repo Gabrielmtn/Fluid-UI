@@ -337,8 +337,13 @@
                 octx.drawImage(art, 0, 0, mainCanvas.width, mainCanvas.height);
                 // Console tunable: config.SPLAT_TO_FLUID_AMOUNT = 0.4 pours a
                 // fainter ghost. 1 = the picture at full strength.
-                const amount = (window.config && typeof config.SPLAT_TO_FLUID_AMOUNT === 'number')
-                    ? config.SPLAT_TO_FLUID_AMOUNT : 1;
+                // Times the layer's Opacity: the pour lays mix(dye, picture,
+                // alpha × amount) (05b imageSplatFrag), the same blend the
+                // layer showed over the fluid, so what pours is what was on
+                // screen.
+                const opacity = (typeof layer.opacity === 'number') ? Math.max(0, Math.min(1, layer.opacity)) : 1;
+                const amount = ((window.config && typeof config.SPLAT_TO_FLUID_AMOUNT === 'number')
+                    ? config.SPLAT_TO_FLUID_AMOUNT : 1) * opacity;
                 // Full Flow: the brush's Flow paces dabs that build up, and
                 // this is one pour (05i opts.flow).
                 if (!window.__splatImageToDye(out, amount, null, { flow: 1 })) {

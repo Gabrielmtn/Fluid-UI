@@ -1,0 +1,543 @@
+/* ================================================================
+   23-COLOUR-PICKER — the shared picker (js/64-colour-picker.js), its
+   popover, the eyedropper loupe, and the palette row's inline feedback.
+
+   The picker is the one component allowed to float and cast a shadow
+   (design handoff, Task 8); corners stay square like everything else.
+   Buttons in here set LAYOUT only: their colour comes from the panel
+   they sit in (css/01-buttons.css, checked by auditButtons()). Swatches
+   are divs, so they may carry their own colour.
+   ================================================================ */
+
+.cp [hidden],
+.cp-loupe[hidden],
+.cp-toast[hidden],
+.palette-note[hidden],
+.palette-picker-host[hidden] { display: none !important; }
+
+.cp {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    font-size: 11px;
+    color: var(--ink-100);
+}
+.cp[data-variant="inline"] {
+    margin-top: 8px;
+    padding: 8px;
+    background: var(--ground-950);
+    border: 1px solid var(--ground-500);
+}
+.cp-title,
+.cp-recent-head,
+.cp-pal-label,
+.cp-pop-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+}
+.cp-title { color: var(--ink-300); }
+
+/* ── Head: before/now · hex · copy · space · eyedropper ── */
+.cp-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+}
+.cp-swatch {
+    display: flex;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 22px;
+    box-sizing: border-box;
+    border: 1px solid var(--ground-500);
+    cursor: pointer;
+}
+.cp-swatch > span { flex: 1 1 0; }
+/* The sidebars style every input and select (full width, 28px tall);
+   the :is() with an id outranks those rules wherever the picker sits,
+   the popover in <body> included. */
+:is(#sidebar-right, #sidebar-left, body) .cp :is(.cp-hex, .cp-num, .cp-space, .cp-pal-select) {
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    height: 22px;
+    min-height: 0;
+    margin: 0;
+    padding: 0 4px;
+    background: var(--ground-900);
+    color: var(--ink-100);
+    border: 1px solid var(--ground-500);
+    border-radius: 0;
+    font-size: 11px;
+    line-height: 20px;
+}
+:is(#sidebar-right, #sidebar-left, body) .cp .cp-hex {
+    flex: 1 1 auto;
+    width: 8ch;
+    padding: 0 5px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+:is(#sidebar-right, #sidebar-left, body) .cp :is(.cp-hex, .cp-num):focus { border-color: var(--ink-300); outline: none; }
+:is(#sidebar-right, #sidebar-left, body) .cp .cp-hex.is-bad { border-color: var(--danger); }
+.cp-copy {
+    flex: 0 0 auto;
+    padding: 3px 5px;
+    font-size: 10px;
+}
+:is(#sidebar-right, #sidebar-left, body) .cp .cp-space {
+    flex: 0 0 auto;
+    padding: 0 2px;
+    font-size: 10px;
+}
+.cp-drop {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 22px;
+}
+
+/* ── Sliders ── */
+.cp-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.cp-row {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) 42px;
+    align-items: center;
+    gap: 6px;
+}
+.cp-lab {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ink-300);
+    text-align: center;
+    cursor: default;
+}
+.cp-track {
+    position: relative;
+    height: 14px;
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.cp-track:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.cp-track-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.cp-thumb {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
+:is(#sidebar-right, #sidebar-left, body) .cp .cp-num {
+    width: 100%;
+    padding: 0 4px;
+    text-align: right;
+    font-family: ui-monospace, Consolas, monospace;
+}
+.cp-gamut {
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--warn);
+}
+
+/* ── Recent colours and the palette strip ── */
+.cp-recent,
+.cp-pal-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+}
+.cp-chip {
+    aspect-ratio: 1.6;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    cursor: pointer;
+    outline: none;
+}
+.cp-chip:hover,
+.cp-chip:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.cp-chip.is-active { box-shadow: 0 0 0 2px var(--ground-900), 0 0 0 4px #fff; }
+.cp-recent-empty {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    color: var(--ink-500);
+}
+.cp-pal {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ground-500);
+}
+.cp-pal-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+:is(#sidebar-right, #sidebar-left, body) .cp .cp-pal-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 4px;
+}
+
+/* ── Inline footer ── */
+.cp-foot {
+    display: flex;
+    gap: 6px;
+}
+.cp-primary { flex: 1 1 auto; }
+.cp-secondary { flex: 0 0 auto; }
+
+/* ── Popover ── */
+.cp-pop {
+    position: fixed;
+    z-index: 10070;
+    width: 268px;
+    box-sizing: border-box;
+    padding: 0 10px 10px;
+    background: var(--ground-900);
+    border: 1px solid var(--ground-500);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.cp-pop-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 28px;
+    margin: 0 -10px 8px;
+    padding: 0 3px 0 10px;
+    background: var(--ground-700);
+    border-bottom: 1px solid var(--ground-500);
+    cursor: move;
+    user-select: none;
+}
+.cp-pop-close {
+    width: 22px;
+    height: 22px;
+    font-size: 15px;
+    line-height: 1;
+}
+input[type="color"].cp-open { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Eyedropper ── */
+body.cp-sampling #canvas-area,
+body.cp-sampling #canvas-area *,
+.cp-veil { cursor: crosshair !important; }
+body.cp-sampling #brushCursor,
+body.cp-sampling #brushCursorGhost,
+body.cp-sampling #brushCursorGhostClip,
+body.cp-sampling #customCursor { visibility: hidden !important; }
+/* The frozen frame, clipped to the canvas area (the canvas can be zoomed
+   past its edges). */
+.cp-veil {
+    position: fixed;
+    z-index: 10065;
+    overflow: hidden;
+}
+.cp-veil canvas { position: absolute; display: block; }
+.cp-loupe {
+    position: fixed;
+    z-index: 10080;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    pointer-events: none;
+}
+.cp-loupe-grid {
+    display: block;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+.cp-loupe-pill {
+    display: flex;
+    align-items: stretch;
+    height: 20px;
+    background: var(--ground-950);
+    border: 1px solid var(--ground-500);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+.cp-loupe-old,
+.cp-loupe-new { width: 12px; }
+.cp-loupe-hex {
+    display: flex;
+    align-items: center;
+    padding: 0 7px;
+    font: 600 11px/1 ui-monospace, Consolas, monospace;
+    color: var(--ink-100);
+}
+.cp-loupe-hint {
+    font-size: 10px;
+    color: var(--ink-100);
+    text-shadow: 0 1px 2px #000, 0 0 4px #000;
+}
+
+/* ── Toast (when the app has no other) ── */
+.cp-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 72px;
+    z-index: 10075;
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    background: var(--ground-800);
+    border: 1px solid var(--ground-500);
+    color: var(--ink-100);
+    font-size: 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
+
+/* ── The palette row's own feedback (js/01-config) ──
+   A note right under the row, and a ring on the colour it is about: the
+   duplicate an add ran into (warm), the colour being changed (accent). */
+.palette-note {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--warn);
+}
+.palette-chip-wrap.is-match .palette-chip {
+    outline: 2px solid var(--warn);
+    outline-offset: 2px;
+    animation: palette-ring 0.5s ease-out 2;
+}
+.palette-chip-wrap.is-editing .palette-chip {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.palette-chip-wrap.is-added .palette-chip {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+@keyframes palette-ring {
+    from { outline-offset: 6px; }
+    to { outline-offset: 2px; }
+}
+
+/* ================================================================
+   The Palettes section (js/01-config), 2026-10-08.
+   Hierarchy, top down: the dropdown (the palette in use) and its
+   colours lead; the key hints and Export / Import step back. The list
+   shows each palette as its name over its colours, New palette first.
+   ================================================================ */
+:is(#sidebar-right, #sidebar-left) .palette-carousel {
+    display: block;
+    max-height: none;
+    overflow: visible;
+    margin: 4px 0 10px;
+    padding: 0;
+}
+.palette-select-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 34px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--ground-950);
+    border: 1px solid var(--ground-500);
+    cursor: pointer;
+    user-select: none;
+}
+.palette-select-trigger:hover { border-color: var(--ink-500); }
+.palette-select-trigger:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.palette-select-trigger.open { border-color: var(--ink-300); }
+.palette-select-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-100);
+}
+.palette-select-chev {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    margin-top: -4px;
+    border-right: 1.5px solid var(--ink-300);
+    border-bottom: 1.5px solid var(--ink-300);
+    transform: rotate(45deg);
+}
+.palette-select-trigger.open .palette-select-chev { margin-top: 4px; transform: rotate(-135deg); }
+.palette-name-input {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 24px;
+    padding: 0 6px;
+    background: var(--ground-900);
+    color: var(--ink-100);
+    border: 1px solid var(--ink-300);
+    border-radius: 0;
+    font: inherit;
+    font-size: 13px;
+}
+.palette-select-trigger.editing { cursor: default; padding: 0 5px; }
+
+/* ── The list ── (under the right-click menu at 10020) */
+.palette-list {
+    position: fixed;
+    z-index: 10010;
+    box-sizing: border-box;
+    overflow-y: auto;
+    padding: 0 0 4px;
+    background: var(--ground-900);
+    border: 1px solid var(--ground-500);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+}
+.palette-new-row {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ground-500);
+    background: var(--ground-800);
+}
+.palette-new-cap {
+    margin-bottom: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-300);
+}
+.palette-new-btns {
+    display: flex;
+    gap: 4px;
+}
+.palette-new-btns button { flex: 1 1 auto; min-width: 0; padding: 4px 6px; white-space: nowrap; }
+.palette-option {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 9px 12px 10px 14px;
+    cursor: pointer;
+    outline: none;
+}
+.palette-option + .palette-option { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+.palette-option:hover,
+.palette-option:focus-visible { background: var(--ground-700); }
+.palette-option.active { background: var(--ground-800); }
+.palette-option.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent);
+}
+.palette-option-name {
+    font-size: 12px;
+    color: var(--ink-300);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.palette-option.active .palette-option-name,
+.palette-option:hover .palette-option-name { color: var(--ink-100); }
+.palette-option.active .palette-option-name { font-weight: 600; }
+.palette-option-strip {
+    display: flex;
+    height: 14px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.palette-option-strip > span { flex: 1 1 0; }
+.palette-option.dragging { opacity: 0.4; }
+.palette-option.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.palette-option.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.palette-option.editing { cursor: default; }
+
+/* ── The colours: bigger, with the one the next stroke paints marked ── */
+.palette-active-head:empty { display: none; }
+.palette-active-head { margin-bottom: 6px; }
+:is(#sidebar-right, #sidebar-left) .palette-preview {
+    gap: 12px 7px;
+    margin-top: 0;
+    padding-bottom: 6px;
+}
+.palette-chip-wrap,
+.palette-chip,
+.palette-add {
+    width: 28px;
+    height: 28px;
+}
+.palette-chip {
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 3px;
+    border-color: rgba(255, 255, 255, 0.22);
+}
+.palette-add { border-radius: 3px; font-size: 16px; }
+/* Active: a white ring standing off the colour, and an accent bar under
+   it. Nothing else in the row is white-ringed at rest. */
+.palette-chip-wrap.is-active .palette-chip {
+    box-shadow: 0 0 0 2px var(--ground-900), 0 0 0 4px #fff;
+}
+.palette-chip-wrap.is-active .palette-chip::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    bottom: -10px;
+    height: 3px;
+    background: var(--accent);
+}
+.palette-chip-wrap.is-editing .palette-chip {
+    outline: 2px dashed #fff;
+    outline-offset: 3px;
+}
+
+/* ── What steps back: hints and Export / Import ── */
+.palette-keys {
+    margin-top: 8px;
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--ink-500);
+}
+:is(#sidebar-right, #sidebar-left) .palette-actions {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ground-500);
+}
+:is(#sidebar-right, #sidebar-left) .palette-actions button {
+    padding: 3px 4px;
+    font-size: 10px;
+}
+/* The section label: the small caps every sidebar control label uses
+   (the block sits outside a .control-group once the sidebar builds it). */
+:is(#sidebar-right, #sidebar-left) .palette-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--ink-300);
+}
+:is(#sidebar-right, #sidebar-left) .palette-label .hk-cap { margin-left: auto; text-transform: none; }

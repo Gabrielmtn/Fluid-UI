@@ -82,6 +82,16 @@
     // speed. STEADY_RELEASE_MAX_S (wall) stops a crawl at very low Time
     // where it is rather than hurrying it; a new press abandons it.
     //
+    // With a splat-out tail to follow (2026-10-09) the head COASTS instead: it
+    // keeps the speed it had at the lift all the way to where it settles
+    // (never slower than the pull, never faster than it was going), and the
+    // tail leaves from there at that same speed. Easing in first meant the
+    // head arrived at a crawl and the tail took its speed from the crawl:
+    // measured on a 1500 px/s flick, 30% slowed to 99 px/s and then jumped
+    // back to 634 for a 142 px tail; 60% and 100% crawled for 0.7 s and 2.5 s
+    // and laid no tail at all ("doesn't play nicely with the inertia of splat
+    // out" — Gabriel). Splat-out Instant keeps the ease-in above.
+    //
     // Let go off the canvas and the line ends at the canvas's edge
     // (2026-10-07). The head used to carry on to the lift point, out past
     // the edge, and the hose kept pouring there until it settled — up to
@@ -122,6 +132,8 @@
     var handSamples = [];         // the hand's raw samples since the last tick
     var px0 = 0, py0 = 0;         // the hand at the end of the last tick
     var strokeSerial = 0;         // bumped by every begin(): which stroke this is
+    var coastV = 0;               // after the lift, with a tail to follow: the head's
+                                  // speed at the lift, canvas px per (Time-scaled) second
 
     function steadyAmount() {
         var s = cfg('BRUSH_STEADY', 0);
@@ -417,15 +429,24 @@
 
     // Head velocity over the last STEADY_TRAIL_MS, in the units 05d's release
     // tail takes (px x10 per 60 Hz frame) — the same window its releaseVelocity
-    // reads off the hand.
-    function headVelocity() {
+    // reads off the hand. Per frame of the HEAD's clock (Time-scaled, tf): the
+    // tail runs on the simulated clock, so a wall-clock speed handed to it
+    // came out tf times too fast or slow — at Time 2 the tail sped off at
+    // twice the head's pace.
+    function headVelocity(tf) {
         var n = headTrail.length;
         if (n < 2) return { dx: 0, dy: 0 };
         var last = headTrail[n - 1], first = headTrail[0];
         var dt = last.t - first.t;
         if (dt < 4) return { dx: 0, dy: 0 };
-        var k = 10 * (1000 / 60) / dt;
+        var k = 10 * (1000 / 60) / dt / (tf > 0 ? tf : headClock());
         return { dx: (last.x - first.x) * k, dy: (last.y - first.y) * k };
+    }
+
+    // The head's clock rate: the Time slider, clamped as steadyTick clamps it.
+    function headClock(timeScale) {
+        var ts = (typeof timeScale === 'number') ? timeScale : window.timeScale;
+        return Math.max(0.05, Math.min(4, (typeof ts === 'number' && ts > 0) ? ts : 1));
     }
 
     function noteHead(now) {
@@ -468,13 +489,20 @@
 
     // The release catch-up has landed: the stroke is over. Off the canvas's
     // edge (offEdge) it ends without its release tail.
-    function arrive(offEdge) {
+    function arrive(offEdge, tf) {
         active = false;
         releasing = false;
+        var coast = coastV;
+        coastV = 0;
         var cb = arriveCb;
         arriveCb = null;
         if (cb && !offEdge) {
-            var v = headVelocity();
+            var v = headVelocity(tf);
+            // A coasting head hands the tail the speed it held. The trail's
+            // average reads low: the head settles partway through its last
+            // step (measured 14% under at 60 Hz).
+            var vm = Math.hypot(v.dx, v.dy), want = coast / 60 * 10;
+            if (vm > 0 && want > vm) { v.dx *= want / vm; v.dy *= want / vm; }
             try { cb({ x: hx, y: hy, dx: v.dx, dy: v.dy }); } catch (_) {}
         }
     }
@@ -484,8 +512,7 @@
     // Returns true on the frame the release catch-up lands.
     function steadyTick(wallMs, timeScale) {
         var s = steadyAmount();
-        var tf = (typeof timeScale === 'number' && timeScale > 0) ? timeScale : 1;
-        tf = Math.max(0.05, Math.min(4, tf));
+        var tf = headClock((typeof timeScale === 'number' && timeScale > 0) ? timeScale : 1);
         var sh = steadyShape(s);
         var wall = Math.max(0, Math.min(50, wallMs || 0)) / 1000;
         var now = performance.now();
@@ -506,7 +533,7 @@
             else { hx = tx; hy = ty; emitAlong(hx, hy, 1); }
             px0 = tx; py0 = ty;
             noteHead(now);
-            if (releasing) { arrive(offEdge); return true; }
+            if (releasing) { arrive(offEdge, tf); return true; }
             return false;
         }
         var n = Math.max(1, Math.min(STEADY_MAX_STEPS,
@@ -529,6 +556,9 @@
             var e = d - sh.slack;
             if (!(e > 0)) continue; // slack: the head stays where it is
             var step = Math.min(e * pull, sh.vmax * h);
+            // Coasting to a release tail: hold the lift's speed to the end
+            // (see the header) rather than easing in to a crawl.
+            if (coastV > 0) step = Math.min(e, Math.max(step, coastV * h));
             if (box) {
                 if (releaseStep(hx + dx / d * step, hy + dy / d * step, box)) { ranOff = true; break; }
                 continue;
@@ -542,7 +572,7 @@
         if (releasing) {
             releaseWall += wall;
             if (ranOff) { arrive(true); return true; }
-            if (settled(sh.slack) || releaseWall >= STEADY_RELEASE_MAX_S) { arrive(); return true; }
+            if (settled(sh.slack) || releaseWall >= STEADY_RELEASE_MAX_S) { arrive(false, tf); return true; }
         }
         return false;
     }
@@ -572,6 +602,7 @@
             handSamples.length = 0;
             releasing = false;
             arriveCb = null;
+            coastV = 0;
             headTrail.length = 0;
             if (steadyOn) {
                 var cv = document.getElementById('canvas');
@@ -627,6 +658,12 @@
                     releasing = true;
                     releaseWall = 0;
                     arriveCb = (typeof onArrive === 'function') ? onArrive : null;
+                    // A tail follows: coast at the speed the head has now.
+                    coastV = 0;
+                    if (arriveCb) {
+                        var v0 = headVelocity();   // x10 px per 60 Hz frame of the head's clock
+                        coastV = Math.hypot(v0.dx, v0.dy) / 10 * 60;
+                    }
                     // Lifted off the canvas with the head out there too: the
                     // line already left the canvas, so nothing is left to
                     // finish (a head still inside runs to the edge in tick).
@@ -649,7 +686,7 @@
         // Abort without the catch-up tail (window blur, pointercancel).
         abort: function () {
             active = false; queue.length = 0;
-            releasing = false; arriveCb = null;
+            releasing = false; arriveCb = null; coastV = 0;
         },
 
         // Still painting: held, or (Steady) reeling in after the lift.
@@ -675,6 +712,9 @@
         head: function () {
             return (active && steadyOn) ? { x: hx, y: hy, handX: tx, handY: ty, releasing: releasing } : null;
         },
+        // Where the head came to rest, on the frame tick() reports the landing
+        // (head() is already null then): the hose pours its last stretch to here.
+        landedAt: function () { return steadyOn ? { x: hx, y: hy } : null; },
 
         // Drain up to maxDabs for this frame (update loop calls once/frame).
         drain: function (maxDabs) {

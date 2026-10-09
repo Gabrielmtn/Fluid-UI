@@ -17,7 +17,8 @@
 //
 // What rides: the look sections of capturePresetSnapshot({lookOnly}) —
 //   sliders, switches, selects, colours, palette, swatch tray, arm colours,
-//   kaleidoscope, light position and path, brush ramps, material, brush tip,
+//   kaleidoscope, light position and path, brush ramps and On Move /
+//   Constant (so Spacing or Interval lands on a brush using it), material, brush tip,
 //   shooting-star origin, oscillator — plus gravity (on, and which way),
 //   which a room shares but a preset never carried. Only values that differ
 //   from the defaults travel (the recipient's applyPresetSnapshotFull fills
@@ -172,7 +173,9 @@
         'breathColorMode', 'lightShiftMode', 'shadeFormResolution',
         // rarely anywhere but their defaults, or written by the path codec
         'mgCycles', 'mgPre', 'mgPost', 'mgCoarse', 'mgRelax', 'captureDimming', 'version',
-        'cosOscillator', 'hue', 'saturation', 'lightness', 'gap'
+        'cosOscillator', 'hue', 'saturation', 'lightness', 'gap',
+        // 2026-10-07: the brush's On Move / Constant mode (brushState)
+        'splatMode'
     ];
     var STRS = [
         'instant', 'linear', 'easing', 'time', 'stroke', 'main', 'random', 'step', 'fixed',
@@ -180,7 +183,8 @@
         'manual', 'light', 'brush', 'relaxed', 'box', '478', 'same', 'cycle', 'breath',
         'replace', 'tint', 'overlay', 'multiply', 'screen', 'add',
         '0', '1', '2', '3', '4', '5', '2048', '1024', '512', '256', '128',
-        'Mountain Majesty', 'Forest Serenity', 'Sunset Dreams', 'Ocean Waves'
+        'Mountain Majesty', 'Forest Serenity', 'Sunset Dreams', 'Ocean Waves',
+        'move', 'constant'
     ];
     function indexOf(list) {
         var m = Object.create(null);
@@ -973,6 +977,8 @@
         if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
         document.querySelectorAll('.user-preset-btn.active, .mixer-user-preset-btn.active')
             .forEach(function (b) { b.classList.remove('active'); });
+        // ...and the Presets button stops naming the preset you were on (20).
+        if (typeof window.setCurrentPreset === 'function') window.setCurrentPreset(null);
         if (window.QualityGovernor) {
             try { (window.QualityGovernor.softReset || window.QualityGovernor.reset)(); } catch (_) {}
         }

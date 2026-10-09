@@ -534,7 +534,12 @@
             recStartCountdown(3);
         }
         
-        function recRecordInteraction(x, y, dx, dy, colorArray) {
+        // flow: the Flow still to apply to colorArray at playback. Callers
+        // handing the raw pointer colour pass the live Flow (05d
+        // __recLiveFlow); one whose colour went through applyPaintFlow passes
+        // __splatFlow (1 under Limit Off, where the flow is already in the
+        // colour). Omitted = the colour is final, as recordings were before.
+        function recRecordInteraction(x, y, dx, dy, colorArray, flow) {
             if (!recEnabled) return;
             const a = recGetActiveLayer();
             if (!a || !a.timeline.isRecording) return;
@@ -588,6 +593,12 @@
             // Same class as `ap` — geometry, not styling — and omitted at 0.
             const mirPin = window.__strokeMirrorPin | 0;
             if (mirPin) interaction.mir = mirPin;
+            // The Flow the dab was painted at, so a take painted thin plays
+            // back thin whatever the slider says now (2026-10-08: playback
+            // ran every dab at full Flow). Omitted at full flow.
+            if (typeof flow === 'number' && isFinite(flow) && flow >= 0 && flow < 0.9995) {
+                interaction.fl = +flow.toPrecision(4);
+            }
             // Preserve Randomness: mark the dab as rolled by random mode rather
             // than only freezing the roll, so 'original' playback re-rolls per
             // stroke ('exact' still freezes). Read through the pin so a replay
@@ -755,6 +766,14 @@
                 } else { // original, non-generative → the baked colors
                     replayColor = i.color;
                 }
+                // The Flow the dab was painted at (recRecordInteraction), through
+                // the live brush's own routing: under Limit it scales the
+                // convergence and the colour stays true, under Limit Off it
+                // scales the colour. Reset in the finally below.
+                const _fl = (typeof i.fl === 'number' && isFinite(i.fl)) ? Math.max(0, Math.min(1, i.fl)) : 1;
+                if (_fl < 1 && typeof window.__applyPaintFlow === 'function') {
+                    replayColor = window.__applyPaintFlow(replayColor, _fl);
+                }
                 // Pin the footprint this dab was recorded with, the same
                 // pin-then-restore stroke replay and peer dabs use. Only when
                 // the interaction actually carries one: recordings made before
@@ -826,6 +845,7 @@
                     if (window.config && typeof prevR === 'number') window.config.SPLAT_RADIUS = prevR;
                 }
                 } finally {
+                    if (_fl < 1) window.__splatFlow = 1;   // as after a live dab
                     if (_fp && window.config) {
                         window.config.BRUSH_TIP = _tipPrev;
                         window.config.BRUSH_SHAPE_ID = _shapePrev;

@@ -100,7 +100,7 @@
         // hard.max/1000, and wheel-zoom, row-drag, the printed scale and brush
         // presets all read the live attrs. Mutation keeps the old 30 ceiling — a
         // random jump to a canvas-swallowing brush is not a style.
-        brushSize: {configKey: null, ui: {min: 0.001, max: 100, step: 0.001}, hard: {min: 0.001, max: 100}, def: 1.3, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
+        brushSize: {configKey: null, ui: {min: 0.001, max: 100, step: 0.0001}, hard: {min: 0.001, max: 100}, def: 1.3, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended", log: true}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
         // No mut (Gabriel 2026-08-06): a mutated timeScale can slow the whole
         // sim to near-frozen, which reads as "mutate broke it", not a style.
@@ -402,7 +402,7 @@
         var sliders = [];
         Object.keys(SLIDERS).forEach(function (id) {
             var m = SLIDERS[id].mut;
-            if (m) sliders.push({ id: id, min: m.min, max: m.max, step: m.step, scope: m.scope });
+            if (m) sliders.push({ id: id, min: m.min, max: m.max, step: m.step, scope: m.scope, log: !!m.log });
         });
         var checkboxes = [];
         Object.keys(CHECKBOXES).forEach(function (id) {

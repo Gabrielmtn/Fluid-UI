@@ -113,7 +113,7 @@ images with a line of context under each.
   |---|---|
   | 2 / 8 painters | `PUBLIC_CAP = 2`, `PRIVATE_CAP = 8` — `party/shared.ts:7` |
   | 30 sec – 5 min turns | `#turnTimerSel` options — `index.html:1040` |
-  | 3 paint materials | `#materialMode`: Swirl · Gloss Paint (Wetness) · Gloss Paint (Thickness) — `index.html:651` |
+  | 3 paint materials | `#materialMode`: Material Type - Fluid · Paint (Wet) · Paint (Thick) — `index.html:787` |
   | 5 brush tips | gaussian · blob · chisel · streak · ring — `js/04a-canvas-gl-config.js:743` |
   | 8 arms | `multiplier` hard max 8 — `js/01a-param-registry.js:63` |
   | 5 symmetry modes | `#symmetryMode` — `index.html:699` |

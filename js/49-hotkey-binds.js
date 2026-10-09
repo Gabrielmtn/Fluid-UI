@@ -253,9 +253,21 @@
                 return s.text === loc.text && s.bg === (loc.bg || '') && s.cls === (loc.cls || '');
             });
             if (worded.length === 1) return worded[0];
+            // Its words were renamed: a key bound before still finds it.
+            var now = RENAMED[loc.text];
+            if (now) {
+                var moved = [].filter.call(root.querySelectorAll(loc.tag), function (c) {
+                    return norm(c.textContent) === now;
+                });
+                if (moved.length === 1) return moved[0];
+            }
         }
         return null;
     }
+    // Old label → new label. The Color cell's "Rnd" became "Random" when
+    // Rnd / Palette became One / Random / Palette (2026-10-08), and its "Cap"
+    // became Limit On / Limit Off, whose text is "Limit" (the On/Off is CSS).
+    var RENAMED = { 'Rnd': 'Random', 'Cap': 'Limit' };
 
     // ─── WHAT TO CALL IT ────────────────────────────────────────
     function cssEsc(s) { return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/"/g, '\\"'); }
@@ -603,7 +615,7 @@
     // the app's own chevron-in-a-child convention (.mixer-more-chev,
     // .qub-dd-chev, .preset-group-chev …), or by name for the few that
     // carry neither.
-    var OPENERS = '#mixerPresetsTrigger, .preset-more, .ch-gear, .ch-tip-swatch, .qub-dd-btn, ' +
+    var OPENERS = '#mixerPresetsTrigger, .preset-more, .qub-dd-btn, ' +
                   '.layer-btn[data-action="collapse"], .brush-trigger, .arm-colors-trigger';
 
     function isOpener(el) {

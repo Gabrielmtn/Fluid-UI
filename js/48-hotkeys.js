@@ -261,12 +261,13 @@
         // lines on it before it existed.
         { says: 'already opens the radial menu', test: function (k) { return k0(k) && k.lower === 'e'; } },
         { says: 'already mutates the settings', test: function (k) { return k0(k) && k.lower === 'm'; } },
-        { says: 'already changes the brush size', test: function (k) { return noCA(k) && (k.key === '[' || k.key === ']'); } },
-        { says: 'already steps through the palette', test: function (k) { return noCA(k) && k.lower === 'n'; } },
-        { says: 'already saves the color', test: function (k) { return noCA(k) && k.shift && k.lower === 's'; } },
-        { says: 'already clears the colors', test: function (k) { return noCA(k) && k.shift && k.lower === 'x'; } },
+        { says: 'already changes the brush size', test: function (k) { return noCA(k) && (k.key === '[' || k.key === ']' || k.key === '{' || k.key === '}'); } },
+        { says: 'already steps through the palette colours', test: function (k) { return noCA(k) && k.lower === 'n'; } },
+        { says: 'already adds the brush colour to the palette', test: function (k) { return noCA(k) && k.shift && k.lower === 's'; } },
+        { says: 'already takes the brush colour out of the palette', test: function (k) { return noCA(k) && k.shift && k.lower === 'x'; } },
         { says: 'already steps through the animation parts', test: function (k) { return k0(k) && (k.key === 'ArrowUp' || k.key === 'ArrowDown'); } },
-        { says: 'already changes the palette', test: function (k) { return k.ctrl && (k.key === 'ArrowLeft' || k.key === 'ArrowRight'); } },
+        { says: 'already changes the palette', test: function (k) { return k.ctrl && k.shift && (k.key === 'ArrowLeft' || k.key === 'ArrowRight'); } },
+        { says: 'already steps through the palette colours', test: function (k) { return k.ctrl && !k.shift && (k.key === 'ArrowLeft' || k.key === 'ArrowRight'); } },
         { says: 'already changes the resolution', test: function (k) { return k.alt && !k.ctrl && (k.key === 'ArrowUp' || k.key === 'ArrowDown'); } },
         // 05e — reads e.code, so Ctrl and Alt still reach it; Shift is left free
         { says: 'already sets the multiplier', test: function (k) { return !k.shift && /^(Digit|Numpad)[1-8]$/.test(k.code); } },

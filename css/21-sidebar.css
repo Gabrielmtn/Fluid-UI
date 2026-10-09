@@ -250,15 +250,22 @@
     width: auto;
     height: auto;
     margin: 0;
-    /* 15px gap between label text and the 8px arrow glyph; JS sizes the
-       element to the selected option so the arrow always hugs the text */
-    padding: 0 23px 0 0;
+    /* 7px gap between label text and the 8px arrow glyph; JS sizes the
+       element to the selected option so the arrow always hugs the text.
+       Was 15px; the 8px came back when the label turned bold (below), so
+       the Fluid cell is no wider than it was (2026-10-07). */
+    padding: 0 15px 0 0;
     border: none;
     border-radius: 0;
     background: transparent;
     color: inherit;
     font-size: inherit;
     font-family: inherit;
+    /* A select doesn't inherit these by default: without them SWIRL -
+       VORTICITY drew at 400 beside the strip's 700 labels and sat a line
+       box taller (2026-10-07). 29 sizes the select from the computed weight. */
+    font-weight: inherit;
+    line-height: inherit;
     text-transform: inherit;
     letter-spacing: inherit;
     cursor: pointer;
@@ -653,19 +660,23 @@
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(255,255,255,0.07);
 }
-/* "Visible to layer" centred on its own row; Import / Flatten / Collider
-   share the row beneath it in equal thirds. */
-.layers-toolbar-main {
-    display: flex;
-    justify-content: center;
-}
-.layers-toolbar-main button {
-    min-width: 60%;
-}
-.layers-toolbar-row {
+/* Import / Visible to layer over Flatten / Collider: a 2×2 grid of equal
+   buttons, the same edges as the rows beneath (05k builds those the same
+   way). Two across is what still fits "Visible to layer" at 220px. */
+.layers-toolbar-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
+}
+/* In a narrow sidebar "Visible to layer" breaks onto two lines rather than
+   running out of its button; the grid stretches its neighbour to match.
+   No overflow clipping: Collider's source menu is a child of the button
+   and hangs below it. */
+.layers-toolbar-grid > button {
+    min-width: 0;
+    white-space: normal;
+    text-wrap: balance;
+    line-height: 1.15;
 }
 .section-header-actions button {
     cursor: pointer;
@@ -780,10 +791,12 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-channel.ch-wide {
     flex: 1 1 100%;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
+    /* One · Random · Palette + Cap take a full row: three words beside
+       the swatch didn't fit (2026-10-08). The swatch sits by Ignite. */
     grid-template-areas:
-        "head head    head"
-        "well toggles toggles"
-        "well ignite  lock";
+        "head    head    head"
+        "toggles toggles toggles"
+        "well    ignite  lock";
     align-items: center;
     /* Touch separation: these are small adjacent targets and a mis-tap on
        Gate/Ignite is destructive-feeling. Gaps buy the safety; the block
@@ -795,10 +808,10 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-channel.ch-wide {
 /* Space the four mode toggles apart from each other, and keep Gate visibly
    detached from the Rnd/Step/Rainbow group it isn't part of. */
 body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-seg-switch {
-    gap: 8px;
+    gap: 6px;
 }
 body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
-    gap: 14px;
+    gap: 12px;
 }
 /* The colour label is hidden here, so its grid row is empty — collapse it
    rather than paying a full row-gap for nothing. */
@@ -833,9 +846,13 @@ body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-ignite-lock {
     width: 30px;
     height: 26px;
 }
-/* Toggles get the taller touch height now that they own a full row */
+/* Toggles get the taller touch height now that they own a full row. 4px
+   sides, not the bar's 6px: four words share the sidebar's width, and a
+   chip squeezed under its text starts the word at its left padding, so the
+   word sat 1-2px right of centre. */
 body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row .ch-text-toggle {
     height: 26px;
+    padding: 0 4px;
 }
 
 /* ── Transport ──
@@ -865,6 +882,21 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-actions .transport-row butt
 }
 body.compact-ui #sidebar-right > #mixer-strip .mixer-actions > button {
     min-width: 88px;
+}
+/* The right-hand stack (20, 2026-10-07) takes a full row of its own: Presets
+   and Help share its top line, the transport row sits centred under them. */
+body.compact-ui #sidebar-right > #mixer-strip .mixer-stack {
+    flex: 1 1 100%;
+    gap: 8px;
+    padding: 0;
+}
+body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-actions {
+    flex: 0 0 auto;
+}
+body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
 }
 
 /* ── Sidebar content polish ── */
@@ -1374,7 +1406,7 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-actions > button {
     line-height: 1.4;
     color: var(--ink-300, #b9bec7);
     margin: -4px 0 12px;
-    /* Two lines, always: a long control name ("Swirl - Vorticity") wraps
+    /* Two lines, always: a long control name ("Material Type - Paint (Thick)") wraps
        instead of clipping, and the buttons below never jump as names come
        and go during someone's drag. */
     min-height: 34px;
@@ -1469,6 +1501,90 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-actions > button {
     margin-bottom: 6px;
 }
 
+/* ── Feature switch + its panel (the checkable group box) ──
+   Mandala Studio and Kaleido were the same small checkbox as Paint Only In
+   Wedge and Show Guides inside them, so the switch that turns a whole mode
+   on read as one more setting (Gabriel, 2026-10-07). Krita's checkable group
+   box / Blender's subpanel header: the master row becomes a header bar with
+   a switch on its right, and while it is on, header and panel draw as one
+   framed card, so the settings inside read as belonging to it.
+   Markup: .feature-head on the master's .checkbox-group row, .feature-body
+   on the panel that directly follows it. The input stays a real checkbox
+   (appearance only), so .checked, change events, hotkeys, tours, Mutate and
+   autoload are untouched. Placed after the rule above, which out-weighs a
+   plain .checkbox-group selector on margin. */
+:is(#sidebar-right, #sidebar-left) .control-group.checkbox-group.feature-head {
+    gap: 8px;
+    min-height: 34px;
+    margin: 0 0 8px;
+    padding: 0 10px;
+    background: var(--ground-700);
+    border: 1px solid var(--ground-500);
+    border-radius: 6px;
+}
+/* The label fills the bar, so a click anywhere on it flips the switch. */
+:is(#sidebar-right, #sidebar-left) .control-group.checkbox-group.feature-head > label {
+    order: 0;
+    flex: 1;
+    align-self: stretch;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-100);
+    opacity: 1;
+}
+:is(#sidebar-right, #sidebar-left) .feature-head > .hk-cap { order: 1; }
+:is(#sidebar-right, #sidebar-left) .control-group.checkbox-group.feature-head > input[type="checkbox"] {
+    order: 2;
+    flex: none;
+    position: relative;
+    width: 30px;
+    height: 16px;
+    margin: 0;
+    border-radius: 8px;
+    border: 1px solid var(--ink-500);
+    background: var(--ground-600);
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+:is(#sidebar-right, #sidebar-left) .feature-head > input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--ink-300);
+    transition: transform 0.15s ease;
+}
+:is(#sidebar-right, #sidebar-left) .control-group.checkbox-group.feature-head > input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+:is(#sidebar-right, #sidebar-left) .feature-head > input[type="checkbox"]:checked::after {
+    background: linear-gradient(180deg, var(--chrome-0), var(--chrome-1));
+    transform: translateX(14px);
+}
+:is(#sidebar-right, #sidebar-left) .feature-head > input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--accent-60);
+    outline-offset: 2px;
+}
+/* On: the bar's lower corners square off and the panel hangs from it. */
+:is(#sidebar-right, #sidebar-left) .control-group.checkbox-group.feature-head:has(> input:checked) {
+    margin-bottom: 0;
+    border-radius: 6px 6px 0 0;
+}
+:is(#sidebar-right, #sidebar-left) .feature-head + .feature-body {
+    margin: 0 0 10px;
+    padding: 10px 10px 10px;
+    background: var(--ground-800);
+    border: 1px solid var(--ground-500);
+    border-top: 0;
+    border-radius: 0 0 6px 6px;
+}
+
 /* ── Brush section ── */
 .brush-section-label {
     display: block;
@@ -1501,6 +1617,89 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 .brush-mode-btn:hover {
     opacity: 0.8;
+}
+/* Paint Into, drawn as a radio group (2026-10-07): one track holding the
+   three choices, a ring in front of each, the chosen ring filled. Layout
+   only here; the track, rings and chosen plate are colours, so they live in
+   01-buttons.css with every other button colour (js/38 audit). */
+.brush-radio-row {
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+}
+.brush-radio-row > .brush-mode-btn {
+    gap: 6px;
+    height: 24px;
+    border-radius: 6px;
+    font-size: 11px;
+}
+.brush-radio-row > .brush-mode-btn:hover {
+    opacity: 1;
+}
+.brush-radio-row > .brush-mode-btn::before {
+    content: '';
+    flex: none;
+    box-sizing: border-box;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+/* Tip's fold (2026-10-07). The heading is a button: chevron, the section
+   label, and the tip's name while folded. It hangs 4px past the panel's
+   edge each side, so the label lines up with the others and the hover
+   plate still has room around it. */
+.brush-fold-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: calc(100% + 8px);
+    margin: 6px -4px 4px;
+    padding: 3px 4px;
+    border-radius: 5px;
+    text-align: left;
+}
+.brush-settings-panel .brush-fold-head > .brush-section-label {
+    margin: 0;
+}
+.brush-fold-chev {
+    flex: none;
+    width: 10px;
+    font-size: 10px;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.4);
+    transition: transform 0.15s ease;
+}
+.brush-fold.collapsed .brush-fold-chev {
+    transform: rotate(-90deg);
+}
+.brush-fold-sum {
+    margin-left: auto;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.brush-fold:not(.collapsed) .brush-fold-sum {
+    display: none;
+}
+/* Snaps, like the sidebar sections: no per-frame layout. */
+.brush-fold.collapsed > .brush-fold-body {
+    display: none;
+}
+
+/* Brush Ghost (2026-10-07): the checkbox that shows it leads the heading
+   of the slider that sets its opacity. The label row is the sidebar's own
+   (flex, value on the right, hotkey slot after it). */
+.brush-ghost-head {
+    cursor: pointer;
+}
+:is(#sidebar-right, #sidebar-left) .brush-ghost-head > input[type="checkbox"] {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin: 0 6px 0 0;
 }
 .brush-time-group {
     margin-bottom: 10px;
@@ -1890,6 +2089,15 @@ select option {
     line-height: 1.4;
     color: var(--ink-500);
 }
+/* Display → under Transparent Background, until the window is see-through. */
+.transparent-restart { margin-top: 6px; }
+.transparent-restart[hidden] { display: none; }
+.transparent-restart-text {
+    margin-bottom: 6px;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--ink-500);
+}
 /* Display → under Show photosensitivity warning. */
 .photo-warn-learn {
     display: block;
@@ -2028,15 +2236,15 @@ select option {
     padding: 2px 6px 2px 10px;
 }
 #sidebar-left .fader-scale { display: none; }
-/* One row: the fader takes the width, the tip swatch sits at its end. */
+/* One row: the fader takes the whole width. */
 .lsb-head .ch-fader { flex-wrap: nowrap; gap: 6px; contain: none; }
 .lsb-head .ch-fader .fader-stack { flex: 1 1 auto; min-width: 0; }
 .lsb-head .ch-fader input[type="range"] { width: 100%; }
-/* Fixed-width readouts: Brush Size reads 0.125 / 1.3 / 11.0 (3 to 5
-   characters) and Steady Off / 5% / 100%, and a box that tracks the text
-   twitches as you drag. Courier is monospaced, so ch is exactly a digit. */
+/* Fixed-width readouts: Brush Size reads 4.5 px / 44 px / 885 px (4 to 6
+   characters) and Stabilization 0% / 5% / 100%, and a box that tracks the
+   text twitches as you drag. Courier is monospaced, so ch is exactly a digit. */
 #mixer-brushValue {
-    min-width: calc(5ch + 2px);
+    min-width: calc(6ch + 2px);
     text-align: right;
 }
 #brushSteadyValue {

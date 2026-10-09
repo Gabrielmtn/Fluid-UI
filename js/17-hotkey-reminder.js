@@ -105,11 +105,13 @@
     // ("⌃⌥Scr"), which is unreadable glyph soup, and they steal the width
     // the channel labels need. Strip bindings live in the appended row and
     // the F1 modal; in-place caps are a sidebar affordance.
+    // Shift+S / Shift+X had caps here too, inside the 22px [+] and after
+    // it: they covered the [+], and the row is rebuilt on every palette
+    // change, which wiped them. The hint line under the row names both.
     var CAPS = [
-        { keys: '⇧S',     mod: '',           title: 'Shift+S — add the picker colour to the palette',      where: byId('paletteAddChip') },
-        { keys: '⇧X',     mod: '',           title: 'Shift+X — remove the picker colour from the palette', where: byId('palettePreview') },
-        { keys: '⌃←→',    mod: 'ctrl',       title: 'Ctrl+← / → — cycle palette',         where: paletteRow() },
-        { keys: 'N',      mod: '',           title: 'N — next colour (Shift: previous)',  where: paletteRow() },
+        // Ctrl+Shift+← → switches palette; the colour keys are in the hint
+        // line under the colours (2026-10-08).
+        { keys: '⌃⇧←→',   mod: 'ctrlshift',  title: 'Ctrl+Shift+← / → — previous / next palette', where: paletteRow() },
         { keys: 'C',      mod: '',           title: 'Toggle brush cursor',                where: checkboxRow('cursorToggle') },
         { keys: 'H',      mod: '',           title: 'Toggle canvas border & handles',     where: checkboxRow('showCanvasHandles') },
         { keys: 'L',      mod: '',           title: 'Lock canvas borders',                where: checkboxRow('lockCanvasBorders') },

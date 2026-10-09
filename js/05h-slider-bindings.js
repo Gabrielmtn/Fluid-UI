@@ -28,15 +28,38 @@
         // Transparent Mode checkbox (controls canvas-area transparency)
         const transparentModeCheckbox = document.getElementById('transparentMode');
         if (transparentModeCheckbox) {
+            // Desktop: the window can only show the desktop through it if it
+            // was BUILT transparent, and Electron cannot change that on an open
+            // window. Main builds it from the preference sent here
+            // (electron-main.js window.json) and says on argv how this one was
+            // built; until the two agree, the row under the checkbox offers to
+            // reopen the window. Turning it off needs no restart: the page goes
+            // opaque again at once and the window follows on the next launch.
+            let ipc = null;
+            let windowSeeThrough = false;
+            if (window.IS_ELECTRON) {
+                try { ipc = require('electron').ipcRenderer; } catch (_) { ipc = null; }
+                try { windowSeeThrough = process.argv.includes('--swirl-transparent-window=1'); } catch (_) {}
+            }
+            const restartRow = document.getElementById('transparentRestartRow');
+            const restartBtn = document.getElementById('transparentRestartBtn');
+            if (restartBtn && ipc) {
+                restartBtn.addEventListener('click', () => ipc.send('reopen-window'));
+            }
             const applyTransparentMode = (enabled) => {
                 if (enabled) {
                     document.body.classList.add('transparent-mode');
-                    canvasArea.style.backgroundColor = 'transparent';
+                    if (typeof window.paintAreaBackdrop === 'function') window.paintAreaBackdrop();
+                    else canvasArea.style.backgroundColor = 'transparent';
                 } else {
                     document.body.classList.remove('transparent-mode');
                     const color = (backgroundColorPicker && backgroundColorPicker.value) || lastBackgroundColor || '#000000';
                     canvasArea.style.backgroundColor = color;
                 }
+                if (ipc) {
+                    try { ipc.send('window-transparent-pref', !!enabled); } catch (_) {}
+                }
+                if (restartRow) restartRow.hidden = !(ipc && enabled && !windowSeeThrough);
             };
             transparentModeCheckbox.addEventListener('change', (e) => {
                 applyTransparentMode(e.target.checked);
@@ -482,17 +505,20 @@
                 // (a 0.04 result rounded to 0.0, then clamped back up), which
                 // is the fine-detail range mandala/tracery work lives in.
                 const scrollSpeed = Math.min(Math.abs(e.deltaY) / 100, 2); // 1–2× from scroll velocity
-                const stepSize = Math.max(0.001, Math.min(currentValue * 0.08 * scrollSpeed, 2.0));
+                const gridStep = parseFloat(brushSizeSlider.step) || 0.0001;
+                const stepSize = Math.max(gridStep, Math.min(currentValue * 0.08 * scrollSpeed, 2.0));
                 let newValue;
                 if (e.deltaY < 0) {
                     newValue = Math.min(currentValue + stepSize, maxValue);
                 } else {
                     newValue = Math.max(currentValue - stepSize, minValue);
                 }
-                // Keep 3 decimals in the fine range, 1 decimal above it, so the
-                // slider lands on clean values at both ends of the scale.
-                const prec = newValue < 1 ? 1000 : 10;
-                newValue = Math.round(newValue * prec) / prec;
+                // Three significant digits on the slider's grid, so the slider
+                // lands on clean values at every scale; decimals stopped the
+                // fine end at 0.001-wide steps (a 2× jump at the floor).
+                newValue = Math.min(maxValue, Math.max(minValue,
+                    Math.round(+newValue.toPrecision(3) / gridStep) * gridStep));
+                newValue = +newValue.toFixed(4);
                 brushSizeSlider.value = newValue;
                 brushSizeSlider.style.setProperty('--val', newValue);
                 // Drive it like a user drag (matches the brush-preset apply
@@ -666,6 +692,8 @@
                 window.backgroundTransparency = savedCaptureDimming / 100;
                 if (dimmingValueDisplay) dimmingValueDisplay.textContent = `${savedCaptureDimming}%`;
             }
+            // Transparent Background was applied above, before these two loaded.
+            if (typeof window.paintAreaBackdrop === 'function') window.paintAreaBackdrop();
             // Load kaleidoscope sliders
             const savedKaleidoSegments = window.Settings.loadSlider('kaleidoSegments', null);
             if (savedKaleidoSegments !== null && kaleidoSegmentsEl) {

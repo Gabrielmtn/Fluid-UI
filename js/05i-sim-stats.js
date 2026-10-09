@@ -1156,6 +1156,7 @@
                             displayHz = reportedHz;
                             displayHzDetected = true;
                             window.__displayHz = reportedHz;
+                            window.__displayHzKnown = true;   // the FPS Limit snaps to it (05d)
                             console.log('[Display Hz] Electron API: ' + reportedHz + 'Hz');
                             return true;
                         } else {
@@ -1217,12 +1218,19 @@
                 }
                 displayHz = closest;
                 window.__displayHz = closest;
+                window.__displayHzKnown = true;
                 console.log('[Display Hz] rAF fallback: ' + closest + 'Hz (raw=' + raw + ', avgMs=' + avgMs.toFixed(2) + ')');
                 if (window.__onDisplayHzChanged) window.__onDisplayHzChanged(displayHz);
             }
         }
-        // DEFAULT to 60 FPS, not uncapped!
-        window.fpsCap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 60;
+        // DEFAULT to 60 FPS, not uncapped! Only when nothing set one: 05d's
+        // control ran first, and a limit that snapped to the full refresh
+        // rate is a deliberate 0.
+        if (typeof window.fpsCap !== 'number') window.fpsCap = 60;
+        // Electron already knew the rate above, before 05d's FPS Limit could
+        // hear it: snap the limit now (the rAF probe and monitor moves call
+        // this themselves).
+        if (displayHzDetected && window.__onDisplayHzChanged) window.__onDisplayHzChanged(displayHz);
         window.__stats = { fps: 0, frametime: 0, lastCpuMs: 0, targetFps: 60, displayHz: displayHz, budgetPct: 0 };
         function blur(target, temp, iterations) {
             blurProg.bind();

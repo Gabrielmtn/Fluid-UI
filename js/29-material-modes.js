@@ -6,12 +6,12 @@
 //   yieldToExternal }
 //
 // The Curl label is a <select id="materialMode">; the slider's role follows:
-//   Swirl - Vorticity       → the classic curl control, untouched behavior
-//                             (internal key 'fluid')
-//   Gloss Paint - Wetness   → Flow: surface shading @0.8 + micro detail maxed; the
+//   Material Type - Fluid         → the classic curl control, untouched
+//                                   behavior (internal key 'fluid')
+//   Material Type - Paint (Wet)   → Flow: surface shading @0.8 + micro detail maxed; the
 //             slider drives Ridge Strength (sharpness) and velocity damping.
 //             (internal key 'acrylic')
-//   Gloss Paint - Thickness → Depth: inverse-chiaroscuro surface shading (shadeInvert)
+//   Material Type - Paint (Thick) → Depth: inverse-chiaroscuro surface shading (shadeInvert)
 //             so strokes read as carved relief; the slider drives depth + dab
 //             size, and the value display becomes a clickable brush-shape
 //             icon (blob / chisel / streak stamp shapes in the splat shader).
@@ -185,8 +185,8 @@
 
     // Size the select to the SELECTED option's text: a bare <select> sizes to
     // its widest option, which strands the dropdown arrow far right of the
-    // shorter ones ("Swirl - Vorticity"). The arrow (8px, right-anchored) sits
-    // 15px after the text — see the padding in 21-sidebar.css.
+    // shorter ones ("Material Type - Fluid"). The arrow (8px, right-anchored) sits
+    // 7px after the text — see the padding in 21-sidebar.css.
     var _measureCtx = null;
     function sizeSelectToLabel() {
         if (!sel) return;
@@ -199,7 +199,7 @@
         var w = _measureCtx.measureText(text).width;
         var ls = parseFloat(cs.letterSpacing);
         if (ls) w += ls * text.length;
-        sel.style.width = Math.ceil(w + 23) + 'px'; // text + 15px gap + 8px arrow
+        sel.style.width = Math.ceil(w + 15) + 'px'; // text + 7px gap + 8px arrow
         // Sharing a header row with the value display: if the ideal width would
         // collide, give back gap pixels rather than overlap the value.
         if (span) {

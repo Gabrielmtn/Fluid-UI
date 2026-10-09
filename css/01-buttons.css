@@ -153,6 +153,13 @@ button.active,
     border-color: oklch(45% calc(var(--sec-c) * 0.70) var(--sec-h));
     color: oklch(97% calc(var(--sec-c) * 0.14) var(--sec-h));
 }
+/* The Ignite latch (20) while a hold is dragged onto it: letting go there
+   latches, so it shows the pressed plate early. Ignite holds the pointer
+   capture, so the latch never gets :hover. */
+.btn.ch-ignite-lock.armed {
+    background: oklch(25% calc(var(--sec-c) * 0.62) var(--sec-h));
+    border-color: oklch(45% calc(var(--sec-c) * 0.70) var(--sec-h));
+}
 
 /* Emphasis: the expected answer in a group of answers. Deliberately the SAME
    treatment as pressed rather than a new colour — "this one is the default
@@ -227,6 +234,41 @@ button.btn--ghost:hover,
 #quality-underbar .qub-dd-btn:hover,
 #quality-underbar .qub-dd.open .qub-dd-btn {
     text-shadow: none;
+}
+
+/* ── Radio ──
+   A row where exactly one choice is on (Brush → Paint Into). Not a colour
+   exception either: the same tokens, arranged so the row reads as ONE
+   control and not as separate buttons. The track takes the plate, the
+   options give theirs up, a ring in front of each says "pick one", and the
+   chosen option takes the pressed plate with its ring filled. Layout and
+   the ring's box are in 21-sidebar.css. */
+.brush-radio-row {
+    --c: calc(var(--sec-c) * 0.38);
+    background: oklch(10% var(--c) var(--sec-h));
+    border: 1px solid oklch(28% var(--c) var(--sec-h));
+}
+.brush-radio-row > button {
+    background: transparent;
+    border-color: transparent;
+    color: oklch(76% calc(var(--sec-c) * 0.20) var(--sec-h));
+}
+.brush-radio-row > button:hover {
+    background: oklch(17% var(--c) var(--sec-h));
+    border-color: transparent;
+    color: oklch(96% calc(var(--sec-c) * 0.20) var(--sec-h));
+}
+.brush-radio-row > button::before {
+    border: 1.5px solid oklch(58% calc(var(--sec-c) * 0.30) var(--sec-h));
+}
+.brush-radio-row > button.active {
+    background: oklch(25% calc(var(--sec-c) * 0.62) var(--sec-h));
+    border-color: oklch(45% calc(var(--sec-c) * 0.70) var(--sec-h));
+    color: oklch(97% calc(var(--sec-c) * 0.14) var(--sec-h));
+}
+.brush-radio-row > button.active::before {
+    border-color: oklch(82% calc(var(--sec-c) * 0.80) var(--sec-h));
+    background: radial-gradient(circle, oklch(90% calc(var(--sec-c) * 0.80) var(--sec-h)) 0 2.5px, transparent 3px);
 }
 
 /* ── Reserved ──

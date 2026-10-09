@@ -67,6 +67,7 @@
             btn.title = isPaused ? 'Resume simulation (Shift+Space)' : 'Pause simulation (Shift+Space)';
 
             btn.classList.toggle('active', isPaused);
+            btn.setAttribute('aria-pressed', isPaused ? 'true' : 'false');   // like Stop beside it
 
             // Resuming with Freeze on picks up STILL: the motion the pause
             // caught is dropped instead of braking out as a slide, so you
@@ -625,12 +626,12 @@
                         // that has only just started), so the user gets an
                         // explicit "safe now" instead of a race. The save clears
                         // __unsavedWork, so the next attempt is silent anyway.
-                        var reloading = (askKind === 'reload' || askKind === 'hard-reload');
+                        var verb = askKind === 'reopen' ? 'restart'
+                            : (askKind === 'reload' || askKind === 'hard-reload') ? 'reload' : 'close';
                         e.title.textContent = 'Project saved';
-                        e.msg.textContent = 'Saved as a .fluid project. It is safe to '
-                            + (reloading ? 'reload' : 'close') + ' now.';
+                        e.msg.textContent = 'Saved as a .fluid project. It is safe to ' + verb + ' now.';
                         e.save.style.display = 'none';
-                        e.quit.textContent = reloading ? 'Reload' : 'Close';
+                        e.quit.textContent = verb.charAt(0).toUpperCase() + verb.slice(1);
                         e.quit.classList.add('app-close-safe');
                         e.quit.focus();
                     } else if (window.__unsavedWork) {
@@ -687,6 +688,13 @@
                         msg: 'This painting has unsaved work. Reloading starts from a blank canvas — '
                             + 'painting is not autosaved.',
                         go: 'Reload anyway', offerSave: true
+                    },
+                    // Display → Transparent Background → Restart now (js/05h)
+                    reopen: {
+                        title: 'Restart without saving?',
+                        msg: 'This painting has unsaved work. Restarting reopens the window on a blank '
+                            + 'canvas — painting is not autosaved.',
+                        go: 'Restart anyway', offerSave: true
                     },
                     nuclear: {
                         title: 'Clear all local data?',

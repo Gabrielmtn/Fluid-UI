@@ -1,15 +1,24 @@
 /**
  * Focus Mode & Social Format Presets
- * 
- * - Focus Mode: Hides all UI, fills viewport with canvas, shows FOCUS badge
- *   Toggle via hotkey 'F' (no modifiers) or checkbox in sidebar
+ *
+ * - Focus Mode: Hides all UI including the title bar and the underbar, and
+ *   takes the window fullscreen (js/36) so only the painting is on screen.
+ *   Toggle via hotkey 'F' (no modifiers) or checkbox in sidebar; Esc leaves.
+ *   Nothing marks it on screen except a short hint on the way in.
  * - Format Presets: One-click aspect ratio switching for TikTok, Instagram, etc.
  */
 (function () {
     'use strict';
 
     var isFocused = false;
-    var badge = null;
+    var hint = null;
+    var hintTimer = null;
+    var HINT_MS = 2500;
+    // The screen-filling Window Mode focus mode switched to, and the one to
+    // go back to. Null when it was already fullscreen or borderless (then it
+    // is left as it was).
+    var fsBorrowed = null;
+    var fsBorrowedFrom = null;
     var activeFormat = null;
     var formatButtons = [];
     var formatInfo = null;
@@ -28,27 +37,73 @@
     });
 
     function init() {
-        createBadge();
+        createHint();
         bindHotkey();
+        bindDisplayMode();
         loadSavedState();
     }
 
-    // ─── LIVE BADGE ─────────────────────────────────────────────
-    function createBadge() {
-        badge = document.createElement('div');
-        badge.id = 'focus-mode-badge';
-        badge.textContent = 'FOCUS';
-        badge.title = 'Click or press F to exit focus mode';
-        badge.addEventListener('click', function () {
-            toggleFocus();
+    // ─── WAY-OUT HINT ───────────────────────────────────────────
+    // Shown for a moment on the way in, then gone: the only thing on screen
+    // in focus mode is the painting. Static on purpose, no fade (see the
+    // compositor note in css/22-overlays.css).
+    function createHint() {
+        hint = document.createElement('div');
+        hint.id = 'focus-mode-hint';
+        hint.setAttribute('role', 'status');
+        hint.textContent = 'Press F or Esc to leave Focus';
+        document.body.appendChild(hint);
+    }
+
+    function flashHint() {
+        if (!hint) return;
+        clearTimeout(hintTimer);
+        hint.classList.add('visible');
+        hintTimer = setTimeout(function () { hint.classList.remove('visible'); }, HINT_MS);
+    }
+
+    // ─── FULLSCREEN ─────────────────────────────────────────────
+    // Desktop: Borderless, the window sized to the monitor. It looks the same
+    // as OS fullscreen, switches instantly and behaves the same whether or
+    // not the window is see-through. A browser has only real fullscreen.
+    function borrowFullscreen() {
+        var dm = window.displayMode;
+        if (!dm || dm.get() !== 'windowed') return;
+        var to = window.IS_ELECTRON ? 'borderless' : 'fullscreen';
+        // A browser grants fullscreen only to a click or a key press. A
+        // focus mode restored at boot has neither, so it stays in the window
+        // rather than being refused.
+        if (to === 'fullscreen' && !window.IS_ELECTRON
+            && navigator.userActivation && !navigator.userActivation.isActive) return;
+        fsBorrowed = to;
+        fsBorrowedFrom = 'windowed';
+        dm.set(to, { persist: false });
+    }
+
+    function returnFullscreen() {
+        var dm = window.displayMode;
+        var back = fsBorrowedFrom, borrowed = fsBorrowed;
+        fsBorrowed = fsBorrowedFrom = null;
+        if (dm && back && dm.get() === borrowed) dm.set(back, { persist: false });
+    }
+
+    // The OS or the browser dropped fullscreen (Esc in a browser eats the
+    // key before the page sees it): that is leaving focus too.
+    function bindDisplayMode() {
+        document.addEventListener('displaymodechange', function (e) {
+            var d = e.detail || {};
+            if (!fsBorrowed || d.mode === fsBorrowed) return;
+            fsBorrowed = fsBorrowedFrom = null;
+            if (d.external && isFocused) toggleFocus();
         });
-        document.body.appendChild(badge);
     }
 
     // ─── FOCUS MODE TOGGLE ──────────────────────────────────────
     function toggleFocus() {
         isFocused = !isFocused;
         applyFocus();
+        if (isFocused) borrowFullscreen();
+        else returnFullscreen();
     }
 
     // Saved wrapper geometry so we can restore after exiting focus mode
@@ -69,9 +124,8 @@
 
         document.body.classList.toggle('focus-mode', isFocused);
 
-        if (badge) {
-            badge.classList.toggle('visible', isFocused);
-        }
+        if (isFocused) flashHint();
+        else if (hint) { clearTimeout(hintTimer); hint.classList.remove('visible'); }
 
         // Sync checkbox if it exists
         var cb = document.getElementById('focusModeToggle');
@@ -131,6 +185,13 @@
             }
             // 'F' without any modifiers = focus mode (CapsLock-proof)
             if ((e.key === 'f' || e.key === 'F') && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                e.preventDefault();
+                toggleFocus();
+                return;
+            }
+            // Esc leaves, unless something open on top took it first.
+            if (e.key === 'Escape' && isFocused && !e.defaultPrevented
+                && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
                 e.preventDefault();
                 toggleFocus();
             }
@@ -215,10 +276,7 @@
         try {
             if (window.settingsManager) {
                 var savedMode = window.settingsManager.get('focus.mode');
-                if (savedMode === true) {
-                    isFocused = true;
-                    applyFocus();
-                }
+                if (savedMode === true) toggleFocus();
 
                 var savedFormat = window.settingsManager.get('stream.format');
                 if (savedFormat) {

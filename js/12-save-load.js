@@ -761,7 +761,11 @@
             // in that mode). Without these a preset or a room only ever
             // carried the distance.
             splatInMs: typeof window.splatInMs === 'number' ? window.splatInMs : 350,
-            splatOutMs: typeof window.splatOutMs === 'number' ? window.splatOutMs : 350
+            splatOutMs: typeof window.splatOutMs === 'number' ? window.splatOutMs : 350,
+            // On Move / Constant (2026-10-07). Spacing and Interval each belong
+            // to one mode, so a preset or settings link that carried Interval
+            // without it landed on a brush that was not using Interval.
+            splatMode: (window.config && window.config.BRUSH_CONTINUOUS) ? 'constant' : 'move'
         };
 
         // ── Shooting star origin ──
@@ -1331,6 +1335,15 @@
                 if (typeof bs.splatInMs === 'number' && isFinite(bs.splatInMs)) { window.splatInMs = ms(bs.splatInMs); rampSave('brush.splatInMs', window.splatInMs); }
                 if (typeof bs.splatOutMs === 'number' && isFinite(bs.splatOutMs)) { window.splatOutMs = ms(bs.splatOutMs); rampSave('brush.splatOutMs', window.splatOutMs); }
                 if (typeof window.__syncSplatRamps === 'function') window.__syncSplatRamps();
+                // On Move / Constant, through the Brush panel's own setter (it
+                // shows Spacing or Interval to match). A snapshot from before
+                // the mode was captured leaves yours as it is, as built-in
+                // looks do (their brushState is the baseline, which has none).
+                if (bs.splatMode === 'move' || bs.splatMode === 'constant') {
+                    var bset = window.__brushSetters;
+                    if (bset && bset.splatMode) bset.splatMode(bs.splatMode);
+                    else if (window.config) window.config.BRUSH_CONTINUOUS = (bs.splatMode === 'constant');
+                }
                 // bs.gateMaxDensity (older snapshots): the Gate ceiling is a
                 // fixed constant now, so the stored level is intentionally
                 // ignored rather than migrated.
@@ -2152,6 +2165,8 @@
                 document.querySelectorAll('.user-preset-btn, .mixer-user-preset-btn').forEach(function(b) {
                     b.classList.toggle('active', b.textContent === name);
                 });
+                // The Presets button in the top bar names it too (20).
+                if (typeof window.setCurrentPreset === 'function') window.setCurrentPreset(name);
             });
 
             var overwriteBtn = document.createElement('button');

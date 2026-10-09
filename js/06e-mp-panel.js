@@ -222,7 +222,7 @@ function controlName(id) {
     var el = document.getElementById(id);
     if (!el) return id;
     // A strip channel whose label is a menu (Curl's is the material picker,
-    // reading "Swirl - Vorticity") is called what the menu shows.
+    // reading "Material Type - Fluid") is called what the menu shows.
     var ch = el.closest('.mixer-channel');
     var pick = ch && ch.querySelector('select');
     if (pick && pick.selectedOptions && pick.selectedOptions[0]) {

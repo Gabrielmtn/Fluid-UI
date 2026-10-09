@@ -55,7 +55,7 @@
     var INSIDE = '.arm-colors-panel, .brush-shape-menu, .delete-modal, .app-confirm-modal, .mask-editor-overlay';
     // Same list as 43's onHidden: each trigger toggles its popup and owns the
     // .active class, so clicking it is the close path.
-    var POPUP_TRIGGERS = '.ch-label.active, .ch-tip-swatch.active, #multiplierValue.active';
+    var POPUP_TRIGGERS = '.ch-label.active, #multiplierValue.active';
 
     function hiddenCell(el) { return el.classList.contains('ui-hidden'); }
     function inBar(el) { return el.parentElement === strip; }

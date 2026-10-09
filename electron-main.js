@@ -644,6 +644,58 @@ ipcMain.on('photo-safe-cache', (_evt, payload) => {
     }
 });
 
+// ══ See-through window ═════════════════════════════════════════════════
+// Display → Transparent Background shows the desktop through the painting
+// area only in a window BUILT with transparent: true, which costs compositing
+// on every frame — so nobody pays for it until they tick the box. The page
+// sends its state on boot and on every change (js/05h); createWindow reads it.
+// Unlike the photo cache this file IS the source of truth for the window:
+// localStorage cannot be read before the window exists.
+const WINDOW_PREFS = () => path.join(app.getPath('userData'), 'window.json');
+
+function readWindowPrefs() {
+    try {
+        const raw = JSON.parse(fs.readFileSync(WINDOW_PREFS(), 'utf8').replace(/^﻿/, ''));
+        return { transparent: !!(raw && raw.transparent === true) };
+    } catch (_) { return { transparent: false }; }
+}
+
+ipcMain.on('window-transparent-pref', (_evt, on) => {
+    const transparent = on === true;
+    if (readWindowPrefs().transparent === transparent) return;
+    try { fs.writeFileSync(WINDOW_PREFS(), JSON.stringify({ transparent }), 'utf8'); }
+    catch (e) { console.warn('[window] prefs write failed:', e && e.message); }
+});
+
+// "Restart now" under the checkbox. The window is rebuilt in this process
+// rather than relaunching it: a relaunched exe would leave Steam's session
+// (overlay, playtime) behind and race its own single-instance lock. It asks
+// first like a reload does, since the canvas starts blank.
+let swappingWindow = false;
+ipcMain.on('reopen-window', () => {
+    askRenderer('reopen').then((ok) => {
+        if (ok) reopenWindow();
+    });
+});
+
+function reopenWindow() {
+    if (!mainWindow || mainWindow.isDestroyed() || swappingWindow || restarting) return;
+    swappingWindow = true;
+    const old = mainWindow;
+    fadeOutThen(() => {
+        if (old.isDestroyed()) { swappingWindow = false; return; }
+        // Registered after createWindow's own 'closed' handler, so that one
+        // has finished with the old window (and nulled mainWindow) first.
+        // The new window exists before this listener returns, so the window
+        // list never empties and 'window-all-closed' never sees a gap.
+        old.once('closed', () => {
+            try { createWindow(); } finally { swappingWindow = false; }
+        });
+        old.__allowClose = true;
+        old.close();
+    });
+}
+
 // The renderer reports ready once its scripts, layout and first drawn frame
 // are all in and the layout has stopped moving (js/00a-boot.js).
 ipcMain.on('boot-ready', () => {
@@ -737,8 +789,11 @@ if (!gotLock) {
 function createWindow() {
     // ⚠️ PERFORMANCE NOTE: transparent: true causes GPU compositor overhead.
     // At high resolutions (4K dye), this can cause "GPU state invalid" errors.
-    // Set to false for maximum performance, true for desktop transparency.
-    const USE_TRANSPARENT_WINDOW = false; // Set to true if you need transparency
+    // So the window is see-through only for someone who asked for it:
+    // Display → Transparent Background, read from window.json (see
+    // readWindowPrefs). Electron fixes this at creation, so a change takes a
+    // reopen (reopenWindow) or the next launch.
+    const USE_TRANSPARENT_WINDOW = readWindowPrefs().transparent;
 
     // createWindow can run a second time (macOS `activate`) — that window is
     // born invisible too, so the reveal state has to start over with it or it
@@ -766,7 +821,8 @@ function createWindow() {
             // paying the ~490ms storage-service cold start before it can paint.
             // Nothing is passed when the cache is missing, and the gate then
             // falls back to localStorage — see readPhotoCache() above.
-            additionalArguments: photoCacheArgs().concat(editionArgs()),
+            additionalArguments: photoCacheArgs().concat(editionArgs(),
+                USE_TRANSPARENT_WINDOW ? ['--swirl-transparent-window=1'] : []),
         },
         transparent: USE_TRANSPARENT_WINDOW,
         frame: false, // Use custom title bar (frameless window)
@@ -1157,6 +1213,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+    if (swappingWindow) return;   // reopenWindow is between windows
     if (process.platform !== 'darwin') {
         app.quit();
     }

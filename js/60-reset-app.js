@@ -129,6 +129,8 @@
             var snap = window.baselineLookSnapshot();
             if (typeof window.LOOK_BASELINE_GEN === 'number') snap.baseline = window.LOOK_BASELINE_GEN;
             try { window.applyPresetSnapshotFull(snap); } catch (err) { console.warn('[ResetApp] look', err); }
+            // No preset now: the Presets button stops naming the last one (20).
+            if (typeof window.setCurrentPreset === 'function') window.setCurrentPreset(null);
             // Random Colors is on again: roll its first colour, or the next
             // stroke paints the defaults' white swatch.
             var a0 = window.multiArmColors && window.multiArmColors[0];

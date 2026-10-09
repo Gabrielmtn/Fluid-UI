@@ -93,11 +93,16 @@
         setTimeout(run, 250); // fallback if the event never reaches the renderer
     }
 
-    function applyElectron(mode) {
+    // `from` is the mode being left. A see-through window (Display →
+    // Transparent Background) fills the screen on setFullScreen but answers
+    // isFullScreen() false, so asking the window alone skipped the
+    // setFullScreen(false) and left Electron believing it was still
+    // fullscreen (measured, Electron 39: 'enter' fired, 'leave' never did).
+    function applyElectron(mode, from) {
         if (!win) return;
         try {
             if (mode === 'fullscreen') { win.setFullScreen(true); return; }
-            if (win.isFullScreen()) {
+            if (from === 'fullscreen' || win.isFullScreen()) {
                 afterLeavingFullScreen(function () { placeWindow(mode); });
                 win.setFullScreen(false);
                 return;
@@ -142,17 +147,26 @@
 
         if (isElectron && current === 'windowed' && mode !== 'windowed') captureWindowedState();
 
+        var from = current;
         current = mode;
         applying = true;
         applyBodyClass(mode);
         if (select && select.value !== mode) select.value = mode;
 
-        if (isElectron) applyElectron(mode);
+        if (isElectron) applyElectron(mode, from);
         else applyWeb(mode);
 
         if (opts.persist !== false) {
             try { if (window.settingsManager) window.settingsManager.set(SETTING_KEY, mode); } catch (_) {}
         }
+
+        // Focus mode (21) borrows fullscreen and needs to hear when the OS or
+        // the browser takes it back (external: Esc in a browser, the OS
+        // leaving fullscreen) as opposed to a mode someone chose.
+        try {
+            document.dispatchEvent(new CustomEvent('displaymodechange',
+                { detail: { mode: mode, external: !!opts.external } }));
+        } catch (_) {}
 
         // The canvas re-fits itself: #canvas-area changes size (window resize
         // and/or the titlebar's 32px coming back), and 01-config's ResizeObserver
@@ -168,7 +182,7 @@
 
     function syncFromBrowser() {
         if (applying || isElectron) return;
-        if (!document.fullscreenElement && current === 'fullscreen') setMode('windowed');
+        if (!document.fullscreenElement && current === 'fullscreen') setMode('windowed', { external: true });
     }
 
     // The browser refused fullscreen (no user gesture, or a policy block). Revert
@@ -185,7 +199,7 @@
         if (isElectron && win) {
             var onLeave = function () {
                 if (applying) return;              // our own transition
-                if (current === 'fullscreen') setMode('windowed');
+                if (current === 'fullscreen') setMode('windowed', { external: true });
             };
             try {
                 win.on('leave-full-screen', onLeave);

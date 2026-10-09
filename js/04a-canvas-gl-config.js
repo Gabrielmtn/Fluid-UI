@@ -348,8 +348,9 @@
                                       // like wet paint: 0 = the pass is skipped and the dye is
                                       // bit-identical. Only the COLOUR moves (plus a little paint where
                                       // two fills meet); velocity and pressure are untouched. A diffusion
-                                      // D = l² × (wet × (stir + COLOR_BLEND_CONTACT) + dry ×
-                                      // COLOR_BLEND_DRY_STIR × stir), wet = the Drying map: wet colours
+                                      // D = l² × (wet × (s² stir + COLOR_BLEND_CONTACT) + dry ×
+                                      // COLOR_BLEND_DRY_STIR × s² stir), s = COLOR_BLEND_STIR_LENGTH,
+                                      // wet = the Drying map: wet colours
                                       // that touch blend, and stop as the paint dries at Dry Time.
                                       // Below 0 is LAMINAR (2026-10-02, the fader's left half): the
                                       // blend is off and the transport stops blurring colours together,
@@ -402,6 +403,35 @@
                                       // one tap, the squeeze's cell-scale mottle gave neighbouring texels
                                       // kernels 3 to 24 texels wide and speckled the hue 1-3% wherever a
                                       // brush was laying two colours into each other. false = one tap
+            COLOR_BLEND_KEEP_VALUE: true, // A blended texel keeps its own BRIGHTNESS (its largest channel)
+                                      // and takes the neighbourhood's colour (2026-10-06). Keeping its
+                                      // r+g+b instead turned colour mixing into mud: a red texel taking
+                                      // orange at red's r+g+b came out brown, a yellow one came out past
+                                      // the Gate ceiling and was clipped, losing paint. Red and yellow
+                                      // stirred with Pressure at Blend 1 went from value 1.0 to 0.58 and
+                                      // 63% of the paint read as mud; kept, 0.99 and 2%. false = r+g+b
+            COLOR_BLEND_STIR_LENGTH: 0.05, // The stir's mixing length as a share of the blend's (2026-10-06).
+                                      // Stirring already mixes colours by stretching them into finer
+                                      // and finer streaks; the blend only has to merge the streaks too
+                                      // thin to see. The stir counts every motion, a swirl that only
+                                      // turns included, so any real reach made it a contagious fog:
+                                      // at the full length (1) every streak finer than ~25 dye texels
+                                      // at Blend 1 went to haze as soon as Pressure stirred the paint,
+                                      // and 0.2 still did. A whisker leaves a little blending where
+                                      // paint moves. Contact mixing (wet colours touching) keeps the
+                                      // full length. Covers the whole stir, squeeze and press included
+            COLOR_BLEND_CRISP_FROM: 0.25, // From this Blend up the dye transport is Laminar's crisp one (no
+                                      // Grain Cleanup floor in open fluid, no Crisp Advection back-off in
+                                      // fast flow), ramping in from 0 (2026-10-06). The blend does the
+                                      // mixing; the transport's own smear only fogged moving paint. 0 =
+                                      // the Blend side keeps the default transport
+            COLOR_BLEND_HOLD_PAINT: true, // While the blend is on, the dye's advection store rounds to the
+                                      // nearest half float (2026-10-06). GPUs that truncate fp32 -> fp16
+                                      // on a store (the 4090 under ANGLE/D3D11) lose half a step a
+                                      // channel wherever the dye is not flat, and the blend leaves no
+                                      // dye flat: paint stirred at Blend 1 drained 0.030% a step against
+                                      // 0.008% at 0, about 40% of it in 10 s. Off (and at Blend 0 and
+                                      // below) the store is as before. false = truncating store
 
             VIBRANCE: 0.5,            // Selective saturation boost (0 = off, 1.0 = max). 0.5 = the old 1.0 (rescaled 2026-10-05).
 

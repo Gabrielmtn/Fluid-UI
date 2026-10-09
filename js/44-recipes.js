@@ -81,15 +81,18 @@
     function isShown(el) { return !!el && el.getClientRects().length > 0; }
     function q(sel) { return typeof sel === 'string' ? document.querySelector(sel) : (sel || null); }
     function isActive(el) { return !!el && (el.classList.contains('active') || !!el.checked || el.getAttribute('aria-pressed') === 'true'); }
-    // Layer rows: every row but the Sim row carries data-layer-index. A
-    // collision row says so in its check label; nothing else marks it.
+    // Layer rows: every row but the Sim row carries data-layer-index; 05k
+    // marks a collider row data-collision and a paint row data-raster.
+    // 'image' means a picture row — a paint row has no Fluidize or mask, so
+    // counting it sent the tour to a row without the button when a paint
+    // layer sat on top.
     function layerRows(kind) {
         const rows = Array.prototype.slice.call(document.querySelectorAll('#layersPanel .layer-item[data-layer-index]'));
         if (!kind || kind === 'any' || kind === 'last') return rows;
         return rows.filter((el) => {
-            const lab = el.querySelector('.layer-check-label');
-            const isCol = !!lab && lab.textContent.trim() === 'Collision';
-            return kind === 'collision' ? isCol : !isCol;
+            const isCol = el.dataset.collision === '1';
+            if (kind === 'collision') return isCol;
+            return !isCol && el.dataset.raster !== '1';
         });
     }
 
@@ -113,9 +116,9 @@
     const RECIPES = [
         // ── Brush ──
         { id: 'brush-size', pillar: 'brush', title: 'Change the brush size',
-          tags: ['brush', 'size', 'bigger', 'smaller', 'scroll', 'wheel'],
-          answer: 'Scroll the wheel over the canvas, or drag the Brush Size fader in the top bar. [ and ] step it from the keyboard; hold Shift for bigger steps.',
-          hotkey: '[ ]', target: { strip: 'Brush Size', sel: '#brushSize' },
+          tags: ['brush', 'size', 'bigger', 'smaller', 'scroll', 'wheel', 'fine', 'thin', 'pixel', 'px'],
+          answer: 'Scroll the wheel over the canvas, or drag the Brush Size fader at the top of the left sidebar; its readout gives the size in px. [ and ] step it from the keyboard; hold Shift for bigger steps. Fine lines soften as the paint moves: Stop (Space) or a layer keeps them.',
+          hotkey: '[ ]', target: { strip: 'Brush Size', sel: '#brushSizePerceptual' },
           demo: { label: 'Try a bigger brush', run() { const el = $('brushSize'); const was = el ? el.value : null; setCtl('brushSize', 30, 'input'); return () => { if (was != null) setCtl('brushSize', was, 'input'); }; } } },
         { id: 'brush-settings', pillar: 'brush', title: 'Open the brush settings',
           tags: ['brush', 'settings', 'drawer', 'tip', 'presets', 'gear'],
@@ -144,7 +147,7 @@
           ] },
         { id: 'material', pillar: 'brush', title: 'Switch between fluid, wet paint and thick paint',
           tags: ['material', 'paint', 'wet', 'thick', 'gloss', 'fluid', 'swirl', 'acrylic', 'clay', 'dry'],
-          answer: 'The Fluid label in the top bar is a picker: Swirl, Gloss Paint (Wetness) or Gloss Paint (Thickness). The fader beside it changes meaning with the material.',
+          answer: 'Material Type, the first label in the top bar, is a picker: Fluid, Paint (Wet) or Paint (Thick). The fader under it changes meaning with the material.',
           target: { strip: 'Fluid', sel: '#materialMode' } },
         { id: 'constant-flow', pillar: 'brush', title: 'Keep painting while holding still',
           tags: ['flow', 'constant', 'hold', 'still', 'spacing', 'interval', 'move'],
@@ -191,40 +194,53 @@
         // ── Colour ──
         { id: 'brush-colour', pillar: 'colour', title: 'Pick a brush colour',
           tags: ['colour', 'color', 'pick', 'swatch', 'picker', 'hue'],
-          answer: 'Click the swatch in the Color cell of the top bar. Shift+S saves the current colour to your swatches; Shift+X clears them.',
-          hotkey: 'Shift+S', target: { strip: 'Color', sel: '#colorPicker' },
+          answer: 'Click the colour dot in the Color cell of the top bar. The picker has sliders, a hex code, your recent colours and the palette. Alt+click the canvas to pick a colour from it. Shift+S adds the brush colour to the palette; Shift+X takes it out.',
+          hotkey: 'Alt+click', target: { strip: 'Color', sel: '#colorPicker' },
           steps: [
-            { say: 'Click the swatch in the Color cell and pick a colour.', target: { strip: 'Color', sel: '#colorPicker' }, until: { input: '#colorPicker' } },
-            { say: 'Shift+S keeps it in your swatches for later; Shift+X clears them.', key: 'Shift+S' }
+            { say: 'Click the colour dot in the Color cell and pick a colour.', target: { strip: 'Color', sel: '#colorPicker' }, until: { input: '#colorPicker' } },
+            { say: 'Alt+click the canvas to pick up a colour that is already there.', key: 'Alt+click', target: { canvas: true } },
+            { say: 'Shift+S adds it to the palette for later; Shift+X takes it out.', key: 'Shift+S' }
           ] },
         { id: 'random-colour', pillar: 'colour', title: 'A new colour every stroke',
-          tags: ['random', 'rnd', 'cycle', 'palette', 'each', 'stroke', 'colour', 'change'],
-          answer: 'In the Color cell switch Rnd for a random colour per stroke, or Palette to walk through the palette. R and A toggle them from the keyboard.',
-          hotkey: 'R / A', target: { strip: 'Color', sel: '.ch-text-toggle', text: 'Rnd' },
+          tags: ['random', 'rnd', 'cycle', 'palette', 'each', 'stroke', 'colour', 'change', 'one'],
+          answer: 'In the Color cell choose Random for a new colour each stroke, or Palette to walk through the palette. One goes back to a single colour. R and A switch from the keyboard.',
+          hotkey: 'R / A', target: { strip: 'Color', sel: '.ch-text-toggle', text: 'Random' },
           demo: { label: 'Try random colours', run() { if (typeof window.setActiveBrushColorMode !== 'function') return; window.setActiveBrushColorMode('random'); return () => window.setActiveBrushColorMode('fixed'); } },
           steps: [
-            { say: 'In the Color cell switch Rnd on.', key: 'R', target: { strip: 'Color', sel: '.ch-text-toggle', text: 'Rnd' }, until: { active: true } },
-            { say: 'Paint: every stroke gets a new colour. Palette walks the palette in order instead.', note: 'Click Rnd again for one fixed colour.', target: { canvas: true }, until: { pointer: true } }
+            { say: 'In the Color cell choose Random.', key: 'R', target: { strip: 'Color', sel: '.ch-text-toggle', text: 'Random' }, until: { active: true } },
+            { say: 'Paint: every stroke gets a new colour. Palette walks the palette in order instead.', note: 'Choose One for a single colour again.', target: { canvas: true }, until: { pointer: true } }
           ] },
         { id: 'make-palette', pillar: 'colour', title: 'Make a palette of your own',
           tags: ['palette', 'new', 'make', 'create', 'save', 'colour', 'add', 'remove', 'rename', 'duplicate'],
-          answer: 'Colors and palettes → + New starts a palette with the colour in the picker. The + after its colours adds the picker colour (Shift+S); right-click a colour to replace or remove it. Every change saves itself.',
-          hotkey: 'Shift+S', target: { section: 'Colors and palettes', sel: '#paletteNewBtn' },
+          answer: 'Colors and palettes → open the palette list: New palette at the top starts one from the brush colour, an image or the canvas. The + after its colours opens a picker to add one (Shift+S adds the brush colour as it is); double-click a colour to change it, right-click to remove it. Every change saves itself.',
+          hotkey: 'Shift+S', target: { section: 'Colors and palettes', sel: '#paletteSelect' },
           steps: [
-            { say: 'Click + New. It starts with the colour in the picker; type a name and press Enter.', target: { section: 'Colors and palettes', sel: '#paletteNewBtn' }, until: { click: true } },
-            { say: 'Pick a colour, then click + to add it (or press Shift+S). Right-click a colour to replace or remove it.', target: { section: 'Colors and palettes', sel: '#paletteAddChip' } }
+            { say: 'Open the palette list. New palette is at the top: choose Brush colour, then type a name and press Enter.', target: { section: 'Colors and palettes', sel: '#paletteSelect' }, until: { click: true } },
+            { say: 'Click + to open a picker under the colours, choose a colour, and press Add to palette. Double-click a colour to change it; right-click to remove it.', target: { section: 'Colors and palettes', sel: '#paletteAddChip' } }
           ] },
+        { id: 'palette-from-image', pillar: 'colour', title: 'Make a palette from a photo',
+          tags: ['palette', 'image', 'photo', 'picture', 'extract', 'from', 'canvas', 'colours', 'theme'],
+          answer: 'Drop an image on Colors and palettes, or open the palette list → New palette → Image. Choose how to pick the colours (Dominant, Bright, Muted, Deep, Dark) and how many, drag the markers on the picture to adjust, then Save palette. Canvas does the same with what you painted.',
+          target: { section: 'Colors and palettes', sel: '#paletteSelect' },
+          steps: [
+            { say: 'Open the palette list and choose New palette → Image, or drop a picture on this section.', target: { section: 'Colors and palettes', sel: '#paletteSelect' }, until: { click: true } },
+            { say: 'Choose the method and the count, drag the markers to fine-tune, then Save palette.', target: { section: 'Colors and palettes', sel: '#paletteExtractHost' } }
+          ] },
+        { id: 'eyedropper', pillar: 'colour', title: 'Pick a colour from the canvas',
+          tags: ['eyedropper', 'dropper', 'sample', 'pick', 'colour', 'color', 'canvas', 'alt'],
+          answer: 'Alt+click the canvas: a loupe shows the pixels under the pointer, and letting go picks that colour for the brush. The pipette button in any colour picker does the same.',
+          hotkey: 'Alt+click', target: { canvas: true } },
         { id: 'palettes', pillar: 'colour', title: 'Use a palette',
           tags: ['palette', 'palettes', 'curated', 'set', 'scheme', 'next', 'previous'],
-          answer: 'Colors and palettes holds the curated palettes. Ctrl+← and Ctrl+→ switch palettes; N and Shift+N step to the next or previous colour.',
-          hotkey: 'Ctrl+← →', target: { section: 'Colors and palettes', sel: '#paletteCarousel' },
+          answer: 'Colors and palettes has a dropdown of your palettes, each shown with its colours. Ctrl+Shift+← and → switch palettes; Ctrl+← and → (or N and Shift+N) step through its colours.',
+          hotkey: 'Ctrl+Shift+← →', target: { section: 'Colors and palettes', sel: '#paletteSelect' },
           steps: [
-            { say: 'Colors and palettes holds the curated palettes. Click one.', target: { section: 'Colors and palettes', sel: '#paletteCarousel' }, until: { click: true } },
-            { say: 'Ctrl+← and Ctrl+→ switch palettes from the keyboard; N and Shift+N step to the next or previous colour.', key: 'Ctrl+← →', target: { sel: '#palettePreview' } }
+            { say: 'Open the palette dropdown and pick a palette.', target: { section: 'Colors and palettes', sel: '#paletteSelect' }, until: { click: true } },
+            { say: 'Ctrl+Shift+← and → switch palettes from the keyboard; Ctrl+← and → step through the colours. The one the next stroke paints is marked.', key: 'Ctrl+← →', target: { sel: '#palettePreview' } }
           ] },
         { id: 'cap-colour', pillar: 'colour', title: 'Stop colours blowing out to white',
-          tags: ['cap', 'gate', 'white', 'overexposed', 'blown', 'bright', 'saturate'],
-          answer: 'Cap in the Color cell keeps piled-up strokes from saturating to white. Light Shift in Effects can also recolour the brightest paint.',
+          tags: ['limit', 'cap', 'gate', 'white', 'overexposed', 'blown', 'bright', 'saturate'],
+          answer: 'Limit On in the Color cell (the default) keeps piled-up strokes from saturating to white; Limit Off lets them stack. Light Shift in Effects can also recolour the brightest paint.',
           target: { strip: 'Color', sel: '.ch-gate-toggle' } },
         { id: 'color-blend', pillar: 'colour', title: 'Make colours mix together',
           tags: ['blend', 'mix', 'mixing', 'merge', 'melt', 'colour', 'color', 'gradient', 'soft'],
@@ -277,7 +293,7 @@
           ] },
         { id: 'collider-from-image', pillar: 'layers', title: 'Make the paint flow around a picture',
           tags: ['collider', 'collision', 'around', 'wall', 'flow', 'image', 'object', 'terrain'],
-          answer: 'Layers → Collider: pick a picture, cut the object out with the mask tools, and it becomes a wall. A layer row also has Generate Collision Layer.',
+          answer: 'Layers → Collider: pick a picture, cut the object out with the mask tools, and it becomes a wall. A picture layer’s row also has a Collider button.',
           target: { section: 'Layers', sel: '#addCollisionLayerBtn' },
           steps: [
             { say: 'Click Collider in Layers.', target: { section: 'Layers', sel: '#addCollisionLayerBtn' }, until: { visible: '.collision-source-menu' } },
@@ -304,11 +320,11 @@
             { say: 'The picture is dye now and the layer hid itself. Unhide it to pour again. There is no undo for dye.', target: { canvas: true } }
           ] },
         { id: 'delete-layer', pillar: 'layers', title: 'Delete a layer',
-          tags: ['delete', 'remove', 'layer', 'trash'],
-          answer: 'Delete on the layer row. Ctrl+Z brings it back.',
+          tags: ['delete', 'remove', 'layer', 'trash', 'bin'],
+          answer: 'The bin on the layer’s row, just left of its show/hide box. Ctrl+Z brings it back.',
           hotkey: 'Ctrl+Z', target: { section: 'Layers' },
           steps: [
-            { say: 'Open the layer’s row in Layers and click Delete.', needs: 'layer', target: { layer: 'any', sel: '.layer-delete-btn' }, until: { click: true } },
+            { say: 'Click the bin on the layer’s row in Layers.', needs: 'layer', target: { layer: 'any', sel: '.layer-delete-btn' }, until: { click: true } },
             { say: 'Ctrl+Z brings it back.', key: 'Ctrl+Z' }
           ] },
 
@@ -365,12 +381,14 @@
           target: { section: 'Effects', sel: '#overflowToggle' } },
         { id: 'kaleidoscope', pillar: 'effects', title: 'Turn on the kaleidoscope',
           tags: ['kaleidoscope', 'kaleido', 'mirror', 'segments', 'symmetry', 'wedges'],
-          answer: 'Kaleidoscope → the toggle at the top. Segments sets how many wedges, Mode how they mirror. Note it raises the arm count on first use.',
+          answer: 'Kaleidoscope → the toggle at the top. Facets sets how many wedges, Kaleidoscope Mode how they mirror (each Mode renames Facets to fit it). Note it raises the arm count on first use.',
           target: { section: 'Kaleidoscope', sel: '#kaleidoToggle' },
           demo: { label: 'Switch it on', run() { const was = !!($('kaleidoToggle') || {}).checked; const mult = ($('multiplier') || {}).value; setCheck('kaleidoToggle', true); return () => { setCheck('kaleidoToggle', was); if (mult != null) setCtl('multiplier', mult, 'input'); }; } },
           steps: [
             { say: 'Kaleidoscope → switch it on at the top.', note: 'It raises the arm count on first use.', target: { section: 'Kaleidoscope', sel: '#kaleidoToggle' }, until: { checked: '#kaleidoToggle' } },
-            { say: 'Segments sets how many wedges; Mode sets how they mirror.', target: { sel: '#kaleidoSegments' } }
+            // The slider's name follows the Mode (05f updateSegmentsLabel:
+            // Facets, Layers, Reflections, Rings), so read it off the label.
+            { get say() { const l = document.querySelector('label[for="kaleidoSegments"]'); const t = l && l.firstChild && l.firstChild.nodeType === 3 ? l.firstChild.textContent.trim() : ''; return (t || 'Facets') + ' sets how many copies; Kaleidoscope Mode sets how they mirror.'; }, target: { sel: '#kaleidoSegments' } }
           ] },
         { id: 'mandala', pillar: 'effects', title: 'Paint one wedge and let the circle fill in',
           tags: ['mandala', 'wedge', 'circle', 'studio', 'radial', 'pattern'],
@@ -399,18 +417,18 @@
           ] },
 
         // ── Motion ──
-        { id: 'freeze-pause', pillar: 'motion', title: 'Freeze the motion, or pause everything',
+        { id: 'freeze-pause', pillar: 'motion', title: 'Stop the motion, or pause everything',
           tags: ['freeze', 'pause', 'stop', 'still', 'motion', 'space', 'hold'],
-          answer: 'Space freezes the fluid’s motion (paint stays put, you can still paint). Shift+Space pauses the whole simulation. Both live in the Transport cell of the top bar.',
+          answer: 'Space, or Stop in the top bar, freezes the fluid’s motion (paint stays put, you can still paint). Shift+Space, or the pause button beside it, pauses the whole simulation.',
           hotkey: 'Space', target: { strip: 'Transport', sel: '#freezeBtn' },
-          demo: { label: 'Freeze for a moment', run() { if (typeof window.toggleFreeze !== 'function') return; const was = !!($('freezeBtn') || { classList: { contains: () => false } }).classList.contains('active'); if (!was) window.toggleFreeze(); return () => { const now = !!($('freezeBtn') || { classList: { contains: () => false } }).classList.contains('active'); if (now !== was) window.toggleFreeze(); }; } },
+          demo: { label: 'Stop for a moment', run() { if (typeof window.toggleFreeze !== 'function') return; const was = !!($('freezeBtn') || { classList: { contains: () => false } }).classList.contains('active'); if (!was) window.toggleFreeze(); return () => { const now = !!($('freezeBtn') || { classList: { contains: () => false } }).classList.contains('active'); if (now !== was) window.toggleFreeze(); }; } },
           steps: [
-            { say: 'Press Space, or click Freeze: the motion stops, the paint stays, and you can still paint.', key: 'Space', target: { strip: 'Transport', sel: '#freezeBtn' }, until: { active: '#freezeBtn' } },
+            { say: 'Press Space, or click Stop: the motion stops, the paint stays, and you can still paint.', key: 'Space', target: { strip: 'Transport', sel: '#freezeBtn' }, until: { active: '#freezeBtn' } },
             { say: 'Space again lets it flow. Shift+Space pauses the whole simulation instead.', key: 'Shift+Space', target: { strip: 'Transport', sel: '#freezeBtn' }, until: { check: () => !isActive($('freezeBtn')) } }
           ] },
         { id: 'clear', pillar: 'motion', title: 'Clear the canvas',
           tags: ['clear', 'erase', 'wipe', 'blank', 'new', 'empty', 'start over'],
-          answer: 'Clear in the Transport cell wipes dye and motion. There is no undo for dye, so capture a layer first if you want to keep it.',
+          answer: 'Clear in the top bar wipes dye and motion. There is no undo for dye, so capture a layer first if you want to keep it.',
           target: { strip: 'Transport', sel: 'button[onclick*="clearCanvas"]' },
           demo: { label: 'Clear now', confirm: 'Clear the canvas? Dye cannot be undone.', run() { if (typeof window.clearCanvas === 'function') window.clearCanvas(); } } },
         { id: 'quality', pillar: 'motion', title: 'Painting feels slow',
@@ -533,11 +551,11 @@
         // ── Interface ──
         { id: 'focus', pillar: 'interface', title: 'Hide the interface',
           tags: ['hide', 'interface', 'focus', 'fullscreen', 'clean', 'ui', 'chrome', 'distraction'],
-          answer: 'Press F for Focus Mode: the canvas fills the window and the FOCUS badge is the way back. Focus also holds stream formats like 9:16.',
+          answer: 'Press F for Focus Mode: the painting fills the screen with nothing else on it. F or Esc brings everything back. Focus also holds stream formats like 9:16.',
           hotkey: 'F', target: { section: 'Focus', sel: '#focusModeToggle' },
           steps: [
-            { say: 'Press F, or tick Focus Mode: the canvas fills the window.', key: 'F', target: { section: 'Focus', sel: '#focusModeToggle' }, until: { bodyClass: 'focus-mode' } },
-            { say: 'The FOCUS badge is the way back. Click it, or press F again.', key: 'F', target: { sel: '#focus-mode-badge', keepFocus: true }, until: { noBodyClass: 'focus-mode' } }
+            { say: 'Press F, or tick Focus Mode: the painting fills the screen.', key: 'F', target: { section: 'Focus', sel: '#focusModeToggle' }, until: { bodyClass: 'focus-mode' } },
+            { say: 'Press F again, or Esc, to bring everything back.', key: 'F', until: { noBodyClass: 'focus-mode' } }
           ] },
         { id: 'simple-ui', pillar: 'interface', title: 'Show fewer controls, or bring them back',
           tags: ['simple', 'everything', 'sections', 'hidden', 'visible', 'missing', 'gone', 'menu', 'where', 'panel'],
@@ -795,6 +813,10 @@
         }
         let el = null;
         if (target.sel) el = pick(container, target.sel, target.text);
+        // A control inside a folded group of Brush (Tip folds, 2026-10-07):
+        // unfold it, or there is nothing on screen to point at.
+        const fold = el && el.closest ? el.closest('.brush-fold.collapsed') : null;
+        if (fold && typeof fold.__setOpen === 'function') { fold.__setOpen(true); await raf2(); }
         if (!el && target.sel && (target.text || target.layer || target.overlay)) return revealFallback(target);
         let anchor = el;
         if (anchor) {
@@ -1058,7 +1080,10 @@
         if (i >= steps.length) {
             t.finished = true; t.i = steps.length - 1;
             const title = t.r.title;
-            pillSet({ tour: true, title: 'That’s it: ' + title.charAt(0).toLowerCase() + title.slice(1) + '.', step: '✓', stepDone: true, backLabel: 'Back to the list' });
+            // "Done: Turn on the kaleidoscope" reads as a ticked task; the old
+            // "That's it: turn on the kaleidoscope." read as one more order.
+            // A question title ("Where do I start?") takes no "Done:" prefix.
+            pillSet({ tour: true, title: /\?$/.test(title) ? 'Done' : 'Done: ' + title, step: '✓', stepDone: true, backLabel: 'Back to the list' });
             guideHide();
             return;
         }

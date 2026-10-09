@@ -181,7 +181,7 @@
     // A stamp whose bitmap never decodes (a dataURL truncated by a full
     // quota, a bad import) must not be retried on every dab — and must not
     // hold paint forever, which is what stampPending below would otherwise
-    // do. Say it once, and drop the selection so the tip swatch stops
+    // do. Say it once, and drop the selection so the Tip row stops
     // advertising a shape that can never print: the brush falls back to its
     // built-in tip deliberately instead of by accident.
     function markBroken(id) {
