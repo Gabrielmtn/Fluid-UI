@@ -144,6 +144,7 @@
             uniform float kIsotropic; // 1 = Wedge folds in screen proportions (config.KALEIDO_ISOTROPIC)
             uniform float displayShading; // 0=off, >0 = shading intensity
             uniform float shadeInvert;    // 1 = flip relief normals (clay chiaroscuro: strokes read as carved dents)
+            uniform float shadeRaised;    // 1 = bright paint is raised: lit and glossed on the side facing the key (config.SHADE_RAISED)
             uniform float shadeRelief;    // SHADE_RELIEF x slider: relief strength (redistributes light across the form)
             uniform float shadeGloss;     // SHADE_GLOSS  x slider: specular gloss strength (the plastic sheen)
             // Light Source (2026-09-14): the one lamp over the canvas. While it
@@ -553,7 +554,15 @@
                     g *= shadeDetailGain;
                     float dx = g.x;
                     float dy = g.y;
-                    float nStr = displayShading * 6.0 * shadeFade * (shadeInvert > 0.5 ? -1.0 : 1.0);
+                    // N tilts DOWN the luminance slope (shadeRaised): bright
+                    // paint is the raised surface, so the rim of a stroke that
+                    // faces a light catches it and the gloss sits on that
+                    // shoulder. N used to tilt UP the slope, so the upper-left
+                    // key lit the LOWER-RIGHT rims and every glint slid off the
+                    // far side of its stroke onto the paint beside it.
+                    // shadeInvert flips it: clay's carved dents.
+                    float nUp = (shadeRaised > 0.5) ? -1.0 : 1.0;
+                    float nStr = displayShading * 6.0 * shadeFade * nUp * (shadeInvert > 0.5 ? -1.0 : 1.0);
                     vec3 N = normalize(vec3(dx * nStr, dy * nStr, 0.25));
                     // Two fixed studio lights (directions/colours unchanged):
                     // warm key upper-left, cool fill lower-right.
@@ -562,18 +571,18 @@
                     vec3 warmKey  = vec3(1.0, 0.97, 0.92);
                     vec3 coolFill = vec3(0.9, 0.94, 1.0);
                     float keyW = 0.62, fillW = 0.24, glossW = 1.0;
-                    // Light Source on: the lamp takes the key. N tilts UP the
-                    // luminance slope (the relief's historic sign, the one
-                    // shadeInvert flips), so the lamp enters mirrored in x/y --
-                    // that is what lights the rim of a stroke that FACES the
-                    // dot and puts the gloss there. The cool fill swings to the
-                    // far side. keyW = 0.86 x L.z peaks one lamp height from
-                    // the foot (45 degrees) at the studio key's strength at
-                    // Intensity 0.5: flatter right under the lamp (top light),
-                    // raking and fading beyond it.
+                    // Light Source on: the lamp takes the key, so the rim of a
+                    // stroke that FACES the dot lights and the gloss sits
+                    // there. Under the old sign (nUp = 1) the lamp enters
+                    // mirrored in x/y to land on that same rim, so lamp frames
+                    // are the same numbers either way. The cool fill swings to
+                    // the far side. keyW = 0.86 x L.z peaks one lamp height
+                    // from the foot (45 degrees) at the studio key's strength
+                    // at Intensity 0.5: flatter right under the lamp (top
+                    // light), raking and fading beyond it.
                     if (lampOn > 0.5) {
-                        keyDir  = vec3(-lampL.xy, lampL.z);
-                        fillDir = normalize(vec3(lampL.xy, 0.75));
+                        keyDir  = vec3(-nUp * lampL.xy, lampL.z);
+                        fillDir = normalize(vec3(nUp * lampL.xy, 0.75));
                         keyW   = 0.86 * lampPower * lampL.z;
                         // The fill is the lamp's bounce: it fades with the lamp
                         // (Intensity 0 would otherwise light the relief from the

@@ -19,7 +19,7 @@
         }
       ]
     },
-    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kIsotropic|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|scatterSmooth|segments|shadeDetailGain|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|shadeWallRim|shadeWalls|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uShadeWall|uTexture": {
+    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kIsotropic|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|scatterSmooth|segments|shadeDetailGain|shadeGloss|shadeInvert|shadeRaised|shadeRelief|shadeTexelSize|shadeWallRim|shadeWalls|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uShadeWall|uTexture": {
       "name": "display",
       "uniforms": [
         "backgroundTransparency",
@@ -54,6 +54,7 @@
         "shadeDetailGain",
         "shadeGloss",
         "shadeInvert",
+        "shadeRaised",
         "shadeRelief",
         "shadeTexelSize",
         "shadeWallRim",

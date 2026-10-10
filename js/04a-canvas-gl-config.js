@@ -527,6 +527,13 @@
                                       // relief follows the letterforms instead of blurring
                                       // a word into one soft pit (05b shadeWallFrag). false
                                       // = the old single blur, bit for bit. Console-tunable.
+            SHADE_RAISED: true,       // Surface Shading reads bright paint as RAISED (2026-10-09):
+                                      // the upper-left key lights a stroke's upper-left shoulder
+                                      // and the gloss sits there. The relief normal used to tilt
+                                      // toward brighter paint, so the key lit the lower-right rims
+                                      // and each glint slid off the far side of its stroke. false
+                                      // = that old sign, bit for bit. The lamp looks the same
+                                      // either way. Console-tunable.
             SHADE_WALL_RIM: 0.3,      // How deep that edge reads, x the paint's own step.
                                       // 1 = the full step, which tilts far past anything
                                       // the blurred paint does and reads as a heavy dark
