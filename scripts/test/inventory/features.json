@@ -179,7 +179,7 @@
       "knownHazards": [
         "stampPending() HOLDS all user paint: dabs landing between setActive and texture-ready are dropped silently - always await !stampPending() before scripted strokes (js/33-brush-shapes.js:109-125, js/05g-arm-colors.js:251-257)",
         "A broken dataURL fires an app-modal dialog and auto-clears the selection (markBroken, js/33-brush-shapes.js:96-107)",
-        "Shapes persist in settings storage; importList merges with a 24 cap where existing entries win (js/33-brush-shapes.js:278-305) - clean up test shapes or ids collide across runs",
+        "Shapes persist in settings storage; importList merges (no count cap since 2026-10-09; existing entries win on a matching id or stamp) (js/33-brush-shapes.js:441-473) - clean up test shapes or ids collide across runs",
         "Shaped strokes render as gaussian for multiplayer peers and recorded-timeline playback in some paths (shape id not on the wire - repo memory, kept gap)"
       ]
     },

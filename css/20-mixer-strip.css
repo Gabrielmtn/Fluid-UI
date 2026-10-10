@@ -1148,8 +1148,37 @@ body > .controls {
     padding: 0;
 }
 
-/* Custom brush shapes (33-brush-shapes): stamp swatches + add button */
+/* Custom brush shapes (33-brush-shapes): stamp swatches + add button.
+   The library has no cap since 2026-10-09, so the swatches scroll: three rows
+   of tiles show and the wheel moves through the rest, a row per snap so no
+   tile sits half cut at rest. The 2px padding keeps a tile's focus ring
+   from being shaved off by the scroll box; the negative margin keeps the
+   tiles in line with the tip row above. Empty, the row takes no room. */
 .brush-shapes-row {
+    flex-wrap: wrap;
+    align-content: flex-start;
+    max-height: calc(3 * 26px + 2 * 4px + 4px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: y mandatory;
+    scroll-padding: 2px 0;
+    padding: 2px;
+    margin: -2px -2px 6px;
+}
+.brush-shapes-row:empty {
+    display: none;
+}
+.brush-shapes-row .brush-shape-btn {
+    scroll-snap-align: start;
+}
+.brush-shapes-row::-webkit-scrollbar {
+    width: 4px;
+}
+.brush-shapes-row::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 2px;
+}
+.brush-shapes-actions {
     flex-wrap: wrap;
 }
 .brush-shape-btn,
@@ -1177,7 +1206,7 @@ body > .controls {
 /* The clipboard button sits beside the ＋ and says what it does in words, so
    it takes the row's height but sizes to its label — the panel's 10px control
    type, same as the labels above it. The row wraps, so a narrow sidebar drops it
-   to its own line rather than squeezing the swatches. */
+   to its own line rather than squeezing the ＋. */
 .brush-shape-paste {
     flex: 0 0 auto;
     width: auto;

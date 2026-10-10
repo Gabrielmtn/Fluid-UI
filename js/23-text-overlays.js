@@ -1325,7 +1325,7 @@
     }
 
     // `done(shapeId)` hears the new shape's id, or null if nothing was made
-    // (no text, the user kept a full library, the stamp came out empty).
+    // (no text, the stamp came out empty).
     function makeBrush(id, done) {
         function finish(v) { if (done) done(v || null); }
         var ov = lineById(id);
@@ -1339,29 +1339,12 @@
             tell('Nothing to make a brush from', 'Type something into this line first.');
             finish(null); return;
         }
-        function build() {
-            var shapeId = null;
-            try { shapeId = B.add(brushNameOf(ov), paintBrushStamp(ov)); }
-            catch (e) { console.warn('⚠️ Text to brush failed for line', id, e); }
-            finish(shapeId);
-        }
-        // add() makes room on a full library by dropping the oldest shape,
-        // silently. A button that makes a shape in one click must not spend
-        // one of the user's own without asking.
-        var lib = (typeof B.list === 'function') ? B.list() : [];
-        var max = B.MAX || 24;
-        if (lib.length >= max && typeof window.appConfirm === 'function') {
-            var oldest = lib[lib.length - 1];
-            window.appConfirm({
-                title: 'Brush shapes are full',
-                message: 'You have ' + max + ' brush shapes, the most there is room for. ' +
-                    'Making this one removes the oldest, "' + ((oldest && oldest.name) || 'Shape') + '".',
-                confirmLabel: 'Make it',
-                cancelLabel: 'Keep mine'
-            }).then(function (ok) { if (ok) build(); else finish(null); });
-            return;
-        }
-        build();
+        // The library has no cap (33), so nothing of the user's is spent to
+        // make room and there is nothing to ask first.
+        var shapeId = null;
+        try { shapeId = B.add(brushNameOf(ov), paintBrushStamp(ov)); }
+        catch (e) { console.warn('⚠️ Text to brush failed for line', id, e); }
+        finish(shapeId);
     }
 
     // ===========================================================

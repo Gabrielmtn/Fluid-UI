@@ -552,13 +552,36 @@
         });
     }
 
-    // Custom stamp swatches (33-brush-shapes) + the import tiles of the Brush
-    // panel's shapes row.
-    function renderShapeTiles(row, opts) {
-        opts = opts || {};
+    // The shape rows scroll (css .brush-shapes-row) since the library lost its
+    // cap (33, 2026-10-09). A re-render empties the row, which throws it back
+    // to the top, so picking a tile three rows down would jump the list out
+    // from under the pointer: keep the scroll. The active tile is brought into
+    // view only when the selection CHANGED (an import lands first, a preset
+    // picks one off screen); a delete or an edit leaves the list where the
+    // user scrolled it.
+    function keepShapeScroll(row, act, render) {
+        var top = row.scrollTop;
+        render();
+        row.scrollTop = top;
+        if (act === row.__shownAct) return;
+        var r = row.getBoundingClientRect();
+        if (!r.height && act) return;      // folded away: reveal it next time
+        row.__shownAct = act;
+        var a = act && row.querySelector('.brush-shape-btn.active');
+        if (!a) return;
+        var b = a.getBoundingClientRect();
+        if (b.top < r.top) row.scrollTop += b.top - r.top;
+        else if (b.bottom > r.bottom) row.scrollTop += b.bottom - r.bottom;
+    }
+
+    // Custom stamp swatches (33-brush-shapes) of the Brush panel's shapes row.
+    function renderShapeTiles(row) {
+        var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
+        keepShapeScroll(row, act, function () { fillShapeTiles(row, act); });
+    }
+    function fillShapeTiles(row, act) {
         row.innerHTML = '';
         var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
-        var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
         lst.forEach(function (s) {
             var b = document.createElement('button');
             b.type = 'button';
@@ -586,6 +609,12 @@
             });
             row.appendChild(b);
         });
+    }
+
+    // The import tiles, on their own row under the swatches so they stay in
+    // reach however far the library scrolls. Built once.
+    function buildShapeActions(row, opts) {
+        opts = opts || {};
         var addB = document.createElement('button');
         addB.type = 'button';
         addB.className = 'brush-tip-btn brush-shape-add';
@@ -4556,9 +4585,12 @@
         });
 
         function renderAltShapes() {
+            var act = (BM.side(side).alt || {}).BRUSH_SHAPE_ID || null;
+            keepShapeScroll(shapeRow, act, function () { fillAltShapes(act); });
+        }
+        function fillAltShapes(act) {
             shapeRow.innerHTML = '';
             var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
-            var act = (BM.side(side).alt || {}).BRUSH_SHAPE_ID || null;
             if (!lst.length) {
                 shapeNote.textContent = 'No custom shapes yet — import one in the Brush panel.';
                 shapeNote.style.display = '';
@@ -5646,6 +5678,9 @@
         var shapesRow = document.createElement('div');
         shapesRow.className = 'brush-tip-row brush-shapes-row';
         shapesArea.appendChild(shapesRow);
+        var shapesActions = document.createElement('div');
+        shapesActions.className = 'brush-tip-row brush-shapes-actions';
+        shapesArea.appendChild(shapesActions);
         tipBody.appendChild(shapesArea);
         var shapeFileInput = document.createElement('input');
         shapeFileInput.type = 'file';
@@ -5657,10 +5692,9 @@
             if (f && window.BrushShapes) window.BrushShapes.beginImportFile(f);
             shapeFileInput.value = '';
         });
+        buildShapeActions(shapesActions, { onImport: function () { shapeFileInput.click(); } });
         markBrushDirty = markDirty;
-        function renderBrushShapes() {
-            renderShapeTiles(shapesRow, { onImport: function () { shapeFileInput.click(); } });
-        }
+        function renderBrushShapes() { renderShapeTiles(shapesRow); }
         SETTERS.shape = function (v) {
             if (!window.BrushShapes) return;
             window.BrushShapes.setActive((typeof v === 'string' && v) ? v : null);

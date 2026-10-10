@@ -11,15 +11,16 @@
 //   rasterizes a white/alpha stamp → cropped to its alpha bounding box,
 //   downscaled to the stamp resolution budget (see STAMP_LONG_MAX below)
 //   and persisted as a PNG dataURL.
-// STORAGE: settingsManager 'brush.shapes' = [{id, name, dataURL}] (≤24),
-//   active id in 'brush.shapeId' + config.BRUSH_SHAPE_ID. Stamps are held to
-//   a ≤100KB PNG each so 24 of them ride presets/quota comfortably.
+// STORAGE: settingsManager 'brush.shapes' = [{id, name, dataURL}], active id
+//   in 'brush.shapeId' + config.BRUSH_SHAPE_ID. No count cap since
+//   2026-10-09 (it was 24, and add() silently dropped the oldest past it);
+//   the ceiling is the storage quota, and add() says so when a save fails.
+//   Stamps are held to a ≤100KB PNG each so a big library still fits.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
 
     var shapes = null;      // in-memory copy of the persisted list
-    var MAX_SHAPES = 24;    // library cap; add() drops the oldest past it
     var TEX = {};           // id → {texture, aspect} (lazy GL upload)
     var BROKEN = {};        // id → 1 for stamps whose bitmap will not decode
 
@@ -113,8 +114,8 @@
     // ── Peer shapes (multiplayer) ────────────────────────────────────────
     // Stamps a peer painted with, held ONLY for as long as we are in a room
     // with them. Deliberately NOT the persisted library: importList() would
-    // merge a stranger's brushes into the user's own 24 slots permanently
-    // (and silently refuse once full). These live in RAM, are keyed by the
+    // merge a stranger's brushes into the user's own library permanently,
+    // spending their storage on it. These live in RAM, are keyed by the
     // sender's id, and are dropped when the room empties.
     var PEER = {};              // id → {texture, aspect, rev}
     var PEER_MAX = 48;          // plenty for a full room; bounds a hostile peer
@@ -264,8 +265,8 @@
     //   LONG_MAX   — 1:1 with that widest print; more would never be sampled.
     //   PIXELS_MAX — so a squarish shape can't spend 1024² on area an
     //                elongated one spends on its long side.
-    //   BYTES_MAX  — the real backstop. Stamps ride localStorage (24 of them,
-    //                alongside presets) and the multiplayer wire (06's chunked
+    //   BYTES_MAX  — the real backstop. Stamps ride localStorage (the whole
+    //                library, alongside presets) and the multiplayer wire (06's chunked
     //                publish tops out ~350KB, putPeer refuses over 400KB), and
     //                flat art and a noisy photo matte differ ~10× in PNG cost
     //                at identical dimensions. Encode, measure, and step the
@@ -330,14 +331,13 @@
         }
         // The same art twice is one shape: pick the one already there rather
         // than spend a slot on a copy. A one-click source (the Text panel's
-        // Convert to brush) makes a second press easy, and on a full library every
-        // copy would push one of the user's own shapes out.
+        // Convert to brush) makes a second press easy, and every copy would be
+        // one more tile to scroll past and one more stamp's worth of storage.
         var same = load().find(function (s) { return s.dataURL === stamp; });
         if (same) { setActive(same.id); return same.id; }
         var id = 'bs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         var entry = { id: id, name: name || 'Shape', dataURL: stamp };
         load().unshift(entry);
-        if (shapes.length > MAX_SHAPES) shapes.length = MAX_SHAPES;
         if (!store()) {
             // Quota: the shape works this session but won't survive a reload.
             say('Saved only for this session',
@@ -435,22 +435,28 @@
     }
 
     // D7 ride-alongs (mirrors brush.presets): full-list import/export.
-    // Import MERGES (union, existing entries win, cap 24) — a .fluid load or
-    // the vault's wipe-recovery must never destroy shapes authored here.
+    // Import MERGES (union, existing entries win) — a .fluid load or the
+    // vault's wipe-recovery must never destroy shapes authored here.
     function exportList() { return load().slice(); }
     function importList(arr) {
         if (!Array.isArray(arr)) return;
         load();
-        var seenId = {}, seenData = {};
+        var seenId = {}, seenData = {}, added = 0;
         shapes.forEach(function (s) { seenId[s.id] = 1; seenData[s.dataURL] = 1; });
         arr.forEach(function (s) {
             if (!s || typeof s.id !== 'string' || typeof s.dataURL !== 'string') return;
             if (seenId[s.id] || seenData[s.dataURL]) return; // already have it
-            if (shapes.length >= MAX_SHAPES) return;         // existing entries win the cap
             shapes.push({ id: s.id, name: s.name || 'Shape', dataURL: s.dataURL });
             seenId[s.id] = 1; seenData[s.dataURL] = 1;
+            added++;
         });
-        store();
+        // With no count cap, a big merge is what can fill the quota. The
+        // shapes still paint this session; say so rather than lose them on
+        // the next reload without a word.
+        if (!store() && added) {
+            say('Saved only for this session',
+                'The brush shapes that came in work now, but storage is full so they will be lost on reload. Free space by deleting presets or shapes.');
+        }
         // Normalize + notify. Before 04a's async load there is no config —
         // derive the persisted active id from settings so a boot-time import
         // can't null the user's saved selection.
@@ -481,7 +487,6 @@
 
     window.BrushShapes = {
         list: function () { return load().slice(); },
-        MAX: MAX_SHAPES,
         activeId: activeId,
         setActive: setActive,
         getActiveStamp: getActiveStamp,
