@@ -587,6 +587,10 @@
                 ? window.__armPushPin
                 : ((typeof window.armPushMask === 'function') ? window.armPushMask() : 0);
             if (apMask) interaction.ap = apMask;
+            // Per-arm tips (05g): arm index -> tip or shape, the arms that
+            // override the brush's only. Omitted when none do.
+            const atip = (typeof window.activeArmTips === 'function') ? window.activeArmTips() : null;
+            if (atip && Object.keys(atip).length) interaction.atip = Object.assign({}, atip);
             // Per-stroke mirror (41-button-modes): a dab painted by a button
             // bound to "mirror brushstroke" landed in two (or four) places, so
             // a recording without it plays back as half the mark that was made.
@@ -792,8 +796,11 @@
                 // snapshot, and the value reaches the arm-transform builder.
                 let _rmir = (typeof i.mir === 'number' && isFinite(i.mir)) ? (i.mir | 0) : 0;
                 if (_rmir < 1 || _rmir > 3) _rmir = 0;
-                const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap || !!_rmir;
-                let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev, _mirPrev;
+                // Per-arm tips, cleaned like the rest (05g sanitizeArmTipMap).
+                const _ratip = (typeof window.sanitizeArmTipMap === 'function')
+                    ? window.sanitizeArmTipMap(i.atip) : null;
+                const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap || !!_rmir || !!_ratip;
+                let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev, _mirPrev, _atipPrev;
                 if (_fp && window.config) {
                     _tipPrev = window.config.BRUSH_TIP;
                     _shapePrev = window.config.BRUSH_SHAPE_ID;
@@ -823,6 +830,10 @@
                                 ? Math.max(0, Math.min(5, _rp.s)) : 1;
                     }
                     window.__armPushPin = _rap;
+                    // Unconditional as well: {} = every arm printed the
+                    // brush's tip, whatever the panel says now.
+                    _atipPrev = window.__armTipPin;
+                    window.__armTipPin = _ratip || {};
                     window.config.BRUSH_TIP = (typeof i.tip === 'number') ? (i.tip | 0) : 0;
                     // A shape we no longer have suppresses stamps outright rather
                     // than printing the recording in whatever shape is selected now.
@@ -854,6 +865,7 @@
                         window.config.BRUSH_VEL_MODE = _pushPrev[1];
                         window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
                         window.__armPushPin = _apPrev;
+                        window.__armTipPin = _atipPrev;
                         window.__strokeMirrorPin = _mirPrev;
                     }
                 }

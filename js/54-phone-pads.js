@@ -210,6 +210,10 @@
         }
         var ap = (typeof window.armPushMask === 'function') ? window.armPushMask() : 0;
         if (ap) info.ap = ap;
+        // Per-arm tips (05g), echoed back on the phone's dabs like `ap`.
+        // Shape ids resolve here, in this canvas's own library.
+        var atip = (typeof window.armTipMap === 'function') ? window.armTipMap() : null;
+        if (atip) info.atip = atip;
         // Arms turn the tip with them unless Same angle is on (06d `at`).
         if (!cfg.SYM_SAME_ANGLE) info.at = 1;
         if (cfg.SYM_FACE_CENTER) info.fc = 1;

@@ -62,6 +62,14 @@
         if (Math.abs(parseFloat(el.value) - n) > 1e-9) window.config[key] = n;
     }
     function setCheck(id, checked) { const el = $(id); if (!el) return; el.checked = !!checked; el.dispatchEvent(new Event('change', {bubbles:true})); }
+    // A Multi-Brush arm's own tip (05g sanitizeArmTip): null = the brush's,
+    // 0-4 a built-in tip, a string a custom shape id. Kept here as well
+    // because a restore can run before 05g has loaded.
+    function armTipOf(v) {
+        if (typeof v === 'number' && isFinite(v)) return Math.max(0, Math.min(4, v | 0));
+        if (typeof v === 'string' && v.length <= 64 && /^[A-Za-z0-9_-]+$/.test(v)) return v;
+        return null;
+    }
 
     // Base64 encode/decode for Uint8Array (collision depthData serialization)
     function _uint8ToBase64(uint8) {
@@ -396,8 +404,9 @@
                     // active mode instead of nothing.
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
                     // push: the arm is a Pressure arm (moves paint, lays none).
+                    // tip: the arm's own tip, null = the brush's.
                     arm.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
-                               push: !!c.push });
+                               push: !!c.push, tip: armTipOf(c.tip) });
                 });
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             } else {
@@ -971,8 +980,13 @@
         try {
             if (window.multiArmColors && window.multiArmColors.length) {
                 armColorsData = window.multiArmColors.map(function(c) {
-                    return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0,
-                             push: !!c.push };
+                    var o = { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0,
+                              push: !!c.push };
+                    // Only when set, so a snapshot of a plain brush is the
+                    // shape it always was (look links diff against it).
+                    var t = armTipOf(c.tip);
+                    if (t !== null) o.tip = t;
+                    return o;
                 });
             }
         } catch(_){}
@@ -1148,7 +1162,7 @@
                     // presets and stale peers' snapshots coerce to 'fixed'.
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
                     armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
-                                  push: !!c.push });
+                                  push: !!c.push, tip: armTipOf(c.tip) });
                 });
                 // A look opened from a link (js/50-look-links.js) is applied
                 // live and never written into the recipient's saved session.
@@ -1157,9 +1171,12 @@
                     // old preset's 'rainbow' would otherwise reseed
                     // localStorage and resurrect on the next launch.
                     window.settingsManager.set('brush.armColors', armArr.map(function (a) {
-                        return { mode: a.mode, color: a.color, stepIndex: a.stepIndex, push: !!a.push };
+                        var o = { mode: a.mode, color: a.color, stepIndex: a.stepIndex, push: !!a.push };
+                        if (a.tip !== null) o.tip = a.tip;
+                        return o;
                     }));
                 }
+                if (typeof window.warmArmTips === 'function') window.warmArmTips();
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             }
         } catch(_){}

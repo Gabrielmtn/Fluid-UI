@@ -734,12 +734,18 @@
             if (Array.isArray(out.armColors)) {
                 out.armColors = out.armColors.slice(0, 8).map(function (a) {
                     a = (a && typeof a === 'object') ? a : {};
-                    return {
+                    var o = {
                         mode: (typeof a.mode === 'string' && /^[a-z]{1,16}$/.test(a.mode)) ? a.mode : 'main',
                         color: (typeof a.color === 'string' && HEX.test(a.color)) ? a.color : '#ffffff',
                         stepIndex: (typeof a.stepIndex === 'number') ? Math.max(0, Math.min(64, a.stepIndex | 0)) : 0,
                         push: !!a.push
                     };
+                    // The arm's own tip (05g): a built-in 0-4 or a shape id,
+                    // which only means something on a machine that has the
+                    // shape (elsewhere that arm prints Soft).
+                    if (typeof a.tip === 'number' && isFinite(a.tip)) o.tip = Math.max(0, Math.min(4, a.tip | 0));
+                    else if (typeof a.tip === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(a.tip)) o.tip = a.tip;
+                    return o;
                 });
             } else delete out.armColors;
         }

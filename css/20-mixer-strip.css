@@ -926,13 +926,6 @@ body > .controls {
     flex-direction: column;
     gap: 6px;
 }
-/* The arm buttons' key, under the rows (20 buildArmColorsDropdown). */
-.arm-legend {
-    margin-top: 8px;
-    font-size: 10px;
-    line-height: 1.4;
-    color: rgba(255, 255, 255, 0.55);
-}
 /* "Left click also mirrors ↔ · Turn off" (20 updateMirrorNote): the mirror
    a mouse button adds sits outside every setting in this panel, so the panel
    says so and offers the way out. */
@@ -971,45 +964,170 @@ body > .controls {
     text-align: center;
     padding: 8px;
 }
+/* One Multi-Brush arm (20 rebuildRows, 2026-10-09): number · colour chip ·
+   the colour mode as a radio group with Pressure under it · the tip square.
+   Layout only; every colour is 01-buttons.css's (radio track, check, menu). */
+/* Top-aligned, with the side pieces dropped to the radio track's middle
+   (track = 2 x 18px + 1px gap + 2px padding + 2px border = 41px), so the
+   Pressure line under the track doesn't pull them off centre. */
 .arm-row {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 0;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 2px 0;
 }
 .arm-label {
+    flex: none;
     font-size: 11px;
     font-weight: 600;
+    line-height: 41px;
     color: var(--ink-300, #b9bec7);
-    min-width: 16px;
+    min-width: 9px;
 }
-.arm-picker {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
+/* The colour chip: a little wider than tall, not a disc. The selectors
+   carry an id and the element so they outrank 21-sidebar.css's
+   input[type=color] rule (1,1,1), which is what kept the old .arm-picker
+   at a 38px disc; the swatch pseudo-elements are squared to match
+   (styles.css rounds every swatch). */
+:is(#sidebar-left, #sidebar-right, body) input[type="color"].arm-picker {
+    flex: none;
+    box-sizing: border-box;
+    width: 30px;
+    height: 22px;
+    min-width: 0;
+    border-radius: 4px;
     border: 1px solid var(--ground-500, #2a2e37);
     cursor: pointer;
     padding: 0;
+    margin: 9.5px 0 0;
     background: transparent;
 }
-.arm-mode-wrap {
+input[type="color"].arm-picker::-webkit-color-swatch-wrapper { padding: 0; border-radius: 3px; }
+input[type="color"].arm-picker::-webkit-color-swatch { border: 0; border-radius: 3px; }
+input[type="color"].arm-picker::-moz-color-swatch { border: 0; border-radius: 3px; }
+.arm-row-mid {
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
-    gap: 3px;
+    flex-direction: column;
+    gap: 2px;
 }
-/* Per-arm colour-mode buttons and the Pressure toggle (20-mixer paintRow).
-   Layout only — colour comes from the panel tint, and the selected mode / a
-   set Pressure toggle wear 01-buttons.css's .active plate. */
-.arm-mode-btn {
-    padding: 4px 6px;
+/* The Paint Into radio track (01-buttons.css .brush-radio-row), two by two. */
+.arm-mode-wrap.brush-radio-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    padding: 1px;
+    margin: 0;
+    border-radius: 6px;
+}
+.arm-mode-wrap.brush-radio-row > .brush-mode-btn {
+    justify-content: flex-start;
+    gap: 4px;
+    height: 18px;
+    min-width: 0;
+    padding: 0 4px;
+    border-radius: 5px;
     font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
 }
-/* line-height 1 keeps the larger glyph from outgrowing the mode buttons;
-   margin-left:auto parks it at the row's far right, clear of the group. */
+/* Pressure: a check box in words under the radio group (colours in
+   01-buttons.css "Check"). */
 .arm-push-btn {
-    margin-left: auto;
-    padding: 4px 7px;
-    font-size: 11px;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 16px;
+    padding: 0 5px;
+    margin-left: 1px;
+    border-radius: 4px;
+    font-size: 10px;
     line-height: 1;
+}
+.arm-push-btn::before {
+    content: '';
+    flex: none;
+    box-sizing: border-box;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+/* The arm's tip: a square showing what it prints (a tip's glyph or a shape's
+   thumbnail), lit when the arm has a tip of its own. */
+.arm-tip-btn {
+    flex: none;
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
+    margin-top: 3.5px;
+    padding: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+.arm-tip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 100%;
+    height: 100%;
+    font-size: 21px;
+    line-height: 1;
+}
+/* A shape this machine doesn't have prints Soft (05g): say so quietly. */
+.arm-tip-btn.is-missing { border-style: dashed; }
+
+/* The tip menu (20 openArmTipMenu), on the .brush-shape-menu skin. */
+.arm-tip-menu {
+    width: 212px;
+    box-sizing: border-box;
+}
+.arm-tip-menu .arm-tip-opt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 26px;
+    padding: 0 6px;
+    border-radius: 5px;
+    font-size: 11px;
+    text-align: left;
+}
+.arm-tip-menu .arm-tip-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 12px;
+}
+.arm-tip-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    margin: 2px 0 6px;
+}
+.arm-tip-sub {
+    padding: 4px 6px 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 10px;
+    font-weight: 600;
+    color: #8b949e;
+}
+.arm-tip-menu .arm-tip-shapes {
+    padding: 2px 4px;
+    margin: 0 0 2px;
+}
+.arm-tip-menu .arm-tip-shapes .brush-shape-btn {
+    flex: 0 0 26px;
+    width: 26px;
+}
+.arm-tip-note {
+    padding: 0 6px 6px;
+    font-size: 10px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 

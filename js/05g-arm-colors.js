@@ -438,6 +438,97 @@
         // (arm index -> colour, see resolveArmColor). null = no pin.
         window.__armColorPin = null;
 
+        // ── Per-arm tip (2026-10-09) ─────────────────────────────────────
+        // An arm can print its own tip while its siblings keep the brush's:
+        // cfg.tip is null (the brush's tip, whatever it is), a built-in tip
+        // 0-4 (BRUSH_TIP: Soft, Blob, Chisel, Streak, Ring) or a custom shape
+        // id from the library (33). Applied in multiSplat by pinning
+        // BRUSH_TIP / BRUSH_SHAPE_ID around that one arm's splat, so splat()
+        // (05i) needs no idea arms exist. Like per-arm Pressure it is the
+        // painter's FOOTPRINT, so it rides strokes, recordings and the wire
+        // as a map (arm index -> tip, only the arms that override), pinned on
+        // playback through __armTipPin.
+        function sanitizeArmTip(v) {
+            if (typeof v === 'number' && isFinite(v)) return Math.max(0, Math.min(4, v | 0));
+            // Shape ids are 33's 'bs' + base36; a peer's arrive as raw wire
+            // data, so hold them to that alphabet and the cache's id cap.
+            if (typeof v === 'string' && v.length <= 64 && /^[A-Za-z0-9_-]+$/.test(v)) return v;
+            return null;
+        }
+        window.sanitizeArmTip = sanitizeArmTip;
+        // A map off the wire, a recording or a stroke event: only legal arm
+        // indices and legal tips survive. null when nothing does.
+        function sanitizeArmTipMap(m) {
+            if (!m || typeof m !== 'object') return null;
+            var out = null;
+            for (var k in m) {
+                if (!Object.prototype.hasOwnProperty.call(m, k)) continue;
+                var i = parseInt(k, 10);
+                if (!(i >= 0 && i < 30) || String(i) !== k) continue;
+                var t = sanitizeArmTip(m[k]);
+                if (t === null) continue;
+                (out || (out = {}))[i] = t;
+            }
+            return out;
+        }
+        window.sanitizeArmTipMap = sanitizeArmTipMap;
+        // The live panel's overrides, or null when every arm follows the brush.
+        function currentArmTips() {
+            var arr = window.multiArmColors;
+            if (!arr) return null;
+            var out = null;
+            for (var i = 0; i < arr.length && i < 30; i++) {
+                var t = arr[i] ? sanitizeArmTip(arr[i].tip) : null;
+                if (t !== null) (out || (out = {}))[i] = t;
+            }
+            return out;
+        }
+        window.armTipMap = currentArmTips;
+        // The overrides this dab paints with: the pin while a replay,
+        // recording or peer stroke is painting (an object, {} = none), else
+        // the panel.
+        function activeArmTips() {
+            var pin = window.__armTipPin;
+            return (pin && typeof pin === 'object') ? pin : currentArmTips();
+        }
+        window.activeArmTips = activeArmTips;
+        window.__armTipPin = null;
+        // Start the GL upload of every shape an arm is set to, so the first
+        // stroke that uses one doesn't lose its opening dabs to the decode.
+        function warmArmTips() {
+            var m = currentArmTips();
+            var BS = window.BrushShapes;
+            if (!m || !BS || typeof BS.warm !== 'function') return;
+            for (var k in m) if (typeof m[k] === 'string') { try { BS.warm(m[k]); } catch (_) {} }
+        }
+        window.warmArmTips = warmArmTips;
+        // Pin one arm's tip into config for its splat and hand back what to
+        // restore. A shape this client cannot draw (deleted since, or a
+        // peer's that never arrived) prints Soft rather than borrowing the
+        // brush's tip: the arm was set to be different from the brush.
+        // __remoteStroke is lifted for a shape we DO have: replays and peer
+        // strokes set it to keep the viewer's own stamp off a stroke, and
+        // this stamp is the stroke's own.
+        function pinArmTip(t) {
+            var saved = [config.BRUSH_TIP, config.BRUSH_SHAPE_ID, window.__remoteStroke];
+            if (typeof t === 'number') {
+                config.BRUSH_TIP = t;
+                config.BRUSH_SHAPE_ID = null;
+            } else {
+                var BS = window.BrushShapes;
+                var have = !!(BS && typeof BS.has === 'function' && BS.has(t));
+                config.BRUSH_TIP = 0;
+                config.BRUSH_SHAPE_ID = have ? t : null;
+                if (have) window.__remoteStroke = false;
+            }
+            return saved;
+        }
+        function unpinArmTip(saved) {
+            config.BRUSH_TIP = saved[0];
+            config.BRUSH_SHAPE_ID = saved[1];
+            window.__remoteStroke = saved[2];
+        }
+
         // exactColor: programmatic splat sources (path layers, audio scenes,
         // animations) pass true so their configured color is deposited as-is on
         // every arm. Pointer strokes, stroke replay, and remote-peer strokes
@@ -477,6 +568,8 @@
             const armPushMask = window.__brushTipOn
                 ? ((typeof window.__armPushPin === 'number') ? window.__armPushPin : currentArmPushMask())
                 : 0;
+            // Per-arm tips, same gate: a programmatic source prints gaussian.
+            const armTips = window.__brushTipOn ? activeArmTips() : null;
             // Multi-Brush arms: one dab per symmetry transform (see the
             // symmetryTransforms block above for what each mode builds).
             const centerX = canvas.width * 0.5;
@@ -530,7 +623,16 @@
                 window.__armVelOnly = (armPushMask & (1 << transforms[i].arm)) ? true : null;
                 window.__armFlip = (m[0] * m[4] - m[1] * m[3]) < 0;
                 window.__armTurn = armStampTurn(m);
-                splat(finalX, finalY, armDx, armDy, armColor);
+                //  · the arm's own tip, pinned for this splat only. A mirrored
+                //    twin carries its source arm, so it prints the same tip.
+                const armTip = armTips ? armTips[transforms[i].arm] : undefined;
+                if (armTip === undefined || armTip === null) {
+                    splat(finalX, finalY, armDx, armDy, armColor);
+                } else {
+                    const tipSaved = pinArmTip(armTip);
+                    try { splat(finalX, finalY, armDx, armDy, armColor); }
+                    finally { unpinArmTip(tipSaved); }
+                }
             }
             window.__armVelOnly = null;
             window.__armFlip = false;

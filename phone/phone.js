@@ -405,6 +405,22 @@
         }
     }
 
+    // The host's per-arm tips (js/05g armTipMap): arm index -> a built-in
+    // tip 0-4 or one of the host's own shape ids. Passed back untouched on
+    // every dab, so only the shape of it is checked here; null when empty.
+    function armTips(m) {
+        if (!m || typeof m !== 'object') return null;
+        var out = null;
+        for (var k in m) {
+            if (!Object.prototype.hasOwnProperty.call(m, k) || !/^[0-7]$/.test(k)) continue;
+            var t = m[k];
+            if (typeof t === 'number' && isFinite(t)) t = Math.max(0, Math.min(4, t | 0));
+            else if (!(typeof t === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(t))) continue;
+            (out || (out = {}))[k] = t;
+        }
+        return out;
+    }
+
     // What the host's canvas is and how it paints (js/54-phone-pads.js).
     // Untrusted like any peer message, so every field is bounded here.
     function applyInfo(p) {
@@ -422,6 +438,7 @@
             push: (typeof p.push === 'string' && /^(smudge|spread|gather|swirl)$/.test(p.push)) ? p.push : null,
             pushS: num(p.pushS, 0, 5, 1),
             ap: (typeof p.ap === 'number' && isFinite(p.ap)) ? (Math.abs(p.ap) | 0) & 0xff : 0,
+            atip: armTips(p.atip),
             at: p.at === 1 ? 1 : 0,
             fc: p.fc === 1 ? 1 : 0,
             colors: (Array.isArray(p.colors) ? p.colors : [])
@@ -590,6 +607,7 @@
         if (i && i.angle) f.angle = i.angle;
         if (i && i.push) { f.push = i.push; f.pushS = i.pushS; }
         if (i && i.ap) f.ap = i.ap;
+        if (i && i.atip) f.atip = i.atip;
         // Multi-Brush arms turn the tip with them (06d brushWireFields `at`).
         if (i && i.at) f.at = 1;
         // ...and keeps its pose relative to the center (`fc`).

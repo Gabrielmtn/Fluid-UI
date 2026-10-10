@@ -504,7 +504,9 @@
                 confirmLabel: 'Delete',
                 cancelLabel: 'Keep'
             }).then(function (ok) {
-                if (ok && window.BrushShapes) window.BrushShapes.remove(shape.id);
+                if (!ok || !window.BrushShapes) return;
+                window.BrushShapes.remove(shape.id);
+                if (typeof window.clearArmTipShape === 'function') window.clearArmTipShape(shape.id);
             });
         });
         // Body-mounted so it escapes the drawer/tip-menu overflow and stacking
@@ -630,6 +632,197 @@
         pasteB.title = 'New brush shape from the clipboard — takes the image you last copied and opens the same cut-out editor as ＋.';
         pasteB.addEventListener('click', importShapeFromClipboard);
         row.appendChild(pasteB);
+    }
+
+    // ─── MULTI-BRUSH ARM TIPS (2026-10-09) ───────────────────────
+    // Each Multi-Brush row ends in a square showing what that arm prints,
+    // and opens a menu to give the arm a tip of its own (05g pinArmTip).
+    // cfg.tip: null = the brush's tip, 0-4 = BRUSH_TIPS, a string = a shape.
+    function shapeEntryById(id) {
+        var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
+        for (var i = 0; i < lst.length; i++) if (lst[i].id === id) return lst[i];
+        return null;
+    }
+    // What a tip value looks like: { name, glyph } or { name, url }.
+    function tipLook(t) {
+        if (typeof t === 'number') {
+            for (var i = 0; i < BRUSH_TIPS.length; i++) {
+                if (BRUSH_TIPS[i].v === t) return { name: BRUSH_TIPS[i].name, glyph: BRUSH_TIPS[i].glyph };
+            }
+            return { name: 'Soft', glyph: BRUSH_TIPS[0].glyph };
+        }
+        var e = (typeof t === 'string') ? shapeEntryById(t) : null;
+        if (e) return { name: e.name || 'Shape', url: e.dataURL };
+        // A shape this machine doesn't have (deleted, or from a look link
+        // made elsewhere): 05g prints Soft for it, so show that.
+        return { name: 'Soft (its shape is missing)', glyph: BRUSH_TIPS[0].glyph, missing: true };
+    }
+    // The brush's own tip right now: its shape if one is picked, else the tip.
+    function brushTipLook() {
+        var s = activeShapeEntry();
+        if (s) return { name: s.name || 'Shape', url: s.dataURL };
+        return tipLook((window.config && window.config.BRUSH_TIP) | 0);
+    }
+    function setTipIcon(icon, look) {
+        if (look.url) {
+            icon.textContent = '';
+            // Inline longhands, as on the shape tiles: a state rule's
+            // `background` shorthand would reset them.
+            icon.style.backgroundImage = 'url("' + look.url + '")';
+            icon.style.backgroundSize = 'contain';
+            icon.style.backgroundRepeat = 'no-repeat';
+            icon.style.backgroundPosition = 'center';
+        } else {
+            icon.style.backgroundImage = '';
+            icon.textContent = look.glyph || '';
+        }
+    }
+    function paintArmTipButton(btn, icon, idx, cfg, inert) {
+        var t = (typeof window.sanitizeArmTip === 'function') ? window.sanitizeArmTip(cfg.tip) : null;
+        var own = t !== null;
+        var look = own ? tipLook(t) : brushTipLook();
+        setTipIcon(icon, look);
+        // Lit when the arm has a tip of its own; following the brush, it
+        // shows the brush's tip on the plain plate.
+        btn.classList.toggle('active', own);
+        btn.classList.toggle('is-missing', !!look.missing);
+        // Tips are dye-only: a pushing arm lays the push's soft round
+        // whatever its tip, so the square greys like the Pressure switch.
+        btn.style.opacity = inert ? '0.45' : '';
+        btn.title = (own
+            ? 'Arm ' + (idx + 1) + ' tip: ' + look.name + ' (its own; the other arms keep theirs).'
+            : 'Arm ' + (idx + 1) + ' tip: the brush’s (' + look.name + ').')
+            + (inert ? ' A Pressure arm pushes with a soft round whatever its tip.' : '')
+            + ' Click to choose.';
+        btn.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' tip: ' + (own ? look.name : 'same as the brush'));
+    }
+
+    var _armTipMenu = null;
+    function closeArmTipMenu() {
+        if (!_armTipMenu) return;
+        var m = _armTipMenu;
+        _armTipMenu = null;
+        if (m.__anchor) m.__anchor.classList.remove('menu-open');
+        m.remove();
+        document.removeEventListener('pointerdown', _onArmTipOutside, true);
+        document.removeEventListener('keydown', _onArmTipKey, true);
+        window.removeEventListener('resize', closeArmTipMenu);
+    }
+    function _onArmTipOutside(e) {
+        var m = _armTipMenu;
+        if (!m || m.contains(e.target)) return;
+        // Its own square toggles it (the click handler), so leave that be.
+        if (m.__anchor && m.__anchor.contains(e.target)) return;
+        closeArmTipMenu();
+    }
+    function _onArmTipKey(e) {
+        if (e.key !== 'Escape' || !_armTipMenu) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var a = _armTipMenu.__anchor;
+        closeArmTipMenu();
+        if (a && a.focus) a.focus();
+    }
+    function openArmTipMenu(idx, cfg, anchor, onPick) {
+        var again = _armTipMenu && _armTipMenu.__anchor === anchor;
+        closeArmTipMenu();
+        if (again) return;   // a second click on the square closes it
+        var cur = (typeof window.sanitizeArmTip === 'function') ? window.sanitizeArmTip(cfg.tip) : null;
+        function pick(v) {
+            cfg.tip = v;
+            // Decode a shape now: a stamp still uploading holds its dabs.
+            if (typeof v === 'string' && window.BrushShapes && window.BrushShapes.warm) {
+                try { window.BrushShapes.warm(v); } catch (_) {}
+            }
+            closeArmTipMenu();
+            onPick();
+        }
+        var m = document.createElement('div');
+        m.className = 'brush-shape-menu arm-tip-menu';
+        m.dataset.group = 'core';
+        m.setAttribute('role', 'menu');
+        m.__anchor = anchor;
+        var head = document.createElement('div');
+        head.className = 'brush-shape-menu-head';
+        head.textContent = 'Arm ' + (idx + 1) + ' tip';
+        m.appendChild(head);
+
+        var same = document.createElement('button');
+        same.type = 'button';
+        same.className = 'arm-tip-opt arm-tip-same' + (cur === null ? ' active' : '');
+        var sameIcon = document.createElement('span');
+        sameIcon.className = 'arm-tip-icon';
+        var bl = brushTipLook();
+        setTipIcon(sameIcon, bl);
+        var sameTxt = document.createElement('span');
+        sameTxt.textContent = 'Same as the brush';
+        same.appendChild(sameIcon);
+        same.appendChild(sameTxt);
+        same.title = 'Print whatever tip the brush has (now ' + bl.name + '), and follow it when it changes.';
+        same.addEventListener('click', function () { pick(null); });
+        m.appendChild(same);
+
+        var grid = document.createElement('div');
+        grid.className = 'arm-tip-grid';
+        BRUSH_TIPS.forEach(function (t) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'arm-tip-opt' + (cur === t.v ? ' active' : '');
+            var ic = document.createElement('span');
+            ic.className = 'arm-tip-icon';
+            ic.textContent = t.glyph;
+            var tx = document.createElement('span');
+            tx.textContent = t.name;
+            b.appendChild(ic);
+            b.appendChild(tx);
+            b.title = t.title;
+            b.addEventListener('click', function () { pick(t.v); });
+            grid.appendChild(b);
+        });
+        m.appendChild(grid);
+
+        var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
+        var sLbl = document.createElement('div');
+        sLbl.className = 'arm-tip-sub';
+        sLbl.textContent = 'Your shapes';
+        m.appendChild(sLbl);
+        if (lst.length) {
+            var row = document.createElement('div');
+            row.className = 'brush-tip-row brush-shapes-row arm-tip-shapes';
+            lst.forEach(function (s) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'brush-tip-btn brush-shape-btn' + (s.id === cur ? ' active' : '');
+                b.style.backgroundImage = 'url("' + s.dataURL + '")';
+                b.style.backgroundSize = 'contain';
+                b.style.backgroundRepeat = 'no-repeat';
+                b.style.backgroundPosition = 'center';
+                b.title = s.name + ' — arm ' + (idx + 1) + ' prints this shape';
+                b.addEventListener('click', function () { pick(s.id); });
+                row.appendChild(b);
+            });
+            m.appendChild(row);
+        } else {
+            var note = document.createElement('div');
+            note.className = 'arm-tip-note';
+            note.textContent = 'None yet. Brush → Tip → ＋ makes one from an image.';
+            m.appendChild(note);
+        }
+
+        // Body-mounted, so the sidebar's scroll and stacking can't clip it.
+        document.body.appendChild(m);
+        var r = anchor.getBoundingClientRect(), mr = m.getBoundingClientRect();
+        var x = r.right - mr.width, y = r.bottom + 4;
+        if (y + mr.height > window.innerHeight - 8) y = Math.max(8, r.top - mr.height - 4);
+        m.style.left = Math.max(8, Math.min(x, window.innerWidth - mr.width - 8)) + 'px';
+        m.style.top = Math.max(8, y) + 'px';
+        anchor.classList.add('menu-open');
+        _armTipMenu = m;
+        var first = m.querySelector('.active') || same;
+        if (first && first.focus) first.focus({ preventScroll: true });
+        document.addEventListener('pointerdown', _onArmTipOutside, true);
+        document.addEventListener('keydown', _onArmTipKey, true);
+        window.addEventListener('resize', closeArmTipMenu);
     }
 
     // ─── MIXER STRIP ─────────────────────────────────────────────
@@ -5708,6 +5901,10 @@
             // still pointing at a deleted stamp would silently fall back to the
             // built-in tip with the swatch gone from the row.
             refreshAltPickers();
+            // ...and so do the Multi-Brush rows' tip squares: an arm on a
+            // shape shows its thumbnail, an arm on the brush's tip the
+            // brush's.
+            if (typeof window.refreshArmColorRows === 'function') window.refreshArmColorRows();
         };
         renderBrushShapes();
         var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
@@ -8536,26 +8733,34 @@
         // Declared up here: the restore below can rebuild before the
         // functions further down are reached.
         var rowPaints = [], rowCfgs = [], lastSig = '';
-        // What the row buttons mean, on the panel itself (user test 3: "tooltips
-        // on the multi brush items aren't enough").
-        var armLegend = document.createElement('div');
-        armLegend.className = 'arm-legend';
-        armLegend.textContent = '\u25CF brush colour \u00B7 \u25C6 fixed \u00B7 R random \u00B7 P palette \u00B7 \u2248 push';
-        panel.appendChild(armLegend);
+        // The row buttons say what they are in words (2026-10-09: "icons and
+        // letters won't do"), so the glyph key that used to sit under the
+        // rows (user test 3) is gone with the glyphs.
 
         function ensureArmConfig(count) {
             var arr = window.multiArmColors;
             if (!arr) { arr = []; window.multiArmColors = arr; }
             while (arr.length < count) {
-                arr.push({ mode: 'main', color: '#ffffff', stepIndex: 0, push: false });
+                arr.push({ mode: 'main', color: '#ffffff', stepIndex: 0, push: false, tip: null });
             }
+        }
+
+        // An arm's own tip (05g sanitizeArmTip): null = the brush's tip,
+        // 0-4 a built-in tip, a string a custom shape id.
+        function armTipOf(v) {
+            if (typeof window.sanitizeArmTip === 'function') return window.sanitizeArmTip(v);
+            return (typeof v === 'number' && isFinite(v)) ? Math.max(0, Math.min(4, v | 0)) : null;
         }
 
         function persistArmColors() {
             if (!window.settingsManager) return;
             var arr = window.multiArmColors || [];
             window.settingsManager.set('brush.armColors', arr.map(function(c) {
-                return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0, push: !!c.push };
+                var o = { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0, push: !!c.push };
+                // Only when set: a plain arm saves exactly as it always did.
+                var t = armTipOf(c.tip);
+                if (t !== null) o.tip = t;
+                return o;
             }));
         }
         // Exposed for the picker→arm-0 sync in 05g (two-way brush color sync)
@@ -8581,8 +8786,10 @@
                     // mode, arm painted fallback).
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
                     arr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
-                               push: !!c.push });
+                               push: !!c.push, tip: armTipOf(c.tip) });
                 });
+                // Decode any shape an arm prints now, not on its first dab.
+                if (typeof window.warmArmTips === 'function') window.warmArmTips();
             } else {
                 // No saved per-arm config: import the active brush's mode from the
                 // legacy checkboxes set by preseedPaletteOnLoad / autoload, so the
@@ -8617,6 +8824,9 @@
         }
 
         function rebuildRows() {
+            // An open tip menu writes to the row's config, which a rebuild
+            // may have swapped out (a preset): close it with the rows.
+            closeArmTipMenu();
             rowsWrap.innerHTML = '';
             rowPaints = [];
             rowCfgs = [];
@@ -8637,34 +8847,65 @@
                     var row = document.createElement('div');
                     row.className = 'arm-row';
 
+                    // One compact row (2026-10-09): the arm's number, its colour
+                    // chip, the colour mode as a radio group in words (Main ·
+                    // Custom · Random · Palette) with the Pressure switch under
+                    // it, and the arm's tip as a square at the right. The words
+                    // replaced ● ◆ R P ≈, which had to be learned from a key
+                    // under the rows. Pressure is a switch, not a fifth mode: an
+                    // arm can push while keeping the colour mode it goes back to.
                     var label = document.createElement('span');
                     label.className = 'arm-label';
                     label.textContent = String(idx + 1);
                     row.appendChild(label);
+                    var mid = document.createElement('div');
+                    mid.className = 'arm-row-mid';
 
+                    // The chip is a colour well: the shared picker (js/64)
+                    // opens on it, and picking a colour makes the arm Custom.
                     var picker = document.createElement('input');
                     picker.type = 'color';
                     picker.className = 'arm-picker';
-                    // Two controls, deliberately: the four colour modes are one
-                    // exclusive choice, and Pressure is an independent switch on
-                    // top of it — so an arm can be pressure-less paint, or push
-                    // while still carrying the colour mode it goes back to. The
-                    // toggle keeps its own place at the far right of the row,
-                    // clear of the four-button group, so it doesn't read as a
-                    // fifth option in it.
+                    picker.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' colour');
+                    picker.title = 'Arm ' + (idx + 1) + ' colour. The colour this arm paints next; '
+                        + 'click to pick one of its own (that makes it Custom).';
                     var modes = [
-                        { key: 'main',    text: '\u25CF', title: 'Brush colour: this arm paints whatever the brush is set to' },
-                        { key: 'fixed',   text: '\u25C6', title: 'Fixed: this arm keeps the colour in its swatch' },
+                        { key: 'main',    text: 'Main',    title: 'Main: this arm paints the brush colour, whatever it is set to' },
+                        { key: 'fixed',   text: 'Custom',  title: 'Custom: this arm keeps a colour of its own. Click to pick it.' },
                         // 'rainbow' removed 2026-08-15 (photosensitivity)
-                        { key: 'random',  text: 'R',      title: 'Random: a new colour each stroke' },
-                        // P, not S (user test 3: "P for palette"): the next palette
-                        // colour each stroke, in step with every other P arm.
-                        { key: 'step',    text: 'P',      title: 'Palette: the next palette colour each stroke, in step with every other P arm' }
+                        { key: 'random',  text: 'Random',  title: 'Random: a new colour each stroke' },
+                        // The next palette colour each stroke, in step with
+                        // every other Palette arm.
+                        { key: 'step',    text: 'Palette', title: 'Palette: the next palette colour each stroke, in step with every other Palette arm' }
                     ];
 
+                    // The Paint Into radio track (01-buttons.css
+                    // .brush-radio-row), folded two by two to fit the row.
                     var modeWrap = document.createElement('div');
-                    modeWrap.className = 'arm-mode-wrap';
+                    modeWrap.className = 'brush-radio-row arm-mode-wrap';
+                    modeWrap.setAttribute('role', 'radiogroup');
+                    modeWrap.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' colour');
                     var btns = [];
+
+                    // ── The arm's tip (2026-10-09) ───────────────────────────
+                    // A square showing what this arm prints; it opens a menu
+                    // of the brush's tip, the five built-ins and the custom
+                    // shapes. The arm prints what is picked while the others
+                    // keep the brush's (05g pinArmTip).
+                    var tipBtn = document.createElement('button');
+                    tipBtn.type = 'button';
+                    tipBtn.className = 'arm-tip-btn';
+                    tipBtn.setAttribute('aria-haspopup', 'menu');
+                    var tipIcon = document.createElement('span');
+                    tipIcon.className = 'arm-tip-icon';
+                    tipBtn.appendChild(tipIcon);
+                    tipBtn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        openArmTipMenu(idx, cfg, tipBtn, function () {
+                            persistArmColors();
+                            paintRow();
+                        });
+                    });
 
                     // ── Per-arm Pressure (2026-08-26) ────────────────────────
                     // Marks this arm as a PUSH arm: it moves paint already on
@@ -8674,15 +8915,18 @@
                     // every arm pushes and this one is inert — greyed rather
                     // than hidden, so the rows don't reflow when you switch the
                     // brush over.
+                    // A check box in words, under the radio group: on/off, not
+                    // one of the four.
                     var pushBtn = document.createElement('button');
                     pushBtn.type = 'button';
-                    pushBtn.className = 'arm-mode-btn arm-push-btn';
-                    pushBtn.textContent = '\u2248';
+                    pushBtn.className = 'arm-push-btn';
+                    pushBtn.setAttribute('role', 'checkbox');
+                    pushBtn.textContent = 'Pressure';
 
                     // Repaints the row from cfg — the mode buttons, the Pressure
-                    // toggle AND the swatch, in one place, so no widget can end
-                    // up describing a state the others have moved on from.
-                    // State only: the buttons take the panel's tint
+                    // toggle, the tip AND the chip, in one place, so no widget
+                    // can end up describing a state the others have moved on
+                    // from. State only: the buttons take the panel's tint
                     // (css/01-buttons.css) and "selected" is its shared .active
                     // plate — their layout lives in 20-mixer-strip.css.
                     function paintRow() {
@@ -8690,11 +8934,14 @@
                         // row that is not rebuilt.
                         var brushPush = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
                         btns.forEach(function(b) {
-                            b.classList.toggle('active', b.dataset.mode === cfg.mode);
+                            var on = b.dataset.mode === cfg.mode;
+                            b.classList.toggle('active', on);
+                            b.setAttribute('aria-checked', on ? 'true' : 'false');
                         });
 
                         var push = !!cfg.push;
                         pushBtn.classList.toggle('active', push);
+                        pushBtn.setAttribute('aria-checked', push ? 'true' : 'false');
                         pushBtn.style.opacity = brushPush ? '0.45' : '';
                         pushBtn.title = brushPush
                             ? 'Pressure arm — the whole brush is already in Pressure mode, '
@@ -8706,6 +8953,8 @@
                                       + 'laying it down, using the mode and Strength set in the '
                                       + 'brush drawer. The other arms keep painting.');
 
+                        paintArmTipButton(tipBtn, tipIcon, idx, cfg, push || brushPush);
+
                         // 'main' arms paint the live default color (resolveArmColor
                         // defers to pointer.color), so show THAT — not the arm's
                         // stored custom hex. Display-only: cfg.color is untouched,
@@ -8713,14 +8962,14 @@
                         // handler (which flips the arm to 'fixed' and persists)
                         // never fires. Rebuilds re-run this on every default-color
                         // change while the popup is open, so it tracks live.
-                        // Each swatch shows the colour the arm paints NEXT (user
+                        // Each chip shows the colour the arm paints NEXT (user
                         // test 3: "colors don't show up in multi brush window" —
                         // Palette and Random rows showed a dimmed white). A
                         // Palette arm paints the one palette counter (05g
                         // nextStepHex); arm 0 on Palette or Random IS the main
                         // picker; another Random arm has its next colour rolled
                         // already. Display-only: .value set by property never
-                        // fires the input handler (which would make it Fixed).
+                        // fires the input handler (which would make it Custom).
                         var mainPk = document.getElementById('colorPicker');
                         var shown = null;
                         if (cfg.mode === 'main' || (idx === 0 && (cfg.mode === 'step' || cfg.mode === 'random'))) {
@@ -8733,17 +8982,29 @@
                                 return h.length === 1 ? '0' + h : h;
                             }).join('');
                         }
-                        picker.value = shown || cfg.color || '#ffffff';
-                        picker.disabled = cfg.mode !== 'fixed';
+                        // Not while its picker is open on it: the popover owns
+                        // the well then, and a repaint would fight the drag.
+                        if (!picker.classList.contains('cp-open')) picker.value = shown || cfg.color || '#ffffff';
                         // Dimmed only while the colour is unknown (a Random arm
-                        // before its first roll); Fixed is the one you can edit.
-                        picker.style.opacity = (cfg.mode === 'fixed') ? '1' : (shown ? '0.85' : '0.35');
+                        // before its first roll). Always clickable: picking a
+                        // colour on it is the same act as Custom.
+                        picker.style.opacity = (cfg.mode === 'fixed' || shown) ? '1' : '0.35';
+                    }
+
+                    // The shared picker (js/64) on this arm's chip. Clicking
+                    // Custom outside an open popover closes it first (its
+                    // outside-press rule), so this always lands open.
+                    function openArmPicker() {
+                        var CP = window.ColourPicker;
+                        if (CP && typeof CP.openFor === 'function') CP.openFor(picker);
+                        else picker.click();
                     }
 
                     modes.forEach(function(m) {
                         var btn = document.createElement('button');
                         btn.type = 'button';
-                        btn.className = 'arm-mode-btn';
+                        btn.className = 'brush-mode-btn arm-mode-btn';
+                        btn.setAttribute('role', 'radio');
                         btn.textContent = m.text;
                         btn.title = m.title;
                         btn.dataset.mode = m.key;
@@ -8763,8 +9024,11 @@
                                 window.syncBrushColorUI({ skipPanel: true });
                             }
                             // Repaint AFTER the sync: on arm 0 that sync can move
-                            // the top-nav picker, and a Follow row mirrors THAT.
+                            // the top-nav picker, and a Main row mirrors THAT.
                             paintRow();
+                            // Custom is the colour you pick, so it opens the
+                            // picker on it.
+                            if (m.key === 'fixed') openArmPicker();
                         });
                         btns.push(btn);
                         modeWrap.appendChild(btn);
@@ -8782,6 +9046,7 @@
                         cfg.color = picker.value;
                         if (cfg.mode !== 'fixed') {
                             cfg.mode = 'fixed';
+                            cfg.cachedColor = null;
                             paintRow();
                         }
                         persistArmColors();
@@ -8794,9 +9059,11 @@
                         }
                     });
 
+                    mid.appendChild(modeWrap);
+                    mid.appendChild(pushBtn);
                     row.appendChild(picker);
-                    row.appendChild(modeWrap);
-                    row.appendChild(pushBtn);
+                    row.appendChild(mid);
+                    row.appendChild(tipBtn);
 
                     rowsWrap.appendChild(row);
                     rowPaints.push(paintRow);
@@ -8820,14 +9087,16 @@
             var c = window.config || {};
             var n = mainMult ? (parseInt(mainMult.value, 10) || 1) : 1;
             var pk = document.getElementById('colorPicker');
+            // The brush's tip and shape: an arm on "same as the brush" shows it.
             var s = n + '|' + (c.SYMMETRY_MODE || '') + '|' + (c.BRUSH_VELOCITY_ONLY ? 1 : 0)
-                + '|' + (pk ? pk.value : '');
+                + '|' + (pk ? pk.value : '') + '|' + (c.BRUSH_TIP | 0) + ',' + (c.BRUSH_SHAPE_ID || '');
             var arr = window.multiArmColors || [];
             var steps = false;
             for (var i = 0; i < n && i < arr.length; i++) {
                 var a = arr[i];
                 if (!a) { s += '|-'; continue; }
-                s += '|' + a.mode + ',' + a.color + ',' + (a.push ? 1 : 0);
+                s += '|' + a.mode + ',' + a.color + ',' + (a.push ? 1 : 0)
+                    + ',' + (a.tip === null || a.tip === undefined ? '' : a.tip);
                 if (a.cachedColor) s += ',' + a.cachedColor[0] + ',' + a.cachedColor[1] + ',' + a.cachedColor[2];
                 if (a.mode === 'step' && i > 0) steps = true;
             }
@@ -8955,6 +9224,16 @@
         // After each stroke (05g advanceArmColors): the swatches move on with
         // the palette and the Random rolls, while the panel is open.
         window.refreshArmColorRows = refreshPanel;
+        // A deleted shape takes the arms that printed it back to the brush's
+        // tip, as deleting the brush's own shape does to the brush (33).
+        window.clearArmTipShape = function (id) {
+            var arr = window.multiArmColors || [];
+            var hit = false;
+            arr.forEach(function (c) { if (c && c.tip === id) { c.tip = null; hit = true; } });
+            if (!hit) return;
+            persistArmColors();
+            refreshPanel();
+        };
 
         watchPanel();
         return { toggle: toggle };

@@ -143,7 +143,15 @@
           target: { section: 'Multi-Brush' },
           steps: [
             { say: 'In Multi-Brush on the left, Symmetry sets how the arms are laid out: radial, mirrored, a rake.', target: { section: 'Multi-Brush', sel: '#symmetryModeGroup' }, until: { change: true, any: true } },
-            { say: 'Each arm below gets its own colour mode: same as the brush, random, or a colour of its own.', target: { section: 'Multi-Brush', sel: '.arm-colors-rows' } }
+            { say: 'Each arm below picks its colour: Main (the brush colour), Custom (one of its own: click its chip), Random or Palette.', target: { section: 'Multi-Brush', sel: '.arm-colors-rows' } }
+          ] },
+        { id: 'arm-tips', pillar: 'brush', title: 'Give one arm a different brush tip',
+          tags: ['arms', 'tip', 'shape', 'chisel', 'ring', 'streak', 'blob', 'stamp', 'multi', 'per arm'],
+          answer: 'Open Multi-Brush on the left. The square at the end of each arm’s row is the tip that arm prints: click it and pick a tip or one of your shapes. The other arms keep the brush’s.',
+          target: { section: 'Multi-Brush', sel: '.arm-tip-btn' },
+          steps: [
+            { say: 'Give the brush two or more arms first.', key: '2', target: { section: 'Multi-Brush', sel: '#multiplier' } },
+            { say: 'The square at the end of an arm’s row is its tip. Click it and pick one; Same as the brush puts it back.', target: { section: 'Multi-Brush', sel: '.arm-tip-btn' } }
           ] },
         { id: 'material', pillar: 'brush', title: 'Switch between fluid, wet paint and thick paint',
           tags: ['material', 'paint', 'wet', 'thick', 'gloss', 'fluid', 'swirl', 'acrylic', 'clay', 'dry'],

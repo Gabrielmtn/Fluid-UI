@@ -259,27 +259,43 @@
     // The active custom shape's bitmap, decoded here for drawing. Until it
     // decodes the ghost shows nothing — splat() holds its dabs for that same
     // window rather than print the tip underneath, so neither guesses.
-    var stampUrl = null, stampImg = null, stampGen = 0;
+    // Keyed by URL since Multi-Brush arms can print shapes of their own (05g
+    // per-arm tips): the brush's shape and an arm's are on screen together.
+    // `id` names the decoded bitmap in the mask key, so a re-edited shape
+    // (new art, new URL) is a new mask. A handful at most; cleared past 16.
+    var stampCache = {}, stampN = 0, stampSeq = 0;
     function stampBitmap(url) {
-        if (url !== stampUrl) {
-            stampUrl = url; stampImg = null;
+        var e = stampCache[url];
+        if (!e) {
+            if (stampN >= 16) { stampCache = {}; stampN = 0; }
+            e = stampCache[url] = { img: null, id: 0 };
+            stampN++;
             var img = new Image();
             img.onload = function () {
-                if (stampUrl !== url) return;
-                stampImg = img; stampGen++;
+                e.img = img; e.id = ++stampSeq;
                 requestRender();
             };
             img.src = url;
         }
-        return stampImg;
+        return e.img ? e : null;
     }
-    function activeShapeUrl() {
+    function shapeUrl(id) {
         var BS = window.BrushShapes;
-        var id = BS && BS.activeId();
-        if (!id) return null;
+        if (!id || !BS) return null;
         var lst = BS.list() || [];
         for (var i = 0; i < lst.length; i++) if (lst[i].id === id) return lst[i].dataURL || null;
         return null;
+    }
+    function activeShapeUrl() {
+        var BS = window.BrushShapes;
+        return shapeUrl(BS && BS.activeId());
+    }
+    // Arm i's own tip (05g per-arm tips), or null when it prints the brush's.
+    // Fluid strokes only: mask and sketch strokes never fan out over arms.
+    function armTip(i) {
+        var a = window.multiArmColors, cfg = a && a[i];
+        if (!cfg || typeof window.sanitizeArmTip !== 'function') return null;
+        return window.sanitizeArmTip(cfg.tip);
     }
 
     // What the next dab prints: hx/hy = the footprint's half-extents in q,
@@ -299,14 +315,22 @@
         // Pressure lays no dye, and the tips are dye-only: its push is the
         // velocity pass's plain gaussian whatever tip is selected.
         if (!raster && armPushes(arm | 0)) return PUSH_SPEC;
+        // An arm with a tip of its own prints that in place of the brush's
+        // tip and shape (05g pinArmTip): a built-in tip number, or a shape,
+        // which prints Soft when this machine doesn't have it.
+        var own = raster ? null : armTip(arm | 0);
+        var tip = c.BRUSH_TIP | 0;
+        var url = activeShapeUrl();
+        if (typeof own === 'number') { tip = own; url = null; }
+        else if (typeof own === 'string') { url = shapeUrl(own); tip = 0; }
         // A custom shape overrides the tips on every route (splat() and
         // bindRasterStamp share its mapping, at the full radius).
-        var url = activeShapeUrl();
         if (url) {
-            var img = stampBitmap(url);
-            if (!img) return null;
+            var st = stampBitmap(url);
+            if (!st) return null;
+            var img = st.img;
             var asp = (img.naturalWidth || 1) / (img.naturalHeight || 1);
-            return { key: 'stamp|' + stampGen, img: img, neutral: raster && neutralRaster,
+            return { key: 'stamp|' + st.id, img: img, neutral: raster && neutralRaster,
                      hx: asp >= 1 ? 1.6 : 1.6 * asp, hy: asp >= 1 ? 1.6 / asp : 1.6 };
         }
         if (raster) {
@@ -320,7 +344,6 @@
                          return soft + (h - soft) * hard;
                      } };
         }
-        var tip = c.BRUSH_TIP | 0;
         if (tip >= 1 && tip <= 3) {
             // Blob / Chisel / Streak: Texture softens the rim, never the shape.
             var shape = tip - 1;

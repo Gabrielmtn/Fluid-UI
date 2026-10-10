@@ -314,6 +314,9 @@
             const _apMask = (typeof window.__armPushPin === 'number')
                 ? window.__armPushPin
                 : ((typeof window.armPushMask === 'function') ? window.armPushMask() : 0);
+            // Per-arm tips (05g), the same way: arm index -> tip, only the
+            // arms that override, through the pin. Omitted when none do.
+            const _atip = (typeof window.activeArmTips === 'function') ? window.activeArmTips() : null;
             // Store the EFFECTIVE painted size (splat-in ramp / pressure), not the
             // base — so stroke replay (local AND multiplayer 2.1) reproduces the
             // actual brush size. The paint path publishes it to __lastPaintRadius.
@@ -381,6 +384,9 @@
                 // whatever this says. Omitted entirely at 0 — the common case —
                 // so an ordinary dab is the same size on the wire as before.
                 ap: _apMask || undefined,
+                // Per-arm tips: the arms that print their own tip or shape.
+                // Copied, so a later change in the panel can't rewrite it.
+                atip: (_atip && Object.keys(_atip).length) ? Object.assign({}, _atip) : undefined,
                 // Per-stroke mirror (41-button-modes): 1 = across the vertical
                 // axis, 2 = horizontal, 3 = both. Recorded for the same reason
                 // `ap` is — a button bound to "mirror brushstroke" changes WHERE
@@ -409,7 +415,8 @@
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(), cw: ev.cw, ch: ev.ch,
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
-                     ap: ev.ap, mir: ev.mir, gf: ev.gf, rnd: ev.rnd, fm: ev.fm, ra: ev.ra };
+                     ap: ev.ap, atip: ev.atip ? Object.assign({}, ev.atip) : undefined,
+                     mir: ev.mir, gf: ev.gf, rnd: ev.rnd, fm: ev.fm, ra: ev.ra };
         }
         // Preserve Randomness: an event whose colour was rolled by random mode
         // carries rnd:1 (+ fm, the flow factor baked into its recorded colour).
@@ -566,6 +573,12 @@
                     for (var wi = 0; wi < eventsToReplay.length; wi++) {
                         var sid = eventsToReplay[wi].shape;
                         if (sid && !seen[sid]) { seen[sid] = 1; window.BrushShapes.warm(sid); }
+                        // ...and every shape an arm printed (per-arm tips).
+                        var wat = eventsToReplay[wi].atip;
+                        if (wat) for (var wk in wat) {
+                            var wsid = wat[wk];
+                            if (typeof wsid === 'string' && !seen[wsid]) { seen[wsid] = 1; window.BrushShapes.warm(wsid); }
+                        }
                     }
                 }
             } catch (_) {}
@@ -601,6 +614,9 @@
                     // ...and WHICH arms pushed, for a stroke whose brush was
                     // painting (bitmask, see pushStrokeEvent).
                     if (ev.ap) o.ap = ev.ap | 0;
+                    // ...and the arms that printed their own tip (06 publishes
+                    // the shapes it names before the events).
+                    if (ev.atip) o.atip = ev.atip;
                     // Where the stroke actually landed, not how it looked: a
                     // mirrored stroke replayed to the room without this comes
                     // out as half the mark the painter made. Sent only when
@@ -810,6 +826,11 @@
             var savedArmPush = window.__armPushPin;
             window.__armPushPin = (typeof ev.ap === 'number' && isFinite(ev.ap))
                 ? (ev.ap | 0) : 0;
+            // Per-arm tips, unconditionally too: no `atip` means every arm
+            // printed the brush's tip, so {} pins "none" over the live panel.
+            var savedArmTip = window.__armTipPin;
+            window.__armTipPin = ((typeof window.sanitizeArmTipMap === 'function')
+                ? window.sanitizeArmTipMap(ev.atip) : null) || {};
             // The stroke's own mirror (41-button-modes), pinned unconditionally
             // for exactly the reason the two above are: absence means "this
             // stroke was NOT mirrored", not "leave the live pin alone". Reading
@@ -908,6 +929,7 @@
                 config.BRUSH_VEL_MODE = savedVelMode;
                 config.BRUSH_VEL_STRENGTH = savedVelStr;
                 window.__armPushPin = savedArmPush;
+                window.__armTipPin = savedArmTip;
                 window.__strokeMirrorPin = savedStrokeMir;
                 window.__armColorPin = savedArmColorPin;
             }
@@ -1127,6 +1149,10 @@
                 push: (ev.push && typeof ev.push === 'object')
                     ? { m: ev.push.m, s: ev.push.s } : null,
                 ap: (typeof ev.ap === 'number' && isFinite(ev.ap)) ? (Math.abs(ev.ap) | 0) : undefined,
+                // Per-arm tips, cleaned here: a raw peer map never reaches
+                // config, only the tips 05g would accept from the panel.
+                atip: (typeof window.sanitizeArmTipMap === 'function')
+                    ? (window.sanitizeArmTipMap(ev.atip) || undefined) : undefined,
                 // Per-stroke mirror, same shape-check-only rule as `push`:
                 // emitReplayDab range-checks the value, and does it for local
                 // events too, so there is exactly one place that decides what

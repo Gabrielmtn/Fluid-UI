@@ -111,6 +111,20 @@ function brushWireFields() {
     if (cfg.SYM_FACE_CENTER) f.fc = 1;
     const rev = publishActiveShape();
     if (rev) { f.shape = cfg.BRUSH_SHAPE_ID; f.rev = rev; }
+    // Per-arm tips (05g): footprint, like `ap`, so the painter's. A shape
+    // rides only once its bitmap is published; one that can't be is left
+    // off and the peer's arm prints the brush's tip. Omitted when no arm
+    // overrides, so an older receiver sees the message it always did.
+    const _at = (typeof window.armTipMap === 'function') ? window.armTipMap() : null;
+    if (_at) {
+        let _out = null;
+        for (const k in _at) {
+            const t = _at[k];
+            if (typeof t === 'string' && !publishShape(t)) continue;
+            (_out || (_out = {}))[k] = t;
+        }
+        if (_out) f.atip = _out;
+    }
     return f;
 }
 
@@ -1370,7 +1384,13 @@ function handleRemoteSplat(data, from, to) {
                          window.config.BRUSH_VEL_MODE,
                          window.config.BRUSH_VEL_STRENGTH,
                          window.__armPushPin,
-                         window.__strokeMirrorPin];
+                         window.__strokeMirrorPin,
+                         window.__armTipPin];
+            // Per-arm tips: the sender's, cleaned (05g), and unconditional
+            // like the arm mask: no `atip` means the sender's arms all
+            // printed the brush's tip, never "use mine".
+            window.__armTipPin = ((typeof window.sanitizeArmTipMap === 'function')
+                ? window.sanitizeArmTipMap(_rd.atip) : null) || {};
             // Per-stroke mirror: unconditional and range-checked, exactly like
             // the arm mask beside it. Absence means "the sender did not mirror
             // this stroke", never "keep mine" — otherwise a peer's plain stroke
@@ -1583,6 +1603,7 @@ function handleRemoteSplat(data, from, to) {
                 window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
                 window.__armPushPin = _pushPrev[3];
                 window.__strokeMirrorPin = _pushPrev[4];
+                window.__armTipPin = _pushPrev[5];
             }
         }
     }
@@ -1626,6 +1647,13 @@ function broadcastReplayStroke(events) {
         if (typeof ev.shape === 'string' && ev.shape && shapeIds.indexOf(ev.shape) < 0) {
             shapeIds.push(ev.shape);
         }
+        // ...and every shape an arm printed with (per-arm tips, 05g).
+        if (ev.atip && typeof ev.atip === 'object') {
+            for (const k in ev.atip) {
+                const s = ev.atip[k];
+                if (typeof s === 'string' && s && shapeIds.indexOf(s) < 0) shapeIds.push(s);
+            }
+        }
     });
     const shapeRevs = {};
     shapeIds.forEach(id => { const r = publishShape(id); if (r) shapeRevs[id] = r; });
@@ -1652,6 +1680,16 @@ function broadcastReplayStroke(events) {
         if (ev.push) o.push = { m: ev.push.m, s: +(+ev.push.s || 1).toFixed(2) };
         // ...and WHICH arms pushed, for a stroke whose brush was painting.
         if (ev.ap) o.ap = ev.ap | 0;
+        // ...and the arms that printed their own tip. A shape that didn't
+        // publish is dropped, as `shape` is above: that arm prints the tip.
+        if (ev.atip && typeof ev.atip === 'object') {
+            let at = null;
+            for (const k in ev.atip) {
+                const t = ev.atip[k];
+                if (typeof t === 'number' || (typeof t === 'string' && shapeRevs[t])) (at || (at = {}))[k] = t;
+            }
+            if (at) o.atip = at;
+        }
         // Per-stroke mirror (41-button-modes) — where the stroke landed, not
         // how it looked. Dropping it here would send peers half the mark, the
         // same class of gap the footprint fields above close. The receiver's
