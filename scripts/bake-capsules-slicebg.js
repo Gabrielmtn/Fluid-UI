@@ -25,7 +25,7 @@
     var SRC   = 'steam/store-assets-slicebg/bg-slices-3840x1240.png';
     var DIR   = 'steam/store-assets-slicebg';
     var TITLE = 'Swirl Together';
-    var TAG   = 'A playful painting game for two or more';
+    var TAG   = 'A fluid sim sandbox for 1-8';
     var TITLE_LINES = TITLE.toUpperCase().split(' ');
 
     var fs = require('fs');
