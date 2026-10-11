@@ -47,7 +47,7 @@
     // to sit inside a centre 860x380 safe area that survives client resizing.
     var LIB   = 'steam/library-assets';
     var TITLE = 'Swirl Together';
-    var TAG   = 'A fluid sim sandbox for 1-8';
+    var TAG   = 'A fluid sim sandbox for one to eight';
     // Stacked form for the narrow slots. Derived here rather than hardcoded at
     // the draw sites so a rename lands in one place — this is the second one.
     var TITLE_LINES = TITLE.toUpperCase().split(' ');

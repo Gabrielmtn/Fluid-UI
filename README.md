@@ -1,6 +1,6 @@
 # Swirl Together
 
-A fluid sim sandbox for 1-8, with comprehensive controls and **real-time multiplayer** support via PartyKit.
+A fluid sim sandbox for one to eight, with comprehensive controls and **real-time multiplayer** support via PartyKit.
 
 ## Features
 
