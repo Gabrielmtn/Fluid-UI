@@ -31,9 +31,12 @@
 //     pixels), the flow model (Cap Colour decides how strong a dab is), how
 //     the brush walks its dabs, and the brush itself (size, tip, arms, how it
 //     picks colours) — and again whenever any of that changes while a phone
-//     is in the room. Colour is the computer's on purpose: a peer's dab is
-//     coloured by the RECEIVING canvas's arm settings (05g resolveArmColor),
-//     so a solid-colour brush here repaints whatever colour a phone chose.
+//     is in the room. Colour is the computer's on purpose: the phone takes
+//     this brush's colour mode, and its arm colours ride back on the phone's
+//     dabs (`ac`), so every canvas in the room paints a phone's stroke in
+//     this brush's colours. (Each receiving canvas's own arm colours used to
+//     paint it, 05g peerArmColor; a phone that predates `ac` still gets the
+//     stroke's own colour on every arm.)
 //     The relay never makes a phone the host (party/index.ts), so the host
 //     is a canvas whenever one is here.
 // ═══════════════════════════════════════════════════════════════════
@@ -214,6 +217,10 @@
         // Shape ids resolve here, in this canvas's own library.
         var atip = (typeof window.armTipMap === 'function') ? window.armTipMap() : null;
         if (atip) info.atip = atip;
+        // The colour each arm lays (06d armColorWire), echoed back the same
+        // way, so every canvas in the room paints a phone's stroke in this
+        // brush's arm colours rather than in its own.
+        if (typeof window.armColorWire === 'function') info.ac = window.armColorWire(mult);
         // Arms turn the tip with them unless Same angle is on (06d `at`).
         if (!cfg.SYM_SAME_ANGLE) info.at = 1;
         if (cfg.SYM_FACE_CENTER) info.fc = 1;

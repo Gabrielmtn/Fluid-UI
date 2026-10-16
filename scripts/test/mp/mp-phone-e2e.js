@@ -103,6 +103,7 @@ const KIT_A = String.raw`(function(){
   var q=window.enqueueRemoteSplat;
   window.enqueueRemoteSplat=function(d){
     try{ if(d&&window.PhonePads&&PhonePads.isPad(d.clientId)){ fromPad.msgs++; var ds=(d.data&&d.data.dabs)||[]; fromPad.dabs+=ds.length;
+      fromPad.ac=(d.data&&('ac' in d.data))?d.data.ac:'none';
       ds.forEach(function(x){ fromPad.maxV=Math.max(fromPad.maxV,Math.hypot(x[2],x[3])); if(fromPad.shares.length<5) fromPad.shares.push(x[5]); }); } }catch(_){}
     return q.apply(this,arguments);
   };
@@ -294,6 +295,11 @@ async function tap(b, sel) {
         const after = await a.eval('__e2e.dye()');
         const fp = await a.eval('__e2e.fromPad');
         check(fp.msgs >= 2 && fp.dabs >= 10, 'the computer receives the phone\'s dab trains', fp);
+        // Every canvas in the room paints a phone's stroke in the computer's
+        // arm colours, not its own: they ride pad-info and come back on the
+        // phone's dabs (06d armColorWire).
+        const hostArms = await a.eval('armColorWire(Math.round(animationMultiplier) || 1)');
+        check(JSON.stringify(fp.ac) === JSON.stringify(hostArms) && !!hostArms[0], 'the phone\'s dabs carry the computer\'s arm colours', { phone: fp.ac, computer: hostArms });
         check(after.mass > before.mass + 5, 'the phone stroke lands as dye on the computer', { before: +before.mass.toFixed(1), after: +after.mass.toFixed(1) });
         const label = await a.eval("(function(){var e=document.querySelector('.remote-cursor .remote-cursor-label'); return e ? e.textContent : null;})()");
         check(!!label && label.indexOf('📱') === 0, 'the phone\'s cursor is marked as a phone', label);

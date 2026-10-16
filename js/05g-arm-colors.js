@@ -10,7 +10,36 @@
         // mode: 'main' = use pointer color, 'fixed' = use .color hex, 'random', 'step'
         var multiArmColors = [];
         window.multiArmColors = multiArmColors;
+        // The colour arm `armIndex` lays for a dab handed `fallbackColor`.
+        // Returns fallbackColor ITSELF when the arm paints the handed colour
+        // and a new array when it paints one of its own (06d armColorWire
+        // tells the two apart by identity).
         function resolveArmColor(armIndex, fallbackColor) {
+            var peer = window.__peerArmColors;
+            if (peer) return peerArmColor(peer, armIndex, fallbackColor);
+            return ownArmColor(armIndex, fallbackColor);
+        }
+        // A peer's dab (06d handleRemoteSplat) or broadcast replay (05d
+        // processPeerReplays) wears the PAINTER's colours, never this
+        // viewer's. Every arm on this canvas used to resolve them, so once
+        // arm 1 here was on a picked colour ('fixed', which any pick sets),
+        // every peer's paint came out in it (2026-10-15, the trailer shoot).
+        // The pin:
+        //   arms  the painter's own map (06d armColorWire): an arm that laid
+        //         a colour of its own lays it here, every other arm the
+        //         dab's colour, so the dye matches the painter's canvas.
+        //   null  an older build or phone, which say nothing per arm: every
+        //         arm takes the dab's colour, laid as strongly as this canvas
+        //         lays that arm. A picked colour lands at full strength and a
+        //         handed one at the dab's share, so a picked arm takes `base`
+        //         (the unbaked colour): the dye such a message always left,
+        //         now in the sender's colour.
+        function peerArmColor(peer, armIndex, fallbackColor) {
+            if (peer.arms) return peer.arms[armIndex] || fallbackColor;
+            var own = ownArmColor(armIndex, fallbackColor);
+            return (own === fallbackColor) ? fallbackColor : (peer.base || fallbackColor);
+        }
+        function ownArmColor(armIndex, fallbackColor) {
             // Arm 0's color mode applies at EVERY multiplier (2026-07-13): the
             // brush-colors panel now renders arm 0 at 1x, and two-way sync with
             // the main #colorPicker keeps the solo brush coherent (the old
@@ -444,6 +473,9 @@
         // Per-arm colour pin, same idea for a replayed stroke's random arms
         // (arm index -> colour, see resolveArmColor). null = no pin.
         window.__armColorPin = null;
+        // A peer's colours, pinned while their paint lands ({arms, base},
+        // see peerArmColor). null = this canvas's own brush.
+        window.__peerArmColors = null;
 
         // ── Per-arm tip (2026-10-09) ─────────────────────────────────────
         // An arm can print its own tip while its siblings keep the brush's:
@@ -539,7 +571,8 @@
         // exactColor: programmatic splat sources (path layers, audio scenes,
         // animations) pass true so their configured color is deposited as-is on
         // every arm. Pointer strokes, stroke replay, and remote-peer strokes
-        // leave it false — they ARE user strokes, so arm color modes apply.
+        // leave it false — they ARE user strokes, so arm color modes apply
+        // (a peer's own, see peerArmColor).
         // withFootprint: paint this dab with the user's TIP/SHAPE even though its
         // colour is exact. Those are independent questions, and bundling both
         // under exactColor is what made recorded playback come out gaussian — a

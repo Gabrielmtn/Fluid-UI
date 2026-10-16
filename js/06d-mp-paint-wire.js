@@ -88,10 +88,10 @@ function brushWireFields() {
         f.pushS = +(+((typeof cfg.BRUSH_VEL_STRENGTH === 'number') ? cfg.BRUSH_VEL_STRENGTH : 1)).toFixed(2);
     }
     // Per-arm Pressure (bitmask, 05g): WHICH arms push is the painter's, not
-    // the viewer's. Arm colours are deliberately resolved locally, but this is
-    // not styling — it decides whether an arm deposits pigment at all, so
+    // the viewer's. It decides whether an arm deposits pigment at all, so
     // leaving it local meant a peer's plain stroke came out with holes wherever
-    // this client had an arm marked. Omitted at 0, like `push`.
+    // this client had an arm marked. Omitted at 0, like `push`. (Arm colours
+    // ride beside this as `ac`, see armColorWire.)
     var _ap = (typeof window.armPushMask === 'function') ? window.armPushMask() : 0;
     if (_ap) f.ap = _ap;
     // Per-stroke mirror (41-button-modes, 1=X 2=Y 3=both). Geometry, not
@@ -127,6 +127,50 @@ function brushWireFields() {
     }
     return f;
 }
+
+// The painter's arm colours (05g), as they stand: every arm of the first `n`
+// that lays a colour of its own rather than the dab's (a picked swatch, a
+// random or palette roll), arm index -> [r, g, b]. Arm colours used to be
+// left to each receiver, so every peer's stroke came out in the receiver's
+// picked colour (2026-10-15). Always sent, {} when every arm paints the
+// dab's colour: a message WITHOUT it is an older build's or a phone's, which
+// the receiver colours its own way (05g peerArmColor).
+function armColorWire(n) {
+    const out = {};
+    if (typeof resolveArmColor !== 'function') return out;
+    const probe = [0, 0, 0];
+    const m = Math.max(1, Math.min(30, n | 0));
+    for (let i = 0; i < m; i++) {
+        const c = resolveArmColor(i, probe);
+        if (c === probe || !Array.isArray(c) || c.length < 3) continue;
+        out[i] = [+(+c[0]).toFixed(4), +(+c[1]).toFixed(4), +(+c[2]).toFixed(4)];
+    }
+    return out;
+}
+window.armColorWire = armColorWire;
+// A map off the wire: legal arm indices and three finite channels survive,
+// each held to [0, 4] (the dab share's ceiling; a swatch is 0..1). null when
+// it is not a map at all, which reads as "this sender said nothing".
+function sanitizeArmColorMap(m) {
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return null;
+    const out = {};
+    for (const k in m) {
+        if (!Object.prototype.hasOwnProperty.call(m, k)) continue;
+        const i = parseInt(k, 10);
+        if (!(i >= 0 && i < 30) || String(i) !== k) continue;
+        const c = m[k];
+        if (!Array.isArray(c) || c.length < 3) continue;
+        const rgb = [];
+        for (let j = 0; j < 3; j++) {
+            const v = c[j];
+            if (typeof v !== 'number' || !isFinite(v)) break;
+            rgb.push(Math.max(0, Math.min(4, v)));
+        }
+        if (rgb.length === 3) out[i] = rgb;
+    }
+    return out;
+}
+window.sanitizeArmColorMap = sanitizeArmColorMap;
 
 // Reassembly of chunked shape definitions, keyed so two peers sending
 // different shapes — or the same shape at different revs — never interleave.
@@ -865,6 +909,7 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius, down) {
         // old receivers ignore it.
         data: Object.assign({ x, y, dx, dy, color, mult, radius: effRadius,
                 sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
+                ac: armColorWire(mult),
                 down: !!down }, brush),
         timestamp: now
     }));
@@ -891,6 +936,7 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius, down) {
 // is lost the way the old 33ms throttle lost them.
 var _dabQueue = [];
 var _dabQueueT0 = 0;     // Date.now() of the first dab in the pending batch
+var _dabQueueArms = null; // armColorWire as the batch's first dab was painted
 var _dabFlushAt = 0;
 var DAB_FLUSH_MS = 33;
 var DAB_MAX_PER_MSG = 96; // ~45 bytes/dab quantized — far under the 16KB relay cap
@@ -919,7 +965,13 @@ var DAB_PACE_JITTER_MS = 50;
 function queueDab(xNorm, yNorm, dxAbs, dyAbs, radius, share, k) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) return;
     var now = Date.now();
-    if (!_dabQueue.length) _dabQueueT0 = now;
+    if (!_dabQueue.length) {
+        _dabQueueT0 = now;
+        // Read now, while the colours this dab was just painted with stand:
+        // a press advances the last stroke's arm colours BEFORE it flushes
+        // that stroke's queued dabs (05d), and those must go out in theirs.
+        _dabQueueArms = armColorWire(currentArmMult());
+    }
     var s = (typeof share === 'number' && isFinite(share)) ? Math.max(0, Math.min(4, share)) : 1;
     var kk = (typeof k === 'number' && isFinite(k) && k > 0) ? Math.min(1, k) : 1;
     // Shares go in significant digits, not decimals: a fine stroke at low Time
@@ -984,6 +1036,8 @@ function flushDabs(color, mult, force) {
             radius: last[4] || undefined,
             // Painter's arm layout — see broadcastSplat's sym note.
             sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
+            // ...and the colours its arms laid (armColorWire).
+            ac: _dabQueueArms || armColorWire(mult || 1),
             dabs: dabs
         }, brush),
         timestamp: now
@@ -1385,12 +1439,17 @@ function handleRemoteSplat(data, from, to) {
                          window.config.BRUSH_VEL_STRENGTH,
                          window.__armPushPin,
                          window.__strokeMirrorPin,
-                         window.__armTipPin];
+                         window.__armTipPin,
+                         window.__peerArmColors];
             // Per-arm tips: the sender's, cleaned (05g), and unconditional
             // like the arm mask: no `atip` means the sender's arms all
             // printed the brush's tip, never "use mine".
             window.__armTipPin = ((typeof window.sanitizeArmTipMap === 'function')
                 ? window.sanitizeArmTipMap(_rd.atip) : null) || {};
+            // Arm colours: the sender's, never this canvas's (05g
+            // peerArmColor). Their map when they sent one; without it (an
+            // older build, a phone) every arm takes the message's colour.
+            window.__peerArmColors = { arms: sanitizeArmColorMap(_rd.ac), base: base || color };
             // Per-stroke mirror: unconditional and range-checked, exactly like
             // the arm mask beside it. Absence means "the sender did not mirror
             // this stroke", never "keep mine" — otherwise a peer's plain stroke
@@ -1604,6 +1663,7 @@ function handleRemoteSplat(data, from, to) {
                 window.__armPushPin = _pushPrev[3];
                 window.__strokeMirrorPin = _pushPrev[4];
                 window.__armTipPin = _pushPrev[5];
+                window.__peerArmColors = _pushPrev[6];
             }
         }
     }
@@ -1625,12 +1685,15 @@ const STROKE_CHUNK_MAX = 64;    // handleStrokeChunk refuses a longer train
 // the painter's own replay folds through right now, the same fields as the
 // live wire's (sym above, at/fc in brushWireFields); without it a peer folded
 // the arms through ITS mode. Speed paces each pass so a held loop takes as
-// long on the peer as here.
-function replayWireMeta() {
+// long on the peer as here. The arm colours are the ones the painter's own
+// replay lays now (it resolves them from the panel), for the most arms any
+// of its events paints with.
+function replayWireMeta(arms) {
     const cfg = window.config || {};
     const m = { sym: cfg.SYMMETRY_MODE || 'radial' };
     if (!cfg.SYM_SAME_ANGLE) m.at = 1;
     if (cfg.SYM_FACE_CENTER) m.fc = 1;
+    m.ac = armColorWire(arms);
     const sp = window.replaySpeed;
     if (typeof sp === 'number' && isFinite(sp) && sp > 0) m.speed = +sp.toFixed(3);
     return m;
@@ -1643,7 +1706,9 @@ function broadcastReplayStroke(events) {
     // them: a replay can span shapes the painter switched between, and the
     // one selected NOW may not be any of them.
     const shapeIds = [];
+    let arms = 1;   // the most arms any event paints with (replayWireMeta)
     (events || []).forEach(ev => {
+        if (ev.mult > arms) arms = Math.min(8, Math.round(ev.mult));
         if (typeof ev.shape === 'string' && ev.shape && shapeIds.indexOf(ev.shape) < 0) {
             shapeIds.push(ev.shape);
         }
@@ -1710,7 +1775,7 @@ function broadcastReplayStroke(events) {
         if (ev.head) o.head = 1;
         return o;
     });
-    const meta = replayWireMeta();
+    const meta = replayWireMeta(arms);
     if (window.__roomTrace) window.__roomTrace.note('sent', 'replay', null, q);   // 61 room report
     const chunks = [];
     let cur = [], bytes = 0;
@@ -1758,7 +1823,7 @@ function handleStrokeChunk(data) {
         buf.received++;
     }
     // Every chunk carries the painter's layout and speed (replayWireMeta).
-    if (typeof d.sym === 'string') buf.meta = { sym: d.sym, at: d.at, fc: d.fc, speed: d.speed };
+    if (typeof d.sym === 'string') buf.meta = { sym: d.sym, at: d.at, fc: d.fc, speed: d.speed, ac: d.ac };
     if (buf.received === buf.total) {
         strokeChunkBuffers.delete(key);
         const all = [].concat.apply([], buf.chunks);

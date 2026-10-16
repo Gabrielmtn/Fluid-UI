@@ -421,6 +421,24 @@
         return out;
     }
 
+    // The host's arm colours (js/06d armColorWire): arm index -> [r, g, b]
+    // for each arm that lays a colour of its own. Passed back on every dab
+    // like the tips, so the room paints this phone's stroke in the host's
+    // colours. {} is an answer (every arm takes the stroke's colour); null
+    // means the host never said, and the phone sends nothing.
+    function armColors(m) {
+        if (!m || typeof m !== 'object' || Array.isArray(m)) return null;
+        var out = {};
+        for (var k in m) {
+            if (!Object.prototype.hasOwnProperty.call(m, k) || !/^[0-7]$/.test(k)) continue;
+            var c = m[k];
+            if (!Array.isArray(c) || c.length < 3) continue;
+            var rgb = [num(c[0], 0, 4, NaN), num(c[1], 0, 4, NaN), num(c[2], 0, 4, NaN)];
+            if (rgb.every(isFinite)) out[k] = rgb;
+        }
+        return out;
+    }
+
     // What the host's canvas is and how it paints (js/54-phone-pads.js).
     // Untrusted like any peer message, so every field is bounded here.
     function applyInfo(p) {
@@ -439,6 +457,7 @@
             pushS: num(p.pushS, 0, 5, 1),
             ap: (typeof p.ap === 'number' && isFinite(p.ap)) ? (Math.abs(p.ap) | 0) & 0xff : 0,
             atip: armTips(p.atip),
+            ac: armColors(p.ac),
             at: p.at === 1 ? 1 : 0,
             fc: p.fc === 1 ? 1 : 0,
             colors: (Array.isArray(p.colors) ? p.colors : [])
@@ -608,6 +627,8 @@
         if (i && i.push) { f.push = i.push; f.pushS = i.pushS; }
         if (i && i.ap) f.ap = i.ap;
         if (i && i.atip) f.atip = i.atip;
+        // ...and the colour each arm lays (06d armColorWire `ac`).
+        if (i && i.ac) f.ac = i.ac;
         // Multi-Brush arms turn the tip with them (06d brushWireFields `at`).
         if (i && i.at) f.at = 1;
         // ...and keeps its pose relative to the center (`fc`).

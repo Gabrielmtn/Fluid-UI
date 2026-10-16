@@ -1091,7 +1091,9 @@
         //   meta (newer senders): sym/at/fc = the painter's Multi-Brush layout
         //   (their own replay folds through it, so peers fold the same way —
         //   the receiver's own mode used to fold it), speed = their Replay
-        //   Speed, so each pass takes as long here as there.
+        //   Speed, so each pass takes as long here as there, arms = the
+        //   colours their arms lay (06d armColorWire; the receiver's own arm
+        //   colours used to paint it).
         var peerReplays = new Map();   // clientId -> { events, head, meta }
         function processPeerReplays() {
             if (!peerReplays.size) return;
@@ -1104,6 +1106,11 @@
                     cfg.SYM_SAME_ANGLE = m.at !== 1;
                     cfg.SYM_FACE_CENTER = m.fc === 1;
                 }
+                // The painter's arm colours (05g peerArmColor), when they
+                // sent them. An older peer's replay keeps colouring through
+                // this canvas's arms, as it always has.
+                var savedArmCols = window.__peerArmColors;
+                if (m && m.arms) window.__peerArmColors = { arms: m.arms, base: null };
                 try {
                     var speed = (m && m.speed) ? m.speed
                         : ((typeof window.replaySpeed === 'number' && window.replaySpeed > 0) ? window.replaySpeed : 1);
@@ -1111,6 +1118,7 @@
                 } catch (err) {
                     peerReplays.delete(id);
                 } finally {
+                    window.__peerArmColors = savedArmCols;
                     if (saved) {
                         cfg.SYMMETRY_MODE = saved.sym;
                         cfg.SYM_SAME_ANGLE = saved.same;
@@ -1129,10 +1137,12 @@
                     sym = window.ParamRegistry.coerceSelect('symmetryMode', sym) || 'radial';
                 }
             } catch (_) { sym = 'radial'; }
-            var out = { sym: sym, at: meta.at === 1 ? 1 : 0, fc: meta.fc === 1 ? 1 : 0, speed: 0 };
+            var out = { sym: sym, at: meta.at === 1 ? 1 : 0, fc: meta.fc === 1 ? 1 : 0, speed: 0, arms: null };
             if (typeof meta.speed === 'number' && isFinite(meta.speed) && meta.speed > 0) {
                 out.speed = Math.max(0.05, Math.min(8, meta.speed));
             }
+            // The painter's arm colours, cleaned (06d). null = not sent.
+            if (typeof window.sanitizeArmColorMap === 'function') out.arms = window.sanitizeArmColorMap(meta.ac);
             return out;
         }
         window.__peerReplayCount = function () { return peerReplays.size; };
