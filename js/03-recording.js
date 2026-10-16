@@ -1,103 +1,16 @@
-        function recScheduleRender() {
-            if (recRenderQueued) return;
-            recRenderQueued = true;
-            requestAnimationFrame(() => {
-                recRenderQueued = false;
-                recRenderUI();
-            });
-        }
-
-        // Throttled timeline UI refresh — limits expensive canvas redraws
-        // PERF: During recording, only update heads (cheap). Full redraw on stop.
-        let _recRefreshQueued = false;
-        let _recRefreshLastTime = 0;
-        const _recRefreshInterval = 200; // ms between timeline redraws (was 100)
-        const _recRefreshIntervalRecording = 500; // slower during recording to reduce lag
-        function recThrottledRefreshUI() {
-            if (_recRefreshQueued) return;
-            const now = performance.now();
-            const a = recGetActiveLayer();
-            const isRecording = a && a.timeline.isRecording;
-            const interval = isRecording ? _recRefreshIntervalRecording : _recRefreshInterval;
-            const elapsed = now - _recRefreshLastTime;
-            if (elapsed >= interval) {
-                _recRefreshLastTime = now;
-                // PERF: During recording, only update playhead position (very cheap)
-                if (isRecording) {
-                    recUpdateHeadsUI();
-                } else {
-                    recRefreshTimelinesUI();
-                }
-            } else {
-                _recRefreshQueued = true;
-                setTimeout(() => {
-                    _recRefreshQueued = false;
-                    _recRefreshLastTime = performance.now();
-                    const aInner = recGetActiveLayer();
-                    if (aInner && aInner.timeline.isRecording) {
-                        recUpdateHeadsUI();
-                    } else {
-                        recRefreshTimelinesUI();
-                    }
-                }, interval - elapsed);
-            }
-        }
-        
-        function recParseTime(str) {
-            if (str === undefined || str === null) return 10000;
-            let s = String(str).trim();
-            if (s.endsWith('.')) s = s.slice(0, -1);
-            // Accept mm:ss:ms with flexible seconds and ms digits (e.g., 00:3:000)
-            const parts = s.split(':');
-            if (parts.length === 3 && parts.every(p => /^\d+$/.test(p))) {
-                const mm = parseInt(parts[0], 10) || 0;
-                const ss = parseInt(parts[1], 10) || 0;
-                let ms = parseInt(parts[2], 10) || 0;
-                ms = Math.max(0, Math.min(999, ms));
-                return (mm * 60 + ss) * 1000 + ms;
-            }
-            if (/^\d+(\.\d+)?$/.test(s)) {
-                // seconds as float
-                return Math.round(parseFloat(s) * 1000);
-            }
-            return 10000;
-        }
-
-        function recFormatTime(ms) {
-            ms = Math.max(0, Math.floor(ms || 0));
-            const totalSec = Math.floor(ms / 1000);
-            const mm = Math.floor(totalSec / 60).toString().padStart(2, '0');
-            const ss = (totalSec % 60).toString().padStart(2, '0');
-            const mms = (ms % 1000).toString().padStart(3, '0');
-            return `${mm}:${ss}:${mms}`;
-        }
-        
         function recGetActiveLayer() {
             return recLayers.find(l => l.id === recActiveLayerId);
         }
 
-        // A recorded pass is a "part" on screen (image and path layers keep
-        // "layer"). Names stored before the rename read "Layer 3"; they show
-        // as "Part 3" and stay as they are on disk.
-        function recPartLabel(name) {
-            const s = (typeof name === 'string') ? name : '';
-            return /^Layer \d+$/.test(s) ? 'Part ' + s.slice(6) : s;
-        }
-        
         function recSetActiveLayer(id) {
             recActiveLayerId = id;
             recRenderUI();
         }
         // The bench: the parts in the recorder right now. After a take ends
-        // with the editor closed, the strip asks Keep · Discard (2026-10-04;
-        // no auto-keep, the ~20-animation localStorage budget would fill).
+        // the strip asks Keep · Discard (2026-10-04; no auto-keep, the
+        // ~20-animation localStorage budget would fill).
         //   recPendingTake  { id } of the part that take went into, while asking
-        //   recOpenedFrom   the saved animation the bench was opened from, or null:
-        //                   Save writes back to it, Keep updates it
-        //   recWorkDirty    the bench holds strokes nobody kept or saved yet
         let recPendingTake = null;
-        let recOpenedFrom = null;
-        let recWorkDirty = false;
         // Countdown state for recording
         let recCountdownActive = false;
         let recCountdownVal = 0;
@@ -125,6 +38,32 @@
                 ? window.__simTimeMs : Date.now();
         }
 
+        // ...but the LENGTH of a take is a stopwatch (2026-10-13). The chip
+        // says "8 s" and the painter counts real seconds; capped on the sim
+        // clock, an 8 s take ran 16.7 s at Time 0.5 and 9 s at ~55 fps,
+        // where the sim's 16 ms step clamp falls behind the wall. The dabs
+        // keep their sim-clock stamps, so playback still lands each one at
+        // the simulated instant it was painted.
+        function recTakeElapsedWall(a) {
+            return (a && typeof a.timeline.takeStartWall === 'number')
+                ? performance.now() - a.timeline.takeStartWall : 0;
+        }
+        function recTakeCapMs(a) {
+            return (a && typeof a.timeline.takeCapMs === 'number' && a.timeline.takeCapMs > 0)
+                ? a.timeline.takeCapMs : recPartCapMs(a);
+        }
+
+        // A part's timeline is in sim ms; simRate is how many of them one
+        // real ms carried while it was recorded (Time, and the step clamp
+        // on a slow frame). Lengths and the clock read in real seconds as
+        // recorded, so an 8 s take says 0:08 whatever Time it was made at.
+        // Parts from before this have none and read as they always did.
+        function recPartRate(l) {
+            const r = l && l.simRate;
+            return (typeof r === 'number' && isFinite(r) && r > 0) ? r : 1;
+        }
+        function recShowMs(l, ms) { return (ms || 0) / recPartRate(l); }
+
         function recStartRecording() {
             if (recPendingTake) { recStripSay('Keep or discard what you painted first.'); return; }
             let a = recGetActiveLayer();
@@ -141,6 +80,13 @@
             a.timeline.recClock = ((window.config && window.config.REC_SIM_CLOCK === false)
                 || typeof window.__simTimeMs !== 'number') ? 'wall' : 'sim';
             a.timeline.recordingStartTime = recClockNow(a) - a.timeline.playbackPosition;
+            a.timeline.takeStartSim = recClockNow(a);
+            a.timeline.takeStartWall = performance.now();
+            a.timeline.takeCapMs = recPartCapMs(a);
+            // What the part read before the take, for a take that adds
+            // nothing or is discarded (recStopRecording overwrites both).
+            a._takeLoopPrev = a.loopMaxMs;
+            a._takeRatePrev = a.simRate;
             a.timeline.duration = recMaxDurationMs;
             // Capture the brush's color mode at record start so 'Preserve Mode'
             // can reproduce it on replay (random keeps being random, etc.)
@@ -148,24 +94,31 @@
             a.recordMode = (_arm0 && _arm0.mode) ? _arm0.mode : 'main';
             a.recordStepPalette = (a.recordMode === 'step' && typeof getStepColorList === 'function')
                 ? getStepColorList().slice() : null;
+            // Everything on the canvas (the strip's Everything): every dab
+            // comes in through the paint funnel instead (recTapDab), other
+            // people's included, so the colours are theirs and as painted:
+            // none of them is re-rolled from this brush's random mode.
+            a.timeline.src = (recRecordSource === 'all') ? 'all' : 'single';
+            if (a.timeline.src === 'all') {
+                a.recordMode = 'all';
+                a.recordStepPalette = null;
+                recTapPart = a;
+                window.__recTap = recTapDab;
+            }
             a._repKey = null;
             if (a.timeline.isPlaying) a.timeline.isPlaying = false;
             recUpdateButtonStates(); // PERF: lightweight - no DOM rebuild during recording
             
-            // Schedule auto-stop at max duration
+            // Auto-stop at the take's length, on the wall clock.
+            // recUpdatePlayback checks the same stopwatch every frame; this
+            // timer ends the take on time while no frames come at all (the
+            // window hidden or minimised).
             recClearAutoStopTimer();
-            const layerMaxMs = (typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0) ? a.loopMaxMs : recMaxDurationMs;
-            const remaining = layerMaxMs - a.timeline.playbackPosition;
-            // A sim-clock take is stopped by recUpdatePlayback when its own
-            // clock reaches the end: below Time 1 the wall clock gets there
-            // first and would cut the take short.
-            if (remaining > 0 && a.timeline.recClock !== 'sim') {
+            const remaining = a.timeline.takeCapMs;
+            if (remaining > 0) {
                 _recAutoStopTimerId = setTimeout(function() {
                     _recAutoStopTimerId = null;
-                    const current = recGetActiveLayer();
-                    if (current && current.timeline.isRecording) {
-                        recStopRecording();
-                    }
+                    if (recLayers.some(l => l.timeline.isRecording)) recStopRecording();
                 }, remaining);
             }
         }
@@ -179,38 +132,52 @@
 
         function recStopRecording() {
             recClearAutoStopTimer(); // Clear any pending auto-stop
-            const a = recGetActiveLayer();
+            window.__recTap = null;
+            recTapPart = null;
+            // The part that is recording, even when another was selected
+            // since the take began: it would otherwise record on unstopped.
+            const a = recLayers.find(l => l.timeline.isRecording) || recGetActiveLayer();
             if (!a) return;
             let ended = false;
             if (a.timeline.isRecording) {
                 a.timeline.isRecording = false;
-                a.timeline.duration = 0;
-                a.timeline.interactions.forEach(i => { a.timeline.duration = Math.max(a.timeline.duration, i.timestamp); });
+                const last = recComputeDurationFromInteractions(a.timeline.interactions);
+                if (a.timeline.interactions.length > (a._takeFrom | 0)) {
+                    // The take is as long as it ran, not as far as its last
+                    // dab: an 8 s take loops every 8 s with its quiet end
+                    // kept, so parts made at one length stay in step. It used
+                    // to loop at the last dab, 1.4 s into an 8 s take.
+                    let span = recClockNow(a) - a.timeline.recordingStartTime;
+                    const simSpan = recClockNow(a) - (a.timeline.takeStartSim || 0);
+                    const wallSpan = recTakeElapsedWall(a);
+                    const cap = recTakeCapMs(a);
+                    if (wallSpan >= 100 && simSpan > 0) {
+                        a.simRate = Math.max(0.02, Math.min(50, simSpan / wallSpan));
+                        // Ran to its length: the frame that noticed is up to
+                        // one late, so the loop is trimmed to the length on
+                        // the chip, in this take's own sim time.
+                        if (wallSpan >= cap) span = Math.min(span, cap * a.simRate + (span - simSpan));
+                    }
+                    a.timeline.duration = Math.max(last, span);
+                    a.loopMaxMs = Math.max(1, a.timeline.duration);
+                } else {
+                    a.timeline.duration = last;
+                }
                 ended = true;
             }
-            // PERF: Full UI refresh now that recording stopped
             recRenderUI();
-            recRefreshTimelinesUI(); // Redraw timelines with all interactions
             if (ended) recTakeEnded(a);
         }
 
         // ── Keep · Discard ───────────────────────────────────────────────
         // Every way a take ends comes through recStopRecording: Stop, F9,
-        // Esc, the length running out. With the editor open the take is just
-        // a new part (Save keeps it); with it closed the strip asks.
+        // Esc, the length running out. Then the strip asks.
         function recTakeEnded(a) {
             const added = a.timeline.interactions.length - (a._takeFrom | 0);
             if (added <= 0) {
                 // Nothing painted: the part made for this take goes again.
                 if (a._takeNewPart && recLayers.length > 1) recRemovePart(a.id);
                 recStripSay('Nothing was painted, so there is nothing to keep.');
-                return;
-            }
-            recWorkDirty = true;
-            if (recEditorOpen()) {
-                const msg = recPartLabel(a.name) + ' recorded. Save keeps it.';
-                recSetStatus(msg);
-                recStripSay(msg);
                 return;
             }
             recPendingTake = { id: a.id };
@@ -230,31 +197,30 @@
         }
 
         // Keep: the bench becomes an animation in the library and the first
-        // empty slot ("Animation N", the lowest free N), or, when the bench
-        // was opened from an animation, that animation is updated. Then the
-        // bench is cleared for the next take. A full store keeps the question
-        // open, so nothing is lost.
+        // empty slot ("Animation N", the lowest free N). Then the bench is
+        // cleared for the next take. A full store keeps the question open,
+        // so nothing is lost.
         function recKeepTake() {
             if (!recPendingTake) return false;
             recStopPlayback();
-            const into = (recOpenedFrom && recIsStoredAnimation(recOpenedFrom)) ? recOpenedFrom : null;
-            const name = into || recAutoName();
-            const res = recSaveAllLayersAsPreset(name, !!into);
+            const name = recAutoName();
+            const res = recSaveAllLayersAsPreset(name);
             if (res === 'full') {
-                recStripSay("Couldn't keep it: storage is full. Delete an old animation and try again.");
-                recShowTakePrompt("Couldn't keep it: storage is full.");
+                // Said once, where the painter is looking. The question
+                // stays open with it, so nothing is lost.
+                const full = "Can't save. Storage is full. Delete an old animation and try again.";
+                if (recStripOnScreen()) recStripSay(full);
+                else recShowTakePrompt(full);
                 return false;
             }
             if (res !== true) { recStripSay(res === 'empty' ? 'Nothing recorded yet.' : "Couldn't keep it."); return false; }
             const askedOnCanvas = recPromptShown();
             recPendingTake = null;
             recLibraryChanged();
-            if (into) recRestartIfPlaying(name);
-            const slot = (!into && window.animSlots && typeof window.animSlots.assignFirstEmpty === 'function')
+            const slot = (window.animSlots && typeof window.animSlots.assignFirstEmpty === 'function')
                 ? window.animSlots.assignFirstEmpty(name) : -1;
             recClearBench();
-            const msg = into ? `Kept in ${name}.`
-                : (slot >= 0 ? `Kept as ${name}, in slot ${slot + 1}.` : `Kept as ${name}. The slots are full: drag it in from Saved Animations.`);
+            const msg = slot >= 0 ? `Kept as ${name}, in slot ${slot + 1}.` : `Kept as ${name}. The slots are full: drag it in from Saved Animations.`;
             recStripSay(msg);
             if (askedOnCanvas) recShowTakePrompt(msg, true);
             return name;
@@ -275,9 +241,10 @@
                     a.timeline.interactions.length = Math.min(a.timeline.interactions.length, a._takeFrom | 0);
                     a.timeline.duration = recComputeDurationFromInteractions(a.timeline.interactions);
                     a.timeline.playbackPosition = 0;
+                    a.loopMaxMs = a._takeLoopPrev;
+                    a.simRate = a._takeRatePrev;
                 }
             }
-            if (!recLayers.some(l => l.timeline.interactions.length > 0)) recWorkDirty = false;
             recRenderUI();
             recStripSay('Discarded.');
             return true;
@@ -286,6 +253,8 @@
         // One empty part, nothing opened, nothing to keep.
         function recClearBench() {
             recLayers.forEach(l => { l.timeline.isPlaying = false; l.timeline.isRecording = false; });
+            window.__recTap = null;
+            recTapPart = null;
             recIsPlayingAll = false;
             recLayers = [];
             recNextLayerId = 1;
@@ -295,13 +264,10 @@
         }
 
         // Nothing on the bench waits to be kept: it was just kept, cleared,
-        // opened from an animation, or replaced by a project or a file.
+        // or replaced by a project.
         function recForgetBench() {
             recPendingTake = null;
-            recOpenedFrom = null;
-            recWorkDirty = false;
             recHideTakePrompt();
-            recSyncNameField(true);
             recUpdateButtonStates();
         }
 
@@ -350,7 +316,7 @@
                 p.dataset.group = 'expressive';
                 p.innerHTML = '<span class="rec-take-ask"></span>' +
                     '<button type="button" id="recTakeKeepBtn" class="btn--emphasis" title="Save it as an animation, in the first empty slot">Keep</button>' +
-                    '<button type="button" id="recTakeDiscardBtn" class="btn--destructive" title="Throw away what you just recorded">Discard</button>';
+                    '<button type="button" id="recTakeDiscardBtn" class="btn--destructive" title="Discard the previous recording">Discard</button>';
                 // Its presses are for its buttons, never a stroke on the canvas
                 ['pointerdown', 'mousedown', 'touchstart'].forEach(t => p.addEventListener(t, e => e.stopPropagation()));
                 p.querySelector('#recTakeKeepBtn').addEventListener('click', e => { e.stopPropagation(); recKeepTake(); });
@@ -427,100 +393,6 @@
         
         function recAddLayer() { recCreateLayer(); }
 
-        // An edit to the parts after they were opened or saved: Save has
-        // something to keep again, and opening another animation asks first.
-        function recMarkEdited() {
-            if (recLayers.some(l => l.timeline.interactions.length > 0)) recWorkDirty = true;
-        }
-
-        // The ⋯ menu's Duplicate: the copy goes right under its part.
-        function recDuplicatePart(id) {
-            const a = recLayers.find(l => l.id === id);
-            if (!a) return;
-            const nl = recCreateLayer(recPartLabel(a.name) + ' copy');
-            nl.timeline.interactions = JSON.parse(JSON.stringify(a.timeline.interactions));
-            nl.timeline.duration = a.timeline.duration;
-            nl.isLooping = a.isLooping;
-            nl.loopMaxMs = a.loopMaxMs;
-            nl.colorMode = a.colorMode || 'original';
-            nl.recordMode = a.recordMode || 'main';
-            nl.recordStepPalette = a.recordStepPalette ? a.recordStepPalette.slice() : null;
-            // Mask data rides along unseen (the part cards lost their mask
-            // buttons; files and projects still carry it)
-            if (a.mask) {
-                nl.mask = JSON.parse(JSON.stringify(a.mask));
-            }
-            const at = recLayers.indexOf(a);
-            recLayers.splice(recLayers.indexOf(nl), 1);
-            recLayers.splice(at + 1, 0, nl);
-            recMarkEdited();
-            recRenderUI();
-        }
-
-        // Clear and Delete from a part's ⋯ ask first, like 05n's Delete key:
-        // parts have no undo. The last part stays (Clear empties it).
-        function recAskClearPart(id) {
-            const l = recLayers.find(x => x.id === id);
-            if (!l || !l.timeline.interactions.length) return;
-            const go = () => { recActiveLayerId = id; recClearActive(); };
-            if (typeof window.appConfirm !== 'function') { go(); return; }
-            window.appConfirm({
-                title: 'Clear this part?',
-                message: (recPartLabel(l.name) || 'It') + ' loses everything recorded in it. This can\'t be undone.',
-                confirmLabel: 'Clear part'
-            }).then(ok => { if (ok) go(); });
-        }
-
-        function recAskDeletePart(id) {
-            const l = recLayers.find(x => x.id === id);
-            if (!l || recLayers.length <= 1) return;
-            const label = recPartLabel(l.name) || 'This part';
-            const go = () => {
-                if (!recLayers.some(x => x.id === id) || recLayers.length <= 1) return;
-                recRemovePart(id);
-                recMarkEdited();
-                if (!recLayers.some(x => x.timeline.interactions.length > 0)) recWorkDirty = false;
-                recSetStatus(label + ' deleted');
-            };
-            if (typeof window.appConfirm !== 'function') { go(); return; }
-            window.appConfirm({
-                title: 'Delete this part?',
-                message: l.timeline.interactions.length
-                    ? label + ' and everything recorded in it go. This can\'t be undone.'
-                    : label + ' is empty, so nothing recorded is lost.',
-                confirmLabel: 'Delete part'
-            }).then(ok => { if (ok) go(); });
-        }
-        
-        function recToggleLayerVisibility(id) {
-            const l = recLayers.find(x => x.id === id);
-            if (!l) return;
-            l.visible = !l.visible;
-            recRenderUI();
-        }
-        
-        function recToggleLayerLoop(id) {
-            const l = recLayers.find(x => x.id === id);
-            if (!l) return;
-            l.isLooping = !l.isLooping;
-            recRenderUI();
-        }
-        
-        function recToggleLayerPlayback(id) {
-            const l = recLayers.find(x => x.id === id);
-            if (!l) return;
-            if (l.timeline.isPlaying) {
-                l.timeline.isPlaying = false;
-            } else {
-                if (l.timeline.interactions.length === 0) return;
-                const eff = recGetEffectiveDuration(l);
-                if (l.timeline.playbackPosition >= eff) l.timeline.playbackPosition = 0;
-                l.timeline.isPlaying = true;
-                recLastPlaybackTime = Date.now();
-            }
-            recRenderUI();
-        }
-        
         function recToggleRecord() {
             // Clicking during countdown cancels it
             if (recCountdownActive) { recCancelCountdown(); return; }
@@ -543,12 +415,15 @@
             if (!recEnabled) return;
             const a = recGetActiveLayer();
             if (!a || !a.timeline.isRecording) return;
-            const timestamp = recClockNow(a) - a.timeline.recordingStartTime;
-            const layerMaxMs = (typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0) ? a.loopMaxMs : recMaxDurationMs;
-            if (timestamp > layerMaxMs) {
+            // An Everything take hears every dab at the paint funnel
+            // (recTapDab), these pointer samples included: taking them here
+            // too would paint the stroke twice.
+            if (a.timeline.src === 'all') return;
+            if (recTakeElapsedWall(a) > recTakeCapMs(a)) {
                 recStopRecording();
                 return;
             }
+            const timestamp = recClockNow(a) - a.timeline.recordingStartTime;
             const mult = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
             // Capture the EFFECTIVE brush size actually painted, not just the
             // base SPLAT_RADIUS: the brush engine tapers each dab by the
@@ -624,28 +499,179 @@
                     interaction.fm = Math.round(fmPin * 1000) / 1000;
                 }
             }
-            a.timeline.interactions.push(interaction);
+            // In the units a kept take is packed to, so Keep changes nothing
+            a.timeline.interactions.push(recQuantizeDab(interaction));
             // PERF: During recording, skip ALL UI updates - just record data
             // Timeline visualization updates when recording stops
         }
-        
-        function recTogglePlayback() {
-            const a = recGetActiveLayer();
-            if (!a) return;
-            if (a.timeline.isPlaying) {
-                a.timeline.isPlaying = false;
-            } else {
-                if (a.timeline.interactions.length === 0) return;
-                recLayers.forEach(l => { if (l.id !== a.id) l.timeline.isPlaying = false; });
-                const eff = recGetEffectiveDuration(a);
-                if (a.timeline.playbackPosition >= eff) a.timeline.playbackPosition = 0;
-                a.timeline.isPlaying = true;
-                recIsPlayingAll = false;
-                recLastPlaybackTime = Date.now();
+
+        // ── Everything on the canvas (2026-10-13) ───────────────────────
+        // A Just-me take records this brush's pointer (above). An Everything
+        // take records at the paint funnel instead: 05g's multiSplat hands
+        // this every dab it lays — this brush and its replays, other
+        // people's strokes in the room, slot animations, text — with what
+        // decided the dab already resolved there: each arm's colour, the arm
+        // mask, tips and mirror after their pins, the pose, the rake heading.
+        // Stored with all of it, a dab plays back the same (recEmitTapDab)
+        // whoever painted it and whatever this brush is set to by then.
+        // An Everything take holds every dab, far more than a Just-me take's
+        // pointer samples, so numbers are rounded to what the canvas can
+        // show and a field at its usual value is left out.
+        let recTapPart = null;
+        function recRound(v, k) { return Math.round(v * k) / k; }
+        // `direct`: heard in splat() (05i), from a source that skips
+        // multiSplat, so one plain dab with no arms and no layout.
+        function recTapDab(x, y, dx, dy, color, exact, footprint, armPush, armTips, mir, faceTurn, rake, arms, direct) {
+            const a = recTapPart;
+            // A file or project replacing the bench mid-take leaves the part
+            // behind still marked recording
+            if (!a || !a.timeline.isRecording || !recEnabled || recLayers.indexOf(a) < 0) return;
+            // The recorder's own parts playing along are on the bench already
+            if (window.__recBenchPlaying) return;
+            if (recTakeElapsedWall(a) > recTakeCapMs(a)) return;   // the frame's check stops the take
+            const cfg = window.config || {};
+            const W = canvas.width || 1, H = canvas.height || 1;
+            const d = {
+                timestamp: recRound(recClockNow(a) - a.timeline.recordingStartTime, 100),
+                x: recRound(x / W, 1e5), y: recRound(y / H, 1e5),
+                vx: recRound(dx, 100), vy: recRound(dy, 100),
+                color: [recRound(color[0], 1e4), recRound(color[1], 1e4), recRound(color[2], 1e4)],
+                // The arm count and size this call painted with: applyMultiSplatWith
+                // has them in place, so a peer's or a replay's own, not the panel's.
+                mult: (!direct && typeof animationMultiplier === 'number') ? Math.max(1, Math.round(animationMultiplier)) : 1,
+                radius: +(+cfg.SPLAT_RADIUS || 0).toPrecision(4),
+                tap: 1
+            };
+            if (exact) d.ex = 1;
+            if (footprint) d.wf = 1;
+            if (window.__remoteStroke) d.rs = 1;
+            if (typeof isProcessingRemoteEvent !== 'undefined' && isProcessingRemoteEvent) d.pr = 1;
+            // The footprint only counts on a dab splat() treats as a brush
+            // stroke (its __brushTipOn gate); a programmatic source prints
+            // gaussian whatever the panel says.
+            if (!exact || footprint) {
+                const tip = cfg.BRUSH_TIP | 0;
+                if (tip) d.tip = tip;
+                // The shape printed only when the stamp was not held off: a
+                // peer's stroke whose stamp never arrived paints with
+                // __remoteStroke over whatever shape this canvas has selected.
+                if (cfg.BRUSH_SHAPE_ID && !window.__remoteStroke) d.shape = cfg.BRUSH_SHAPE_ID;
+                if ((tip || d.shape) && typeof cfg.BRUSH_TIP_TEXTURE === 'number' && cfg.BRUSH_TIP_TEXTURE !== 1) {
+                    d.tx = recRound(cfg.BRUSH_TIP_TEXTURE, 1000);
+                }
+                if (cfg.BRUSH_VELOCITY_ONLY) {
+                    d.push = {
+                        m: cfg.BRUSH_VEL_MODE || 'smudge',
+                        s: (typeof cfg.BRUSH_VEL_STRENGTH === 'number') ? cfg.BRUSH_VEL_STRENGTH : 1
+                    };
+                }
+                if (armPush) d.ap = armPush | 0;
+                if (armTips && Object.keys(armTips).length) d.atip = Object.assign({}, armTips);
+                if (mir) d.mir = mir | 0;
+                if (faceTurn) d.ft = recRound(faceTurn, 1e4);
+                if (cfg.SYM_SAME_ANGLE) d.sa = 1;
             }
-            recUpdateButtonStates(); // PERF: lightweight update
+            // The angle turns a material's clay stamp on any dab, not only
+            // the brush's tip
+            if (cfg.BRUSH_ANGLE) d.ang = recRound(+cfg.BRUSH_ANGLE, 100);
+            // Where the arms land counts for every dab that had arms
+            const sym = cfg.SYMMETRY_MODE || 'radial';
+            if (sym !== 'radial' && !direct) d.sym = sym;
+            if (rake) d.rk = [recRound(rake[0], 1e4), recRound(rake[1], 1e4), recRound(rake[2], 1000)];
+            const fl = window.__splatFlow;
+            if (typeof fl === 'number' && isFinite(fl) && fl >= 0 && fl < 0.9995) d.fl = +fl.toPrecision(4);
+            const vk = window.__splatVelK;
+            if (typeof vk === 'number' && isFinite(vk) && vk > 0 && vk < 0.9995) d.vk = +vk.toPrecision(4);
+            // Each arm's colour, where it is not the dab's own
+            if (arms) {
+                let ac = null;
+                for (const k in arms) {
+                    const v = arms[k];
+                    if (!v || (v[0] === color[0] && v[1] === color[1] && v[2] === color[2])) continue;
+                    (ac || (ac = {}))[k] = [recRound(v[0], 1e4), recRound(v[1], 1e4), recRound(v[2], 1e4)];
+                }
+                if (ac) d.ac = ac;
+            }
+            a.timeline.interactions.push(recQuantizeDab(d));
         }
-        
+
+        // One dab recTapDab stored. Every pin it was laid under goes on for
+        // the call and comes off after, the pin-then-restore the replay
+        // paths use, so neither the live brush nor the panel leaks into it
+        // and it leaks into neither. `live` (Current brush) paints with this
+        // brush's colours now; otherwise each arm gets the colour it painted.
+        // Fields are range-checked: a take can arrive from a file.
+        function recEmitTapDab(i, x, y, col, live) {
+            const cfg = window.config;
+            if (!cfg || typeof window.applyMultiSplatWith !== 'function') return;
+            const saved = [cfg.BRUSH_TIP, cfg.BRUSH_SHAPE_ID, cfg.BRUSH_ANGLE, cfg.BRUSH_TIP_TEXTURE,
+                cfg.BRUSH_VELOCITY_ONLY, cfg.BRUSH_VEL_MODE, cfg.BRUSH_VEL_STRENGTH,
+                cfg.SYMMETRY_MODE, cfg.SYM_SAME_ANGLE,
+                window.__remoteStroke, window.__armPushPin, window.__armTipPin, window.__strokeMirrorPin,
+                window.__splatVelK, window.__armColorPin, window.__faceTurnPin, window.__rakePin];
+            try {
+                // A shape we no longer have (deleted, or a peer's that left
+                // with them) prints the built-in tip, never the one selected now
+                const shape = (typeof i.shape === 'string') ? i.shape : null;
+                const BS = window.BrushShapes;
+                const have = !!(shape && BS && ((typeof BS.has === 'function' && BS.has(shape))
+                    || (typeof BS.peerReady === 'function' && BS.peerReady(shape))));
+                cfg.BRUSH_TIP = (typeof i.tip === 'number' && isFinite(i.tip)) ? Math.max(0, Math.min(4, i.tip | 0)) : 0;
+                cfg.BRUSH_SHAPE_ID = have ? shape : null;
+                window.__remoteStroke = shape ? !have : !!i.rs;
+                cfg.BRUSH_ANGLE = (typeof i.ang === 'number' && isFinite(i.ang)) ? i.ang : 0;
+                cfg.BRUSH_TIP_TEXTURE = (typeof i.tx === 'number' && isFinite(i.tx)) ? Math.max(0, Math.min(1, i.tx)) : 1;
+                const p = (i.push && typeof i.push === 'object') ? i.push : null;
+                cfg.BRUSH_VELOCITY_ONLY = !!p;
+                if (p) {
+                    cfg.BRUSH_VEL_MODE = (p.m === 'spread' || p.m === 'gather' || p.m === 'swirl') ? p.m : 'smudge';
+                    cfg.BRUSH_VEL_STRENGTH = (typeof p.s === 'number' && isFinite(p.s)) ? Math.max(0, Math.min(5, p.s)) : 1;
+                }
+                window.__armPushPin = (typeof i.ap === 'number' && isFinite(i.ap)) ? (Math.abs(i.ap) | 0) : 0;
+                window.__armTipPin = ((typeof window.sanitizeArmTipMap === 'function') ? window.sanitizeArmTipMap(i.atip) : null) || {};
+                const mir = (typeof i.mir === 'number' && isFinite(i.mir)) ? (i.mir | 0) : 0;
+                window.__strokeMirrorPin = (mir >= 1 && mir <= 3) ? mir : 0;
+                let sym = (typeof i.sym === 'string') ? i.sym : 'radial';
+                try {
+                    if (window.ParamRegistry && window.ParamRegistry.coerceSelect) {
+                        sym = window.ParamRegistry.coerceSelect('symmetryMode', sym) || 'radial';
+                    }
+                } catch (_) {}
+                cfg.SYMMETRY_MODE = sym;
+                cfg.SYM_SAME_ANGLE = !!i.sa;
+                window.__faceTurnPin = (typeof i.ft === 'number' && isFinite(i.ft)) ? i.ft : 0;
+                window.__rakePin = (Array.isArray(i.rk) && i.rk.length === 3 && i.rk.every(isFinite)) ? i.rk : null;
+                window.__splatVelK = (typeof i.vk === 'number' && isFinite(i.vk) && i.vk > 0) ? Math.min(1, i.vk) : 1;
+                // Flow through the live routing, like a Just-me dab's: under
+                // Limit it sets the convergence, under Limit Off it scales
+                const fl = (typeof i.fl === 'number' && isFinite(i.fl)) ? Math.max(0, Math.min(1, i.fl)) : 1;
+                const c = (fl < 1 && typeof window.__applyPaintFlow === 'function') ? window.__applyPaintFlow(col, fl) : col;
+                const mult = Math.max(1, Math.min(8, Math.round(+i.mult || 1)));
+                let pin = null;
+                if (!live && !i.ex) {
+                    const k = (fl < 1 && !cfg.COLOR_GATE) ? fl : 1;
+                    pin = { all: true };
+                    for (let arm = 0; arm < mult; arm++) {
+                        const v = (i.ac && Array.isArray(i.ac[arm]) && i.ac[arm].length >= 3) ? i.ac[arm] : col;
+                        pin[arm] = [(+v[0] || 0) * k, (+v[1] || 0) * k, (+v[2] || 0) * k];
+                    }
+                }
+                window.__armColorPin = pin;
+                window.applyMultiSplatWith(x, y, +i.vx || 0, +i.vy || 0, c, mult,
+                    (typeof i.radius === 'number' && isFinite(i.radius)) ? i.radius : undefined, !!i.ex, !!i.wf);
+            } finally {
+                cfg.BRUSH_TIP = saved[0]; cfg.BRUSH_SHAPE_ID = saved[1]; cfg.BRUSH_ANGLE = saved[2];
+                cfg.BRUSH_TIP_TEXTURE = saved[3]; cfg.BRUSH_VELOCITY_ONLY = saved[4];
+                cfg.BRUSH_VEL_MODE = saved[5]; cfg.BRUSH_VEL_STRENGTH = saved[6];
+                cfg.SYMMETRY_MODE = saved[7]; cfg.SYM_SAME_ANGLE = saved[8];
+                window.__remoteStroke = saved[9]; window.__armPushPin = saved[10];
+                window.__armTipPin = saved[11]; window.__strokeMirrorPin = saved[12];
+                window.__splatVelK = saved[13]; window.__armColorPin = saved[14];
+                window.__faceTurnPin = saved[15]; window.__rakePin = saved[16];
+                window.__splatFlow = 1;   // as after a live dab
+            }
+        }
+
         function recTogglePlaybackAll() {
             if (recIsPlayingAll) {
                 recLayers.forEach(l => l.timeline.isPlaying = false);
@@ -685,9 +711,7 @@
         // recordMode / recordStepPalette) plus the _rep* scratch — a recorder
         // layer and a slot animation's track both qualify, so both get the
         // same colour handling, footprint pinning and push-dab behaviour.
-        // maskId is a layer id to test against the mask system, or null for
-        // sources that have no mask of their own (slot animations).
-        function recEmitTrackWindow(track, interactions, prevMs, currMs, maskId) {
+        function recEmitTrackWindow(track, interactions, prevMs, currMs) {
             if (!interactions || !interactions.length) return;
             // Per-track replay color behavior (1.3, reworked 2026-07-18):
             //   'original' (default) — reproduce the record-time brush
@@ -732,10 +756,6 @@
             for (let idx = lo; idx < interactions.length; idx++) {
                 const i = interactions[idx];
                 if (i.timestamp > currMs) break;
-                // Check if this interaction passes through the layer's mask
-                if (maskId !== null && typeof window.checkMaskPoint === 'function' && !window.checkMaskPoint(maskId, i.x, i.y)) {
-                    continue; // Skip this interaction if masked out
-                }
                 const x = i.x * canvas.width;
                 const y = i.y * canvas.height;
                 let replayColor;
@@ -769,6 +789,14 @@
                     replayColor = liveSolid || i.color;
                 } else { // original, non-generative → the baked colors
                     replayColor = i.color;
+                }
+                // A dab from an Everything take carries its whole context
+                // and plays through its own pins. A programmatic source in
+                // it (an animation, an audio scene) keeps its colour under
+                // Current brush: it was never a brush stroke.
+                if (i.tap) {
+                    recEmitTapDab(i, x, y, i.ex ? i.color : replayColor, cMode === 'live' && !i.ex);
+                    continue;
                 }
                 // The Flow the dab was painted at (recRecordInteraction), through
                 // the live brush's own routing: under Limit it scales the
@@ -872,7 +900,7 @@
             }
         }
 
-        // PERF: Throttle heads UI updates during recording
+        // PERF: Throttle the strip's clock during recording
         let _recHeadsLastUpdate = 0;
         const _recHeadsUpdateInterval = 100; // ms
 
@@ -910,41 +938,52 @@
             let takeFull = false;
             let ranOut = false;   // a part set to play once got to its end
 
-            recLayers.forEach(layer => {
-                if (layer.timeline.isRecording) {
-                    anyRecording = true;
-                    if (layer.timeline.recClock === 'sim') {
-                        const maxMs = (typeof layer.loopMaxMs === 'number' && layer.loopMaxMs > 0) ? layer.loopMaxMs : recMaxDurationMs;
-                        if (recClockNow(layer) - layer.timeline.recordingStartTime >= maxMs) takeFull = true;
+            // The parts on the bench, playing under an Everything take, are
+            // on the bench already: the tap (recTapDab) leaves them out.
+            window.__recBenchPlaying = true;
+            try {
+                recLayers.forEach(layer => {
+                    if (layer.timeline.isRecording) {
+                        anyRecording = true;
+                        if (recTakeElapsedWall(layer) >= recTakeCapMs(layer)) takeFull = true;
                     }
-                }
-                if (!layer.timeline.isPlaying || !layer.visible) return;
-                anyPlaying = true;
-                const scaledDelta = delta * recPlaybackSpeed;
-                layer.timeline.playbackPosition += scaledDelta;
-                const eff = recGetEffectiveDuration(layer);
-                const currentTime = layer.timeline.playbackPosition;
-                const prevTime = currentTime - scaledDelta;
-                const cappedPrev = Math.min(prevTime, eff);
-                const cappedCurr = Math.min(currentTime, eff);
-                recEmitTrackWindow(layer, layer.timeline.interactions, cappedPrev, cappedCurr, layer.id);
-                if (layer.timeline.playbackPosition >= eff) {
-                    if (layer.isLooping) {
-                        layer.timeline.playbackPosition = 0;
-                    } else {
-                        layer.timeline.isPlaying = false;
-                        layer.timeline.playbackPosition = 0;
-                        ranOut = true;
+                    if (!layer.timeline.isPlaying || !layer.visible) return;
+                    anyPlaying = true;
+                    const eff = recGetEffectiveDuration(layer);
+                    let prev = layer.timeline.playbackPosition;
+                    if (!(prev < eff)) prev = 0;
+                    let remaining = delta;
+                    // The overshoot past the end carries into the next pass. It
+                    // used to be dropped, so each loop ran up to a frame long and
+                    // parts drifted apart over time. A stall never spins: past
+                    // a few loops the rest is dropped.
+                    let guard = 0;
+                    while (remaining > 0 && guard++ < 8) {
+                        const step = Math.min(remaining, eff - prev);
+                        const curr = prev + step;
+                        // A pass from 0 takes a dab stamped at 0 too (the
+                        // window is (prev, curr]); one was never played.
+                        recEmitTrackWindow(layer, layer.timeline.interactions, prev > 0 ? prev : -1, curr);
+                        remaining -= step;
+                        prev = curr;
+                        if (prev >= eff) {
+                            prev = 0;
+                            // Fresh generative colors each loop ("keeps being random")
+                            layer._repKey = null;
+                            if (!layer.isLooping) {
+                                layer.timeline.isPlaying = false;
+                                ranOut = true;
+                                break;
+                            }
+                        }
                     }
-                    // Fresh generative colors each loop ("keeps being random")
-                    layer._repKey = null;
-                }
-            });
-            recLastPlaybackTime = now;
-            if (takeFull) {
-                const cur = recGetActiveLayer();
-                if (cur && cur.timeline.isRecording) recStopRecording();
+                    layer.timeline.playbackPosition = prev;
+                });
+            } finally {
+                window.__recBenchPlaying = false;
             }
+            recLastPlaybackTime = now;
+            if (takeFull) recStopRecording();
             // Its ▶ and the Play buttons went on saying Pause until the next
             // click without this.
             if (ranOut) {
@@ -952,17 +991,17 @@
                 recUpdateButtonStates();
             }
             
-            // PERF: Only update heads UI if something is actually playing or recording
-            // and throttle during recording to reduce DOM overhead
+            // PERF: Only update the strip's clock if something is actually
+            // playing or recording, and throttle it during recording
             if (anyPlaying || anyRecording) {
                 if (anyRecording) {
                     // Throttle during recording - only update every 100ms
                     if (now - _recHeadsLastUpdate >= _recHeadsUpdateInterval) {
                         _recHeadsLastUpdate = now;
-                        recUpdateHeadsUI();
+                        recUpdateStripTime();
                     }
                 } else {
-                    recUpdateHeadsUI();
+                    recUpdateStripTime();
                 }
             }
         }
@@ -972,11 +1011,6 @@
         function _getRecBtns() {
             if (!_recBtnCache) {
                 _recBtnCache = {
-                    rec: document.getElementById('recRecordBtn'),
-                    playAll: document.getElementById('recPlayAllBtn'),
-                    stop: document.getElementById('recStopBtn'),
-                    save: document.getElementById('recSaveBtn'),
-                    saveNew: document.getElementById('recSavePresetBtn'),
                     miniRec: document.getElementById('recMiniRecordBtn'),
                     miniPause: document.getElementById('recMiniPauseBtn'),
                     miniStop: document.getElementById('recMiniStopBtn')
@@ -996,52 +1030,16 @@
             const a = recGetActiveLayer();
             const isRec = !!(a && a.timeline.isRecording);
             const isPlay = !!(a && a.timeline.isPlaying) || !!recIsPlayingAll;
-            const btns = _getRecBtns();
-            
-            // The editor's Play and File groups. Like the strip, a button with
-            // nothing to act on is disabled rather than silent.
-            const busy = isRec || !!recCountdownActive;
-            const hasTake = recLayers.some(l => l.timeline.interactions.length > 0);
-            const anyPlaying = recLayers.some(l => l.timeline.isPlaying);
-            if (btns.rec) {
-                btns.rec.textContent = _recRecordLabel(isRec);
-                btns.rec.classList.toggle('active', isRec);
-            }
-            if (btns.playAll) {
-                btns.playAll.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
-                btns.playAll.classList.toggle('active', !!recIsPlayingAll);
-                btns.playAll.disabled = busy || (!recIsPlayingAll && !hasTake);
-            }
-            if (btns.stop) btns.stop.disabled = !(busy || anyPlaying);
-            if (btns.save) btns.save.disabled = busy || !hasTake;
-            if (btns.saveNew) btns.saveNew.disabled = busy || !hasTake;
-
-            recSyncPartCards(busy);
             recSyncStrip(isRec);
             recSyncBodyState(isRec, isPlay);
         }
 
-        // Each card's ▶ follows its part without rebuilding the list: a
-        // click on ▶ (or F8) starts a part after the cards were drawn.
-        function recSyncPartCards(busy) {
-            const list = document.getElementById('recLayersList');
-            if (!list) return;
-            list.querySelectorAll('button[data-action="toggle-play"]').forEach(b => {
-                const l = recLayers.find(x => x.id === parseInt(b.getAttribute('data-id'), 10));
-                const on = !!(l && l.timeline.isPlaying);
-                const glyph = on ? '⏸' : '▶';
-                if (b.textContent !== glyph) b.textContent = glyph;
-                b.setAttribute('aria-pressed', on ? 'true' : 'false');
-                b.disabled = !on && (busy || !l || !l.timeline.interactions.length);
-            });
-        }
-
         // ── The record strip (top of Animations, 2026-10-04) ────────────
-        // ● Record · ▶ Play · ■ Stop, the clock, the length chips and Edit ⤢.
+        // ● Record · ▶ Play · ■ Stop, the clock and the length chips.
         // It replaced Recording Mode Off / Minimized / Full: nothing is
         // captured until Record is pressed, so there is no Off to forget.
-        // Play runs every part together (F8 keeps playing the one part). A
-        // button with nothing to act on is disabled rather than silent.
+        // Play (and F8) runs every part together. A button with nothing to
+        // act on is disabled rather than silent.
         const REC_LENGTHS = [4000, 8000, 15000, 30000];
 
         // The length a part records up to: its own cap, else the global one.
@@ -1049,21 +1047,17 @@
             return (a && typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0) ? a.loopMaxMs : recMaxDurationMs;
         }
 
-        // The animation editor is the drawer with its Animation tab showing.
-        // Delete, ↑/↓ and Ctrl+Shift+N only act on parts while it is (05n).
-        function recEditorOpen() {
-            return !!(window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record');
-        }
-
         // Anything for Esc to stop: a countdown, a part recording or playing.
         function recIsBusy() {
             return !!recCountdownActive || recLayers.some(l => l.timeline.isRecording || l.timeline.isPlaying);
         }
 
-        // m:ss. A length rounds up, so a half-second part reads 0:01, not 0:00.
+        // m:ss. A length goes to the nearest second but never below one, so
+        // a half-second part reads 0:01, not 0:00, and an 8 s take that
+        // stopped a frame late still reads 0:08.
         function recClock(ms, up) {
             const v = Math.max(0, (ms || 0) / 1000);
-            const s = up ? Math.ceil(v - 0.001) : Math.floor(v);
+            const s = up ? (v > 0 ? Math.max(1, Math.round(v)) : 0) : Math.floor(v);
             return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
         }
 
@@ -1075,13 +1069,16 @@
             const el = document.getElementById('recMiniTime');
             if (!el) return;
             const a = recGetActiveLayer();
-            let at = 0, of = recPartCapMs(a);
+            const empty = !a || !a.timeline.interactions.length;
+            let at = 0, of = empty ? recPartCapMs(a) : recMaxDurationMs;
             if (a && a.timeline.isRecording) {
-                at = recClockNow(a) - a.timeline.recordingStartTime;
+                // The stopwatch the take stops on
+                at = recTakeElapsedWall(a);
+                of = recTakeCapMs(a);
             } else if (!recCountdownActive) {
                 const p = (a && a.timeline.isPlaying) ? a : recLayers.find(l => l.timeline.isPlaying);
-                if (p) { at = p.timeline.playbackPosition; of = recGetEffectiveDuration(p); }
-                else if (a && a.timeline.interactions.length) of = recGetEffectiveDuration(a);
+                if (p) { at = recShowMs(p, p.timeline.playbackPosition); of = recShowMs(p, recGetEffectiveDuration(p)); }
+                else if (!empty) of = recShowMs(a, recGetEffectiveDuration(a));
             }
             const text = recClock(Math.min(at, of)) + ' / ' + recClock(of, true);
             if (text !== _recStripTimeText || el.textContent !== text) { _recStripTimeText = text; el.textContent = text; }
@@ -1102,15 +1099,22 @@
                 btns.miniPause.disabled = busy || (!anyPlaying && !hasTake);
             }
             if (btns.miniStop) btns.miniStop.disabled = !(busy || anyPlaying);
-            const cap = recPartCapMs(recGetActiveLayer());
+            // The length the NEXT take records for: a filled part's own
+            // length is its loop now, and a take never lands on it.
+            const act = recGetActiveLayer();
+            const cap = (act && act.timeline.interactions.length) ? recMaxDurationMs : recPartCapMs(act);
             REC_LENGTHS.forEach(ms => {
                 const chip = document.getElementById('recLen' + (ms / 1000));
                 if (!chip) return;
                 chip.setAttribute('aria-pressed', cap === ms ? 'true' : 'false');
                 chip.disabled = isRec;
             });
-            const edit = document.getElementById('recOpenFullBtn');
-            if (edit) edit.setAttribute('aria-pressed', recEditorOpen() ? 'true' : 'false');
+            [['recSrcMe', 'single'], ['recSrcAll', 'all']].forEach(([id, v]) => {
+                const chip = document.getElementById(id);
+                if (!chip) return;
+                chip.setAttribute('aria-pressed', recRecordSource === v ? 'true' : 'false');
+                chip.disabled = busy;
+            });
             const keepRow = document.getElementById('recKeepRow');
             if (keepRow) keepRow.style.display = recPendingTake ? 'flex' : 'none';
             recUpdateStripTime();
@@ -1129,19 +1133,27 @@
             }
         }
 
-        // A chip sets the global length AND the active part's own cap: the
-        // global one alone only reached parts made after it changed.
+        // A chip sets the global length AND an empty active part's own cap:
+        // the global one alone only reached parts made after it changed. A
+        // filled part keeps its loop; the next take gets a part of its own
+        // at the new length.
         function recSetLength(ms) {
             const a = recGetActiveLayer();
             if (a && a.timeline.isRecording) return;
             recMaxDurationMs = ms;
-            if (a) {
-                a.loopMaxMs = ms;
-                if (a.timeline.playbackPosition > recGetEffectiveDuration(a)) a.timeline.playbackPosition = 0;
-            }
-            const dur = document.getElementById('recMaxDuration');
-            if (dur) dur.value = recFormatTime(ms);
+            if (a && !a.timeline.interactions.length) a.loopMaxMs = ms;
             recRenderUI();
+        }
+
+        // Just me · Everything: what the next take records (recTapDab). A
+        // preference, kept at once like the slots; a take already running
+        // keeps the one it started with.
+        function recSetRecordSource(v) {
+            if (recCountdownActive || recLayers.some(l => l.timeline.isRecording)) return;
+            recRecordSource = (v === 'all') ? 'all' : 'single';
+            const sm = window.settingsManager;
+            if (sm && typeof sm.set === 'function') sm.set('recRecordSource', recRecordSource, false);
+            recUpdateButtonStates();
         }
 
         // The strip's Play: every part together, or pause whatever plays.
@@ -1155,335 +1167,10 @@
             recTogglePlaybackAll();
         }
 
+        // The parts show only through the strip and the canvas badge since
+        // the animation editor went (2026-10-13). 05n and 15 still call this.
         function recRenderUI() {
-            // Clear cached DOM refs since we're rebuilding
-            recClearCachedElements();
-            
-            const list = document.getElementById('recLayersList');
-            if (!list) return;
-            list.innerHTML = '';
-            recLayers.forEach(layer => {
-                const el = document.createElement('div');
-                el.className = 'rec-item' + (layer.id === recActiveLayerId ? ' active-layer' : '');
-                el.setAttribute('data-id', layer.id);
-                el.setAttribute('data-action', 'set-active');
-                // ▶ plays this part alone; ⋯ holds what else acts on it
-                // (recOpenPartMenu). The mask buttons went 2026-10-04: a
-                // part's mask had no editor behind it any more.
-                el.innerHTML = `
-                    <div class="layer-item-header">
-                        <div class="layer-thumbnail" style="background: linear-gradient(135deg, rgba(100,200,255,0.4), rgba(150,100,255,0.4)); display:flex; align-items:center; justify-content:center; font-size: 18px;">🎬</div>
-                        <div class="layer-info">
-                            <input type="text" class="layer-title" value="${window.escHtml(recPartLabel(layer.name))}" data-action="rename" data-id="${layer.id}" aria-label="Part name">
-                        </div>
-                        <div class="layer-controls">
-                            <button type="button" class="layer-btn rec-part-play" data-action="toggle-play" data-id="${layer.id}" title="Play / pause this part (F8 plays the selected one)" aria-pressed="false">▶</button>
-                            <button type="button" class="layer-btn" data-action="toggle-visibility" data-id="${layer.id}" title="${layer.visible ? 'Leave this part out when the parts play' : 'Put this part back into playback'}">${layer.visible ? '👁️' : '👁️‍🗨️'}</button>
-                            <button type="button" class="layer-btn" data-action="toggle-loop" data-id="${layer.id}" title="${layer.isLooping ? 'Loops. Click to play it once.' : 'Plays once. Click to loop it.'}">${layer.isLooping ? '🔁' : '⏹'}</button>
-                            <button type="button" class="layer-btn rec-part-more" data-action="part-menu" data-id="${layer.id}" aria-haspopup="menu" aria-expanded="false" title="Duplicate, clear, delete, loop length and colours">⋯</button>
-                        </div>
-                    </div>
-                    <div id="recLayerMeta-${layer.id}" class="rec-part-meta">${window.escHtml(recPartMeta(layer))}</div>
-                    <canvas id="recMiniTimeline-${layer.id}" class="rec-mini-timeline"></canvas>
-                `;
-                list.appendChild(el);
-            });
-            const a = recGetActiveLayer();
-            recRefreshTimelinesUI();
-            recBindLayerListEvents();
-
-            // The strip, the drawer's state classes and the body's
-            const recDrawerElState = document.getElementById('recDrawer');
-            if (recDrawerElState) {
-                recDrawerElState.classList.toggle('rec-recording', !!(a && a.timeline.isRecording));
-                recDrawerElState.classList.toggle('rec-playing', !!(a && a.timeline.isPlaying));
-                recDrawerElState.classList.toggle('rec-countdown', !!recCountdownActive);
-            }
             recUpdateButtonStates();
-            // A menu open on a card follows the rebuilt card (or closes)
-            if (_recMenu) recPlaceMenu();
-        }
-
-        // The card's second line: how long the part plays and how its
-        // colours replay (both live in its ⋯ menu now).
-        function recPartMeta(layer) {
-            if (!layer.timeline.interactions.length) return 'Empty';
-            const mode = REC_COLOR_MODES.find(m => m.v === (layer.colorMode || 'original'));
-            return (recGetEffectiveDuration(layer) / 1000).toFixed(1) + ' s · ' + (mode ? mode.label : 'As painted');
-        }
-
-        function recBindLayerListEvents() {
-            const list = document.getElementById('recLayersList');
-            if (!list || list._recBound) return;
-            list.addEventListener('click', (e) => {
-                // Avoid re-render-on-click when interacting with inputs/selects inside a layer card.
-                // Buttons are let through when they carry an action: the guard used to
-                // cover every button, so 👁 ▶ 🔁 did nothing.
-                if (e.target.closest('input, textarea, select')) return;
-                const target = e.target.closest('[data-action]');
-                if (!target) return;
-                if (e.target.closest('button') && !target.matches('button')) return;
-                const action = target.getAttribute('data-action');
-                const id = parseInt(target.getAttribute('data-id'), 10);
-                if (!isFinite(id)) return;
-                e.stopPropagation();
-                if (action === 'toggle-visibility') {
-                    const layer = recLayers.find(l => l.id === id);
-                    if (layer) { layer.visible = !layer.visible; recScheduleRender(); }
-                } else if (action === 'toggle-play') {
-                    if (recActiveLayerId !== id) recSetActiveLayer(id);
-                    recTogglePlayback();
-                } else if (action === 'toggle-loop') {
-                    const layer = recLayers.find(l => l.id === id);
-                    if (layer) { layer.isLooping = !layer.isLooping; recScheduleRender(); }
-                } else if (action === 'part-menu') {
-                    if (_recMenu && _recMenu.partId === id) recCloseMenu();
-                    else recOpenPartMenu(id, target);
-                } else if (action === 'set-active') {
-                    const container = e.target.closest('.rec-item');
-                    const cid = container ? parseInt(container.getAttribute('data-id'), 10) : id;
-                    if (isFinite(cid)) recSetActiveLayer(cid);
-                }
-            });
-            list.addEventListener('change', (e) => {
-                const input = e.target.closest('input.layer-title[data-action="rename"]');
-                if (input) {
-                    const id = parseInt(input.getAttribute('data-id'), 10);
-                    const layer = recLayers.find(l => l.id === id);
-                    if (layer) { layer.name = input.value; recMarkEdited(); recScheduleRender(); }
-                }
-            });
-            list._recBound = true;
-        }
-
-        // ── The editor's menus: a part's ⋯ and File ▾ ────────────────────
-        // Both wear the .brush-shape-menu skin and are body-mounted, like the
-        // palette and room menus, so the drawer's overflow cannot clip them;
-        // a press outside, Esc or a resize closes them. Rows are ghost
-        // buttons (01-buttons: rows on an open menu), not .brush-shape-menu-
-        // item, which sets its own colours and fails js/38's audit. A part's
-        // menu is built for each open (it holds no ids anyone reads); File ▾
-        // is one element in index.html, since its rows keep the ids of the
-        // buttons they replaced.
-        let _recMenu = null;   // { el, btn, partId } while one is open
-
-        function recMenuAnchor() {
-            if (!_recMenu) return null;
-            // The part list rebuilds under an open menu (a card clicked, a
-            // take ending): find this part's ⋯ again.
-            if (_recMenu.partId != null) {
-                return document.querySelector(`#recLayersList button[data-action="part-menu"][data-id="${_recMenu.partId}"]`);
-            }
-            return _recMenu.btn;
-        }
-
-        // Under its button with the right edges lined up, flipped above when
-        // there is no room below (the usual case: the drawer sits at the
-        // bottom of the window), kept inside the window. Closes once the
-        // button is gone (scrolled away, its part deleted).
-        function recPlaceMenu() {
-            const m = _recMenu && _recMenu.el;
-            const btn = recMenuAnchor();
-            const b = btn && btn.getBoundingClientRect();
-            if (!m || !b || !b.width || b.bottom < 0 || b.top > window.innerHeight) { recCloseMenu(); return; }
-            btn.setAttribute('aria-expanded', 'true');
-            btn.classList.add('active');
-            m.style.left = '0px';
-            m.style.top = '0px';
-            const r = m.getBoundingClientRect();
-            const x = Math.min(b.right - r.width, window.innerWidth - r.width - 8);
-            let y = b.bottom + 6;
-            if (y + r.height > window.innerHeight - 8) y = Math.max(8, b.top - r.height - 6);
-            m.style.left = Math.max(8, x) + 'px';
-            m.style.top = Math.max(8, y) + 'px';
-        }
-
-        function recOpenMenu(el, btn, partId) {
-            recCloseMenu();
-            if (el.parentElement !== document.body) document.body.appendChild(el);
-            el.hidden = false;
-            _recMenu = { el, btn, partId: (partId == null ? null : partId) };
-            recPlaceMenu();
-            if (!_recMenu) return;   // its button was not on screen
-            // Added straight away: the press that opened it is over by the
-            // time its click runs, so it cannot close it.
-            document.addEventListener('mousedown', recOnMenuOutside, true);
-            document.addEventListener('keydown', recOnMenuKey, true);
-            document.addEventListener('scroll', recOnMenuScroll, true);
-            window.addEventListener('resize', recCloseMenu);
-        }
-
-        // Closing keeps a loop length still being typed: a field removed
-        // while focused never sends its change event.
-        function recCloseMenu() {
-            const o = _recMenu;
-            if (!o) return;
-            _recMenu = null;
-            document.removeEventListener('mousedown', recOnMenuOutside, true);
-            document.removeEventListener('keydown', recOnMenuKey, true);
-            document.removeEventListener('scroll', recOnMenuScroll, true);
-            window.removeEventListener('resize', recCloseMenu);
-            const loop = o.el.querySelector('input.rec-loop-input');
-            if (loop && loop.value !== loop.defaultValue && recIsTimeText(loop.value)) recSetPartLoop(o.partId, recParseTime(loop.value));
-            if (o.partId != null) o.el.remove(); else o.el.hidden = true;
-            const btn = (o.partId != null)
-                ? document.querySelector(`#recLayersList button[data-action="part-menu"][data-id="${o.partId}"]`)
-                : o.btn;
-            if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.classList.remove('active'); }
-        }
-
-        function recOnMenuOutside(e) {
-            if (!_recMenu) return;
-            // A press on the menu's own button is that button's toggle
-            const btn = recMenuAnchor();
-            if (_recMenu.el.contains(e.target) || (btn && btn.contains(e.target))) return;
-            recCloseMenu();
-        }
-        // Esc closes the menu and does nothing else: 05n's Esc would also
-        // stop the parts playing. A half-typed loop length is dropped.
-        function recOnMenuKey(e) {
-            if (e.key !== 'Escape' || !_recMenu) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const btn = recMenuAnchor();
-            const loop = _recMenu.el.querySelector('input.rec-loop-input');
-            if (loop) loop.value = loop.defaultValue;
-            recCloseMenu();
-            if (btn) { try { btn.focus(); } catch (_) {} }
-        }
-        // The parts list scrolling carries the button away: the menu
-        // follows it while it is on screen and closes once it is not.
-        function recOnMenuScroll(e) {
-            if (!_recMenu || (e.target instanceof Node && _recMenu.el.contains(e.target))) return;
-            recPlaceMenu();
-        }
-
-        // "00:04:500" or "4.5" (seconds), the two forms recParseTime reads;
-        // anything else would come back as its 10 s fallback.
-        function recIsTimeText(s) {
-            s = String(s || '').trim();
-            return /^\d+:\d+:\d+$/.test(s) || /^\d+(\.\d+)?$/.test(s);
-        }
-
-        function recSetPartLoop(id, ms) {
-            const l = recLayers.find(x => x.id === id);
-            if (!l) return;
-            l.loopMaxMs = Math.max(1, ms || recPartCapMs(l));
-            if (l.timeline.playbackPosition > recGetEffectiveDuration(l)) l.timeline.playbackPosition = 0;
-            recMarkEdited();
-            recScheduleRender();
-        }
-
-        function recSetPartColorMode(id, v) {
-            const l = recLayers.find(x => x.id === id);
-            if (!l) return;
-            l.colorMode = recMigrateColorMode(v);
-            l._repKey = null;   // re-seed generative replay colours
-            recMarkEdited();
-            recScheduleRender();
-        }
-
-        // A part's ⋯: Duplicate · Clear · Delete…, then its loop length and
-        // how its colours replay (the card's Length and Colours rows, which
-        // moved in here).
-        function recOpenPartMenu(id, btn) {
-            const layer = recLayers.find(l => l.id === id);
-            if (!layer) return;
-            const busy = !!recCountdownActive || layer.timeline.isRecording;
-            const has = layer.timeline.interactions.length > 0;
-            const m = document.createElement('div');
-            m.className = 'brush-shape-menu rec-menu';
-            m.setAttribute('role', 'menu');
-            m.setAttribute('aria-label', 'Part options');
-            m.dataset.group = 'expressive';   // body-mounted: the tint has to come along
-            const head = document.createElement('div');
-            head.className = 'brush-shape-menu-head';
-            head.textContent = head.title = recPartLabel(layer.name) || 'Part';
-            m.appendChild(head);
-            const row = (label, title, fn, o) => {
-                o = o || {};
-                const b = document.createElement('button');
-                b.type = 'button';
-                b.className = 'btn--ghost rec-menu-item';
-                b.setAttribute('role', o.radio ? 'menuitemradio' : 'menuitem');
-                if (o.radio) b.setAttribute('aria-checked', o.checked ? 'true' : 'false');
-                b.textContent = label;
-                if (title) b.title = title;
-                b.disabled = !!o.disabled;
-                b.addEventListener('click', () => { recCloseMenu(); fn(); });
-                m.appendChild(b);
-            };
-            const sep = () => {
-                const s = document.createElement('div');
-                s.className = 'rec-menu-sep';
-                s.setAttribute('role', 'separator');
-                m.appendChild(s);
-            };
-            row('Duplicate', 'A copy of this part, right under it', () => recDuplicatePart(id), { disabled: busy });
-            row('Clear', has ? 'Empty this part. It asks first.' : 'Nothing is recorded in it yet', () => recAskClearPart(id), { disabled: busy || !has });
-            row('Delete…', recLayers.length > 1 ? 'Remove this part. It asks first.' : "The last part can't be deleted. Clear empties it.",
-                () => recAskDeletePart(id), { disabled: busy || recLayers.length <= 1 });
-            sep();
-            // Loop length: Enter or leaving the menu keeps it, Esc drops it.
-            // A filled part shows the length it loops at, an empty one the
-            // length it will record up to.
-            const field = document.createElement('label');
-            field.className = 'rec-menu-field';
-            field.textContent = 'Loop length';
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'time-input rec-loop-input';
-            inp.placeholder = 'mm:ss:ms';
-            inp.defaultValue = recFormatTime(has ? recGetEffectiveDuration(layer) : recPartCapMs(layer));
-            inp.title = has
-                ? `Up to the ${(layer.timeline.duration / 1000).toFixed(1)} s it recorded. Shorter starts the loop again sooner.`
-                : 'How long this part records for';
-            inp.disabled = busy;
-            inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); recCloseMenu(); } });
-            field.appendChild(inp);
-            m.appendChild(field);
-            sep();
-            const lab = document.createElement('div');
-            lab.className = 'rec-menu-label';
-            lab.textContent = 'Colours';
-            m.appendChild(lab);
-            REC_COLOR_MODES.forEach(mode => {
-                row(mode.label, mode.tip, () => recSetPartColorMode(id, mode.v),
-                    { radio: true, checked: (layer.colorMode || 'original') === mode.v });
-            });
-            recOpenMenu(m, btn, id);
-        }
-
-        function recResizeTimelineCanvas() {
-            const c = document.getElementById('recTimelineCanvas');
-            if (!c) return;
-            const dpr = window.devicePixelRatio || 1;
-            const w = c.clientWidth || 0;
-            const h = c.clientHeight || 0;
-            if (w === 0 || h === 0) return;
-            c.width = Math.max(1, Math.floor(w * dpr));
-            c.height = Math.max(1, Math.floor(h * dpr));
-            const ctx = c.getContext('2d');
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }
-
-        function recResizeAllMiniTimelines() {
-            const dpr = window.devicePixelRatio || 1;
-            recLayers.forEach(layer => {
-                const c = document.getElementById(`recMiniTimeline-${layer.id}`);
-                if (!c) return;
-                const w = c.clientWidth || 0;
-                const h = c.clientHeight || 0;
-                if (w === 0 || h === 0) return;
-                const targetW = Math.max(1, Math.floor(w * dpr));
-                const targetH = Math.max(1, Math.floor(h * dpr));
-                if (c.width !== targetW || c.height !== targetH) {
-                    c.width = targetW;
-                    c.height = targetH;
-                    const ctx = c.getContext('2d');
-                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                }
-            });
         }
 
         function recHexToRgb(hex) {
@@ -1516,13 +1203,13 @@
             return null;
         }
 
-        // Human-readable labels for the color-mode dropdowns (the part cards
-        // and the Saved Animations library). The names say what each one keeps:
+        // Human-readable labels for the color-mode dropdown on the Saved
+        // Animations library's rows. The names say what each one keeps:
         // the record-time MODE (re-rolled), the record-time OUTPUT (frozen),
         // or nothing at all (whatever the brush is set to right now).
         var REC_COLOR_MODES = [
-            { v: 'original', label: 'As painted', tip: 'The brush as it was set: random colours roll fresh each loop' },
-            { v: 'exact', label: 'Exact colours', tip: 'The very colours that were painted, every loop' },
+            { v: 'original', label: 'As painted', tip: 'The brush as it was set: random colors roll fresh each loop' },
+            { v: 'exact', label: 'Exact colors', tip: 'The exact colors that were painted, every loop' },
             { v: 'live', label: 'Current brush', tip: 'Whatever the brush is set to now' }
         ];
 
@@ -1535,358 +1222,12 @@
             return 'original';
         }
 
-        function recColorToCss(arr) {
-            if (!arr || arr.length < 3) return 'rgba(0,0,0,0.6)';
-            const r = Math.max(0, Math.min(255, Math.round(arr[0] * 255)));
-            const g = Math.max(0, Math.min(255, Math.round(arr[1] * 255)));
-            const b = Math.max(0, Math.min(255, Math.round(arr[2] * 255)));
-            return `rgb(${r},${g},${b})`;
-        }
-
-        function recDrawTimeline() {
-            const c = document.getElementById('recTimelineCanvas');
-            if (!c) return;
-            const ctx = c.getContext('2d');
-            const w = c.clientWidth;
-            const h = c.clientHeight;
-            if (!w || !h) return;
-            // Clear
-            ctx.clearRect(0, 0, w, h);
-            // Background grid stripes
-            ctx.fillStyle = 'rgba(255,255,255,0.08)';
-            for (let y = 0; y < h; y += 10) ctx.fillRect(0, y, w, 1);
-            // Active layer interactions
-            const a = recGetActiveLayer();
-            if (!a) return;
-            const eff = recGetEffectiveDuration(a);
-            if (eff <= 0) return;
-            // Time markers
-            ctx.fillStyle = 'rgba(255,255,255,0.85)';
-            ctx.font = '12px monospace';
-            const marks = 8;
-            for (let i = 0; i <= marks; i++) {
-                const x = (i / marks) * w;
-                const t = (i / marks) * eff / 1000;
-                ctx.fillText(t.toFixed(1) + 's', x + 2, 12);
-                ctx.fillStyle = 'rgba(255,255,255,0.18)';
-                ctx.fillRect(x, 16, 1, h - 16);
-                ctx.fillStyle = 'rgba(255,255,255,0.85)';
-            }
-            a.timeline.interactions.forEach(inter => {
-                if ((inter.timestamp || 0) > eff) return;
-                const x = (inter.timestamp / eff) * w;
-                ctx.strokeStyle = recColorToCss(inter.color);
-                ctx.globalAlpha = 0.9;
-                ctx.beginPath();
-                ctx.moveTo(x, 18);
-                ctx.lineTo(x, h);
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.globalAlpha = 1;
-                ctx.fillStyle = recColorToCss(inter.color);
-                ctx.beginPath();
-                ctx.arc(x, (18 + h) / 2, 4, 0, Math.PI * 2);
-                ctx.fill();
-            });
-        }
-
         function recGetEffectiveDuration(layer) {
             if (!layer) return 0;
             const base = Math.max(0, layer.timeline && layer.timeline.duration || 0);
             const loop = (typeof layer.loopMaxMs === 'number' && layer.loopMaxMs > 0) ? layer.loopMaxMs : null;
             const eff = (loop !== null) ? Math.min(base, loop) : base;
             return Math.max(1, eff);
-        }
-
-        function recGetGlobalDurationBase() {
-            const maxLayerDuration = recLayers.reduce((m, l) => {
-                const ld = (l.timeline?.duration) || (l.timeline?.interactions?.reduce((mm, i) => Math.max(mm, i.timestamp), 0) || 0);
-                return Math.max(m, ld);
-            }, 0);
-            return Math.max(recMaxDurationMs || 0, maxLayerDuration, 1);
-        }
-
-        function recDrawMiniTimelines() {
-            const base = recGetGlobalDurationBase();
-            recLayers.forEach(layer => {
-                const c = document.getElementById(`recMiniTimeline-${layer.id}`);
-                if (!c) return;
-                const ctx = c.getContext('2d');
-                const w = c.clientWidth;
-                const h = c.clientHeight;
-                if (!w || !h) return;
-                ctx.clearRect(0, 0, w, h);
-                // subtle stripes
-                ctx.fillStyle = 'rgba(255,255,255,0.04)';
-                for (let y = 0; y < h; y += 8) ctx.fillRect(0, y, w, 1);
-                // draw interactions only up to the layer's effective duration, mapped to global base
-                const eff = recGetEffectiveDuration(layer);
-                const cutoffX = Math.max(0, Math.min(w, (eff / base) * w));
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(0, 0, cutoffX, h);
-                ctx.clip();
-                ctx.globalAlpha = 0.95;
-                (layer.timeline.interactions || []).forEach(inter => {
-                    if ((inter.timestamp || 0) > eff) return;
-                    const x = (inter.timestamp / base) * w;
-                    ctx.strokeStyle = recColorToCss(inter.color);
-                    ctx.beginPath();
-                    ctx.moveTo(x, 4);
-                    ctx.lineTo(x, h - 4);
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                });
-                ctx.restore();
-                ctx.globalAlpha = 1;
-                // dim the truncated region beyond eff
-                if (cutoffX < w) {
-                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-                    ctx.fillRect(cutoffX, 0, w - cutoffX, h);
-                }
-            });
-        }
-
-        function recRefreshTimelinesUI() {
-            recResizeTimelineCanvas();
-            recUpdateHeadsUI();
-            recDrawTimeline();
-            recResizeAllMiniTimelines();
-            recDrawMiniTimelines();
-        }
-
-        // PERF: Cache DOM references for heads UI
-        let _recPlayheadEl = null;
-        let _recRecordheadEl = null;
-        let _recTimelineCanvasEl = null;
-        
-        function recUpdateHeadsUI() {
-            // Cache DOM lookups
-            if (!_recPlayheadEl) _recPlayheadEl = document.getElementById('recPlayhead');
-            if (!_recRecordheadEl) _recRecordheadEl = document.getElementById('recRecordhead');
-            if (!_recTimelineCanvasEl) _recTimelineCanvasEl = document.getElementById('recTimelineCanvas');
-            
-            const a = recGetActiveLayer();
-            const w = _recTimelineCanvasEl ? _recTimelineCanvasEl.clientWidth : 0;
-            
-            if (_recPlayheadEl) {
-                if (a && (a.timeline.duration > 0 || (typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0)) && w > 0) {
-                    const eff = recGetEffectiveDuration(a);
-                    const ratio = eff > 0 ? (a.timeline.playbackPosition / eff) : 0;
-                    _recPlayheadEl.style.left = (Math.max(0, Math.min(1, ratio)) * w) + 'px';
-                } else {
-                    _recPlayheadEl.style.left = '0px';
-                }
-            }
-            if (_recRecordheadEl) {
-                if (a && a.timeline.isRecording && w > 0) {
-                    _recRecordheadEl.style.display = 'block';
-                    const elapsed = recClockNow(a) - a.timeline.recordingStartTime;
-                    const ratio = Math.min(1, elapsed / recPartCapMs(a));
-                    _recRecordheadEl.style.left = (ratio * w) + 'px';
-                } else {
-                    _recRecordheadEl.style.display = 'none';
-                }
-            }
-            recUpdateStripTime();
-        }
-        
-        // Clear cached elements when UI is rebuilt
-        function recClearCachedElements() {
-            _recPlayheadEl = null;
-            _recRecordheadEl = null;
-            _recTimelineCanvasEl = null;
-            _recBtnCache = null;
-        }
-
-        function recSetupTimelineInteractions() {
-            const c = document.getElementById('recTimelineCanvas');
-            if (!c) return;
-            let seeking = false;
-            function seekClientX(clientX) {
-                const rect = c.getBoundingClientRect();
-                const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
-                const a = recGetActiveLayer();
-                if (!a) return;
-                const eff = recGetEffectiveDuration(a);
-                if (eff <= 0) return;
-                const ratio = x / rect.width;
-                a.timeline.playbackPosition = ratio * eff;
-                recUpdateHeadsUI();
-                recDrawTimeline();
-            }
-            c.addEventListener('mousedown', (e) => { seeking = true; seekClientX(e.clientX); });
-            window.addEventListener('mousemove', (e) => { if (seeking) seekClientX(e.clientX); });
-            window.addEventListener('mouseup', () => { seeking = false; });
-        }
-
-        function recSetupResizeHandle() {
-            const drawer = document.getElementById('recDrawer');
-            const handle = document.getElementById('recResizeHandle');
-            if (!drawer || !handle) return;
-            // The drawer is zoomed by --ui-scale (init-responsive.css), so the
-            // pointer and getBoundingClientRect speak SCREEN px while its CSS
-            // height is pre-zoom. Mixing the two made every grab jump by the
-            // scale, and the 90%-of-window cap became 90% x scale: from about
-            // 1.12 the handle went off the top, the Full audio view could be
-            // dragged over nearly the whole canvas, and only a sliver came
-            // back (usertest 2026-10-03). Work in screen px, convert once, and
-            // keep at least 120 px of canvas above it, at most 60% of the
-            // window.
-            const MIN_PX = 160;
-            const zoomOf = () => {
-                const css = drawer.offsetHeight, scr = drawer.getBoundingClientRect().height;
-                return (css > 0 && scr > 0) ? scr / css : 1;
-            };
-            const maxPx = () => Math.max(MIN_PX, Math.min(window.innerHeight * 0.6, window.innerHeight - 120));
-            const setScreenHeight = (px) => {
-                const h = Math.max(MIN_PX, Math.min(maxPx(), px));
-                drawer.style.height = `${Math.round(h / zoomOf())}px`;
-                recResizeTimelineCanvas();
-                recUpdateHeadsUI();
-                recDrawTimeline();
-            };
-            let resizing = null;   // { id, startY, startH } in screen px
-            handle.addEventListener('pointerdown', (e) => {
-                if (e.button !== 0) return;
-                resizing = { id: e.pointerId, startY: e.clientY, startH: drawer.getBoundingClientRect().height };
-                try { handle.setPointerCapture(e.pointerId); } catch (_) {}
-                e.preventDefault();
-            });
-            handle.addEventListener('pointermove', (e) => {
-                if (!resizing || e.pointerId !== resizing.id) return;
-                setScreenHeight(resizing.startH + (resizing.startY - e.clientY)); // up = taller
-            });
-            const stop = (e) => {
-                if (!resizing || (e && e.pointerId !== resizing.id)) return;
-                try { handle.releasePointerCapture(resizing.id); } catch (_) {}
-                resizing = null;
-            };
-            handle.addEventListener('pointerup', stop);
-            handle.addEventListener('pointercancel', stop);
-            handle.addEventListener('lostpointercapture', stop);
-            // A smaller window (or a bigger ui scale) takes the drawer down
-            // with it rather than leaving it over the canvas.
-            window.addEventListener('resize', () => {
-                if (!drawer.classList.contains('open')) return;
-                if (drawer.getBoundingClientRect().height > maxPx() + 1) setScreenHeight(maxPx());
-            });
-        }
-        
-        function recSetStatus(text) {
-            const s = document.getElementById('recStatus');
-            if (s) s.textContent = text;
-        }
-        
-        function recClearActive() {
-            const a = recGetActiveLayer();
-            if (!a) return;
-            a.timeline.interactions = [];
-            a.timeline.duration = 0;
-            a.timeline.playbackPosition = 0;
-            a.timeline.isRecording = false;
-            a.timeline.isPlaying = false;
-            recWorkDirty = false;
-            recMarkEdited();
-            recSetStatus('Part cleared');
-            recRenderUI();
-        }
-        
-        function recExportAll() {
-            // A loop length still being typed in an open ⋯ lands first
-            recCloseMenu();
-            const data = {
-                version: '2.1',
-                layers: recLayers.map(layer => ({
-                    id: layer.id,
-                    name: layer.name,
-                    visible: layer.visible,
-                    isLooping: layer.isLooping,
-                    loopMaxMs: layer.loopMaxMs,
-                    colorMode: layer.colorMode || 'original',
-                    recordMode: layer.recordMode || 'main',
-                    recordStepPalette: layer.recordStepPalette || null,
-                    mask: layer.mask ? {
-                        enabled: layer.mask.enabled,
-                        mode: layer.mask.mode,
-                        shapes: layer.mask.shapes
-                    } : undefined,
-                    timeline: {
-                        interactions: layer.timeline.interactions,
-                        duration: layer.timeline.duration
-                    }
-                }))
-            };
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            // Named after the animation when it has a name
-            const field = document.getElementById('recAnimName');
-            const stem = String((field && field.value.trim()) || recOpenedFrom || '').replace(/[\\/:*?"<>|]+/g, '').trim();
-            a.download = (stem || `animation-${Date.now()}`) + '.json';
-            a.click();
-            URL.revokeObjectURL(url);
-            recSetStatus('Saved to file');
-        }
-        
-        function recImportFromFile(file) {
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    recCloseMenu();
-                    recCancelCountdown();
-                    recClearAutoStopTimer();
-                    recIsPlayingAll = false;
-                    recLayers = [];
-                    if ((data.version === '2.0' || data.version === '2.1') && Array.isArray(data.layers)) {
-                        data.layers.forEach(ld => {
-                            const layer = recCreateLayer(ld.name);
-                            layer.visible = !!ld.visible;
-                            layer.isLooping = ld.isLooping !== undefined ? !!ld.isLooping : true;
-                            layer.loopMaxMs = (typeof ld.loopMaxMs === 'number') ? ld.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
-                            layer.colorMode = recMigrateColorMode(ld.colorMode);
-                            layer.recordMode = ld.recordMode || 'main';
-                            layer.recordStepPalette = ld.recordStepPalette || null;
-                            // Import mask data if present (v2.1+)
-                            if (ld.mask) {
-                                layer.mask = {
-                                    enabled: !!ld.mask.enabled,
-                                    mode: ld.mask.mode || 'show',
-                                    shapes: ld.mask.shapes || []
-                                };
-                            }
-                            layer.timeline.interactions = ld.timeline?.interactions || [];
-                            layer.timeline.duration = ld.timeline?.duration || 0;
-                            layer.timeline.playbackPosition = 0;
-                        });
-                    } else if (data.timeline) {
-                        const layer = recCreateLayer('Imported part');
-                        layer.timeline.interactions = data.timeline.interactions || [];
-                        layer.timeline.duration = data.timeline.duration || 0;
-                        layer.timeline.playbackPosition = 0;
-                        layer.loopMaxMs = (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
-                    }
-                    // A file with no parts in it still leaves one to record into
-                    if (!recLayers.length) recCreateLayer();
-                    // Reset active to first
-                    recActiveLayerId = recLayers[0] ? recLayers[0].id : null;
-                    recForgetBench();
-                    // The file's name is offered as the animation's (Save
-                    // makes it a new one, bumped when the name is taken)
-                    const nameField = document.getElementById('recAnimName');
-                    if (nameField) nameField.value = String(file.name || '').replace(/\.json$/i, '').trim().slice(0, 60);
-                    recRenderUI();
-                    recSetStatus(`Opened "${file.name}"`);
-                } catch (err) {
-                    recSetStatus("Couldn't open that file");
-                    console.error('Import error:', err);
-                }
-            };
-            reader.readAsText(file);
         }
 
         function recGenJellyfishPreset() {
@@ -1976,6 +1317,238 @@
             return d;
         }
 
+        // ── Takes on disk, packed (2026-10-14) ──────────────────────────
+        // A take holds hundreds of dabs a second, and as objects a dab was
+        // ~250 characters (a Just-me dab's full-length floats) or ~110 (an
+        // Everything dab), so a few long takes filled the browser's ~5 MB.
+        // Saved, every take becomes columns ('rec2'): each number field in
+        // REC_COLS as whole steps of its unit, stored as the step from the
+        // dab before (or the step's own change, recEncCol), a run of the
+        // same step folded into one, 7 bits a byte, base64. On simulated
+        // 30 s takes a Just-me one went from ~1.2 MB to ~40 KB, and an
+        // Everything one to a quarter of its 'tap1' size. What holds still
+        // through a stroke (arm count, tip, shape, push...) goes in a table
+        // the dabs index. Dabs are rounded to the same units as they are
+        // painted (recQuantizeDab), so a kept take plays back exactly as it
+        // did on the bench; the units sit below what the canvas can show.
+        // 'tap1' (2026-10-13, Everything takes only) and plain arrays still
+        // load.
+        const REC_COLS = [
+            ['timestamp', 100], ['x', 1e5], ['y', 1e5], ['vx', 100], ['vy', 100],
+            ['color', 1e6, 3], ['radius', 1e7], ['fl', 1e7], ['vk', 1e7], ['fm', 1000],
+            ['ft', 1e4], ['ang', 100], ['tx', 1000], ['rk', 1e4, 3]
+        ];
+        const REC_COL_SPEC = {};
+        REC_COLS.forEach(c => { REC_COL_SPEC[c[0]] = c; });
+        const REC_INT_MAX = 2 ** 48;   // past this a value rides the table whole
+
+        // A dab's number fields, rounded to the units its columns keep
+        function recQuantizeDab(d) {
+            for (let c = 0; c < REC_COLS.length; c++) {
+                const key = REC_COLS[c][0], s = REC_COLS[c][1], k = REC_COLS[c][2] || 0;
+                const v = d[key];
+                if (!k) {
+                    if (typeof v === 'number' && isFinite(v)) d[key] = Math.round(v * s) / s;
+                } else if (Array.isArray(v) && v.length === k) {
+                    for (let e = 0; e < k; e++) if (typeof v[e] === 'number' && isFinite(v[e])) v[e] = Math.round(v[e] * s) / s;
+                }
+            }
+            return d;
+        }
+
+        // Whole numbers to text. A step either way is zigzagged so a small
+        // one is a small number; a token's low bit says a run count follows.
+        function recEncInts(vals) {
+            const bytes = [];
+            const put = u => { while (u >= 128) { bytes.push(u % 128 + 128); u = Math.floor(u / 128); } bytes.push(u); };
+            let prev = 0;
+            for (let j = 0; j < vals.length;) {
+                const d = vals[j] - prev;
+                let run = 1;
+                while (j + run < vals.length && vals[j + run] - vals[j + run - 1] === d) run++;
+                const z = d >= 0 ? d * 2 : -d * 2 - 1;
+                if (run > 1) { put(z * 2 + 1); put(run - 2); } else put(z * 2);
+                prev = vals[j + run - 1];
+                j += run;
+            }
+            let bin = '';
+            for (let j = 0; j < bytes.length; j += 0x8000) bin += String.fromCharCode.apply(null, bytes.slice(j, j + 0x8000));
+            return btoa(bin);
+        }
+
+        // A column is its values' steps, or, when that comes out shorter,
+        // the steps of the steps ('~'): position and velocity change
+        // smoothly, so their steps change by little.
+        function recEncCol(vals) {
+            const one = recEncInts(vals);
+            const steps = vals.map((v, j) => v - (j ? vals[j - 1] : 0));
+            const two = '~' + recEncInts(steps);
+            return two.length < one.length ? two : one;
+        }
+        function recDecCol(s, n) {
+            if (typeof s !== 'string' || s.charAt(0) !== '~') return recDecInts(s, n);
+            const out = recDecInts(s.slice(1), n);
+            for (let j = 1; j < out.length; j++) out[j] += out[j - 1];
+            return out;
+        }
+
+        // And back: never more than n numbers, whatever a file says
+        function recDecInts(s, n) {
+            const out = [];
+            let bin;
+            try { bin = atob(typeof s === 'string' ? s : ''); } catch (_) { return out; }
+            let pos = 0, prev = 0;
+            const get = () => {
+                let u = 0, m = 1, c;
+                do { c = bin.charCodeAt(pos++); u += (c % 128) * m; m *= 128; } while (c >= 128 && pos < bin.length);
+                return u;
+            };
+            while (pos < bin.length && out.length < n) {
+                const t = get();
+                const run = (t % 2) ? Math.min(get() + 2, n - out.length) : 1;
+                const z = Math.floor(t / 2);
+                const d = (z % 2) ? -(z + 1) / 2 : z / 2;
+                for (let r = 0; r < run; r++) { prev += d; out.push(prev); }
+            }
+            return out;
+        }
+
+        // A field that is missing, or not a number its column can hold,
+        // is marked absent in the column (`has`) and rides the dab's table
+        // row as it was, so nothing comes back changed.
+        function recPackInteractions(list) {
+            if (!Array.isArray(list) || !list.length || !list.every(i => i && typeof i === 'object' && !Array.isArray(i))) return list;
+            const n = list.length;
+            const vals = REC_COLS.map(c => Array.from({ length: c[2] || 1 }, () => []));
+            const seen = REC_COLS.map(() => []);
+            const ctx = [], ctxIx = new Map(), ki = [];
+            for (let j = 0; j < n; j++) {
+                const i = list[j];
+                const rest = {};
+                for (const key in i) if (!REC_COL_SPEC[key] && i[key] !== undefined) rest[key] = i[key];
+                for (let c = 0; c < REC_COLS.length; c++) {
+                    const key = REC_COLS[c][0], s = REC_COLS[c][1], k = REC_COLS[c][2] || 0;
+                    const v = i[key];
+                    if (v === undefined) { seen[c].push(0); continue; }
+                    const parts = k ? ((Array.isArray(v) && v.length === k) ? v : null) : [v];
+                    const ints = parts && parts.map(e => (typeof e === 'number' && isFinite(e)) ? Math.round(e * s) : NaN);
+                    if (ints && ints.every(q => Math.abs(q) <= REC_INT_MAX)) {
+                        seen[c].push(1);
+                        for (let e = 0; e < ints.length; e++) vals[c][e].push(ints[e]);
+                    } else {
+                        seen[c].push(0);
+                        rest[key] = v;
+                    }
+                }
+                const kk = JSON.stringify(rest);
+                let ix = ctxIx.get(kk);
+                if (ix === undefined) { ix = ctx.length; ctx.push(rest); ctxIx.set(kk, ix); }
+                ki.push(ix);
+            }
+            const p = { pack: 'rec2', n, cols: {}, ctx, ki: recEncInts(ki) };
+            REC_COLS.forEach((c, ci) => {
+                const got = vals[ci][0].length;
+                if (!got) return;
+                p.cols[c[0]] = [c[1]].concat(vals[ci].map(recEncCol));
+                if (got < n) (p.has || (p.has = {}))[c[0]] = recEncInts(seen[ci]);
+            });
+            return p;
+        }
+
+        function recUnpackRec2(p) {
+            // Every dab has a table row, so a file cannot claim more dabs
+            // than its rows hold
+            const ki = recDecInts(p.ki, Math.max(0, Math.min(Math.floor(+p.n) || 0, 2e6)));
+            const n = ki.length;
+            const out = new Array(n);
+            for (let j = 0; j < n; j++) out[j] = {};
+            const cols = (p.cols && typeof p.cols === 'object') ? p.cols : {};
+            Object.keys(cols).forEach(key => {
+                const c = cols[key];
+                const s = Array.isArray(c) ? +c[0] : 0;
+                if (!(s > 0) || c.length < 2) return;
+                const streams = c.slice(1).map(t => recDecCol(t, n));
+                const arr = streams.length > 1 || !!(REC_COL_SPEC[key] && REC_COL_SPEC[key][2]);
+                const present = (p.has && p.has[key] != null) ? recDecInts(p.has[key], n) : null;
+                for (let j = 0, q = 0; j < n; j++) {
+                    if (present && !present[j]) continue;
+                    out[j][key] = arr ? streams.map(st => st[q] / s) : streams[0][q] / s;
+                    q++;
+                }
+            });
+            const ctx = Array.isArray(p.ctx) ? p.ctx : [];
+            for (let j = 0; j < n; j++) {
+                const k = ctx[ki[j] | 0];
+                if (k && typeof k === 'object') Object.assign(out[j], k);
+            }
+            return out;
+        }
+
+        // Back to dab objects. A plain array is returned as it is. `cache`
+        // keeps the result against the packed object for the library, which
+        // normalizes every stored animation each time it is listed; callers
+        // that go on to change the array ask for a fresh one.
+        const _recUnpacked = new WeakMap();
+        function recUnpackInteractions(p, cache) {
+            if (Array.isArray(p)) return p;
+            if (!p || typeof p !== 'object' || (p.pack !== 'rec2' && p.pack !== 'tap1')) return [];
+            if (cache && _recUnpacked.has(p)) return _recUnpacked.get(p);
+            const out = (p.pack === 'rec2') ? recUnpackRec2(p) : recUnpackTap1(p);
+            if (cache) _recUnpacked.set(p, out);
+            return out;
+        }
+
+        // The first packing (Everything takes, 2026-10-13), read only
+        function recUnpackTap1(p) {
+            if (!Array.isArray(p.t)) return [];
+            const n = p.t.length;
+            const col = Array.isArray(p.col) ? p.col : [], ctx = Array.isArray(p.ctx) ? p.ctx : [];
+            const out = new Array(n);
+            let ti = 0, xi = 0, yi = 0;
+            for (let j = 0; j < n; j++) {
+                ti += +p.t[j] || 0; xi += +(p.x && p.x[j]) || 0; yi += +(p.y && p.y[j]) || 0;
+                const c = col[p.ci ? p.ci[j] : 0];
+                const d = {
+                    timestamp: ti / 100, x: xi / 1e5, y: yi / 1e5,
+                    vx: (+(p.vx && p.vx[j]) || 0) / 100, vy: (+(p.vy && p.vy[j]) || 0) / 100,
+                    color: Array.isArray(c) ? c.slice(0, 3) : [1, 1, 1]
+                };
+                const k = ctx[p.ki ? p.ki[j] : 0];
+                if (k && typeof k === 'object') Object.assign(d, k);
+                d.tap = 1;
+                if (p.fl && p.fl[j] !== 1e6) d.fl = p.fl[j] / 1e6;
+                if (p.vk && p.vk[j] !== 1e6) d.vk = p.vk[j] / 1e6;
+                if (p.ft && p.ft[j]) d.ft = p.ft[j] / 1e4;
+                if (p.rk && Array.isArray(p.rk[j])) d.rk = p.rk[j];
+                out[j] = d;
+            }
+            return out;
+        }
+        window.recPackInteractions = recPackInteractions;
+        window.recUnpackInteractions = recUnpackInteractions;
+
+        // A stored animation (either shape recNormalizePreset reads) with
+        // every track in 'rec2', as a copy, or null when there is nothing to
+        // change. A track that does not unpack to as many dabs as it had
+        // stays as it was.
+        function recRepackAnimation(data) {
+            if (!data || typeof data !== 'object') return null;
+            const rows = Array.isArray(data.layers) ? data.layers : [data];
+            if (!rows.some(r => r && r.interactions && r.interactions.pack !== 'rec2')) return null;
+            const out = JSON.parse(JSON.stringify(data));
+            let changed = false;
+            (Array.isArray(out.layers) ? out.layers : [out]).forEach(r => {
+                if (!r || !r.interactions || r.interactions.pack === 'rec2') return;
+                const list = recUnpackInteractions(r.interactions);
+                const p = recPackInteractions(list);
+                if (p === list || recUnpackInteractions(p).length !== list.length) return;
+                r.interactions = p;
+                changed = true;
+            });
+            return changed ? out : null;
+        }
+        window.recRepackAnimation = recRepackAnimation;
+
         // One track's own length, capped by its loop Max the way
         // recGetEffectiveDuration caps a live layer's.
         function recTrackEffectiveDuration(t) {
@@ -1992,18 +1565,21 @@
             if (!data || typeof data !== 'object') return null;
             let raw;
             if (Array.isArray(data.layers) && data.layers.length) raw = data.layers;
-            else if (Array.isArray(data.interactions)) raw = [data];
+            // A plain array, or packed (a v1 save that was packed again)
+            else if (data.interactions && typeof data.interactions === 'object') raw = [data];
             else return null;
             const tracks = [];
             raw.forEach((l, idx) => {
-                if (!l || !Array.isArray(l.interactions) || !l.interactions.length) return;
-                const interactions = l.interactions.slice();
+                const src = l ? recUnpackInteractions(l.interactions, true) : null;
+                if (!src || !src.length) return;
+                const interactions = src.slice();
                 tracks.push({
                     name: (typeof l.name === 'string' && l.name) ? l.name : `Part ${idx + 1}`,
                     interactions,
                     duration: (typeof l.duration === 'number' && l.duration > 0)
                         ? l.duration : recComputeDurationFromInteractions(interactions),
                     loopMaxMs: (typeof l.loopMaxMs === 'number') ? l.loopMaxMs : undefined,
+                    simRate: (typeof l.simRate === 'number') ? l.simRate : undefined,
                     colorMode: recMigrateColorMode(l.colorMode),
                     recordMode: (typeof l.recordMode === 'string') ? l.recordMode : 'main',
                     recordStepPalette: Array.isArray(l.recordStepPalette) ? l.recordStepPalette.slice() : null
@@ -2016,129 +1592,97 @@
             return { tracks, duration: Math.max(1, duration) };
         }
 
+        // ── Where saved animations live ──────────────────────────────────
+        // In a browser: settingsManager keys recPreset.<name>, inside the
+        // ~5 MB this site gets, shared with presets, brush shapes and the
+        // rest. On desktop: 12b's AnimationVault, a file per animation in
+        // an Animations folder beside the Presets vault, with no quota.
+        // Both answer the same calls. put() and rename() say 'full' only
+        // for the browser's quota; a desktop write that fails is false.
+        const REC_KEY = 'recPreset.';
+        const recWebStore = {
+            all() {
+                const sm = window.settingsManager;
+                const all = (sm && typeof sm.getAll === 'function') ? sm.getAll() : {};
+                const out = {};
+                Object.keys(all).forEach(key => { if (key.startsWith(REC_KEY)) out[key.slice(REC_KEY.length)] = all[key]; });
+                return out;
+            },
+            has(name) {
+                const sm = window.settingsManager;
+                return !!sm && typeof sm.has === 'function' && sm.has(REC_KEY + name);
+            },
+            get(name) {
+                const sm = window.settingsManager;
+                return (sm && this.has(name)) ? sm.get(REC_KEY + name) : null;
+            },
+            put(name, data) {
+                const sm = window.settingsManager;
+                if (!sm) return false;
+                // set() reports a full localStorage as false
+                return sm.set(REC_KEY + name, data, false) ? true : 'full';
+            },
+            remove(name) {
+                const sm = window.settingsManager;
+                if (!sm || !this.has(name)) return false;
+                return sm.remove(REC_KEY + name);
+            },
+            // The copy first while there is room for two. A nearly full store
+            // takes the old one out first, and back in if the copy still
+            // does not fit.
+            rename(from, to) {
+                const sm = window.settingsManager;
+                if (!sm || !this.has(from)) return false;
+                const stored = JSON.parse(JSON.stringify(this.get(from)));
+                if (sm.set(REC_KEY + to, stored, false)) { sm.remove(REC_KEY + from); return true; }
+                sm.remove(REC_KEY + from);
+                if (sm.set(REC_KEY + to, stored, false)) return true;
+                sm.set(REC_KEY + from, stored, false);
+                return 'full';
+            }
+        };
+        function recStore() {
+            const v = window.AnimationVault;
+            return (v && v.available) ? v : recWebStore;
+        }
+
+        // Animations kept before rec2 take far more room than they need.
+        // In a browser they are packed again in place once, after boot;
+        // desktop packs them as it moves them to files (12b).
+        let _recRepackDone = false;
+        function recRepackStoredOnce() {
+            if (_recRepackDone || recStore() !== recWebStore) return;
+            _recRepackDone = true;
+            const all = recWebStore.all();
+            Object.keys(all).forEach(name => {
+                try {
+                    const packed = recRepackAnimation(all[name]);
+                    if (packed) recWebStore.put(name, packed);
+                } catch (e) { console.warn('Repacking animation "' + name + '" failed:', e); }
+            });
+        }
+
         function recListLocalPresets() {
-            const sm = window.settingsManager;
-            const all = sm && typeof sm.getAll === 'function' ? sm.getAll() : {};
+            const all = recStore().all();
             const out = {};
-            Object.keys(all).forEach(key => {
-                if (key.startsWith('recPreset.')) {
-                    const name = key.substring('recPreset.'.length);
-                    const preset = recNormalizePreset(all[key]);
-                    if (preset) out[name] = preset;
-                }
+            Object.keys(all).forEach(name => {
+                const preset = recNormalizePreset(all[name]);
+                if (preset) out[name] = preset;
             });
             return out;
         }
 
-        // The library changed (saved, kept, renamed, deleted). The sidebar's
-        // Animations section mirrors it (slots + Saved Animations), and an
-        // empty name field offers the next free name. The editor's own
-        // "Animations" select went 2026-10-04: the library's ⤢ opens one.
+        // The library changed (kept, renamed, deleted). The sidebar's
+        // Animations section mirrors it (slots + Saved Animations).
         function recLibraryChanged() {
-            recSyncNameField(false);
             try { window.dispatchEvent(new CustomEvent('recPresetsChanged')); } catch (_) {}
         }
 
-        // ── The animation's name (the File group) ───────────────────────
-        // Shows the animation the editor was opened from; with none it is
-        // empty and its placeholder is the name Save would give. Rewritten
-        // only when that animation changes (or `force`), so a re-render
-        // never eats a name being typed.
-        let _recNameFor = null;
-        function recSyncNameField(force) {
-            const f = document.getElementById('recAnimName');
-            if (!f) return;
-            const opened = recOpenedFrom || '';
-            if (force || _recNameFor !== opened) {
-                _recNameFor = opened;
-                f.value = opened;
-            }
-            if (!opened) f.placeholder = recAutoName();
-        }
-
-        // Parts on the bench that nobody kept or saved.
-        function recHasUnsaved() {
-            return !!recPendingTake || (recWorkDirty && recLayers.some(l => l.timeline.interactions.length > 0));
-        }
-
-        // Save and Save as new, under the name in the field.
-        //   Save, opened from a stored animation: writes back to it. A new
-        //     name in the field renames it first (the key moves, the slots
-        //     follow, a taken name bumps).
-        //   Save with nothing opened (or a built-in), and Save as new: a new
-        //     animation; a taken name bumps ("Sunset 2") instead of refusing.
-        function recSaveNamed(asNew) {
-            recCloseMenu();
-            const field = document.getElementById('recAnimName');
-            const typed = String(field && field.value || '').trim().slice(0, 60);
-            const n = recLayers.filter(l => l.timeline.interactions.length > 0).length;
-            if (!n) { recSetStatus('Nothing recorded yet'); return false; }
-            const opened = (recOpenedFrom && recIsStoredAnimation(recOpenedFrom)) ? recOpenedFrom : null;
-            const parts = n > 1 ? ` (${n} parts)` : '';
-            let name, overwrite = false, say;
-            if (!asNew && opened) {
-                name = opened;
-                overwrite = true;
-                if (typed && typed !== opened) {
-                    const r = recRenameSavedAnimation(opened, typed);
-                    if (r === 'full') { recSetStatus("Couldn't rename it: storage is full."); return false; }
-                    if (r) name = r;
-                }
-                say = (typed && typed !== name)
-                    ? `"${typed}" is taken, so it saved as "${name}"${parts}`
-                    : `Saved "${name}"${parts}`;
-            } else {
-                const base = typed || recOpenedFrom || recAutoName();
-                name = recFreeName(base);
-                say = (name === base) ? `Saved as "${name}"${parts}`
-                    : `"${base}" is ${recIsBuiltinAnimation(base) ? 'built in' : 'taken'}, so it saved as "${name}"${parts}`;
-            }
-            const result = recSaveAllLayersAsPreset(name, overwrite);
-            if (result === true) {
-                recOpenedFrom = name;
-                recWorkDirty = false;
-                recPendingTake = null;
-                recHideTakePrompt();
-                recSyncNameField(true);
-                recLibraryChanged();
-                recRestartIfPlaying(name);
-                recSetStatus(say);
-                recUpdateButtonStates();
-                return name;
-            }
-            if (result === 'full') recSetStatus("Couldn't save: storage is full. Delete an old animation and try again.");
-            else if (result === 'empty') recSetStatus('Nothing recorded yet');
-            else recSetStatus("Couldn't save the animation");
-            return false;
-        }
-
-        // File ▾ → Start empty: one empty part and no name, for a new
-        // animation. Parts nobody saved are asked about first.
-        function recStartEmpty() {
-            if (recCountdownActive || recLayers.some(l => l.timeline.isRecording)) { recSetStatus('Stop recording first'); return; }
-            const go = () => {
-                recStopPlayback();
-                recClearBench();
-                recSetStatus('Started empty');
-            };
-            if (recHasUnsaved() && typeof window.appConfirm === 'function') {
-                window.appConfirm({
-                    title: 'Start empty?',
-                    message: "What you recorded hasn't been saved. Starting empty clears it.",
-                    confirmLabel: 'Start empty'
-                }).then(ok => { if (ok) go(); });
-                return;
-            }
-            go();
-        }
-
         // ── Names ────────────────────────────────────────────────────────
-        // A saved animation is the key recPreset.<name>. A name that is taken
+        // A saved animation is a name in recStore(). A name that is taken
         // bumps ("Animation 2", "Sunset 3") instead of refusing.
         function recIsStoredAnimation(name) {
-            const sm = window.settingsManager;
-            const all = (sm && typeof sm.getAll === 'function') ? sm.getAll() : {};
-            return Object.prototype.hasOwnProperty.call(all, `recPreset.${name}`);
+            return recStore().has(name);
         }
         function recNameTaken(name) {
             return recIsStoredAnimation(name) || Object.prototype.hasOwnProperty.call(recBuiltinPresetGenerators, name);
@@ -2167,99 +1711,39 @@
             return null;
         }
 
-        // Opening restores the whole performance: one part per saved track,
-        // each with the colour behaviour and loop length it was saved with.
-        // The bench becomes those parts, ready to edit and Save.
-        function recLoadBench(name, preset) {
-            recLayers.forEach(l => { l.timeline.isPlaying = false; });
-            recIsPlayingAll = false;
-            recLayers = [];
-            recNextLayerId = 1;
-            recActiveLayerId = null;
-            let first = null;
-            preset.tracks.forEach(t => {
-                const layer = recCreateLayer(t.name);
-                layer.timeline.interactions = JSON.parse(JSON.stringify(t.interactions));
-                layer.timeline.duration = t.duration;
-                layer.timeline.playbackPosition = 0;
-                if (typeof t.loopMaxMs === 'number') layer.loopMaxMs = t.loopMaxMs;
-                layer.colorMode = t.colorMode;
-                layer.recordMode = t.recordMode;
-                layer.recordStepPalette = t.recordStepPalette ? t.recordStepPalette.slice() : null;
-                if (!first) first = layer;
-            });
-            if (!recLayers.length) recCreateLayer();
-            recActiveLayerId = (first || recLayers[0]).id;
-            recForgetBench();
-            recOpenedFrom = name;
-            recSyncNameField(true);
-            recRenderUI();
-            recSetStatus(`Editing "${name}"` + (preset.tracks.length > 1 ? ` (${preset.tracks.length} parts)` : ''));
-        }
-
-        // The library's ⤢: open a saved animation in the editor. Parts nobody
-        // kept are asked about first, since opening replaces them.
-        function recEditSavedAnimation(name) {
-            const preset = name ? recGetPresetByName(name) : null;
-            if (!preset) { recStripSay('That animation is gone.'); return false; }
-            if (recCountdownActive || recLayers.some(l => l.timeline.isRecording)) { recStripSay('Stop recording first.'); return false; }
-            const go = () => {
-                recLoadBench(name, preset);
-                const sel = document.getElementById('recMode');
-                if (sel) { sel.value = 'full'; sel.dispatchEvent(new Event('change')); }
-                else if (window.studioDrawer) window.studioDrawer.open('record');
-            };
-            if (recHasUnsaved() && typeof window.appConfirm === 'function') {
-                window.appConfirm({
-                    title: 'Replace the parts in the editor?',
-                    message: `What you recorded hasn't been kept. Opening "${name}" replaces it.`,
-                    confirmLabel: 'Replace'
-                }).then(ok => { if (ok) go(); });
-                return true;
-            }
-            go();
-            return true;
-        }
-
-        // A slot or library row playing the old copy picks up the new one.
-        function recRestartIfPlaying(name) {
-            if (recAnimPlayers.has(name)) recStartSavedAnimation(name);
+        // A packed track, or a copy of one that cannot be packed
+        function recPackForSave(list) {
+            const p = recPackInteractions(list);
+            return (p === list) ? list.map(i => ({ ...i })) : p;
         }
 
         // Save the whole stack, not just the selected layer: a performance is
         // every layer that has something in it, and recalling one from a slot
         // should bring back what the artist actually made. Empty layers are
-        // dropped so a stray New Layer doesn't pad the preset. `overwrite`
-        // writes over a stored one of that name (Save, Keep into the opened
-        // animation); without it a taken name reports 'exists'.
-        function recSaveAllLayersAsPreset(name, overwrite) {
+        // dropped so a stray empty part doesn't pad the preset. A taken name
+        // reports 'exists'.
+        function recSaveAllLayersAsPreset(name) {
             if (!name) return false;
-            // A loop length still being typed in an open ⋯ lands first
-            recCloseMenu();
             const filled = recLayers.filter(l => l && l.timeline && (l.timeline.interactions || []).length > 0);
             if (!filled.length) return 'empty';
             const layers = filled.map(l => ({
                 name: l.name,
-                interactions: (l.timeline.interactions || []).map(i => ({ ...i })),
+                interactions: recPackForSave(l.timeline.interactions || []),
                 duration: l.timeline.duration || recComputeDurationFromInteractions(l.timeline.interactions),
                 loopMaxMs: (typeof l.loopMaxMs === 'number') ? l.loopMaxMs : undefined,
+                simRate: (typeof l.simRate === 'number') ? l.simRate : undefined,
                 colorMode: l.colorMode || 'original',
                 recordMode: l.recordMode || 'main',
                 recordStepPalette: Array.isArray(l.recordStepPalette) ? l.recordStepPalette.slice() : null
             }));
             let duration = 0;
             layers.forEach(l => { duration = Math.max(duration, recTrackEffectiveDuration(l)); });
-            const sm = window.settingsManager;
-            if (!sm) return false;
-            const key = `recPreset.${name}`;
-            const all = (typeof sm.getAll === 'function') ? sm.getAll() : {};
-            if (!overwrite && Object.prototype.hasOwnProperty.call(all, key)) {
-                return 'exists';
-            }
-            // set() reports a full localStorage as false; it used to be ignored,
-            // so a take that never landed still said it was saved.
-            if (!sm.set(key, { version: 2, layers, duration: Math.max(1, duration) }, false)) return 'full';
-            return true;
+            const store = recStore();
+            if (store.has(name)) return 'exists';
+            // A failed write used to be ignored, so a take that never landed
+            // still said it was saved.
+            const res = store.put(name, { version: 2, layers, duration: Math.max(1, duration) });
+            return (res === true || res === 'full') ? res : false;
         }
 
         // ── Slot animations: an independent, looping transport ──────────
@@ -2343,7 +1827,7 @@
                         // A short track inside a longer performance finishes
                         // and waits for the loop point, like a layer does.
                         if (prev >= t.endMs) continue;
-                        recEmitTrackWindow(t, t.interactions, prev, Math.min(curr, t.endMs), null);
+                        recEmitTrackWindow(t, t.interactions, prev > 0 ? prev : -1, Math.min(curr, t.endMs));
                     }
                     remaining -= step;
                     p.position = curr;
@@ -2356,21 +1840,17 @@
             });
         }
 
-        // Deleting is permanent — a recorded performance has no undo and no
-        // vault copy — so every caller confirms first. Builtins aren't stored
-        // and simply report false. A playing copy is stopped rather than left
-        // looping against a recording that no longer exists.
+        // Deleting has no undo (in a browser it is gone; desktop moves the
+        // file to the Animations folder's .trash), so every caller confirms
+        // first. Builtins aren't stored and simply report false. A playing
+        // copy is stopped rather than left looping against a recording that
+        // no longer exists.
         function recDeleteSavedAnimation(name) {
             if (!name) return false;
-            const sm = window.settingsManager;
-            if (!sm) return false;
-            const key = `recPreset.${name}`;
-            const all = (typeof sm.getAll === 'function') ? sm.getAll() : {};
-            if (!Object.prototype.hasOwnProperty.call(all, key)) return false;
+            const store = recStore();
+            if (!store.has(name)) return false;
             recStopSavedAnimation(name);
-            if (recOpenedFrom === name) recOpenedFrom = null;
-            if (typeof sm.remove === 'function') sm.remove(key);
-            else sm.set(key, undefined, false);
+            if (!store.remove(name)) return false;
             // recLibraryChanged fires recPresetsChanged for the sidebar;
             // the delete event additionally lets it prune slots that pointed
             // here, which a generic refresh must never do on its own.
@@ -2382,34 +1862,27 @@
         }
 
         // Rename moves the stored key and everything that names it: a copy
-        // playing in a slot, the editor's opened animation, and (through
-        // recAnimationRenamed, js/20) the slots. A taken name bumps. Returns
-        // the name it ended up with, 'full', or false.
+        // playing in a slot and (through recAnimationRenamed, js/20) the
+        // slots. A taken name bumps. Returns the name it ended up with,
+        // 'full', or false.
         function recRenameSavedAnimation(from, to) {
             to = String(to == null ? '' : to).trim().slice(0, 60);
             if (!from || !to) return false;
             if (to === from) return from;
-            const sm = window.settingsManager;
-            if (!sm || typeof sm.remove !== 'function') return false;
-            const oldKey = `recPreset.${from}`;
-            const all = (typeof sm.getAll === 'function') ? sm.getAll() : {};
-            if (!Object.prototype.hasOwnProperty.call(all, oldKey)) return false;   // builtins and strays
+            const store = recStore();
+            if (!store.has(from)) return false;   // builtins and strays
             const name = recFreeName(to);
-            const stored = JSON.parse(JSON.stringify(all[oldKey]));
-            // Out first, so a nearly full store has room for the copy; back in
-            // if the copy still does not fit.
-            sm.remove(oldKey);
-            if (!sm.set(`recPreset.${name}`, stored, false)) {
-                sm.set(oldKey, stored, false);
+            const res = store.rename(from, name);
+            if (res === 'full') {
                 recStripSay("Couldn't rename it: storage is full.");
                 return 'full';
             }
+            if (res !== true) return false;
             if (recAnimPlayers.has(from)) {
                 const p = recAnimPlayers.get(from);
                 recAnimPlayers.delete(from);
                 recAnimPlayers.set(name, p);
             }
-            if (recOpenedFrom === from) recOpenedFrom = name;
             try {
                 window.dispatchEvent(new CustomEvent('recAnimationRenamed', { detail: { from, to: name } }));
             } catch (_) {}
@@ -2446,20 +1919,17 @@
         function recSetSavedAnimationColorMode(name, mode) {
             if (!name) return false;
             mode = recMigrateColorMode(mode);
-            const sm = window.settingsManager;
-            if (!sm) return false;
-            const key = `recPreset.${name}`;
-            const all = (typeof sm.getAll === 'function') ? sm.getAll() : {};
-            if (!Object.prototype.hasOwnProperty.call(all, key)) return false;
-            const stored = all[key];
+            const store = recStore();
+            if (!store.has(name)) return false;
+            const stored = store.get(name);
             if (!stored || typeof stored !== 'object') return false;
             // Both shapes on disk: v2 wraps a layers[] array, the original
             // single-track form IS the track.
             const rows = Array.isArray(stored.layers) ? stored.layers
-                : (Array.isArray(stored.interactions) ? [stored] : null);
+                : ((stored.interactions && typeof stored.interactions === 'object') ? [stored] : null);
             if (!rows) return false;
             rows.forEach(r => { if (r && typeof r === 'object') r.colorMode = mode; });
-            sm.set(key, stored, false);
+            store.put(name, stored);
             // Live retune. _repKey/_repStep are the generative scratch: clearing
             // them re-seeds on the next dab instead of holding the colour the
             // old mode had cached.
@@ -2473,15 +1943,10 @@
             return true;
         }
 
-        window.recEditorOpen = recEditorOpen;
         window.recRenameSavedAnimation = recRenameSavedAnimation;
-        window.recEditSavedAnimation = recEditSavedAnimation;
         window.recKeepTake = recKeepTake;
         window.recDiscardTake = recDiscardTake;
         window.recForgetBench = recForgetBench;
-        window.recBenchState = function () {
-            return { pending: !!recPendingTake, openedFrom: recOpenedFrom, dirty: recWorkDirty };
-        };
         window.recDeleteSavedAnimation = recDeleteSavedAnimation;
         window.recGetSavedAnimationColorMode = recGetSavedAnimationColorMode;
         window.recSetSavedAnimationColorMode = recSetSavedAnimationColorMode;
@@ -2495,71 +1960,19 @@
         };
 
         function setupRecUI() {
-            // #recMode stays, hidden inside the strip: 28 (the shared drawer),
-            // 12 (saved settings) and the Audio tab read it. 'min' is the
-            // strip with the editor closed, 'full' the editor open. A saved
-            // 'off' from before the strip, or anything else, reads as 'min'.
-            const recModeSel = document.getElementById('recMode');
-            const recDrawerEl = document.getElementById('recDrawer');
+            // The record strip is the whole recorder since the animation
+            // editor went (2026-10-13); #recMode went with it.
             const recMiniRecordBtn = document.getElementById('recMiniRecordBtn');
             const recMiniPauseBtn = document.getElementById('recMiniPauseBtn');
             const recMiniStopBtn = document.getElementById('recMiniStopBtn');
-            const recOpenFullBtn = document.getElementById('recOpenFullBtn');
 
             // Capture is always armed: a dab only lands in a part while that
             // part is recording, so there is nothing for an Off to protect.
             recEnabled = true;
 
-            function applyMode(mode) {
-                const full = (mode === 'full');
-                if (recModeSel && recModeSel.value !== (full ? 'full' : 'min')) recModeSel.value = full ? 'full' : 'min';
-
-                // There is always a part to record into
-                if (recLayers.length === 0) recAddLayer();
-
-                if (!full) {
-                    // The drawer is shared with the Audio tab: only close it when
-                    // the Animation tab is the one showing. Touching the class
-                    // directly is a fallback for studioDrawer being absent; an
-                    // unconditional else here closes the drawer mid tab-swap
-                    // (the demote to 'min' fires after the tab flips to audio).
-                    if (window.studioDrawer) {
-                        if (window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
-                    } else if (recDrawerEl) recDrawerEl.classList.remove('open');
-                    recRenderUI();
-                } else {
-                    if (window.studioDrawer) window.studioDrawer.open('record');
-                    else if (recDrawerEl) recDrawerEl.classList.add('open');
-                    // Reflect current max into full field
-                    const dur = document.getElementById('recMaxDuration');
-                    if (dur) dur.value = recFormatTime(recMaxDurationMs || 10000);
-                    const spd = document.getElementById('recPlaybackSpeed');
-                    if (spd) recPlaybackSpeed = parseFloat(spd.value) || 1;
-                    recRenderUI();
-                    recResizeTimelineCanvas();
-                    recUpdateHeadsUI();
-                    recDrawTimeline();
-                    recResizeAllMiniTimelines();
-                    recDrawMiniTimelines();
-                }
-            }
-
-            if (recModeSel) {
-                recModeSel.addEventListener('change', (e) => applyMode(e.target.value));
-                // Apply initial mode
-                applyMode(recModeSel.value);
-            } else {
-                applyMode('min');
-            }
-            // The shared drawer opens and closes from its own tab bar and ✕ as
-            // well; the strip's Edit ⤢ follows whichever tab is showing.
-            // A menu of the editor's goes with it.
-            if (recDrawerEl && typeof MutationObserver === 'function') {
-                new MutationObserver(() => {
-                    if (_recMenu && !recEditorOpen()) recCloseMenu();
-                    recUpdateButtonStates();
-                }).observe(recDrawerEl, { attributes: true, attributeFilter: ['class', 'data-active-tab'] });
-            }
+            // There is always a part to record into
+            if (recLayers.length === 0) recAddLayer();
+            recRenderUI();
 
     // The strip
     if (recMiniRecordBtn) recMiniRecordBtn.addEventListener('click', recToggleRecord);
@@ -2569,96 +1982,20 @@
         const chip = document.getElementById('recLen' + (ms / 1000));
         if (chip) chip.addEventListener('click', () => recSetLength(ms));
     });
-    // Edit ⤢ opens the editor, and closes it again while it is open
-    if (recOpenFullBtn) recOpenFullBtn.addEventListener('click', () => {
-        // Asked Keep · Discard and chose the editor instead: the take stays,
-        // as a part there, and the editor's Save keeps it.
-        if (recPendingTake && !recEditorOpen()) {
-            const a = recLayers.find(l => l.id === recPendingTake.id);
-            recPendingTake = null;
-            recHideTakePrompt();
-            recStripSay((a ? recPartLabel(a.name) : 'It') + ' is in the editor. Save keeps it.');
-            recUpdateButtonStates();
-        }
-        if (!recModeSel) { if (window.studioDrawer) window.studioDrawer.open('record'); return; }
-        recModeSel.value = recEditorOpen() ? 'min' : 'full';
-        recModeSel.dispatchEvent(new Event('change'));
+    {
+        const sm = window.settingsManager;
+        const saved = (sm && typeof sm.get === 'function') ? sm.get('recRecordSource', 'single') : 'single';
+        recRecordSource = (saved === 'all') ? 'all' : 'single';
+    }
+    [['recSrcMe', 'single'], ['recSrcAll', 'all']].forEach(([id, v]) => {
+        const chip = document.getElementById(id);
+        if (chip) chip.addEventListener('click', () => recSetRecordSource(v));
     });
     const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
-    // Play · Edit · File (the drawer's toolbar). A part's own actions are
-    // on its card: ▶ and ⋯ (recBindLayerListEvents).
-    bind('recRecordBtn', recToggleRecord);
-    bind('recPlayAllBtn', recTogglePlaybackAll);
-    bind('recStopBtn', recStopAll);
-    bind('recAddLayerBtn', recAddLayer);
     bind('recKeepBtn', recKeepTake);
     bind('recDiscardBtn', recDiscardTake);
-    bind('recSaveBtn', () => recSaveNamed(false));
-    bind('recSavePresetBtn', () => recSaveNamed(true));
-    const nameField = document.getElementById('recAnimName');
-    if (nameField) nameField.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); recSaveNamed(false); }
-        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); recSyncNameField(true); nameField.blur(); }
-    });
-    // File ▾: Open file…, Save to file…, Start empty. One element, mounted
-    // on <body> the first time it opens (recOpenMenu); a row closes it.
-    const fileBtn = document.getElementById('recFileBtn');
-    const fileMenu = document.getElementById('recFileMenu');
-    if (fileBtn && fileMenu) {
-        fileBtn.addEventListener('click', () => {
-            if (_recMenu && _recMenu.el === fileMenu) { recCloseMenu(); return; }
-            const hasTake = recLayers.some(l => l.timeline.interactions.length > 0);
-            const exp = document.getElementById('recExportBtn');
-            const empty = document.getElementById('recStartEmptyBtn');
-            if (exp) exp.disabled = !hasTake;
-            if (empty) empty.disabled = !hasTake && !recOpenedFrom && recLayers.length <= 1;
-            recOpenMenu(fileMenu, fileBtn, null);
-        });
-        fileMenu.addEventListener('click', (e) => { if (e.target.closest('button')) recCloseMenu(); });
-    }
-    bind('recExportBtn', recExportAll);
-    bind('recStartEmptyBtn', recStartEmpty);
-    const impBtn = document.getElementById('recImportBtn');
-    const impFile = document.getElementById('recImportFile');
-    if (impBtn && impFile) {
-        impBtn.addEventListener('click', () => impFile.click());
-        // Opening a file replaces the parts, so parts nobody saved are asked
-        // about once the file is picked (asking before would cost the click
-        // the file chooser needs).
-        impFile.addEventListener('change', (e) => {
-            const f = e.target.files?.[0];
-            e.target.value = '';
-            if (!f) return;
-            if (recHasUnsaved() && typeof window.appConfirm === 'function') {
-                window.appConfirm({
-                    title: 'Replace the parts in the editor?',
-                    message: `What you recorded hasn't been saved. Opening "${f.name}" replaces it.`,
-                    confirmLabel: 'Replace'
-                }).then(ok => { if (ok) recImportFromFile(f); });
-                return;
-            }
-            recImportFromFile(f);
-        });
-    }
-    const speedSel = document.getElementById('recPlaybackSpeed');
-    if (speedSel) speedSel.addEventListener('change', (e) => { recPlaybackSpeed = parseFloat(e.target.value) || 1; });
-    const durInput = document.getElementById('recMaxDuration');
-    if (durInput) durInput.addEventListener('change', (e) => { recMaxDurationMs = recParseTime(e.target.value) || 8000; recUpdateButtonStates(); });
 
     recLibraryChanged();
     try { window.addEventListener('load', () => recLibraryChanged()); } catch(_){}
-
-    // One-time setup for interactions and resizing
-    recSetupTimelineInteractions();
-    recSetupResizeHandle();
-    window.addEventListener('resize', () => { recResizeTimelineCanvas(); recUpdateHeadsUI(); recDrawTimeline(); recResizeAllMiniTimelines(); recDrawMiniTimelines(); });
+    setTimeout(recRepackStoredOnce, 3000);
         }
-
-        function recCycleLayer(dir) {
-        if (!Array.isArray(recLayers) || recLayers.length === 0) return;
-        const idx = recLayers.findIndex(l => l.id === recActiveLayerId);
-        let next = (idx >= 0 ? idx : 0) + dir;
-        if (next < 0) next = recLayers.length - 1;
-        if (next >= recLayers.length) next = 0;
-        recSetActiveLayer(recLayers[next].id);
-    }

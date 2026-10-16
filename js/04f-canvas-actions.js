@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/04f-canvas-actions.js — part 6/7 of former 04-ui-interactions.js (lines 2921–3320)
+// js/04f-canvas-actions.js
 // LOAD ORDER: after 04e-anim-portal.js, before 04g-hover-capture.js
 // PROVIDES: wipeSimulation, clearCanvas, togglePause, captureLayer, image upload
 // REQUIRES: gl/config (04a); layers (05k, runtime)
@@ -584,6 +584,7 @@
 
                 var modal = null;      // lazily built DOM
                 var onModalKey = null; // Esc handler while it is up
+                var modalHold = null;  // 00b: role, Tab kept inside, focus back
                 var askKind = 'close'; // which question is currently on screen
                 var pendingReply = null; // how to answer whatever main last asked
 
@@ -608,6 +609,7 @@
                 function hideModal() {
                     if (!modal) return;
                     modal.classList.remove('show');
+                    if (modalHold) { modalHold.release(); modalHold = null; }
                     if (onModalKey) {
                         document.removeEventListener('keydown', onModalKey, true);
                         onModalKey = null;
@@ -638,8 +640,7 @@
                         // Cancelled the save dialog, or the write failed —
                         // either way the work is still unsaved, and saying so
                         // is the whole point of this prompt.
-                        e.msg.textContent = 'Not saved — the save was cancelled or failed. '
-                            + 'This painting still has unsaved work.';
+                        e.msg.textContent = 'Not saved - the save was cancelled or failed. This painting still has unsaved work.';
                     }
                 }
 
@@ -651,7 +652,7 @@
                         '<div class="delete-modal-content">' +
                             '<div class="delete-modal-title" id="appCloseTitle">Close without saving?</div>' +
                             '<div class="delete-modal-message" id="appCloseMessage">' +
-                                'This painting has unsaved work. Painting is not autosaved — closing now loses it.' +
+                                'This painting has unsaved work. Painting is not autosaved - closing now loses it.' +
                             '</div>' +
                             '<div class="delete-modal-actions">' +
                                 '<button type="button" class="delete-modal-cancel" id="appCloseKeep">Keep painting</button>' +
@@ -674,33 +675,28 @@
                 var ASKS = {
                     close: {
                         title: 'Close without saving?',
-                        msg: 'This painting has unsaved work. Painting is not autosaved — closing now loses it.',
+                        msg: 'This painting has unsaved work. Painting is not autosaved - closing now loses it.',
                         go: 'Close anyway', offerSave: true
                     },
                     reload: {
                         title: 'Reload without saving?',
-                        msg: 'This painting has unsaved work. Reloading starts from a blank canvas — '
-                            + 'painting is not autosaved.',
+                        msg: 'This painting has unsaved work. Reloading starts from a blank canvas - painting is not autosaved.',
                         go: 'Reload anyway', offerSave: true
                     },
                     'hard-reload': {
                         title: 'Hard reload without saving?',
-                        msg: 'This painting has unsaved work. Reloading starts from a blank canvas — '
-                            + 'painting is not autosaved.',
+                        msg: 'This painting has unsaved work. Reloading starts from a blank canvas - painting is not autosaved.',
                         go: 'Reload anyway', offerSave: true
                     },
                     // Display → Transparent Background → Restart now (js/05h)
                     reopen: {
                         title: 'Restart without saving?',
-                        msg: 'This painting has unsaved work. Restarting reopens the window on a blank '
-                            + 'canvas — painting is not autosaved.',
+                        msg: 'This painting has unsaved work. Restarting reopens the window on a blank canvas - painting is not autosaved.',
                         go: 'Restart anyway', offerSave: true
                     },
                     nuclear: {
                         title: 'Clear all local data?',
-                        msg: 'This wipes settings and the in-app preset list, and reloads. Presets saved to '
-                            + 'your Preset Vault folder survive and come back on next launch — anything not '
-                            + 'in the vault is lost.',
+                        msg: 'This wipes settings, and reloads. (only presets saved to your Preset folder survive and come back on next launch)',
                         go: 'Reset everything', offerSave: false
                     }
                 };
@@ -716,12 +712,13 @@
                     e.quit.textContent = spec.go;
                     e.quit.classList.remove('app-close-safe');
                     modal.classList.add('show');
-                    e.keep.focus();
+                    modalHold = window.DialogFocus.hold(modal, { initial: e.keep });
                     // Re-shown over itself (a new question replaced the old):
                     // one Esc handler, not one per question. A leftover kept
                     // swallowing Escape app-wide after the modal closed.
                     if (onModalKey) document.removeEventListener('keydown', onModalKey, true);
                     onModalKey = function (ev) {
+                        if (window.DialogFocus.top() !== modal) return;   // a dialog over this one has the keys
                         if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); answer(false); }
                     };
                     document.addEventListener('keydown', onModalKey, true);

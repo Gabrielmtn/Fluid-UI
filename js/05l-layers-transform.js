@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05l-layers-transform.js — part 12/14 of former 05-fluid-sim.js (lines 3898–4301)
+// js/05l-layers-transform.js
 // LOAD ORDER: after 05k-layers-render.js, before 05m-layer-masks.js
 // PROVIDES: layer toggle/delete, active-layer drag, resize/rotate handles, updateLayerPosition
 // REQUIRES: 05k
@@ -827,7 +827,6 @@
                     const btn = el.querySelector('.raster-paint-btn');
                     if (btn) btn.classList.toggle('active', on);
                 });
-                if (typeof window.__onActiveRasterChanged === 'function') window.__onActiveRasterChanged(id, layer.title);
                 return true;
             }
             function create(name) {
@@ -881,7 +880,6 @@
                     const next = layers.find(l => l.isRaster && l.index !== id && rasterStore[l.index]);
                     if (next) setActive(next.index);
                     // else: the next sketch-route dab lazily recreates a default
-                    else if (typeof window.__onActiveRasterChanged === 'function') window.__onActiveRasterChanged(null, null);
                 }
             }
             // Per-frame: visible raster layers in composite order (bottom →

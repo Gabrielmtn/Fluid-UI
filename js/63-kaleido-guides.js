@@ -2,7 +2,7 @@
 // js/63-kaleido-guides.js — Kaleidoscope → Show Guides
 // LOAD ORDER: after 34-mandala-mode.js (reads window.MandalaStudio lazily)
 // PROVIDES: the #kaleidoGuides overlay in #canvas-wrapper, one step above
-//   the canvas like Mandala Studio's guides (34), so Zoom View carries it
+//   the canvas like Mandala Overlay's guides (34), so Zoom View carries it
 //   and the side panels stay on top. Off unless Show Guides is ticked.
 //   window.KaleidoGuides (shown / paint / onFrame), so the Pen Input
 //   Window (47) draws the same marks over its own box.
@@ -26,7 +26,7 @@
 //   fold   q = R(-kAngle) · p, the shader's mat2(ca, -sa, sa, ca).
 //   screen (W/2, H/2) + diag(sx, -sy) · R(kAngle) · q, with (sx, sy) the
 //          px per unit: (S, S) isotropic (S = short side), else (W, H).
-// Mandala Studio draws its own guides (the wedge, its seams, the rings),
+// Mandala Overlay draws its own guides (the wedge, its seams, the rings),
 // so these step aside while it is on. Captures never include them: the
 // overlay is DOM, and neither the picture nor the video path reads it.
 // ═══════════════════════════════════════════════════════════════════

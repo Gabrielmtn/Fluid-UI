@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05n-hotkeys-init.js — part 14/14 of former 05-fluid-sim.js (lines 4645–5058)
+// js/05n-hotkeys-init.js
 // LOAD ORDER: after 05m-layer-masks.js, before 06-slider-updater.js (async loader)
 // PROVIDES: hotkey overlay, undo/redo stacks + keyboard handlers, window.layers/renderLayers exposure, rec layer snapshot fns, bootstrap calls: renderLayers(), setupRecUI(), recRenderUI(), update()
 // REQUIRES: update (05j), renderLayers (05k), setupRecUI/recRenderUI (03)
@@ -12,28 +12,44 @@
         // Key-chip pass (2026-08-15): the modal's <li>s are authored as
         // "Keys — Description" prose; on first open, wrap the key half in
         // <kbd> + the rest in .hk-desc so the CSS renders real key caps.
-        // Lines without the ' — ' separator are left untouched.
+        // 2026-10-14: the lines are Gabriel's to word, so ' - ', ' – ' and
+        // ': ' split them too; the first one in the line wins ("1-8 - Set",
+        // "Middle-click - Radial" keep their own hyphens). Lines with none
+        // are left untouched.
+        const HK_SPLIT = / [—–-] |: /;
         let hotkeysChipped = false;
         function chipHotkeyList() {
             if (hotkeysChipped || !hotkeyOverlay) return;
             hotkeysChipped = true;
             hotkeyOverlay.querySelectorAll('.hotkey-body li').forEach((li) => {
-                const t = li.textContent;
-                const i = t.indexOf(' — ');
-                if (i <= 0) return;
+                const t = li.textContent.trim();
+                const m = HK_SPLIT.exec(t);
+                if (!m || m.index <= 0) return;
                 const kbd = document.createElement('kbd');
-                kbd.textContent = t.slice(0, i);
+                kbd.textContent = t.slice(0, m.index);
                 const d = document.createElement('span');
                 d.className = 'hk-desc';
-                d.textContent = t.slice(i + 3);
+                d.textContent = t.slice(m.index + m[0].length);
                 li.textContent = '';
                 li.appendChild(kbd);
                 li.appendChild(d);
             });
         }
-        function showHotkeys() { if (hotkeyOverlay) { chipHotkeyList(); hotkeyOverlay.style.display = 'flex'; } }
-        function hideHotkeys() { if (hotkeyOverlay) hotkeyOverlay.style.display = 'none'; }
-        function toggleHotkeys() { if (!hotkeyOverlay) return; chipHotkeyList(); hotkeyOverlay.style.display = (hotkeyOverlay.style.display === 'flex' ? 'none' : 'flex'); }
+        // The sheet holds the keyboard while it is up (00b): focus on its ×,
+        // Tab kept inside, Esc closes, focus back to where it was.
+        let hotkeyHold = null;
+        function showHotkeys() {
+            if (!hotkeyOverlay) return;
+            chipHotkeyList();
+            hotkeyOverlay.style.display = 'flex';
+            hotkeyHold = window.DialogFocus.hold(hotkeyOverlay, { initial: hotkeyClose, onEscape: hideHotkeys });
+        }
+        function hideHotkeys() {
+            if (!hotkeyOverlay) return;
+            hotkeyOverlay.style.display = 'none';
+            if (hotkeyHold) { hotkeyHold.release(); hotkeyHold = null; }
+        }
+        function toggleHotkeys() { if (!hotkeyOverlay) return; if (hotkeyOverlay.style.display === 'flex') hideHotkeys(); else showHotkeys(); }
         // Exposed so a non-keyboard opener routes through here and the chip
         // pass runs (13's phone-layout '?' button was one, until 2026-10-07).
         // showHotkeys is kept for the same reason — 17-hotkey-reminder's
@@ -233,9 +249,10 @@
         }
         // [ ] walk a ladder of round sizes, ten to a decade (1, 1.2, 1.5, 2,
         // 2.5, 3, 4, 5, 6, 8 × 10^k): about ×1.26 in size per press, ~12% in
-        // stroke width, at every scale. Shift ({ }) takes three rungs (×2).
-        // The old ±1 went 1.3 → 0.3 → the floor in two presses, and Shift
-        // never fired, because Shift+[ is '{'. (2026-10-07)
+        // stroke width, at every scale. The old ±1 went 1.3 → 0.3 → the floor
+        // in two presses. (2026-10-07) Shift+[ / Shift+] ({ }) took three
+        // rungs until 2026-10-14; it did not need its own key, so { } are
+        // free for the hotkey maker.
         const BRUSH_RUNGS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
         function brushLadder(min, max) {
             const out = [];
@@ -245,9 +262,12 @@
                     if (v >= min - 1e-12 && v <= max + 1e-12) out.push(v);
                 }
             }
+            // The floor itself is a stop when it is off the round rungs
+            // (0.00017), or ] from the bottom would skip past it.
+            if (!out.length || out[0] > min * 1.0001) out.unshift(min);
             return out;
         }
-        function adjustBrush(delta, coarse=false) {
+        function adjustBrush(delta) {
             const el = document.getElementById('brushSize');
             if (!el) return;
             const v = parseFloat(el.value || '1.3');
@@ -259,7 +279,6 @@
             let i;
             if (delta > 0) { i = ladder.findIndex(r => r > v * 1.0001); if (i < 0) i = ladder.length - 1; }
             else { i = -1; for (let j = ladder.length - 1; j >= 0; j--) { if (ladder[j] < v * 0.9999) { i = j; break; } } if (i < 0) i = 0; }
-            if (coarse) i = Math.max(0, Math.min(ladder.length - 1, i + 2 * Math.sign(delta)));
             const next = ladder[i];
             if (next === v) return;
             pushUndo();
@@ -365,11 +384,48 @@
             if (isRightShiftKey(e) || !e.shiftKey) rightShiftHeld = false;
         }, true);
         window.addEventListener('blur', () => { rightShiftHeld = false; });
+        // ── How focus got where it is (Space: press or freeze) ──
+        // A control reached from the keyboard (Tab, the skip menu, a dialog
+        // opening on it) takes Space as its own press, the way every button
+        // and checkbox does. One the pointer pressed keeps Space for Freeze:
+        // click a button, then Space, is how the app has always worked.
+        // :focus-visible can't tell the two apart — Chrome turns it on at the
+        // Space keydown itself — so the press is matched to the focus here: a
+        // focusin on the element just pressed (or the input its label names).
+        let pointerDownEl = null, pointerDownAt = -1e9, pointerFocused = null;
+        document.addEventListener('pointerdown', (e) => {
+            pointerDownEl = e.target;
+            pointerDownAt = performance.now();
+        }, true);
+        document.addEventListener('focusin', (e) => {
+            const t = e.target, d = pointerDownEl;
+            let byPointer = false;
+            if (d && performance.now() - pointerDownAt < 1000) {
+                const lab = d.closest ? d.closest('label') : null;
+                byPointer = t === d || (t.contains && t.contains(d)) || !!(lab && lab.control === t);
+            }
+            pointerFocused = byPointer ? t : null;
+        }, true);
+        // 21's focus mode asks before handing focus back by script.
+        window.__pointerFocused = (el) => !!el && el === pointerFocused;
+        const PRESS_INPUTS = { checkbox: 1, radio: 1, button: 1, submit: 1, reset: 1, color: 1, file: 1, image: 1 };
+        function spacePressesIt(el) {
+            if (!el || el === document.body || el === pointerFocused || el.disabled) return false;
+            const tag = (el.tagName || '').toLowerCase();
+            if (tag === 'button' || tag === 'summary') return true;
+            return tag === 'input' && !!PRESS_INPUTS[(el.type || '').toLowerCase()];
+        }
         document.addEventListener('keydown', (e) => {
             if (isTypingTarget(e.target)) return;
             const key = e.key;
             const lower = key.length === 1 ? key.toLowerCase() : key;
             const ctrlOrMeta = e.ctrlKey || e.metaKey;
+            // A dialog has the keyboard (00b): nothing here acts behind it.
+            // The hotkey sheet is one too, and F1 / ? still closes it.
+            if (window.DialogFocus.hasKeyboard()) {
+                const sheetKey = key === 'F1' || (e.shiftKey && (key === '?' || key === '/'));
+                if (!(sheetKey && window.DialogFocus.top() === hotkeyOverlay)) return;
+            }
             // Fullscreen (F11) — convenience toggle for the Window Mode setting
             // in the sidebar's Display section, which is the real authority.
             if (key === 'F11') {
@@ -438,22 +494,24 @@
             // ── Recording playback: F8 ──
             // Beside F9 Record. It used to ride Space whenever the recorder
             // was open, which took Freeze away the moment the recorder showed.
-            if (key === 'F8') {
+            // It is the strip's Play. Shift+F8 (every part) went 2026-10-14:
+            // Keep · Discard leaves one take on the bench, so it did the same.
+            if (key === 'F8' && !e.shiftKey) {
                 e.preventDefault();
                 if (e.repeat) return;
-                if (e.shiftKey) {
-                    // Shift+F8: play all / pause all
-                    if (typeof recTogglePlaybackAll === 'function') recTogglePlaybackAll();
-                } else {
-                    // F8: play / pause active layer
-                    if (typeof recTogglePlayback === 'function') recTogglePlayback();
-                }
+                if (typeof recStripTogglePlay === 'function') recStripTogglePlay();
                 return;
             }
             // ── Space transport ──
             // Space drives the sim, recorder open or not: Space = stop/unstop
             // fluid motion (freeze), Shift+Space = pause/unpause the simulation.
             if (key === ' ') {
+                // A control already answered it (the palette rows, colour
+                // chips and option lists take Space as a pick).
+                if (e.defaultPrevented) return;
+                // A keyboard-focused button or checkbox: its press, not Freeze.
+                // Shift+Space still pauses from anywhere.
+                if (!e.shiftKey && !ctrlOrMeta && !e.altKey && spacePressesIt(e.target)) return;
                 e.preventDefault();
                 // OS key auto-repeat fires keydown ~25-30 Hz while held — a
                 // held Space must not strobe freeze/pause into a
@@ -480,42 +538,12 @@
                 window.UndoManager.redo();
                 return;
             }
-            // The part keys below act only while the animation editor is open
-            // (the drawer on its Animation tab). With the recorder always armed
-            // they would otherwise take Delete and the arrows from everything.
-            const recEditing = typeof recEditorOpen === 'function' && recEditorOpen();
-            // Ctrl+Shift+N: new part. Swallowed either way: the browser's
-            // own Ctrl+Shift+N opens a private window.
-            if (ctrlOrMeta && e.shiftKey && lower === 'n') {
-                e.preventDefault();
-                if (recEditing && typeof recAddLayer === 'function') recAddLayer();
-                return;
-            }
-            // Delete: clear active recording layer. It asks first: a stray
-            // Delete used to wipe the take with no way back (Ctrl+Z doesn't
-            // hold recordings), and an empty take has nothing to clear.
-            if (key === 'Delete' && !ctrlOrMeta && !e.altKey && !e.shiftKey) {
-                if (recEditing && typeof recClearActive === 'function') {
-                    e.preventDefault();
-                    const take = typeof recGetActiveLayer === 'function' ? recGetActiveLayer() : null;
-                    const n = take && take.timeline && take.timeline.interactions ? take.timeline.interactions.length : 0;
-                    if (!n || document.getElementById('appConfirmModal')?.classList.contains('show')) return;
-                    if (typeof window.appConfirm !== 'function') return;
-                    const label = (typeof recPartLabel === 'function') ? recPartLabel(take.name) : take.name;
-                    window.appConfirm({
-                        title: 'Clear this part?',
-                        message: (label ? label + ' loses' : 'It loses') + ' everything recorded in it. This can\'t be undone.',
-                        confirmLabel: 'Clear part'
-                    }).then((ok) => { if (ok) recClearActive(); });
-                    return;
-                }
-            }
             // Toggles
             if (!ctrlOrMeta && !e.altKey) {
                 // 't' was bound to a 'trailToggle' element that does not exist
                 // anywhere (removed long ago) — the key silently did nothing and
                 // the help surfaces advertised it. Left unbound deliberately.
-                // Plain keys only: Shift+C/H/L/R/A were silent copies of the
+                // Plain keys only: Shift+C/H/L/R were silent copies of the
                 // bare letter, now left free for the hotkeys people bind
                 // (js/48-hotkeys.js). `lower` still keeps them Caps-Lock-proof —
                 // Caps Lock changes e.key, never e.shiftKey. N, S and X below
@@ -525,7 +553,9 @@
                     if (lower === 'h') { toggleCheckbox('showCanvasHandles'); return; }
                     if (lower === 'l') { toggleCheckbox('lockCanvasBorders'); return; }
                     if (lower === 'r') { toggleCheckbox('randomColor'); return; }
-                    if (lower === 'a') { toggleCheckbox('stepPalette'); return; }
+                    // P for Palette (2026-10-14; was A, which is now left
+                    // free for the hotkeys people bind).
+                    if (lower === 'p') { toggleCheckbox('stepPalette'); return; }
                     // K turns the kaleidoscope on and off (usertest
                     // 2026-10-03). A SOFT key, unlike the letters above:
                     // presets already put text lines on K (Word bank, swirl
@@ -547,24 +577,11 @@
                     if (mutBtn) mutBtn.click();
                     return;
                 }
-                if (key === '[' || key === '{') { adjustBrush(-1, key === '{' || e.shiftKey); return; }
-                if (key === ']' || key === '}') { adjustBrush(1, key === '}' || e.shiftKey); return; }
+                if (key === '[') { adjustBrush(-1); return; }
+                if (key === ']') { adjustBrush(1); return; }
                 if (lower === 'n') { stepPaletteColour(e.shiftKey ? -1 : 1); return; }
                 if (e.shiftKey && lower === 's' && typeof window.saveColor === 'function') { e.preventDefault(); pushUndo(); window.saveColor(); return; }
                 if (e.shiftKey && lower === 'x' && typeof window.clearColors === 'function') { e.preventDefault(); pushUndo(); window.clearColors(); return; }
-            }
-            // ── Layer navigation: ↑/↓ (unmodified) ──
-            if (!ctrlOrMeta && !e.altKey && !e.shiftKey) {
-                if (key === 'ArrowUp' && recEditing && typeof recCycleLayer === 'function') {
-                    e.preventDefault();
-                    recCycleLayer(-1);
-                    return;
-                }
-                if (key === 'ArrowDown' && recEditing && typeof recCycleLayer === 'function') {
-                    e.preventDefault();
-                    recCycleLayer(1);
-                    return;
-                }
             }
             // Palettes (2026-10-08): Ctrl+Shift+← → switches palette, Ctrl+← →
             // steps through the palette's colours. Ctrl+← → used to switch
@@ -617,6 +634,7 @@
                     visible: layer.visible,
                     isLooping: layer.isLooping,
                     loopMaxMs: layer.loopMaxMs,
+                    simRate: layer.simRate,
                     colorMode: layer.colorMode || 'original',
                     recordMode: layer.recordMode || 'main',
                     recordStepPalette: layer.recordStepPalette || null,
@@ -626,7 +644,9 @@
                         shapes: layer.mask.shapes
                     } : undefined,
                     timeline: {
-                        interactions: layer.timeline.interactions,
+                        // Stored packed (03 'rec2')
+                        interactions: (typeof recPackInteractions === 'function')
+                            ? recPackInteractions(layer.timeline.interactions) : layer.timeline.interactions,
                         duration: layer.timeline.duration
                     }
                 };
@@ -643,6 +663,7 @@
                 layer.visible = ld.visible !== false;
                 layer.isLooping = ld.isLooping !== undefined ? !!ld.isLooping : true;
                 layer.loopMaxMs = (typeof ld.loopMaxMs === 'number') ? ld.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
+                if (typeof ld.simRate === 'number') layer.simRate = ld.simRate;
                 layer.colorMode = (typeof recMigrateColorMode === 'function') ? recMigrateColorMode(ld.colorMode) : (ld.colorMode || 'original');
                 layer.recordMode = ld.recordMode || 'main';
                 layer.recordStepPalette = ld.recordStepPalette || null;
@@ -653,7 +674,9 @@
                         shapes: ld.mask.shapes || []
                     };
                 }
-                layer.timeline.interactions = (ld.timeline && ld.timeline.interactions) || [];
+                layer.timeline.interactions = (typeof recUnpackInteractions === 'function')
+                    ? recUnpackInteractions((ld.timeline && ld.timeline.interactions) || [])
+                    : ((ld.timeline && ld.timeline.interactions) || []);
                 layer.timeline.duration = (ld.timeline && ld.timeline.duration) || 0;
                 layer.timeline.playbackPosition = 0;
             });

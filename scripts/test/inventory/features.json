@@ -16,7 +16,7 @@
         "animationMultiplier + #multiplier slider (first-enable bootstrap writes 8; toggle-off restores _prevMultiplier; js/05f-kaleido-controls.js:37-66)",
         "window.kAngle is ALSO written by: the update loop when kAnimateRot (js/05j-update-loop.js:150-152, sim-clock frameDt so deterministic), audio-reactive mid->kaleido mapping (js/22-audio-reactive.js:791-797, wall-clock), and mandala's pinAngle (js/34-mandala-mode.js:144-153)",
         "window._kaleidoBootstrapped / window._prevMultiplier",
-        "DOM: #kaleidoGuides SVG overlay appended to #canvas-wrapper while #kaleidoShowGuides is ticked (js/63-kaleido-guides.js, settingsManager 'kaleido.showGuides', not in the param registry); reads the kaleido globals once a frame and hides while Mandala Studio is on"
+        "DOM: #kaleidoGuides SVG overlay appended to #canvas-wrapper while #kaleidoShowGuides is ticked (js/63-kaleido-guides.js, settingsManager 'kaleido.showGuides', not in the param registry); reads the kaleido globals once a frame and hides while Mandala Overlay is on"
       ],
       "knownHazards": [
         "First-enable bootstrap mutates multi-arm state (multiplier 8x, segments 16) - js/05f-kaleido-controls.js:37-55; suppress with window._kaleidoBootstrapped = true (mandala does exactly this, js/34-mandala-mode.js:406)",
@@ -314,14 +314,14 @@
     },
     {
       "name": "recordingLayers",
-      "activate": "var rm = document.getElementById('recMode'); rm.value = 'min'; rm.dispatchEvent(new Event('change')); recStartRecording();  /* applyMode('min') sets recEnabled=true and mints a layer if none (js/03-recording.js:1501-1528). recStartRecording() (top-level fn, js/03-recording.js:99-127) starts capture IMMEDIATELY - recToggleRecord() instead runs a 3-2-1 setTimeout countdown (js/03-recording.js:152-172), avoid it in tests. Stop: recStopRecording(). Play back: recTogglePlayback() or recTogglePlaybackAll() (js/03-recording.js:307-342). Playback speed: #recPlaybackSpeed select - NOTE its registry default is '0.25' (js/01a-param-registry.js:171). */",
-      "deactivate": "recStopAll(); var rm = document.getElementById('recMode'); rm.value = 'off'; rm.dispatchEvent(new Event('change'));  /* applyMode('off') sets recEnabled=false and stops playback/recording (js/03-recording.js:1501-1516) */",
+      "activate": "recStartRecording();  /* setupRecUI sets recEnabled=true and mints a part at boot. recStartRecording() (top-level fn, js/03-recording.js:99-127) starts capture IMMEDIATELY - recToggleRecord() instead runs a 3-2-1 setTimeout countdown (js/03-recording.js:152-172), avoid it in tests. Stop: recStopRecording(). Play back: recTogglePlaybackAll() (js/03-recording.js). Playback speed: #recPlaybackSpeed select - NOTE its registry default is '0.25' (js/01a-param-registry.js:171). */",
+      "deactivate": "recStopAll();  /* stops the countdown, recording and playback */",
       "activeCheck": "recEnabled === true",
       "touchesSharedState": [
         "Dye/velocity via playback splats (applyMultiSplatWith with each interaction's recorded mult + radius)",
         "recRecordInteraction reads window.__lastPaintRadius, animationMultiplier, and captures the brush colour mode from window.multiArmColors at record start (js/03-recording.js:99-112,278-305)",
         "Playhead rides window.__simDtMs when config.REC_SIM_CLOCK !== false (js/03-recording.js:361-398) - playback IS deterministic under a driven sim clock",
-        "recEnabled / recLayers / recPlaybackSpeed / recMaxDurationMs globals (declared js/02-palettes.js:346-356)",
+        "recEnabled / recLayers / recMaxDurationMs globals (declared js/02-palettes.js:346-356)",
         "Constant-flow mode records stationary holds from inside update() (js/05j-update-loop.js:326-329)"
       ],
       "knownHazards": [
@@ -338,13 +338,12 @@
       "activeCheck": "isReplayActive === true",
       "touchesSharedState": [
         "Dye/velocity via replayed splats with recorded radius/mult/tip/shape (js/05d-input-replay.js:403-470)",
-        "isReplayActive gates: the brush-engine drain (js/05j-update-loop.js:243), pushStrokeEvent recording (js/05d-input-replay.js:200), and trackMouseMovement (js/04a-canvas-gl-config.js:75)",
+        "isReplayActive gates: the brush-engine drain (js/05j-update-loop.js:243) and pushStrokeEvent recording (js/05d-input-replay.js:200)",
         "strokeEvents/strokeHistory ring (cap 200 strokes, js/05d-input-replay.js:183-192)",
         "window.BrushShapes.warm() pre-uploads recorded stamp textures (js/05d-input-replay.js:302-310)"
       ],
       "knownHazards": [
         "Replay pacing is Date.now() wall clock times window.replaySpeed (js/05d-input-replay.js:405-407) - NOT the sim clock; under a stepped harness pin Date.now or all events fire on the first frame whose elapsed wall time covers them",
-        "Right-mouse hold-to-replay (mousePositions trail) is a separate legacy loop (replayMovements, js/04a-canvas-gl-config.js:116-176) driven by its own rAF and Date.now",
         "Recorded events replay with exact recorded radius/mult - current UI slider state is irrelevant during replay, by design (js/05d-input-replay.js:409-414)"
       ]
     },

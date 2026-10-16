@@ -82,7 +82,7 @@ const STATE = `(function(){
         const dot = await rectOf(d, '#colorPicker');
         await d.click(dot.x, dot.y); await sleep(250);
         const pop = await d.ev(`(function(){var p=document.querySelector('.cp-pop'); return p && {title:p.querySelector('.cp-pop-title').textContent, pal:!!p.querySelector('.cp-pal'), chips:p.querySelectorAll('.cp-pal-row .cp-chip').length};})()`);
-        check('P1 the dot opens the picker popover with the palette', pop && pop.title === 'Brush colour' && pop.pal && pop.chips > 0, pop);
+        check('P1 the dot opens the picker popover with the palette', pop && pop.title === 'Brush color' && pop.pal && pop.chips > 0, pop);
         const tr = await rectOf(d, '.cp-pop .cp-row:nth-child(1) .cp-track');
         await d.move(tr.l + 4, tr.y); await d.down(tr.l + 4, tr.y); await sleep(30);
         for (let i = 1; i <= 8; i++) { await d.move(tr.l + 4 + i * (tr.w * 0.6) / 8, tr.y, 1); await sleep(20); }
@@ -151,7 +151,7 @@ const STATE = `(function(){
         await d.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: chip.x, y: chip.y, button: 'left', buttons: 0, clickCount: 2 });
         await sleep(250);
         const ed = await d.ev(`(function(){var b=document.querySelector('#palettePickerHost .cp-primary'); return b && {text:b.textContent, disabled:b.disabled, editing:Array.prototype.map.call(document.querySelectorAll('#palettePreview .is-editing'),function(w){return w.dataset.hex;}), title:document.querySelector('#palettePickerHost .cp-title').textContent};})()`);
-        check('E1 double-click opens Change this colour on that colour', ed && ed.title === 'Change this colour' && ed.disabled && ed.editing[0] === '#E85D75', ed);
+        check('E1 double-click opens Change this color on that colour', ed && ed.title === 'Change this color' && ed.disabled && ed.editing[0] === '#E85D75', ed);
         st = await typeHex('#5DE8C1');
         const cb = await rectOf(d, '#palettePickerHost .cp-primary');
         await d.click(cb.x, cb.y); await sleep(250);
@@ -196,7 +196,7 @@ const STATE = `(function(){
         await d.tap('ArrowDown', 'ArrowDown', 40); await sleep(60);
         await d.tap('Enter', 'Enter', 13); await sleep(250);
         const l2 = await d.ev(`({open: !!document.querySelector('.palette-list'), name: document.querySelector('#paletteSelect .palette-select-name').textContent, idx: window.currentPaletteIndex, mode: window.multiArmColors[0].mode})`);
-        check('L2 arrow down + Enter picks the next palette, in Palette mode, and closes the list', !l2.open && l2.idx === 2 && l2.name === 'Sunset Dreams' && l2.mode === 'step', l2);
+        check('L2 arrow down + Enter picks the next palette, in Palette mode, and closes the list', !l2.open && l2.idx === 2 && l2.name === "Ross' Sunset" && l2.mode === 'step', l2);
         check('L3 no "Next" line under the colours', await d.ev(`!document.getElementById('paletteStepIndicator') || getComputedStyle(document.getElementById('paletteStepIndicator')).display === 'none'`));
         const act = await d.ev(`({active: Array.prototype.map.call(document.querySelectorAll('#palettePreview .palette-chip-wrap.is-active'),function(w){return w.dataset.hex;}), dot: document.getElementById('colorPicker').value.toUpperCase()})`);
         check('L4 the colour the next stroke paints is the one marked active', act.active.length === 1 && act.active[0] === act.dot, act);

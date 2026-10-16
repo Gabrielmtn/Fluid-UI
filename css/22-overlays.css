@@ -1381,7 +1381,7 @@ input[type="color"].text-swatch::-moz-color-swatch {
 #hkWheel .hk-wheel-val { font-variant-numeric: tabular-nums; }
 #hkWheel .hk-wheel-hint { color: rgba(230, 237, 243, 0.55); }
 
-/* Tab switched the brush (js/59): all three kinds, the current one lit.
+/* ~ switched the brush (js/59): all three kinds, the current one lit.
    Same spot and ground as the toast, and monochrome like the radial menu. */
 #brushTypePill {
     position: fixed;
@@ -2036,6 +2036,90 @@ body.text-arrange-active #canvas-size-display {
     .ui-fork-cards { grid-template-columns: 1fr; }
 }
 
+/* ── Skip menu (js/66) ──
+   The first Tab stop in the page, shown while focus is in it (and Tab with
+   nothing focused goes there). Top left with no backdrop: a way in, not a
+   stop. The four places sit where they are on
+   screen, the bars round a stand-in for the canvas. 10035: above the
+   body-mounted strip popups and the fx card (10030), below the dialogs
+   (10040+), which keep Tab to themselves anyway. Tint from
+   data-group="system" on the menu (css/01-buttons.css), layout here. */
+.skip-menu {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 10035;
+    width: 300px;
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+    padding: 12px 12px 10px;
+    background: linear-gradient(180deg, #1a1f2e, #0f141b);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+    color: #e6edf3;
+}
+/* A skip link: in the page and first in the Tab order, out of sight until
+   focus is on one of its buttons. Clipped, not display:none or hidden —
+   those would take it out of the Tab order too. */
+.skip-menu:not(:focus-within) {
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    opacity: 0;
+    box-shadow: none;
+    pointer-events: none;
+}
+.skip-menu-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.skip-menu-map {
+    display: grid;
+    grid-template-columns: 84px 1fr 84px;
+    grid-template-rows: 30px 66px 30px;
+    grid-template-areas:
+        "top top top"
+        "left canvas right"
+        "bottom bottom bottom";
+    gap: 6px;
+}
+.skip-menu-left   { grid-area: left; }
+.skip-menu-top    { grid-area: top; }
+.skip-menu-right  { grid-area: right; }
+.skip-menu-bottom { grid-area: bottom; }
+.skip-menu-canvas {
+    grid-area: canvas;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+}
+.skip-menu-option {
+    padding: 4px 6px;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: normal;
+}
+.skip-menu-option:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+.skip-menu-option[aria-disabled="true"] { opacity: 0.35; cursor: default; }
+.skip-menu-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: rgba(230, 237, 243, 0.6);
+}
+.skip-menu-foot .hk-cap { margin-left: 0; color: #e6edf3; border-color: rgba(255, 255, 255, 0.45); }
+/* Where focus went: one soft ring that fades, never a blink. */
+.skip-landed { animation: skip-landed 1s ease-out; }
+@keyframes skip-landed {
+    from { box-shadow: inset 0 0 0 2px rgba(88, 166, 255, 0.9); }
+    to   { box-shadow: inset 0 0 0 2px rgba(88, 166, 255, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .skip-landed { animation: none; }
+}
+
 /* ── Effect preview card (js/20-mixer-layout.js fxTipShow) ──
    Opens to the left of an effect row, over the canvas. pointer-events:none —
    it is a tooltip, the row underneath keeps the mouse. 10030: above the
@@ -2367,10 +2451,63 @@ body.text-arrange-active #canvas-size-display {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
 }
 .reset-app-btn:hover { text-shadow: none; }
+
+/* ── Slowdown button (js/08a-quality-governor.js) ──
+   On the pills' line after the Canvas readout, before Reset app's auto
+   margin: it lands in the bar's empty middle, so nothing moves when it
+   comes and goes. Floats to the painting's bottom-left corner when the bar
+   is hidden (left set by js). The colours are in 01-buttons.css. */
+#quality-underbar > .slowdown-cell {
+    order: 97;
+    align-self: flex-end;
+    min-width: 0;
+    flex-shrink: 1;
+}
+.slowdown-cell {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.slowdown-cell[hidden] { display: none; }
+.slowdown-cell.floating {
+    position: fixed;
+    bottom: 8px;
+    z-index: 1200;
+}
+.slowdown-cell button {
+    height: 22px;
+    padding: 1px 9px;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.slowdown-cell #slowdownBtn {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.slowdown-cell .slowdown-close {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
+}
+.slowdown-cell .slowdown-close:hover { text-shadow: none; }
 .reset-app-modal { z-index: 10045; }
 .reset-app-modal .delete-modal-content { max-width: 420px; }
 .reset-app-modal .delete-modal-message { line-height: 1.5; }
 .reset-app-modal .delete-modal-actions { flex-wrap: wrap; }
+/* Shipped defaults instead of the saved settings: only when some are saved. */
+.reset-app-modal .reset-app-defaults {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -6px 0 18px;
+    font-size: 12px;
+    color: rgba(230, 237, 243, 0.8);
+    cursor: pointer;
+}
+.reset-app-modal .reset-app-defaults[hidden] { display: none; }
+.reset-app-modal .reset-app-defaults input { margin: 0; cursor: pointer; }
 /* The one-time note above the button, pointing down at it. */
 .reset-app-hint {
     position: fixed;

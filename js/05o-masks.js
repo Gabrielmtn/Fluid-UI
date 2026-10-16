@@ -37,9 +37,6 @@
     function setActive(id) {
         if (!maskStore[id]) return false;
         _activeMaskId = id;
-        if (typeof window.__onActiveMaskChanged === 'function') {
-            window.__onActiveMaskChanged(id, _meta[id] ? _meta[id].name : null);
-        }
         return true;
     }
     function remove(id) {
@@ -55,7 +52,6 @@
             _activeMaskId = null;
             const ids = Object.keys(_meta).filter(function (k) { return maskStore[k]; });
             if (ids.length) setActive(parseInt(ids[0], 10));
-            else if (typeof window.__onActiveMaskChanged === 'function') window.__onActiveMaskChanged(null, null);
         }
         _notifyList();
     }
@@ -166,9 +162,6 @@
             if (ids.length) _activeMaskId = parseInt(ids[0], 10);
         }
         _notifyList();
-        if (_activeMaskId != null && typeof window.__onActiveMaskChanged === 'function') {
-            window.__onActiveMaskChanged(_activeMaskId, _meta[_activeMaskId] ? _meta[_activeMaskId].name : null);
-        }
     }
     // ── D3: import existing mask sources into a paintable Mask ─────────
     // Upload any white/alpha coverage canvas into a fresh Mask.

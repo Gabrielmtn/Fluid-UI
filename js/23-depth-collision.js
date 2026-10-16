@@ -206,7 +206,7 @@ class DepthEstimator {
             modal.innerHTML = '<div style="background:linear-gradient(180deg,#1a1f2a,#0f141b);border:1px solid rgba(255,120,80,0.3);border-radius:16px;padding:32px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.8);text-align:center;">' +
                 '<div style="font-size:48px;margin-bottom:16px;">🧱</div>' +
                 '<h2 style="color:#ff8850;margin:0 0 12px 0;font-size:24px;font-weight:600;">Downloading Depth Model</h2>' +
-                '<p id="depthDownloadMessage" style="color:#8b949e;margin:0 0 24px 0;font-size:14px;">First-time setup: Downloading Depth Anything V2...</p>' +
+                '<p id="depthDownloadMessage" style="color:#8b949e;margin:0 0 24px 0;font-size:14px;">First-time setup: Downloading Instant Roto Model Depth Anything V2...</p>' +
                 '<div style="background:rgba(0,0,0,0.3);border-radius:8px;height:8px;overflow:hidden;margin-bottom:12px;">' +
                 '<div id="depthDownloadBar" style="background:linear-gradient(90deg,#e85d26,#ff8850);height:100%;width:0%;transition:width 0.3s ease;box-shadow:0 0 12px rgba(255,136,80,0.6);"></div></div>' +
                 '<div id="depthDownloadPercent" style="color:#ff8850;font-size:18px;font-weight:600;font-family:monospace;">0%</div>' +
@@ -614,7 +614,7 @@ class DepthEstimator {
                 ctx.rotate((rotation * Math.PI) / 180);
                 ctx.translate(-cx, -cy);
             }
-            // Use the shared drawMaskShape from 05-fluid-sim.js if available
+            // Use the shared drawMaskShape from 05m-layer-masks.js if available
             if (typeof window._drawMaskShape === 'function') {
                 window._drawMaskShape(ctx, shape);
             } else {
@@ -1297,7 +1297,6 @@ class DepthEstimator {
         var layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
         d.style.opacity = String(colliderOpacityOf(layer));
     }
-    window.__setColliderFilm = _setColliderFilm;
 
     // Opaque grayscale data-URL from a depth map — matches the conversion
     // addCollisionLayer performs internally for layer.data.
@@ -1346,7 +1345,13 @@ class DepthEstimator {
     // the room last got it — counted whether or not the binding is live, so
     // a one-shot bound collider painted into later still reaches peers.
     window.__onSketchMutated = function (rid) { _bumpSrc('raster', rid); scheduleSketchRefresh('raster', rid); };
-    window.__onMaskMutated = function (mid) { _bumpSrc('mask', mid); scheduleSketchRefresh('mask', mid); };
+    // __onMaskMutated is shared with 05m (image-layer clip refresh), and this
+    // module can load before or after it: chain whatever is already there.
+    var _prevOnMaskMutated = window.__onMaskMutated;
+    window.__onMaskMutated = function (mid) {
+        if (typeof _prevOnMaskMutated === 'function') { try { _prevOnMaskMutated(mid); } catch (e) {} }
+        _bumpSrc('mask', mid); scheduleSketchRefresh('mask', mid);
+    };
 
     // Live binding: the collider keeps tracking its source surface.
     // kind (optional) = 'raster' | 'mask': which ACTIVE surface a fresh
@@ -1400,7 +1405,6 @@ class DepthEstimator {
         } else {
             _sketchLive = false; // binding stays; the collider just stops tracking
         }
-        if (typeof window.__onSketchLiveChanged === 'function') window.__onSketchLiveChanged(_sketchLive, _boundSrc);
         return _sketchLive;
     }
     function setMaskLive(on, opts) { return setSketchLive(on, 'mask', opts); }
@@ -1971,15 +1975,16 @@ class DepthEstimator {
     // would collide with nothing. Bake the coverage in and cut the binding
     // BEFORE the delete: the undo snapshot holds this same layer object, so it
     // comes back as an ordinary baked collider. Costs one readback, on an
-    // action the user takes by hand.
+    // action the user takes by hand. Returns false when nothing was baked:
+    // the binding stays, and the caller must keep the Mask it points at.
     function _bakeColliderMaskIntoLayer(layer, maskId) {
-        if (!layer) return;
+        if (!layer) return false;
         var built = buildSketchDepth(true, window.Masks.getFBO(maskId));
-        if (built) {
-            updateLayerDepthMask(layer.index, built.depth);
-            _applyColliderPreview(layer, built);
-        }
+        if (!built) return false;
+        updateLayerDepthMask(layer.index, built.depth);
+        _applyColliderPreview(layer, built);
         layer.collisionSource = null;
+        return true;
     }
 
     // Listen for layer deletion to clean up the live binding.
@@ -2005,13 +2010,12 @@ class DepthEstimator {
                 var l = window.layers && window.layers.find(function (x) { return x.index === index; });
                 wasCollider = !!(l && l.isCollision);
                 if (wasCollider) {
-                    deadMaskId = _orphanedColliderMaskId(l, index);
-                    if (deadMaskId != null) _bakeColliderMaskIntoLayer(l, deadMaskId);
+                    var orphan = _orphanedColliderMaskId(l, index);
+                    if (orphan != null && _bakeColliderMaskIntoLayer(l, orphan)) deadMaskId = orphan;
                 }
             } catch (_) {}
-            // Deleting the live-bound sketch collider unbinds IMMEDIATELY
-            // (the ⟳ Live button follows via __onSketchLiveChanged) — the
-            // next-mutation auto-disable stays as the fallback.
+            // Deleting the live-bound sketch collider unbinds IMMEDIATELY —
+            // the next-mutation auto-disable stays as the fallback.
             if (_sketchColliderIndex != null && index === _sketchColliderIndex) {
                 setSketchLive(false);
                 _sketchColliderIndex = null;

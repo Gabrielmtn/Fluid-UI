@@ -1,11 +1,11 @@
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// js/05a-shader-core.js â€” part 1/14 of former 05-fluid-sim.js (lines 1â€“653)
-// LOAD ORDER: after 04-ui-interactions.js (async loader), before 05b-shader-sim.js
+// ═══════════════════════════════════════════════════════════════════
+// js/05a-shader-core.js
+// LOAD ORDER: after 04g-hover-capture.js (async loader), before 05b-shader-sim.js
 // PROVIDES: compileShader, Program, PRECISION, baseVert/blur/display/sharpen/microDetail frag sources
 // REQUIRES: gl (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
-//   Correctness comes from preserved source order â€” do not reorder.
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//   Correctness comes from preserved source order — do not reorder.
+// ═══════════════════════════════════════════════════════════════════
         function compileShader(type, source) {
             const shader = gl.createShader(type);
             gl.shaderSource(shader, source);
@@ -112,7 +112,7 @@
             uniform vec4 uRasterP2;
             uniform vec4 uRasterP3;
             // D3: active mask shown as a red film while painting into it
-            // (UI affordance only â€” never part of the exported content,
+            // (UI affordance only — never part of the exported content,
             // which is why it composites after everything else)
             uniform sampler2D uMaskOverlay;
             uniform float maskOverlayOn;
@@ -160,9 +160,9 @@
             uniform float gateWhite;      // >0 = Gate on: extended-Reinhard white point (ceiling x GATE_WHITE_MULT); 0 = plain Reinhard
             uniform float igniteVibrance; // 0-1 Ignite envelope: enrich rather than lighten (see below)
             uniform vec2 texelSize;
-            // â”€â”€ Light Shift (unified, 2026-07-18) â”€â”€
-            // ONE implementation, run here at the END of display â€” on the
-            // actually-displayed (post tone-map / vibrance / shading) color â€”
+            // ── Light Shift (unified, 2026-07-18) ──
+            // ONE implementation, run here at the END of display — on the
+            // actually-displayed (post tone-map / vibrance / shading) color —
             // so "overblown white" means the white you SEE, identically whether
             // Lighting is on or off. Replaces the two divergent versions that
             // used to run pre-tone-map in the lighting/standalone passes.
@@ -265,7 +265,7 @@
             // D2: fold one slot into the composite. Below-fluid slots
             // accumulate into 'under' (plain premult over among themselves);
             // the first above-fluid slot first merges 'under' beneath the
-            // fluid (fluid coverage = tone-mapped intensity â€” under-layers
+            // fluid (fluid coverage = tone-mapped intensity — under-layers
             // show where the dye is dark), then blends itself on top.
             void rasterSlot(vec4 rs, vec4 p, inout vec3 col, inout vec4 under, inout float merged, inout float skA) {
                 if (p.w > 0.5) {
@@ -465,19 +465,19 @@
                 } else {
                     color.rgb = color.rgb / (1.0 + color.rgb);
                 }
-                // Light Shift keys off THIS â€” the tone-mapped dye before any
+                // Light Shift keys off THIS — the tone-mapped dye before any
                 // re-saturation. Gate/Ignite vibrance (and shading's sat boost)
                 // below pull overblown pixels back off white; keying the
                 // overblow test on the post-vibrance color let them consume the
                 // whiteness signal, so "Replace" quit firing once Ignite/Gate
                 // enriched a region. Detect on the raw overblow, recolor the
-                // displayed pixel â€” the two effects now stack instead of fight.
+                // displayed pixel — the two effects now stack instead of fight.
                 vec3 lsSrc = color.rgb;
                 // Gate vibrance: per-channel Reinhard flattens channel ratios as
-                // dye climbs into HDR â€” the washed-out look near the bloom
+                // dye climbs into HDR — the washed-out look near the bloom
                 // ceiling. Re-widen saturation in proportion to how deep into
                 // HDR the dye sits (the richness the pre-Gate blowout showed in
-                // transit, but bounded â€” dye can't pass the ceiling, so neither
+                // transit, but bounded — dye can't pass the ceiling, so neither
                 // can the boost).
                 float satW = 0.0;
                 if (gateVibrance > 0.0) satW += smoothstep(0.8, 2.5, hdrMax) * 0.35 * gateVibrance;
@@ -514,11 +514,11 @@
                     // paint hard lines along those steps.
                     float shadeFade = smoothstep(0.005, 0.06, centerLuma);
                     // Gradient from the blurred quarter-res form field (raw
-                    // HDR for strong gradients) â€” the paint-engine approach:
+                    // HDR for strong gradients) — the paint-engine approach:
                     // relief is lit from a smoothed height map, so pigment
                     // texel noise (fp16 grain, stir micro-laminae) physically
                     // cannot read as texture; only actual swirl forms shade.
-                    // Sobel at 1 form texel â‰ˆ 4 dye texels; 0.0625 keeps the
+                    // Sobel at 1 form texel ≈ 4 dye texels; 0.0625 keeps the
                     // same response as the original 1-texel differences on
                     // smooth ramps.
                     vec2 t2 = shadeTexelSize;
@@ -634,7 +634,7 @@
                     color.rgb += spec * warmKey * (displayShading * shadeGloss * glossW) * shadeFade;
                     color.rgb = max(color.rgb, vec3(0.0));
                 }
-                // â”€â”€ Light Shift â”€â”€ recolor overblown/white areas of the fluid.
+                // ── Light Shift ── recolor overblown/white areas of the fluid.
                 // Keyed on the DISPLAYED color: brightness weighted by whiteness
                 // (desaturated bright = the real target), so pure white always
                 // maxes the factor and a saturated hue does not read as "white".
@@ -776,7 +776,7 @@
                 // D2 raster layer stack: paint layers composited around the
                 // fluid, AFTER tone-map/shading/glow (fluid effects never
                 // touch them) and sampled at RAW vUv (kaleido never warps
-                // them â€” a sketch stays where you drew it). Unrolled Ã—4:
+                // them — a sketch stays where you drew it). Unrolled ×4:
                 // GLSL ES 3.0 forbids dynamically-indexed sampler arrays.
                 float skA = 0.0;
                 vec4 under = vec4(0.0);
@@ -802,7 +802,7 @@
                     if (uRasterC3.x > 0.5) { float m3 = texture(uRasterM3, vUv).a; rs3 *= (uRasterC3.y > 0.5) ? 1.0 - m3 : m3; }
                     rasterSlot(rs3, uRasterP3, cc, under, underMerged, skA);
                 }
-                // every slot was below the fluid â€” merge the accumulated
+                // every slot was below the fluid — merge the accumulated
                 // under-stack beneath the dye now
                 if (under.a > 0.0 && underMerged < 0.5) {
                     float fA = min(1.0, max(max(cc.r, cc.g), cc.b));
@@ -815,10 +815,10 @@
                     float mcov = texture(uMaskOverlay, vUv).a;
                     color.rgb = mix(color.rgb, vec3(1.0, 0.25, 0.2), mcov * 0.45);
                 }
-                // Â±0.5 LSB hash dither before the 8-bit store: smooth slow
+                // ±0.5 LSB hash dither before the 8-bit store: smooth slow
                 // gradients otherwise quantize into visible contour bands that
                 // crawl as the field decays (the S-curve and saturation boost
-                // in the shading pass steepen them further). Static pattern â€”
+                // in the shading pass steepen them further). Static pattern —
                 // temporal dither would shimmer.
                 float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
                 color.rgb = max(color.rgb + dn * (1.0 / 255.0), 0.0);
@@ -826,7 +826,7 @@
                 if (preserveOpacity > 0.5) {
                     // Preserve fluid opacity - make alpha proportional to color intensity
                     // backgroundTransparency controls how transparent the black areas become
-                    // (sketch coverage counts as content â€” dark sketch strokes
+                    // (sketch coverage counts as content — dark sketch strokes
                     // must not go transparent in layer mode)
                     float alpha = mix(1.0, max(intensity, skA), backgroundTransparency);
                     fragColor = vec4(color.rgb, alpha);
@@ -928,9 +928,9 @@
                 fragColor = vec4(ridgesSharpen(uTexture, uVelocity, vUv, texelSize * kernelScale, sharpness, strength), 1.0);
             }
         `;
-        // â”€â”€â”€ Micro Detail Pass â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Micro Detail Pass ─────────────────────────────────────
         // Vibrance only (Clarity left with the Effects panel, 2026-09-03).
-        // Selective saturation on the displayed dye â€” keeps colour rich
+        // Selective saturation on the displayed dye — keeps colour rich
         // through TikTok / H.264 encoding without colour artifacts.
         const microDetailFrag = `#version 300 es
             precision ${PRECISION} float;
@@ -946,7 +946,7 @@
                 vec3 lumaW = vec3(0.299, 0.587, 0.114);
                 float centerLuma = dot(center, lumaW);
                 // Early exit only for truly black pixels; the effect fades in
-                // smoothly above that (same fix as the sharpen pass â€” a hard
+                // smoothly above that (same fix as the sharpen pass — a hard
                 // cutoff draws a jagged seam through fading dye).
                 if (centerLuma < 0.001) {
                     fragColor = vec4(center, 1.0);
@@ -954,7 +954,7 @@
                 }
                 float lowFade = smoothstep(0.003, 0.03, centerLuma);
                 vec3 result = center;
-                // â”€â”€ Vibrance â€” RGB-space selective saturation â”€â”€
+                // ── Vibrance — RGB-space selective saturation ──
                 if (vibrance > 0.0) {
                     float gray = dot(result, lumaW);
                     float maxC = max(result.r, max(result.g, result.b));

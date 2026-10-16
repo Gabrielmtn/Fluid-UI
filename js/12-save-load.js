@@ -124,7 +124,7 @@
     // case apply-side clamping is broken anyway). Mirrors pre-registry coverage.
     var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','viscosity','colorBlend','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','vibrance','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','shadingIntensity'];
     var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','macCormackToggle','multigridToggle','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
-    var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','recMode','recPlaybackSpeed','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
+    var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
 
     var _PR = window.ParamRegistry;
     if (!_PR || !_PR.SLIDERS) console.warn('[Save/Load] ParamRegistry unavailable — using fallback persist lists (reduced preset coverage)');
@@ -466,15 +466,7 @@
             if (typeof kr.segments === 'number') setVal('kaleidoSegments', kr.segments, 'input');
         }
 
-        // ── 9. COS Oscillator state ──
-        try {
-            var cosSnap = sm.get('cosOscillator', null);
-            if (cosSnap && window.cosOscillator && typeof window.cosOscillator.loadState === 'function') {
-                window.cosOscillator.loadState(cosSnap);
-            }
-        } catch(_){}
-
-        // ── 10. Sidebar section collapsed states ──
+        // ── 9. Sidebar section collapsed states ──
         // 5.2 timing: sections are MOVED into #sidebar-right by
         // initMixerLayout ~800ms after load — at loadSettings time the
         // container is empty and an immediate pass is a no-op. Poll until
@@ -516,6 +508,8 @@
                 const state = scanAppState();
                 // Also store a collapsed snapshot for debugging
                 window.settingsManager?.set('app.lastSnapshot', state);
+                // ...and what Reset app goes back to from now on (60).
+                if (window.ResetApp) window.ResetApp.saveLook();
                 saveBtn.textContent = 'Saved';
                 setTimeout(() => saveBtn.textContent = saveIdle, 1500);
             } catch (err) {
@@ -545,7 +539,7 @@
                 // no confirmation (root cause of the 2026-07 preset loss). Now it
                 // confirms and PRESERVES presets (clearExceptPresets); the on-disk
                 // Preset Vault is untouched either way.
-                if (!window.confirm('Reset saved settings to defaults?\n\nWhat you made is kept: presets, animations, the brush library, text, palettes and hotkeys. This clears the window and layout, colour choices and other settings.')) {
+                if (!window.confirm('Reset saved settings to defaults?\n\nPreserved: presets, animations, the brush library, text, palettes and hotkeys.')) {
                     return;
                 }
                 try {
@@ -642,7 +636,7 @@
                         const caveat = painted
                             ? '\n\nSettings, brush and layer setup will be exact. Painted pixels can only come back as far as your last save — anything painted after it was lost with the driver reset.'
                             : '';
-                        if (window.confirm('The graphics driver reset during the last session.\n\nRestore your settings, layers, and brush state from just before the reset?' + caveat)) {
+                        if (window.confirm('The graphics driver reset during the last session.\n\nRestore your settings, layers, and brush state from just before the reset?')) {
                             applyPresetSnapshot(rec.snapshot);
                         }
                     } catch (err) { console.warn('[ContextLoss] restore failed', err); }
@@ -959,14 +953,6 @@
             }
         } catch(_){}
 
-        // ── COS Oscillator state ──
-        var cosState = null;
-        try {
-            if (window.cosOscillator && typeof window.cosOscillator.getState === 'function') {
-                cosState = window.cosOscillator.getState();
-            }
-        } catch(_){}
-
         // ── Path layers state ──
         var pathLayersData = null;
         try {
@@ -1036,7 +1022,6 @@
             masks: masksData,
             textOverlays: textOverlayData,
             recordedLayers: recordedLayers,
-            cosOscillator: cosState,
             pathLayers: pathLayersData,
             armColors: armColorsData
         };
@@ -1770,13 +1755,6 @@
             }
         } catch(_){}
 
-        // ── COS Oscillator state ──
-        try {
-            if (snapshot.cosOscillator && window.cosOscillator && typeof window.cosOscillator.loadState === 'function') {
-                window.cosOscillator.loadState(snapshot.cosOscillator);
-            }
-        } catch(_){}
-
         // ── Path layers state ──
         try {
             if (snapshot.pathLayers && window.pathLayers && typeof window.pathLayers.restoreSnapshot === 'function') {
@@ -1860,6 +1838,8 @@
     var BASELINE_SKIP = { visualResolution: 1, physicsResolution: 1, fpsCap: 1,
         recMode: 1, recPlaybackSpeed: 1, statsToggle: 1, autoloadSettings: 1,
         preserveFluidOpacity: 1, photoSafeToggle: 1 };
+    // 60-reset-app leaves the same keys out of the settings it saves.
+    window.LOOK_BASELINE_SKIP = BASELINE_SKIP;
 
     // ── Defaults generations ─────────────────────────────────────────
     // 2026-09-24 the shipped defaults became the "Nice for default" look
@@ -1874,7 +1854,7 @@
     // is exactly the state it used to land on. When a look default changes
     // again: bump LOOK_BASELINE_GEN and add that generation's entry to
     // LOOK_BASELINE_MOVES.
-    var LOOK_BASELINE_GEN = 7;
+    var LOOK_BASELINE_GEN = 8;
     // Per generation, the keys whose default it MOVED, at the value they had
     // before the move. A snapshot taken against generation g fills its gaps
     // from every entry newer than g, the oldest value winning when a key
@@ -1910,7 +1890,11 @@
         // 2026-10-05: Vibrance rescaled (LOOK_UNIT_MOVES below). Held in the
         // old units like everything a snapshot of that generation carries;
         // the slider apply converts both alike.
-        7: { sliders: { vibrance: 1 } }
+        7: { sliders: { vibrance: 1 } },
+        // 2026-10-13: Pressure Iteration starts at 25, Brush Size at 1.00.
+        // (Motion Detail went 512 -> 2048 the same day; it is a machine
+        // setting, BASELINE_SKIP, which Reset app now puts back itself.)
+        8: { sliders: { pressureIteration: 47, brushSize: 1.3 } }
     };
     // Per generation, the sliders whose SCALE it changed, not just their
     // default: a value saved against an older generation is multiplied by
@@ -1998,12 +1982,10 @@
         });
         // A look preset is a look (2026-10-04): it no longer replaces the
         // parts in the recorder (switching looks could swap your animation
-        // for whatever was on the bench when the preset was saved), and it
-        // no longer opens or closes the animation editor. Projects and the
-        // crash restore still bring both: they apply through
+        // for whatever was on the bench when the preset was saved). Projects
+        // and the crash restore still bring them: they apply through
         // applyPresetSnapshot directly.
         delete merged.recordedLayers;
-        delete merged.selects.recMode;
         ['colors', 'kaleido', 'brushState', 'material', 'brushTip', 'lightPos', 'armColors'].forEach(function (sec) {
             if (snapshot[sec] === undefined || snapshot[sec] === null) {
                 merged[sec] = legacy[sec] ? legacy[sec] : base[sec];
@@ -2111,7 +2093,7 @@
                 delete lite.recordedLayers;
                 ok = window.Settings.savePreset(name, lite);
             }
-            window._lastPresetSaveWarning = 'Some data too large for storage — saved settings only';
+            window._lastPresetSaveWarning = 'Some data too large for storage - saved settings only';
             return ok !== false;
         }
         window._lastPresetSaveWarning = null;
@@ -2208,7 +2190,7 @@
                     } else if (saved) {
                         showPresetStatus('Updated: ' + name, '#64b5f6');
                     } else {
-                        showPresetStatus('Update failed — storage full', '#ff6b6b');
+                        showPresetStatus('Update failed - storage full', '#ff6b6b');
                     }
                 }
             });
@@ -2274,7 +2256,7 @@
             // Check for duplicate
             var existing = getUserPresets();
             if (existing[name]) {
-                showPresetStatus('Name already exists \u2014 use overwrite button', '#ff6b6b');
+                showPresetStatus('Name already exists - use overwrite button', '#ff6b6b');
                 return;
             }
             var snapshot = capturePresetSnapshot();
@@ -2289,7 +2271,7 @@
             } else if (saved) {
                 showPresetStatus('Saved: ' + name, '#3fb950');
             } else {
-                showPresetStatus('Save failed — storage full', '#ff6b6b');
+                showPresetStatus('Save failed - storage full', '#ff6b6b');
             }
             if (nameRow) nameRow.style.display = 'none';
             if (saveRow) saveRow.style.display = 'flex';
@@ -2547,7 +2529,6 @@
             reader.onerror = function () { if (cb) cb(reader.error || new Error('read failed')); };
             reader.readAsText(file);
         }
-        window.presetLibrary = { exportAll: exportAllPresets, import: importPresetsFile };
 
         var exportAllBtn = $('exportAllPresetsBtn');
         var importBtn = $('importPresetsBtn');
@@ -2561,7 +2542,7 @@
                 importPresetsFile(f, function (err, res) {
                     if (err) { showPresetStatus('Import failed: ' + err.message, '#ff6b6b'); return; }
                     var msg = 'Imported ' + res.imported + '/' + res.total;
-                    if (res.degraded) msg += ' — ' + res.degraded + ' shed layer data (storage limit)';
+                    if (res.degraded) msg += ' - ' + res.degraded + ' shed layer data (storage limit)';
                     if (res.failed) msg += ', ' + res.failed + ' failed';
                     showPresetStatus(msg, (res.degraded || res.failed) ? '#ffa500' : '#3fb950');
                 });
@@ -2577,7 +2558,6 @@
                 if (typeof window.renderUserPresets === 'function') window.renderUserPresets();
                 if (typeof window.renderMixerUserPresets === 'function') window.renderMixerUserPresets();
                 if (typeof window.renderSidebarPresets === 'function') window.renderSidebarPresets();
-                if (typeof window.renderLayoutUserPresets === 'function') window.renderLayoutUserPresets();
             });
         };
     }

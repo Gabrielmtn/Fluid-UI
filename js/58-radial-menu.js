@@ -87,7 +87,7 @@
     var STRIP_SLIDERS = ['brushSize', 'curl', 'viscosity', 'velocityInfluence', 'colorBlend',
                          'multiplier', 'timeScale', 'densityDissipation', 'velocityDissipation'];
     // Sliders whose useful range spans decades: the wheel works them on a
-    // log scale. Brush Size runs 0.001 to 100, and the sizes people paint
+    // log scale. Brush Size runs 0.00017 to 100, and the sizes people paint
     // with are all in the bottom few percent of a straight line.
     var LOG_SLIDERS = { brushSize: true };
 
@@ -840,7 +840,7 @@
         if (st || e.defaultPrevented || !isOwnKey(e) || typing(e.target)) return;
         e.preventDefault();
         if (e.repeat) return;
-        if (document.querySelector('.delete-modal.show')) return;          // a dialog has the keyboard
+        if (window.DialogFocus.hasKeyboard()) return;                      // a dialog has the keyboard
         if (window.HotkeyBinds && window.HotkeyBinds.isActive()) return;   // choosing a control to bind
         open({ key: e.code || 'KeyE' });
     });
@@ -879,8 +879,7 @@
             var pickBtn = el('button', 'radial-pick-btn btn--block', block);
             pickBtn.type = 'button';
             pickBtn.textContent = '+ Add from the interface';
-            pickBtn.title = 'Then move a slider, click a button or a checkbox, or choose in a dropdown: it goes on the menu. '
-                + 'Menus, More and sections still open and close as usual, so you can reach what is inside.';
+            pickBtn.title = 'Valid Targets: move a slider, click a button or checkbox, option in a dropdown.';
             pickBtn.addEventListener('click', function () {
                 if (full()) { say('The menu holds ' + MAX_ITEMS + ' items. Take one off first.', true); return; }
                 say('');
@@ -892,8 +891,8 @@
         addLabel = el('input', 'radial-add-label', addRow);
         addLabel.type = 'text';
         addLabel.maxLength = LABEL_MAX;
-        addLabel.placeholder = 'Or a key: label';
-        addLabel.title = 'An item that presses a key for you: what it is called on the menu';
+        addLabel.placeholder = 'Enter a Label';
+        addLabel.title = 'Label for hotkey, what it is called on the menu';
         addLabel.setAttribute('aria-label', 'Label for a new key item');
         addNote = document.createElement('div');
         addPicker = H.picker({

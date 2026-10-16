@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05h-slider-bindings.js — part 8/14 of former 05-fluid-sim.js (lines 2440–2941)
+// js/05h-slider-bindings.js
 // LOAD ORDER: after 05g-arm-colors.js, before 05i-sim-stats.js
 // PROVIDES: sliderConfig (registry-derived), brushSize, transparentMode, resolution selects, density snap, loadSavedSliderValues, updateSliderValues
 // REQUIRES: ParamRegistry (01a), config (04), initFramebuffers (05c)
@@ -498,7 +498,7 @@
                 const currentValue = parseFloat(brushSizeSlider.value);
                 const minValue = parseFloat(brushSizeSlider.min);
                 const maxValue = parseFloat(brushSizeSlider.max);
-                // Proportional step: ~8% of current value, clamped to [0.001, 2.0]
+                // Proportional step: ~8% of current value, at most 2.0
                 // Gives fine control at small sizes, snappier at large sizes.
                 // The floor and the rounding below both used to sit at 0.1 —
                 // together they made every sub-0.1 size unreachable by wheel
@@ -518,7 +518,7 @@
                 // fine end at 0.001-wide steps (a 2× jump at the floor).
                 newValue = Math.min(maxValue, Math.max(minValue,
                     Math.round(+newValue.toPrecision(3) / gridStep) * gridStep));
-                newValue = +newValue.toFixed(4);
+                newValue = +newValue.toFixed(5);
                 brushSizeSlider.value = newValue;
                 brushSizeSlider.style.setProperty('--val', newValue);
                 // Drive it like a user drag (matches the brush-preset apply

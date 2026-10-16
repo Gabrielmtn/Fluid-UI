@@ -216,9 +216,9 @@ equality; add a perceptual threshold (mean |Δlum| < ε) via `pixelmatch`
   toggles mid-stroke; resolution select while painting.
 
 **P4 — input conformance.** `run-inputs.js` over all 45 bindings; add the
-wheel bindings (inventory has synthesis shapes). Known bug to fix first:
-Shift+[ / Shift+] coarse brush is unreachable (05n matches `e.key==='['`
-exactly; with Shift it's `'{'`). The inventory's sheet-mismatch notes list
+wheel bindings (inventory has synthesis shapes). The Shift+[ / Shift+]
+coarse brush is gone (fixed 2026-10-07, removed 2026-10-14; { } are free
+for the hotkey maker). The inventory's sheet-mismatch notes list
 undocumented bindings (Z, 0, Ctrl+Alt+Scroll, Ctrl+Enter ComfyUI post with
 no typing guard) — decide document-or-guard for each with Gabriel.
 
@@ -251,7 +251,7 @@ refactor's safety net and the whole point.
 |---|---|---|
 | 1 | Ridges 0–0.9 bit-dead (sub-texel kernel); felt range confirmed | 05j:1139 kernelScale |
 | 2 | Display-chain→dye coupling on Ridges toggle (UNEXPLAINED) | P6 above |
-| 3 | Shift+[ / ] coarse brush unreachable; F1 sheet advertises it | 05n:412 |
+| 3 | ~~Shift+[ / ] coarse brush unreachable~~ removed 2026-10-14 | 05n |
 | 4 | Pigment memory survives clear → baseline drift | 05c/05i, wipe TBD |
 | 5 | Collision-1.0 destruction unreproduced yet; fp16 suspect documented | 04a:416 |
 | 6 | Ctrl+Enter ComfyUI post fires with no typing guard | comfyui-bridge.js:231 |

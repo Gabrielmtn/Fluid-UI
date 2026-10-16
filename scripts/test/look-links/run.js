@@ -399,14 +399,7 @@ const KIT = String.raw`(function(){
             log('skip live room section (set MP_HOST=<local relay>, e.g. npx wrangler dev --port 8787 --ip 127.0.0.1)');
         }
 
-        // ── 6c. How do I… (js/44) ──────────────────────────────────────
-        const help = await page.eval(String.raw`(async function(){
-          var hits = (Recipes.search('share my settings link') || []).map(function(r){ return r.id || (r.r && r.r.id); });
-          var rec = Recipes.RECIPES.filter(function(r){ return r.id === 'share-settings'; })[0];
-          var got = rec ? await Recipes._reveal(rec.target) : null;
-          return { hits: hits.slice(0, 3), found: !!rec, el: got && got.el ? got.el.id : null };
-        })()`).catch((e) => ({ err: String(e) }));
-        check(help.found && help.el === 'shareLookBtn' && (help.hits || []).indexOf('share-settings') !== -1, 'How do I…: "Share my settings as a link" is found and points at the button', help);
+        // (6c, How do I… finding Share my settings, went with js/44, parked 2026-10-14.)
 
         // ── 7. Button audit ────────────────────────────────────────────
         const audit = await page.eval(String.raw`(function(){

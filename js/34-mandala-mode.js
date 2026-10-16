@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/34-mandala-mode.js — Mandala Studio
+// js/34-mandala-mode.js — Mandala Overlay
 // LOAD ORDER: last (after 05f-kaleido-controls.js and 05g-arm-colors.js)
 // PROVIDES: a radial-symmetry PAINTING rig — you paint one wedge, the
 //   kaleido display mirrors it into a full mandala. Auto-rigs kaleido +

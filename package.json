@@ -12,6 +12,7 @@
     "party": "partykit dev",
     "serve": "npx http-server -p 8080 -c-1",
     "copy-sink": "node scripts/copy-sink.js serve",
+    "copy-check": "node scripts/copy-sink.js check",
     "electron": "electron .",
     "electron-build": "electron-builder",
     "dist:win": "electron-builder --win",
@@ -91,7 +92,7 @@
       "!Design system breakdown exploration/**",
       "!Design system breakdown exploration.zip",
       "!*.xlsx",
-      "!js/07-cos-oscillator.js",
+      "!js/44-recipes.js",
       "!steam_appid.txt",
       "!assets/boot-swirl/**"
     ],

@@ -3,7 +3,7 @@
 // LOAD ORDER: after 08-stats-panel.js (any time before 05 finishes is fine;
 //   05's hooks all guard on window.QualityGovernor)
 // PROVIDES: window.QualityGovernor
-// HOOKS (all in 05-fluid-sim.js, marked // [GOVERNOR HOOK]):
+// HOOKS (in 05c and 05j, marked // [GOVERNOR HOOK]):
 //   1. pressure Jacobi loop uses effIters(config.PRESSURE_ITERATIONS)
 //   2. initFramebuffers multiplies dye/sim base resolution by dyeScale()/simScale()
 //   3. sharpen / micro-detail / glow passes gated by fxOn()
@@ -128,6 +128,7 @@
             if (bootStage > 0 && ++bootLowStreak >= 2) {
                 bootStage--;
                 window.needsFramebufferReinit = true;
+                idleFps = 0;
                 freezeUntilMs = nowMs + 3000;
                 bootDone = true;
                 console.log('[Governor] boot ascent parked at dye ×' + BOOT_STAGES[bootStage].dye +
@@ -146,6 +147,7 @@
                 bootHighStreak = 0;
                 bootStage++;
                 window.needsFramebufferReinit = true;
+                idleFps = 0;
                 freezeUntilMs = nowMs + 3000;
                 lowStreak = 0;
                 highStreak = 0;
@@ -212,7 +214,9 @@
         console.log('[Governor] L' + level + ' → L' + next + ' (' + why + ')' +
             (needReinit ? ' [framebuffer reinit, dye preserved]' : ''));
         level = next;
-        if (needReinit) window.needsFramebufferReinit = true;
+        if (needReinit) { window.needsFramebufferReinit = true; idleFps = 0; }
+        // Paint relief needs a moment to show before a stroke is judged slow.
+        slowQuietUntil = nowMs + 1000;
         freezeUntilMs = nowMs + 3000;
         lowStreak = 0;
         highStreak = 0;
@@ -288,10 +292,11 @@
     // adaptation will save the session — offer the user a one-click way out.
     // "Severe" means genuinely unusable (≈<15-20 fps), NOT merely missing an
     // ambitious 240 fps cap; a catastrophic fast-path (<8 fps) offers rescue
-    // immediately without waiting for the ladder to bottom out.
+    // immediately without waiting for the ladder to bottom out. It lights the
+    // slowdown button red (below); a click there runs applyRescue.
     var severeStreak = 0;
     var rescueCooldownUntil = 0;
-    var rescueEl = null;
+    var rescueUp = false;
 
     function atLadderBottom() { return nextDown(level) === level; }
 
@@ -310,42 +315,18 @@
         }
     }
 
-    function buildRescue() {
-        if (rescueEl) return;
-        rescueEl = document.createElement('div');
-        rescueEl.id = 'perfRescueToast';
-        // Portaled to <body>, so no panel tints its buttons — take the group
-        // the governor's own controls sit in. The amber plate is the toast's;
-        // the buttons inherit (css/01-buttons.css), the ✕ as a ghost on it.
-        rescueEl.dataset.group = 'system';
-        rescueEl.style.cssText =
-            'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:10005;' +
-            'display:none;align-items:center;gap:10px;padding:10px 12px;' +
-            'background:linear-gradient(180deg,#2a2016,#1c1610);border:1px solid rgba(255,178,71,0.55);' +
-            'border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.6);color:#e6edf3;' +
-            'font-size:13px;font-family:inherit;';
-        rescueEl.innerHTML =
-            '<span>🐌 Running very slowly</span>' +
-            '<button id="perfRescueBtn" style="padding:6px 12px;border-radius:8px;cursor:pointer;' +
-                'font-weight:700;font-size:12px;">Boost performance</button>' +
-            '<button id="perfRescueClose" class="btn--ghost" title="Dismiss" style="padding:4px 8px;' +
-                'border-radius:6px;cursor:pointer;font-size:13px;">✕</button>';
-        document.body.appendChild(rescueEl);
-        rescueEl.querySelector('#perfRescueBtn').addEventListener('click', applyRescue);
-        rescueEl.querySelector('#perfRescueClose').addEventListener('click', function () {
-            hideRescue(true); // user said no — don't nag for a while
-        });
-    }
-
     function showRescue() {
-        buildRescue();
-        rescueEl.style.display = 'flex';
+        if (rescueUp) return;
+        rescueUp = true;
+        renderSlow();
     }
 
     function hideRescue(withCooldown) {
-        if (rescueEl) rescueEl.style.display = 'none';
         if (withCooldown) rescueCooldownUntil = performance.now() + 60000;
         severeStreak = 0;
+        if (!rescueUp) return;
+        rescueUp = false;
+        renderSlow();
     }
 
     // Set a control through its OWN handlers so UI, config, and framebuffers
@@ -357,12 +338,18 @@
         el.dispatchEvent(new Event(evt || 'change', { bubbles: true }));
     }
 
+    // Only ever down: a rescue must not raise a setting already below its pick.
+    function lowerCtl(id, value, current, evt) {
+        if (isFinite(current) && current > value) setCtl(id, value, evt);
+    }
+
     function applyRescue() {
         // Resolution dominates cost — drop to modest-but-fine values; ease the
         // pressure solve too. Artwork survives (initFramebuffers preserves dye).
-        setCtl('visualResolution', '1024', 'change');
-        setCtl('physicsResolution', '256', 'change');
-        setCtl('pressureIteration', 20, 'input');
+        var c = window.config || {};
+        lowerCtl('visualResolution', 1024, c.DYE_RESOLUTION, 'change');
+        lowerCtl('physicsResolution', 256, c.SIM_RESOLUTION, 'change');
+        lowerCtl('pressureIteration', 20, c.PRESSURE_ITERATIONS, 'input');
         if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
         // The workload just dropped massively and deliberately — a HARD reset
         // to full tier is correct here (unlike preset clicks, which soft-reset)
@@ -370,6 +357,193 @@
         rescueCooldownUntil = performance.now() + 20000;
         hideRescue(false);
         console.log('[Governor] performance rescue applied (dye 1024, sim 256, iters 20)');
+    }
+
+    // ── Slowdown button: under the canvas, yellow or red ────────────────
+    // Gabriel 2026-10-15: the old "Running very slowly" toast is now one
+    // button on the quality underbar, beside the pills it lowers. High GPU
+    // settings hold their fps between strokes and chug once the brush adds
+    // its splats, so the main test is painting: fps over half-second windows
+    // of a stroke against the fps between strokes (capped at the target —
+    // above it painting is smooth anyway). More than 10% under is yellow,
+    // more than 25% red, judged on two windows in a row so one hitch is not
+    // a slowdown. The rescue above lights it red too. Nothing changes until
+    // it is clicked; 3 s of clean painting takes a paint warning back.
+    var SLOW_WIN_MS = 500;
+    var SLOW_YELLOW = 0.10;
+    var SLOW_RED = 0.25;
+    var SLOW_CLEAN_MS = 3000;
+    var slowWin = { painting: false, frames: 0, startMs: 0, lastMs: 0 };
+    var idleFps = 0;          // fps between strokes (EMA); 0 = not measured yet
+    var lastPaintSev = 0;     // the previous paint window's verdict
+    var cleanPaintMs = 0;
+    var paintLevel = 0;       // 0 none, 1 yellow, 2 red
+    var paintWavedOff = 0;    // the colour the user dismissed (until the workload changes)
+    var slowQuietUntil = 0;   // a level change is still landing: windows wait
+    var slowEl = null, slowBtn = null, slowPlacedMs = 0;
+
+    function slowFrame(nowMs) {
+        // The bar comes and goes without a resize (Simple layout, focus
+        // mode): while the button is up, check its spot twice a second.
+        if (slowEl && !slowEl.hidden && nowMs - slowPlacedMs > 500) placeSlow();
+        var w = slowWin;
+        var painting = !!(window.__lastPaintMs && (nowMs - window.__lastPaintMs) < 250);
+        // A stall (hidden tab, reinit, long GC) is not a frame rate, and a
+        // window never spans a stroke's start or end: begin a fresh one.
+        if (!w.lastMs || nowMs - w.lastMs > 250 || painting !== w.painting || nowMs < slowQuietUntil) {
+            w.painting = painting;
+            w.frames = 0;
+            w.startMs = nowMs;
+            w.lastMs = nowMs;
+            return;
+        }
+        w.frames++;
+        w.lastMs = nowMs;
+        var ms = nowMs - w.startMs;
+        if (ms < SLOW_WIN_MS) return;
+        var fps = w.frames * 1000 / ms;
+        w.frames = 0;
+        w.startMs = nowMs;
+        if (!painting) idleFps = idleFps ? idleFps * 0.7 + fps * 0.3 : fps;
+        else judgePaint(fps);
+    }
+
+    function judgePaint(fps) {
+        if (!idleFps) return; // nothing to compare against until a pause between strokes
+        var base = Math.min(idleFps, targetFps());
+        var drop = 1 - fps / base;
+        var sev = drop > SLOW_RED ? 2 : (drop > SLOW_YELLOW ? 1 : 0);
+        var both = Math.min(sev, lastPaintSev);
+        lastPaintSev = sev;
+        if (!sev) {
+            cleanPaintMs += SLOW_WIN_MS;
+            if (paintLevel && cleanPaintMs >= SLOW_CLEAN_MS) { paintLevel = 0; renderSlow(); }
+            return;
+        }
+        cleanPaintMs = 0;
+        if (both > paintLevel) {
+            paintLevel = both;
+            console.log('[Governor] paint slowdown ' + Math.round(drop * 100) + '% (' + fps.toFixed(1) +
+                ' fps painting vs ' + base.toFixed(1) + ' between strokes) - ' + (both === 2 ? 'red' : 'yellow'));
+            renderSlow();
+        }
+    }
+
+    // The settings changed under the measurements (resolution, preset,
+    // ladder reinit): measure the pause between strokes again, and a colour
+    // the user waved off may ask again.
+    function slowRelearn() {
+        idleFps = 0;
+        lastPaintSev = 0;
+        cleanPaintMs = 0;
+        paintWavedOff = 0;
+    }
+
+    function slowLevel() {
+        if (!enabled) return 0;
+        if (rescueUp) return 2;
+        return paintLevel > paintWavedOff && nextLower() ? paintLevel : 0;
+    }
+
+    // One step down on whichever of Motion Detail / Image Sharpness is set
+    // higher (Motion on a tie: the pressure solve runs on its grid and is
+    // most of the frame). Returns null when both are at their lowest.
+    function nextLower() {
+        var c = window.config || {};
+        var pick = function (id, cur) {
+            var sel = document.getElementById(id), best = null;
+            if (!sel || !isFinite(cur)) return null;
+            Array.prototype.forEach.call(sel.options, function (o) {
+                var v = parseInt(o.value, 10);
+                if (isFinite(v) && v < cur && (best === null || v > best)) best = v;
+            });
+            return best === null ? null : { id: id, from: cur, to: best };
+        };
+        var m = pick('physicsResolution', c.SIM_RESOLUTION);
+        var i = pick('visualResolution', c.DYE_RESOLUTION);
+        if (m && (!i || m.from >= i.from)) return m;
+        return i;
+    }
+
+    function lowerQuality() {
+        if (rescueUp) { applyRescue(); }
+        else {
+            var step = nextLower();
+            if (step) {
+                console.log('[Governor] slowdown button: ' + step.id + ' ' + step.from + ' -> ' + step.to);
+                setCtl(step.id, step.to, 'change');
+                if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+            }
+        }
+        slowRelearn();
+        paintLevel = 0;
+        slowQuietUntil = performance.now() + 1500;
+        renderSlow();
+    }
+
+    function buildSlow() {
+        if (slowEl) return;
+        slowEl = document.createElement('div');
+        slowEl.id = 'slowdownCell';
+        slowEl.className = 'slowdown-cell';
+        // Body-floated when the bar is hidden, so it takes the group the
+        // governor's own controls sit in (css/01-buttons.css).
+        slowEl.dataset.group = 'system';
+        slowEl.hidden = true;
+        slowBtn = document.createElement('button');
+        slowBtn.type = 'button';
+        slowBtn.id = 'slowdownBtn';
+        slowBtn.textContent = 'Slowdown detected, lower quality?';
+        slowBtn.addEventListener('click', lowerQuality);
+        var x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'btn--ghost slowdown-close';
+        x.title = 'Dismiss';
+        x.setAttribute('aria-label', 'Dismiss');
+        x.textContent = '✕';
+        x.addEventListener('click', function () {
+            // No: this colour stays quiet until the settings change; the
+            // rescue keeps its old minute.
+            paintWavedOff = Math.max(paintWavedOff, paintLevel);
+            if (rescueUp) hideRescue(true);
+            renderSlow();
+        });
+        slowEl.appendChild(slowBtn);
+        slowEl.appendChild(x);
+    }
+
+    // On the underbar when it is on screen; the painting's bottom-left
+    // corner when it is not (Simple layout, focus mode, narrow windows).
+    function placeSlow() {
+        slowPlacedMs = performance.now();
+        var bar = document.getElementById('quality-underbar');
+        var shown = false;
+        if (bar) { try { shown = getComputedStyle(bar).display !== 'none'; } catch (_) {} }
+        var parent = shown ? bar : document.body;
+        if (slowEl.parentElement !== parent) {
+            // Before Reset app / the clock in the DOM too, so Tab meets it
+            // where the eye does (22-overlays orders it there).
+            parent.insertBefore(slowEl, shown ? bar.querySelector('.reset-app-btn, .demo-clock, .playtest-label') : null);
+        }
+        slowEl.classList.toggle('floating', !shown);
+        var left = '';
+        if (!shown) {
+            var ca = document.getElementById('canvas-area');
+            var r = ca ? ca.getBoundingClientRect() : null;
+            left = ((r && r.left > 1 ? Math.round(r.left) : 0) + 14) + 'px';
+        }
+        if (slowEl.style.left !== left) slowEl.style.left = left;
+    }
+
+    function renderSlow() {
+        var lv = slowLevel();
+        if (!lv && !slowEl) return;
+        buildSlow();
+        slowEl.hidden = !lv;
+        if (!lv) return;
+        slowBtn.className = lv === 2 ? 'btn--slow-red' : 'btn--slow-yellow';
+        slowEl.dataset.level = lv === 2 ? 'red' : 'yellow';
+        placeSlow();
     }
 
     // Highest quality level that does NOT change resolution — stepping through these
@@ -395,7 +569,7 @@
         if (!painting || level >= MAX_NONRES_LEVEL || nowMs < fastFreezeUntil) return;
         if (fps >= 0.85 * targetFps()) return;
         fastFreezeUntil = nowMs + 700; // brief settle before another step
-        setLevel(level + 1, nowMs, 'paint relief — fps ' + fps.toFixed(1));
+        setLevel(level + 1, nowMs, 'paint relief - fps ' + fps.toFixed(1));
     }
 
     function updateStatusLine() {
@@ -450,6 +624,7 @@
             fastFrameCount++;
             cpuEma = cpuEma === 0 ? cpuMs : cpuEma * 0.95 + cpuMs * 0.05;
             if (lastEvalMs === 0) { lastEvalMs = nowMs; fastLastMs = nowMs; return; }
+            slowFrame(nowMs);
             maybeFastRelief(nowMs);
             if (nowMs - lastEvalMs >= 1000) evaluate(nowMs);
         },
@@ -470,6 +645,7 @@
             highStreak = 0;
             freezeUntilMs = 0;
             fastFreezeUntil = 0;
+            slowRelearn();
             updateStatusLine();
         },
         // For workload changes (preset apply, snapshot restore): the OLD
@@ -486,6 +662,7 @@
             highStreak = 0;
             freezeUntilMs = 0;
             fastFreezeUntil = 0;
+            slowRelearn();
             updateStatusLine();
         },
         // WYSIWYG on an explicit Visual/Physics resolution pick: the user chose
@@ -506,6 +683,7 @@
             highStreak = 0;
             fastFreezeUntil = 0;
             freezeUntilMs = performance.now() + 3000;
+            slowRelearn();
             updateStatusLine();
         },
         setEnabled: function (b) {
@@ -516,6 +694,7 @@
             var s = settings();
             if (s) s.set('governor.enabled', b);
             updateStatusLine();
+            renderSlow();
             console.log('[Governor]', b ? 'enabled' : 'disabled');
         },
         setAllowFx: function (b) {
@@ -538,7 +717,9 @@
             updateStatusLine();
         },
         getState: function () {
-            return { enabled: enabled, allowResolution: allowResolution, level: level, cpuEma: cpuEma, upDwell: upDwell };
+            return { enabled: enabled, allowResolution: allowResolution, level: level, cpuEma: cpuEma, upDwell: upDwell,
+                slowdown: { shown: ['none', 'yellow', 'red'][slowLevel()], paintLevel: paintLevel, rescue: rescueUp,
+                            idleFps: idleFps, wavedOff: paintWavedOff } };
         }
     };
 

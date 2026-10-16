@@ -34,12 +34,11 @@ with another person for a few minutes.
 
 [list]
 [*]2 to 8 painters on one canvas — one stranger at the press of a button, or a six-character code for friends
-[*]Turns on a 30-second to 5-minute timer, or everyone painting at once
 [*]3 paint materials: fluid, wet paint that dries, thick paint that piles up
 [*]5 brush tips you can rotate — plus stamp shapes you draw yourself
 [*]8 painting arms across 5 symmetry modes, each arm with its own colour
 [*]A 24-segment kaleidoscope with 5 modes, folding the whole canvas as it moves
-[*]Mandala Studio — paint one wedge of up to 24 and the circle fills itself in
+[*]Mandala Overlay — paint one wedge of up to 24 and the circle fills itself in
 [*]8 one-tap physics presets, and every parameter underneath them
 [*]10 layers, masks, and colliders you paint by hand for the fluid to break against
 [*]2 on-device AI models: cut an object out of a photo, or turn a photo into terrain
@@ -112,7 +111,6 @@ images with a line of context under each.
   | Claim | Source |
   |---|---|
   | 2 / 8 painters | `PUBLIC_CAP = 2`, `PRIVATE_CAP = 8` — `party/shared.ts:7` |
-  | 30 sec – 5 min turns | `#turnTimerSel` options — `index.html:1040` |
   | 3 paint materials | `#materialMode`: Material Type - Fluid · Paint (Wet) · Paint (Thick) — `index.html:787` |
   | 5 brush tips | gaussian · blob · chisel · streak · ring — `js/04a-canvas-gl-config.js:743` |
   | 8 arms | `multiplier` hard max 8 — `js/01a-param-registry.js:63` |
@@ -221,7 +219,7 @@ with another person for a few minutes.
 [img]{STEAM_APP_IMAGE}/extras/about-09-symmetry.png[/img]
 
 [list]
-[*][b]Opening the Mandala Studio.[/b] Paint one wedge and watch the whole mandala fill in around it.
+[*][b]Opening the Mandala Overlay.[/b] Paint one wedge and watch the whole mandala fill in around it.
 [*][b]Zooming in.[/b] A zoom mode for detail work, a focus mode for when the interface should get out of the way.
 [/list]
 
@@ -384,7 +382,7 @@ paint does when it meets in the middle.
 
 [h2]Kaleidoscope and Mandala[/h2]
 Mirror your brush across up to eight arms. Fold the whole canvas through a
-kaleidoscope. Or open Mandala Studio, paint one wedge, and watch the rest of
+kaleidoscope. Or open Mandala Overlay, paint one wedge, and watch the rest of
 the circle paint itself — a single stroke opening like a flower.
 
 [h2]And then there is the rest of it[/h2]

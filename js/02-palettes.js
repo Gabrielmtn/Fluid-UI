@@ -366,6 +366,4 @@
         let recIsPlayingAll = false;
         let recMaxDurationMs = 8000;   // the strip's 8 s chip
         let recLastPlaybackTime = Date.now();
-        let recPlaybackSpeed = 1;
-        let recRenderQueued = false;
         let recRecordSource = 'single';

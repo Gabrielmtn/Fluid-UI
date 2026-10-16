@@ -216,7 +216,7 @@
         copyBtn.type = 'button';
         copyBtn.title = 'Copy the hex code';
         var spaceSel = el('select', 'cp-space', head);
-        spaceSel.setAttribute('aria-label', 'Colour space');
+        spaceSel.setAttribute('aria-label', 'Color space');
         spaceSel.title = 'OKLCH: equal steps look equal. HSL and RGB are here too.';
         Object.keys(SPACES).forEach(function (k) {
             var o = el('option', null, spaceSel, SPACES[k].label);
@@ -226,13 +226,13 @@
         var dropBtn = el('button', 'cp-drop btn--ghost btn--icon', head);
         dropBtn.type = 'button';
         dropBtn.innerHTML = PIPETTE_SVG;
-        dropBtn.title = 'Pick a colour from the canvas. Alt+click on the canvas does it too.';
-        dropBtn.setAttribute('aria-label', 'Pick a colour from the canvas');
+        dropBtn.title = 'Pick a color from the canvas. Alt+click on the canvas does it too.';
+        dropBtn.setAttribute('aria-label', 'Pick a color from the canvas');
 
         var sliders = el('div', 'cp-sliders', root);
         var rows = [0, 1, 2].map(makeRow);
         var gamutNote = el('div', 'cp-gamut', root,
-            'The screen can’t show this one, so the nearest colour is used.');
+            'The screen can’t show this one, so the nearest color is used.');
         gamutNote.hidden = true;
 
         var recHead = el('div', 'cp-recent-head', root, 'Recent');
@@ -427,7 +427,7 @@
             recWrap.innerHTML = '';
             var list = recents();
             if (!list.length) {
-                el('span', 'cp-recent-empty', recWrap, 'Colours you pick show up here.');
+                el('span', 'cp-recent-empty', recWrap, 'Colors you pick show up here.');
                 return;
             }
             list.forEach(function (h) {
@@ -525,11 +525,11 @@
     var pop = null;
 
     function titleFor(input) {
-        if (input.id === 'colorPicker') return 'Brush colour';
+        if (input.id === 'colorPicker') return 'Brush color';
         if (input.id === 'backgroundColorPicker') return 'Background';
         var t = input.getAttribute('aria-label') || input.title || '';
         t = t.split(/[.—(]/)[0].trim();
-        return t || 'Colour';
+        return t || 'Color';
     }
     function writeInput(input, hex, type) {
         var v = String(hex).toLowerCase();
@@ -548,7 +548,7 @@
         el('span', 'cp-pal-label', headRow, 'Palette');
         var sel = el('select', 'cp-pal-select', headRow);
         sel.setAttribute('aria-label', 'Palette');
-        sel.title = 'Choosing a palette turns Palette mode on: a new palette colour each stroke.';
+        sel.title = 'Choosing a palette turns Palette mode on: a new palette color each stroke.';
         var row = el('div', 'cp-pal-row', box);
         var lastKey = '';
         function render(force) {
@@ -637,6 +637,15 @@
         pop = { wrap: wrap, picker: picker, input: input, original: M.normalizeHex(input.value), last: input.value, moved: false };
         placePopover(wrap, input);
         input.classList.add('cp-open');
+        // From the keyboard, focus goes into the picker; Tab out closes it;
+        // closed with focus inside (× or Esc), back to the well (00b popup).
+        pop.focus = window.DialogFocus.popup(wrap, input, {
+            initial: function () {
+                var f = picker.el.querySelector('input:not([type="hidden"]), button, [tabindex]:not([tabindex="-1"])');
+                return f || x;
+            },
+            close: close
+        });
         x.addEventListener('click', close);
         // Drag by the bar to move it off what you're painting.
         bar.addEventListener('pointerdown', function (e) {
@@ -703,6 +712,7 @@
         // moves on after every stroke, and those rolls aren't picks.
         var now = M.normalizeHex(p.input.value);
         if (p.picked && now && now !== p.original) addRecent(now);
+        if (p.focus) p.focus.release();
         p.picker.destroy();
         if (p.wrap.parentNode) p.wrap.parentNode.removeChild(p.wrap);
     }
@@ -804,7 +814,7 @@
         state.picker = create({
             value: start,
             variant: 'inline',
-            title: mode === 'add' ? 'Add a colour' : 'Change this colour',
+            title: mode === 'add' ? 'Add a color' : 'Change this color',
             onInput: refreshInline,
             onCommit: refreshInline,
             onEnter: primaryInline,
@@ -1077,7 +1087,7 @@
         if (!e.altKey || e.button !== 0 || sampling || e.ctrlKey || e.metaKey || e.shiftKey) return;
         var area = document.getElementById('canvas-area');
         if (!area || !area.contains(e.target)) return;
-        if (document.querySelector('.delete-modal.show')) return;
+        if (window.DialogFocus.hasKeyboard()) return;
         stop(e);
         sample({ press: e, onPick: pickToTarget, current: inline ? inline.picker.get() : (pop ? pop.picker.get() : null) });
     }, true);

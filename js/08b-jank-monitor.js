@@ -320,7 +320,7 @@
                 verdict: uiMs > 500 && baseline.ms > 2000
                     ? ((uiDrops / (uiMs / 1000)) > baselineRate() * 1.3
                         ? 'UI interactions measurably worsen frame drops'
-                        : 'UI interactions ≈ ambient — the drops are sim load, not UI')
+                        : '')
                     : 'not enough data yet'
             };
         },

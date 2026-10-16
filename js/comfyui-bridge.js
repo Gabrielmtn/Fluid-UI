@@ -45,131 +45,41 @@
         } catch (e) { /* ignore */ }
     }
 
-    // ── Canvas capture (composites all visible layers + sim) ───────
+    // ── Canvas capture ──────────────────────────────────────────────
+    // The export's own composite (24), so the frame matches a still export:
+    // ground under it, clip masks, raster layers once, text overlays. A JPG
+    // asks for it opaque — JPG has no alpha, and a see-through ground would
+    // come out black.
     function captureCanvas() {
-        return new Promise((resolve, reject) => {
-            const simCanvas = document.getElementById('canvas');
-            if (!simCanvas) return reject(new Error('Canvas not found'));
-
-            const w = simCanvas.width;
-            const h = simCanvas.height;
-
-            // Snapshot the WebGL canvas immediately (may clear after this frame)
-            const simSnap = document.createElement('canvas');
-            simSnap.width = w;
-            simSnap.height = h;
-            simSnap.getContext('2d').drawImage(simCanvas, 0, 0);
-
-            // Scale factors: canvas internal resolution vs CSS display size
-            const displayW = simCanvas.clientWidth || w;
-            const displayH = simCanvas.clientHeight || h;
-            const sx = w / displayW;
-            const sy = h / displayH;
-
-            // Build draw list bottom-to-top (layerOrder[0] = top, so reverse)
-            const order = (window.layerOrder || []).slice().reverse();
-
-            // Fallback: if no layer order, just capture the sim
-            if (!order.length) {
-                order.push({ type: 'sim' });
+        const fx = window.fluidExport;
+        if (!fx || typeof fx.captureFrame !== 'function') {
+            return Promise.reject(new Error('Export module not loaded'));
+        }
+        const jpg = config.format === 'jpg';
+        return Promise.resolve(fx.captureFrame(null, { opaque: jpg })).then(frame => new Promise((resolve, reject) => {
+            // Fixed capture size if set (stretched to it), otherwise native
+            // canvas resolution
+            const targetW = config.captureWidth > 0 ? config.captureWidth : frame.width;
+            const targetH = config.captureHeight > 0 ? config.captureHeight : frame.height;
+            let out = frame;
+            if (targetW !== frame.width || targetH !== frame.height) {
+                out = document.createElement('canvas');
+                out.width = targetW;
+                out.height = targetH;
+                out.getContext('2d').drawImage(frame, 0, 0, targetW, targetH);
             }
-
-            const drawList = [];
-
-            for (const item of order) {
-                if (item.type === 'sim') {
-                    if (simCanvas.style.display !== 'none') {
-                        const opacity = parseFloat(simCanvas.style.opacity);
-                        drawList.push({ type: 'sim', opacity: isNaN(opacity) ? 1 : opacity });
-                    }
-                } else {
-                    const layer = (window.layers || []).find(l => l.index === item.id);
-                    if (!layer || !layer.visible) continue;
-                    const layerDiv = document.getElementById('layer' + layer.index);
-                    if (!layerDiv || layerDiv.style.display === 'none') continue;
-
-                    const bg = layerDiv.style.backgroundImage;
-                    if (!bg || bg === 'none' || bg === '') continue;
-                    const m = bg.match(/url\(["']?(.+?)["']?\)/);
-                    if (!m) continue;
-
-                    const divOpacity = parseFloat(layerDiv.style.opacity);
-                    drawList.push({
-                        type: 'layer',
-                        src: m[1],
-                        x: (layer.x || 0) * sx,
-                        y: (layer.y || 0) * sy,
-                        scaleX: layer.scaleX || 1,
-                        scaleY: layer.scaleY || 1,
-                        rotation: layer.rotation || 0,
-                        skewX: layer.skewX || 0,
-                        skewY: layer.skewY || 0,
-                        opacity: isNaN(divOpacity) ? 1 : divOpacity
-                    });
-                }
-            }
-
-            // Pre-load all layer images in parallel
-            Promise.all(drawList.map(task => {
-                if (task.type === 'sim') return Promise.resolve(null);
-                return new Promise(res => {
-                    const img = new Image();
-                    img.onload = () => res(img);
-                    img.onerror = () => res(null);
-                    img.src = task.src;
-                });
-            })).then(images => {
-                // Determine output dimensions: use fixed capture size if set,
-                // otherwise native canvas resolution
-                const targetW = config.captureWidth > 0 ? config.captureWidth : w;
-                const targetH = config.captureHeight > 0 ? config.captureHeight : h;
-                const scaleX = targetW / w;
-                const scaleY = targetH / h;
-
-                const comp = document.createElement('canvas');
-                comp.width = targetW;
-                comp.height = targetH;
-                const ctx = comp.getContext('2d');
-
-                // If scaling, apply transform so all draw operations map to target size
-                if (scaleX !== 1 || scaleY !== 1) {
-                    ctx.scale(scaleX, scaleY);
-                }
-
-                drawList.forEach((task, idx) => {
-                    ctx.globalAlpha = task.opacity;
-                    if (task.type === 'sim') {
-                        ctx.drawImage(simSnap, 0, 0);
-                    } else {
-                        const img = images[idx];
-                        if (!img) return;
-                        ctx.save();
-                        // Replicate CSS: transform-origin center, then translate/rotate/skew/scale
-                        ctx.translate(w / 2 + task.x, h / 2 + task.y);
-                        ctx.rotate(task.rotation * Math.PI / 180);
-                        if (window.LayerXform) window.LayerXform.shearCtx(ctx, task);
-                        ctx.scale(task.scaleX, task.scaleY);
-                        ctx.drawImage(img, -w / 2, -h / 2, w, h);
-                        ctx.restore();
-                    }
-                    ctx.globalAlpha = 1;
-                });
-
-                const mimeType = config.format === 'jpg' ? 'image/jpeg' : 'image/png';
-                const quality = config.format === 'jpg' ? 0.95 : undefined;
-                comp.toBlob((blob) => {
-                    if (!blob) return reject(new Error('toBlob failed'));
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(Buffer.from(reader.result));
-                    reader.onerror = reject;
-                    reader.readAsArrayBuffer(blob);
-                }, mimeType, quality);
-            }).catch(reject);
-        });
+            out.toBlob((blob) => {
+                if (!blob) return reject(new Error('toBlob failed'));
+                const reader = new FileReader();
+                reader.onload = () => resolve(Buffer.from(reader.result));
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(blob);
+            }, jpg ? 'image/jpeg' : 'image/png', jpg ? 0.95 : undefined);
+        }));
     }
 
     // ── Save to folder ──────────────────────────────────────────────
-    async function sendToComfyUI() {
+    async function saveFrameToFolder() {
         if (sending) return;
         if (!config.outputFolder) {
             showToast('⚠️ Set a save folder first (Export → Set Save To Folder)', 'warn');
@@ -187,7 +97,7 @@
         }
 
         sending = true;
-        showToast('📸 Capturing…', 'info');
+        showToast('Capturing…', 'info');
 
         try {
             const buffer = await captureCanvas();
@@ -233,9 +143,10 @@
     // ── Hotkey: Ctrl+Enter ──────────────────────────────────────────
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.key === 'Enter' && !e.shiftKey && !e.altKey) {
+            if (window.DialogFocus && window.DialogFocus.hasKeyboard()) return;   // a dialog has the keyboard (00b)
             e.preventDefault();
             e.stopPropagation();
-            sendToComfyUI();
+            saveFrameToFolder();
         }
     }, true);
 
@@ -265,7 +176,7 @@
 
     // ── Public API ──────────────────────────────────────────────────
     window.comfyuiBridge = {
-        send: sendToComfyUI,
+        send: saveFrameToFolder,
         pickFolder: pickOutputFolder,
         openFolder: openOutputFolder,
         getConfig: () => ({ ...config }),

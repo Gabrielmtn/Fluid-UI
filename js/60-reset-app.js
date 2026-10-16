@@ -6,7 +6,7 @@
 //   quality underbar) and everything it resets: 04a (__CONFIG_DEFAULTS),
 //   04b/04f (freeze, pause, clear), 12 (baselineLookSnapshot,
 //   applyPresetSnapshotFull), 20 (the underbar, __brushSetters).
-// PROVIDES: window.ResetApp = { reset, ask, showHint }
+// PROVIDES: window.ResetApp = { reset, ask, showHint, saveLook }
 //
 // Gabriel: "Bottom right button for reset sim should reset the sim and ALL
 // settings to default without requiring a full app restart." Before this,
@@ -22,10 +22,20 @@
 // brush drawer's engine settings, which the registry keeps no default for
 // (Spacing, Interval, Texture, Flow... from 04a's literal); Replay Speed;
 // running again (unfrozen, unpaused); the view (zoom back to 1:1, Zoom
-// Mode off); and a clean canvas, pressure included. What it keeps:
-// presets, palettes, hotkeys, mouse-button roles, the layout, PhotoSafe,
-// image and motion resolution, the fps cap and animations — the machine
+// Mode off); Motion Detail (2026-10-13: Gabriel wants 2048 after a reset,
+// not whatever was left); and a clean canvas, pressure included. What it
+// keeps: presets, palettes, hotkeys, mouse-button roles, the layout,
+// PhotoSafe, image resolution, the fps cap and animations — the machine
 // and the player's libraries.
+//
+// Saved settings (2026-10-14): Gabriel: Save settings saves the current
+// settings "to be loaded by default upon reset", and they "can be reset to
+// default". Settings → Save settings stores the look, the drawer, Motion
+// Detail and Replay Speed under SAVED_KEY (12 calls saveLook); a reset
+// lands on those instead of the shipped defaults, and fills what they lack
+// the way a preset does. The question then has a tick for the shipped
+// defaults, and Settings → Clear forgets them with the rest of the saved
+// settings (SAVED_KEY is not on 09's keep list).
 //
 // The question asks about the player's work (2026-10-06): Keep layers
 // leaves the Layers panel (images, paint layers, colliders, path layers,
@@ -41,12 +51,11 @@
     'use strict';
 
     var HINT_KEY = 'swirlResetHint.v1';   // outside fluidUI:, so a reset or Settings → Clear never re-shows it
-    var HINT_TEXT = 'Dear user, Swirl Together gives you a lot of options, which means you can ' +
-        'sometimes break it. Sometimes it’s best to just restart from the baseline and build from there.';
+    var HINT_TEXT = 'Protip: Swirl Together gives you a lot of options, which means you can sometimes break it. Sometimes it’s best to just restart from the baseline and build from there.';
     var HINT_MS = 30000;
     var ARM_DELAY_MS = 400;
 
-    var btn = null, modal = null, keyHandler = null, armedAt = 0;
+    var btn = null, modal = null, keyHandler = null, armedAt = 0, hold = null;
     var hint = null, hintTimer = null;
 
     function modalUp() { return !!(modal && modal.classList.contains('show')); }
@@ -64,17 +73,25 @@
         } catch (_) {}
     }
 
-    function resetBrushDrawer() {
+    // The drawer's engine settings as its setters take them, read from a
+    // config (the live one, or 04a's defaults).
+    function drawerOf(c) {
+        return {
+            tipTexture: c.BRUSH_TIP_TEXTURE, flow: c.BRUSH_FLOW, hardness: c.BRUSH_HARDNESS,
+            stabilizer: c.BRUSH_STABILIZER, spacing: c.BRUSH_SPACING, jitter: c.BRUSH_JITTER,
+            dabInterval: c.BRUSH_DAB_INTERVAL_MS, splatMode: c.BRUSH_CONTINUOUS ? 'constant' : 'move',
+            steady: c.BRUSH_STEADY, velMode: c.BRUSH_VEL_MODE || 'smudge', velStrength: c.BRUSH_VEL_STRENGTH
+        };
+    }
+
+    // saved: the drawer from the saved settings, which overrides the
+    // defaults. The brush type (paint, Pressure, eraser, sketch) is a tool,
+    // not a setting: every reset hands back the fluid brush.
+    function resetBrushDrawer(saved) {
         var S = window.__brushSetters, D = window.__CONFIG_DEFAULTS;
         if (!S || !D) return;
-        var want = {
-            target: 'fluid', eraser: false, tip: 0, shape: null, angle: 0,
-            tipTexture: D.BRUSH_TIP_TEXTURE, flow: D.BRUSH_FLOW, hardness: D.BRUSH_HARDNESS,
-            stabilizer: D.BRUSH_STABILIZER, spacing: D.BRUSH_SPACING, jitter: D.BRUSH_JITTER,
-            dabInterval: D.BRUSH_DAB_INTERVAL_MS, splatMode: D.BRUSH_CONTINUOUS ? 'constant' : 'move',
-            steady: D.BRUSH_STEADY,
-            velOnly: false, velMode: D.BRUSH_VEL_MODE || 'smudge', velStrength: D.BRUSH_VEL_STRENGTH
-        };
+        var want = Object.assign({ target: 'fluid', eraser: false, velOnly: false, tip: 0, shape: null, angle: 0 },
+            drawerOf(D), saved || {});
         Object.keys(want).forEach(function (k) {
             if (typeof S[k] !== 'function' || want[k] === undefined) return;
             try { S[k](want[k]); } catch (err) { console.warn('[ResetApp] brush setting', k, err); }
@@ -87,6 +104,19 @@
     function resetView() {
         if (typeof window.setZoomMode === 'function') window.setZoomMode(false);
         if (window.ZoomView) window.ZoomView.reset();
+    }
+
+    // Motion Detail through its own dropdown, as a pick: config, the
+    // framebuffer rebuild, the governor pin and the saved select. Only when
+    // it differs, so a reset at the default does not rebuild the grid.
+    // saved: the saved settings' Motion Detail, in place of the default.
+    function resetMotionDetail(saved) {
+        var want = saved > 0 ? saved : window.__SIM_RESOLUTION_DEFAULT;
+        var sel = document.getElementById('physicsResolution');
+        if (!sel || typeof want !== 'number' || window.config.SIM_RESOLUTION === want) return;
+        if (typeof window.setResolutionDropdown === 'function') window.setResolutionDropdown(sel, want);
+        else sel.value = String(want);
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     // Reset all: each kind goes through its own Delete, so GPU buffers,
@@ -119,15 +149,62 @@
         }
     }
 
+    // ── Saved settings (see the header) ──────────────────────────────
+    var SAVED_KEY = 'settings.resetLook';
+    // Not settings a reset puts back, so not saved either: a look link or a
+    // room never carries them.
+    var NOT_SAVED = ['timestamp', 'savedColors', 'userPalettes', 'focusState', 'canvasWrapper', 'canvasBox',
+        'sidebarSections', 'layers', 'layerOrder', 'masks', 'textOverlays', 'recordedLayers', 'pathLayers'];
+
+    // Settings → Save settings (12). The look as a preset holds it, less
+    // the machine (Image Detail, fps cap...), which every reset keeps;
+    // Motion Detail rides beside it, since a reset sets it on its own.
+    function saveLook() {
+        var sm = window.settingsManager;
+        if (!sm || typeof window.capturePresetSnapshot !== 'function') return false;
+        var look = window.capturePresetSnapshot({ lookOnly: true });
+        if (!look) return false;
+        var motion = parseInt(look.selects && look.selects.physicsResolution, 10);
+        var skip = Object.keys(window.LOOK_BASELINE_SKIP || {});
+        ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
+            if (look[sec]) skip.forEach(function (k) { delete look[sec][k]; });
+        });
+        NOT_SAVED.forEach(function (k) { delete look[k]; });
+        var c = window.config || {};
+        var shapes = window.BrushShapes;
+        var rs = document.getElementById('replaySpeed');
+        sm.set(SAVED_KEY, {
+            look: look,
+            drawer: Object.assign(drawerOf(c), {
+                tip: c.BRUSH_TIP | 0, angle: c.BRUSH_ANGLE || 0,
+                shape: (shapes && shapes.activeId && shapes.activeId()) || null
+            }),
+            motionDetail: motion > 0 ? motion : null,
+            replaySpeed: rs ? parseFloat(rs.value) : 1
+        });
+        return true;
+    }
+
+    // A copy, so applying it never edits the stored one.
+    function savedLook() {
+        try {
+            var s = window.settingsManager && window.settingsManager.get(SAVED_KEY);
+            return (s && s.look && typeof s.look === 'object') ? JSON.parse(JSON.stringify(s)) : null;
+        } catch (_) { return null; }
+    }
+
     // opts.layers: Reset all (the player's layers, paths, masks and text go
-    // too). Without it, Keep layers.
+    // too). Without it, Keep layers. opts.defaults: the shipped defaults
+    // even when there are saved settings.
     function reset(opts) {
+        var saved = (opts && opts.defaults) ? null : savedLook();
         // 0. Reset all: the player's layers first, so nothing below re-reads them.
         if (opts && opts.layers) clearLayers();
-        // 1. The look, at today's generation (see the header).
+        // 1. The look: the saved one, or the defaults at today's generation
+        //    (see the header).
         if (typeof window.baselineLookSnapshot === 'function' && typeof window.applyPresetSnapshotFull === 'function') {
-            var snap = window.baselineLookSnapshot();
-            if (typeof window.LOOK_BASELINE_GEN === 'number') snap.baseline = window.LOOK_BASELINE_GEN;
+            var snap = saved ? saved.look : window.baselineLookSnapshot();
+            if (!saved && typeof window.LOOK_BASELINE_GEN === 'number') snap.baseline = window.LOOK_BASELINE_GEN;
             try { window.applyPresetSnapshotFull(snap); } catch (err) { console.warn('[ResetApp] look', err); }
             // No preset now: the Presets button stops naming the last one (20).
             if (typeof window.setCurrentPreset === 'function') window.setCurrentPreset(null);
@@ -138,12 +215,14 @@
                 window.setActiveBrushColorMode('random');
             }
         }
-        // 2. The brush drawer's engine settings.
-        resetBrushDrawer();
+        // 2. The brush drawer's engine settings, and Motion Detail.
+        resetBrushDrawer(saved && saved.drawer);
+        resetMotionDetail(saved && saved.motionDetail);
         // 3. Replay Speed (kept per player, outside the look).
+        var speed = (saved && saved.replaySpeed > 0) ? saved.replaySpeed : 1;
         var rs = document.getElementById('replaySpeed');
-        if (rs && parseFloat(rs.value) !== 1) {
-            rs.value = '1';
+        if (rs && parseFloat(rs.value) !== speed) {
+            rs.value = String(speed);
             rs.dispatchEvent(new Event('input', { bubbles: true }));
             rs.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -180,9 +259,12 @@
         modal.innerHTML =
             '<div class="delete-modal-content">' +
                 '<div class="delete-modal-title" id="resetAppTitle">Reset Swirl Together?</div>' +
-                '<div class="delete-modal-message" id="resetAppMsg">Clears the canvas and puts every setting ' +
-                    'back the way the app starts. Presets, palettes, hotkeys and animations always stay.' +
+                '<div class="delete-modal-message" id="resetAppMsg"><span id="resetAppWhat"></span> ' +
+                    'Presets, palettes, hotkeys and animations always stay.' +
                     '<br><br>Keep your layers, text and paths, or remove them too?</div>' +
+                '<label class="reset-app-defaults" id="resetAppDefaultsRow" hidden>' +
+                    '<input type="checkbox" id="resetAppDefaults"> ' +
+                    'Use Swirl Together’s defaults, not my saved settings</label>' +
                 '<div class="delete-modal-actions">' +
                     '<button type="button" class="delete-modal-cancel" id="resetAppCancel">Cancel</button>' +
                     '<button type="button" class="btn--emphasis" id="resetAppKeep">Keep layers</button>' +
@@ -191,10 +273,12 @@
             '</div>';
         document.body.appendChild(modal);
         modal.querySelector('#resetAppCancel').addEventListener('click', close);
+        modal.querySelector('#resetAppDefaults').addEventListener('change', sayWhat);
         function answer(layers) {
             if (performance.now() < armedAt) return;
+            var defaults = modal.querySelector('#resetAppDefaults').checked;
             close();
-            reset({ layers: layers });
+            reset({ layers: layers, defaults: defaults });
         }
         modal.querySelector('#resetAppKeep').addEventListener('click', function () { answer(false); });
         modal.querySelector('#resetAppAll').addEventListener('click', function () { answer(true); });
@@ -202,27 +286,43 @@
         modal.addEventListener('mousedown', function (e) { if (e.target === modal) close(); });
     }
 
+    // The first sentence says where the settings go: the saved ones, unless
+    // there are none or the tick asks for the defaults.
+    function sayWhat() {
+        var row = modal.querySelector('#resetAppDefaultsRow');
+        var toSaved = !row.hidden && !modal.querySelector('#resetAppDefaults').checked;
+        modal.querySelector('#resetAppWhat').textContent = toSaved
+            ? 'Clears the canvas and puts every setting back to the settings you saved.'
+            : 'Clears the canvas and puts every setting back the way the app starts.';
+    }
+
     function ask() {
         buildModal();
         dismissHint();
+        modal.querySelector('#resetAppDefaultsRow').hidden = !savedLook();
+        modal.querySelector('#resetAppDefaults').checked = false;
+        sayWhat();
         modal.classList.add('show');
         armedAt = performance.now() + ARM_DELAY_MS;
         if (!keyHandler) {
             // Nothing typed at the question reaches the app's hotkeys (Space
             // would freeze); Escape is Cancel.
             keyHandler = function (e) {
+                if (window.DialogFocus.top() !== modal) return;   // a dialog over this one has the keys
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
                 if (e.key !== 'Tab' && e.key !== 'Enter') e.stopPropagation();
             };
             document.addEventListener('keydown', keyHandler, true);
         }
-        try { modal.querySelector('#resetAppCancel').focus({ preventScroll: true }); } catch (_) {}
+        // Focus in on Cancel, Tab kept to the question, focus back after (00b).
+        hold = window.DialogFocus.hold(modal, { initial: modal.querySelector('#resetAppCancel'), fallback: btn });
     }
 
     function close() {
         if (!modal) return;
         modal.classList.remove('show');
         if (keyHandler) { document.removeEventListener('keydown', keyHandler, true); keyHandler = null; }
+        if (hold) { hold.release(); hold = null; }
     }
 
     // ── The button ───────────────────────────────────────────────────
@@ -235,8 +335,7 @@
             btn.id = 'resetAppBtn';
             btn.className = 'btn--ghost reset-app-btn';
             btn.textContent = 'Reset app';
-            btn.title = 'Reset app: a clean canvas and every setting back to how Swirl Together starts. ' +
-                'Asks whether your layers stay.';
+            btn.title = 'Reset app to either the default, or the baseline you saved in settings. Asks whether your layers stay.';
             btn.addEventListener('click', function () { if (!modalUp()) ask(); });
         }
         if (btn.parentElement !== bar) {
@@ -337,5 +436,5 @@
         whenReady(hintWhenQuiet);
     })();
 
-    window.ResetApp = { reset: reset, ask: function () { if (!modalUp()) ask(); }, showHint: showHint };
+    window.ResetApp = { reset: reset, ask: function () { if (!modalUp()) ask(); }, showHint: showHint, saveLook: saveLook };
 })();

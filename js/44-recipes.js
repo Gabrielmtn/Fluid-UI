@@ -30,7 +30,7 @@
 //   popup: brush|arms|presets   body-mounted popup, opened via its trigger
 //   chrome: underbar            the quality bar bottom-left
 //   layer: any|image|collision|last   a Layers row, expanded
-//   overlay: mask|transform|recorder|mp   a body-mounted editor / the room panel
+//   overlay: mask|transform|mp   a body-mounted editor / the room panel
 //   canvas: true                the canvas itself (pointer at its centre)
 //   sel: <css>                  the control inside the revealed container;
 //                               the pointer aims at its ROW, like the hotkey caps
@@ -98,7 +98,7 @@
 
     // ── Pillars (the tag chips) ────────────────────────────────────────
     const PILLARS = [
-        ['brush', 'Brush'], ['colour', 'Colour'], ['layers', 'Layers'], ['effects', 'Effects'],
+        ['brush', 'Brush'], ['colour', 'Color'], ['layers', 'Layers'], ['effects', 'Effects'],
         ['motion', 'Motion'], ['record', 'Perform'], ['together', 'Together'], ['export', 'Export'],
         ['interface', 'Interface']
     ];
@@ -117,7 +117,7 @@
         // ── Brush ──
         { id: 'brush-size', pillar: 'brush', title: 'Change the brush size',
           tags: ['brush', 'size', 'bigger', 'smaller', 'scroll', 'wheel', 'fine', 'thin', 'pixel', 'px'],
-          answer: 'Scroll the wheel over the canvas, or drag the Brush Size fader at the top of the left sidebar; its readout gives the size in px. [ and ] step it from the keyboard; hold Shift for bigger steps. Fine lines soften as the paint moves: Stop (Space) or a layer keeps them.',
+          answer: 'Scroll the wheel over the canvas, or drag the Brush Size fader at the top of the left sidebar; its readout gives the size in px. [ and ] step it from the keyboard. Fine lines soften as the paint moves: Stop (Space) or a layer keeps them.',
           hotkey: '[ ]', target: { strip: 'Brush Size', sel: '#brushSizePerceptual' },
           demo: { label: 'Try a bigger brush', run() { const el = $('brushSize'); const was = el ? el.value : null; setCtl('brushSize', 30, 'input'); return () => { if (was != null) setCtl('brushSize', was, 'input'); }; } } },
         { id: 'brush-settings', pillar: 'brush', title: 'Open the brush settings',
@@ -139,7 +139,7 @@
           demo: { label: 'Try four arms', run() { const el = $('multiplier'); const was = el ? el.value : null; setCtl('multiplier', 4, 'input'); return () => { if (was != null) setCtl('multiplier', was, 'input'); }; } } },
         { id: 'arm-colours', pillar: 'brush', title: 'Give each arm its own colour, or a symmetry',
           tags: ['arms', 'colour', 'symmetry', 'mirror', 'rake', 'radial', 'quad'],
-          answer: 'Open Multi-Brush on the left. Each arm gets a colour mode; Symmetry sets how the arms are laid out across the canvas.',
+          answer: 'Use Multi-Brush on the left. Each brush can be set to it\'s own color.',
           target: { section: 'Multi-Brush' },
           steps: [
             { say: 'In Multi-Brush on the left, Symmetry sets how the arms are laid out: radial, mirrored, a rake.', target: { section: 'Multi-Brush', sel: '#symmetryModeGroup' }, until: { change: true, any: true } },
@@ -147,7 +147,7 @@
           ] },
         { id: 'arm-tips', pillar: 'brush', title: 'Give one arm a different brush tip',
           tags: ['arms', 'tip', 'shape', 'chisel', 'ring', 'streak', 'blob', 'stamp', 'multi', 'per arm'],
-          answer: 'Open Multi-Brush on the left. The square at the end of each arm’s row is the tip that arm prints: click it and pick a tip or one of your shapes. The other arms keep the brush’s.',
+          answer: 'Open Multi-Brush on the left. The square at the end of each row lets you change the brush tip.',
           target: { section: 'Multi-Brush', sel: '.arm-tip-btn' },
           steps: [
             { say: 'Give the brush two or more arms first.', key: '2', target: { section: 'Multi-Brush', sel: '#multiplier' } },
@@ -155,11 +155,11 @@
           ] },
         { id: 'material', pillar: 'brush', title: 'Switch between fluid, wet paint and thick paint',
           tags: ['material', 'paint', 'wet', 'thick', 'gloss', 'fluid', 'swirl', 'acrylic', 'clay', 'dry'],
-          answer: 'Material Type, the first label in the top bar, is a picker: Fluid, Paint (Wet) or Paint (Thick). The fader under it changes meaning with the material.',
+          answer: 'There are a few material type presets built into the material type slider.',
           target: { strip: 'Fluid', sel: '#materialMode' } },
         { id: 'constant-flow', pillar: 'brush', title: 'Keep painting while holding still',
           tags: ['flow', 'constant', 'hold', 'still', 'spacing', 'interval', 'move'],
-          answer: 'In Brush on the left, under Stroke, pick Constant (where a new brush starts). The brush keeps depositing while you hold the button; Interval and Flow set the rate.',
+          answer: 'In Brush settings, you can select between "On Move" and Constant. Pick Constant and the brush keeps painting while you hold the the mouse down. ',
           target: inDrawer('.brush-mode-btn', 'Constant'),
           steps: [
             { say: 'In Brush on the left, under Stroke, pick Constant.', target: inDrawer('.brush-mode-btn', 'Constant'), until: { active: true } },
@@ -167,12 +167,12 @@
           ] },
         { id: 'steady-stroke', pillar: 'brush', title: 'Smooth out a shaky or too-fast stroke',
           tags: ['steady', 'smooth', 'stabilization', 'stabilisation', 'stabilizer', 'stabiliser', 'lazy', 'string', 'shaky', 'wobbly', 'jitter', 'fast', 'calm', 'slow'],
-          answer: 'Raise Stabilization, right under Brush Size on the left. The brush follows your cursor on a string: small wobbles vanish, corners round off and a fast drag paints at a calm, even pace. Slowing Time slows it further.',
+          answer: 'Increase stabilization, under Brush Size on the left. The brush follows your cursor on a string to even out small wobbles and slow the pace.',
           target: { strip: 'Stabilization', sel: '#brushSteady' },
           demo: { label: 'Try a stabilized brush', run() { const el = $('brushSteady'); const was = el ? el.value : null; setCtl('brushSteady', 0.6, 'input'); return () => { if (was != null) setCtl('brushSteady', was, 'input'); }; } } },
         { id: 'pressure-brush', pillar: 'brush', title: 'Move paint around without adding any',
           tags: ['smudge', 'spread', 'gather', 'swirl', 'push', 'pressure', 'stir', 'tab'],
-          answer: 'In Brush on the left, choose Pressure and a mode: Smudge drags, Spread pushes out, Gather pulls in, Swirl spins. Nothing new is deposited. Tab switches Fluid, Pressure and Collider from the keyboard.',
+          answer: 'Under brush settings on the left, select Pressure, and select a mode: Smudge drags, Spread pushes out, Gather pulls in, Swirl... well you know.',
           target: inDrawer('.brush-mode-btn', 'Pressure'),
           steps: [
             { say: 'In Brush on the left, choose Pressure.', target: inDrawer('.brush-mode-btn', 'Pressure'), until: { active: true } },
@@ -182,7 +182,7 @@
           ] },
         { id: 'paint-collider', pillar: 'brush', title: 'Paint walls the fluid flows around',
           tags: ['collider', 'wall', 'collision', 'block', 'obstacle', 'mask', 'tab'],
-          answer: 'In Brush, under Paint Into, click Collider. Strokes become walls; click Fluid to paint dye again. The wall shows in Layers as a collision layer. Tab switches Fluid, Pressure and Collider from the keyboard.',
+          answer: 'In Brush, under Paint Into, click Collider. Strokes become walls; click Fluid to paint dye again.',
           target: inDrawer('.brush-mode-btn', 'Collider'),
           steps: [
             { say: 'In Brush, under Paint Into, click Collider.', target: inDrawer('.brush-mode-btn', 'Collider'), until: { active: true } },
@@ -202,7 +202,7 @@
         // ── Colour ──
         { id: 'brush-colour', pillar: 'colour', title: 'Pick a brush colour',
           tags: ['colour', 'color', 'pick', 'swatch', 'picker', 'hue'],
-          answer: 'Click the colour dot in the Color cell of the top bar. The picker has sliders, a hex code, your recent colours and the palette. Alt+click the canvas to pick a colour from it. Shift+S adds the brush colour to the palette; Shift+X takes it out.',
+          answer: 'Click the colour dot in the Color cell of the top bar. The picker has sliders, a hex code, your recent colours and the palette.',
           hotkey: 'Alt+click', target: { strip: 'Color', sel: '#colorPicker' },
           steps: [
             { say: 'Click the colour dot in the Color cell and pick a colour.', target: { strip: 'Color', sel: '#colorPicker' }, until: { input: '#colorPicker' } },
@@ -220,7 +220,7 @@
           ] },
         { id: 'make-palette', pillar: 'colour', title: 'Make a palette of your own',
           tags: ['palette', 'new', 'make', 'create', 'save', 'colour', 'add', 'remove', 'rename', 'duplicate'],
-          answer: 'Colors and palettes → open the palette list: New palette at the top starts one from the brush colour, an image or the canvas. The + after its colours opens a picker to add one (Shift+S adds the brush colour as it is); double-click a colour to change it, right-click to remove it. Every change saves itself.',
+          answer: 'Colors and palettes → open the palette list → New palette ',
           hotkey: 'Shift+S', target: { section: 'Colors and palettes', sel: '#paletteSelect' },
           steps: [
             { say: 'Open the palette list. New palette is at the top: choose Brush colour, then type a name and press Enter.', target: { section: 'Colors and palettes', sel: '#paletteSelect' }, until: { click: true } },
@@ -236,11 +236,11 @@
           ] },
         { id: 'eyedropper', pillar: 'colour', title: 'Pick a colour from the canvas',
           tags: ['eyedropper', 'dropper', 'sample', 'pick', 'colour', 'color', 'canvas', 'alt'],
-          answer: 'Alt+click the canvas: a loupe shows the pixels under the pointer, and letting go picks that colour for the brush. The pipette button in any colour picker does the same.',
+          answer: 'Alt+hold click on the canvas: you\'ll see a preview of the pixels under the pointer, and letting go picks that color for the brush.',
           hotkey: 'Alt+click', target: { canvas: true } },
         { id: 'palettes', pillar: 'colour', title: 'Use a palette',
           tags: ['palette', 'palettes', 'curated', 'set', 'scheme', 'next', 'previous'],
-          answer: 'Colors and palettes has a dropdown of your palettes, each shown with its colours. Ctrl+Shift+← and → switch palettes; Ctrl+← and → (or N and Shift+N) step through its colours.',
+          answer: 'Colors and palettes menu has a dropdown of your palettes. To change between palettes, Ctrl+Shift+← and → switch palettes',
           hotkey: 'Ctrl+Shift+← →', target: { section: 'Colors and palettes', sel: '#paletteSelect' },
           steps: [
             { say: 'Open the palette dropdown and pick a palette.', target: { section: 'Colors and palettes', sel: '#paletteSelect' }, until: { click: true } },
@@ -248,16 +248,16 @@
           ] },
         { id: 'cap-colour', pillar: 'colour', title: 'Stop colours blowing out to white',
           tags: ['limit', 'cap', 'gate', 'white', 'overexposed', 'blown', 'bright', 'saturate'],
-          answer: 'Limit On in the Color cell (the default) keeps piled-up strokes from saturating to white; Limit Off lets them stack. Light Shift in Effects can also recolour the brightest paint.',
+          answer: 'Limit On in the Color cell (the default) keeps prevents colors from being additive.',
           target: { strip: 'Color', sel: '.ch-gate-toggle' } },
         { id: 'color-blend', pillar: 'colour', title: 'Make colours mix together',
           tags: ['blend', 'mix', 'mixing', 'merge', 'melt', 'colour', 'color', 'gradient', 'soft'],
-          answer: 'Drag the Laminar / Blend fader in the top bar to the right of the middle. Where colours meet they run into each other while the paint is wet, then settle as it dries; Dry Time sets how long that lasts, and swirling or colliding paint blends more.',
+          answer: 'Drag the Laminar / Blend fader in the top bar to the right to enable blending.',
           target: { strip: 'Color Blend', sel: '#colorBlendPerceptual' },
           demo: { label: 'Try Blend 0.5', run() { const el = $('colorBlend'); const was = el ? el.value : null; setCtl('colorBlend', 0.5, 'input'); return () => { if (was != null) setCtl('colorBlend', was, 'input'); }; } } },
         { id: 'laminar', pillar: 'colour', title: 'Keep colours from smearing when I stir',
           tags: ['laminar', 'layers', 'suspension', 'suspend', 'smear', 'smudge', 'muddy', 'mud', 'detail', 'streaks', 'marble', 'marbling', 'separate', 'apart', 'colloid'],
-          answer: 'Drag the Laminar / Blend fader in the top bar to the left of the middle. Colours then slide past each other in layers without mixing: stirring and smudging stretch them into finer streaks instead of smearing them together. Crisp Advection needs to be on.',
+          answer: 'Drag the Laminar / Blend fader in the top bar to the left of the middle. Colors will slide past each other like laminar dye. ',
           target: { strip: 'Color Blend', sel: '#colorBlendPerceptual' },
           demo: { label: 'Try Laminar 1', run() { const el = $('colorBlend'); const was = el ? el.value : null; setCtl('colorBlend', -1, 'input'); return () => { if (was != null) setCtl('colorBlend', was, 'input'); }; } } },
 
@@ -289,7 +289,7 @@
           ] },
         { id: 'flatten-layers', pillar: 'layers', title: 'Merge layers into one',
           tags: ['flatten', 'merge', 'combine', 'layers', 'many', 'tidy'],
-          answer: 'Flatten in Layers merges the visible picture layers (captures, imports, cut-outs) into one. The fluid, colliders and hidden layers keep their places between them, so the picture does not change; paint layers stay as they are. Ctrl+Z undoes it.',
+          answer: 'Layers menu → Flatten merges the visible picture layers (captures, imports, cut-outs) into one.',
           target: { section: 'Layers', sel: '#flattenLayersBtn' } },
         { id: 'move-layer', pillar: 'layers', title: 'Move, scale or rotate a layer',
           tags: ['move', 'scale', 'rotate', 'transform', 'skew', 'position', 'resize', 'layer'],
@@ -399,11 +399,11 @@
             { get say() { const l = document.querySelector('label[for="kaleidoSegments"]'); const t = l && l.firstChild && l.firstChild.nodeType === 3 ? l.firstChild.textContent.trim() : ''; return (t || 'Facets') + ' sets how many copies; Kaleidoscope Mode sets how they mirror.'; }, target: { sel: '#kaleidoSegments' } }
           ] },
         { id: 'mandala', pillar: 'effects', title: 'Paint one wedge and let the circle fill in',
-          tags: ['mandala', 'wedge', 'circle', 'studio', 'radial', 'pattern'],
-          answer: 'Kaleidoscope → Mandala Studio. Paint inside one wedge; the others follow. Wedges sets the count.',
+          tags: ['mandala', 'wedge', 'circle', 'overlay', 'studio', 'radial', 'pattern'],
+          answer: 'Kaleidoscope → Mandala Overlay. Paint inside one wedge; the others follow. Wedges sets the count.',
           target: { section: 'Kaleidoscope', sel: '#mandalaToggle' },
           steps: [
-            { say: 'Kaleidoscope → switch Mandala Studio on.', target: { section: 'Kaleidoscope', sel: '#mandalaToggle' }, until: { checked: '#mandalaToggle' } },
+            { say: 'Kaleidoscope → switch Mandala Overlay on.', target: { section: 'Kaleidoscope', sel: '#mandalaToggle' }, until: { checked: '#mandalaToggle' } },
             { say: 'Paint inside one wedge; the others follow. Wedges sets how many.', target: { sel: '#mandalaWedges' } }
           ] },
         { id: 'presets', pillar: 'effects', title: 'Load a look, or save your own',
@@ -479,7 +479,7 @@
             { say: 'Animations → Record. It counts down 3-2-1, then records what you paint.', note: 'The chips beside the clock set how long it runs: 4, 8, 15 or 30 seconds.', key: 'F9', target: { section: 'Animations', sel: '#recMiniRecordBtn' }, until: [{ bodyClass: 'rec-countdown' }, { bodyClass: 'rec-recording' }] },
             { say: 'Paint your performance. Stop ends it, or it stops by itself at the length you picked.', target: { section: 'Animations', sel: '#recMiniStopBtn' }, until: [{ visible: '#recKeepBtn' }, { visible: '#recTakeKeepBtn' }] },
             { say: 'Keep saves it as an animation and puts it in the first empty slot. Discard throws it away.', target: { section: 'Animations', sel: '#recKeepBtn', fallback: { section: 'Animations', sel: '#recMiniRecordBtn' } }, until: { click: true } },
-            { say: 'Click the slot to loop it; click again to stop.', note: 'Edit ⤢ opens the editor: parts, speed, colours, and Save.', target: { section: 'Animations', sel: '.anim-slot' } }
+            { say: 'Click the slot to loop it; click again to stop.', target: { section: 'Animations', sel: '.anim-slot' } }
           ] },
         { id: 'animations', pillar: 'record', title: 'Play a saved animation',
           tags: ['animation', 'slot', 'play', 'loop', 'saved'],
@@ -750,7 +750,6 @@
     const OVERLAYS = {
         mask:      { el: () => $('maskEditorOverlay') },
         transform: { el: () => $('layerTransformOverlay') },
-        recorder:  { el: () => $('recDrawer') },
         mp:        { el: () => $('mpConnected'), section: 'Swirl Together' }
     };
     // Pick the element `sel` names, narrowed to `text` when given (exact
@@ -1174,7 +1173,7 @@
             '<div class="delete-modal-content recipe-content">' +
                 '<div class="recipe-head">' +
                     '<span class="recipe-slash" aria-hidden="true">/</span>' +
-                    '<input type="search" id="recipeSearch" placeholder="How do I…" autocomplete="off" spellcheck="false" maxlength="64" aria-label="Search how-to">' +
+                    '<input type="search" id="recipeSearch" placeholder="Question mark Icon, opens the &quot;How do I&quot; menu" autocomplete="off" spellcheck="false" maxlength="64" aria-label="Search how-to">' +
                     '<span class="recipe-count" aria-live="polite"></span>' +
                     '<button type="button" class="recipe-close btn--icon" title="Close (Esc)" aria-label="Close">✕</button>' +
                 '</div>' +
@@ -1183,7 +1182,7 @@
                     '<div class="recipe-results" role="listbox" aria-label="Recipes"></div>' +
                     '<div class="recipe-detail"><div class="recipe-empty">Type what you want to do, or pick a topic.</div></div>' +
                 '</div>' +
-                '<div class="recipe-foot"><span id="recipeTitle" class="recipe-foot-title">How do I…</span><span class="recipe-foot-keys">↑ ↓ move · Enter shows me · Esc closes</span><button type="button" class="recipe-foot-hotkeys btn--ghost btn--sm">Hotkeys (F1)</button></div>' +
+                '<div class="recipe-foot"><span id="recipeTitle" class="recipe-foot-title">Question mark icon: opens "how do I" modal</span><span class="recipe-foot-keys">↑ ↓ move · Enter shows me · Esc closes</span><button type="button" class="recipe-foot-hotkeys btn--ghost btn--sm">Hotkeys (F1)</button></div>' +
             '</div>';
         document.body.appendChild(m);
         modal = m;

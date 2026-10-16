@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05i-sim-stats.js — part 9/14 of former 05-fluid-sim.js (lines 2942–3119)
+// js/05i-sim-stats.js
 // LOAD ORDER: after 05h-slider-bindings.js, before 05j-update-loop.js
 // PROVIDES: splat(), FPS ring buffer, displayHz detection, window.__stats seed, applyGlow, blur
 // REQUIRES: splatProg/blurProg (05c), gl (04)
@@ -20,11 +20,15 @@
         // per-dab cost scales with brush size, not texture size.
         // Console: config.SPLAT_SCISSOR=false reverts to fullscreen passes.
         function splatScissorRect(u, v, dHalf, aspectRatio, W, H) {
-            const hx = dHalf / Math.max(aspectRatio, 1e-6); // p.x carries the aspect scale
+            // p.x carries the aspect scale
+            return scissorRectUV(u, v, dHalf / Math.max(aspectRatio, 1e-6), dHalf, W, H);
+        }
+        // The same box from separate half-extents in UV (an ellipse's).
+        function scissorRectUV(u, v, hx, hy, W, H) {
             const x0 = Math.max(0, Math.floor((u - hx) * W) - 2);
             const x1 = Math.min(W, Math.ceil((u + hx) * W) + 2);
-            const y0 = Math.max(0, Math.floor((v - dHalf) * H) - 2);
-            const y1 = Math.min(H, Math.ceil((v + dHalf) * H) + 2);
+            const y0 = Math.max(0, Math.floor((v - hy) * H) - 2);
+            const y1 = Math.min(H, Math.ceil((v + hy) * H) + 2);
             if (x1 <= x0 || y1 <= y0) return null;            // fully off-target
             // Above ~half the texture the scissored draw + region copy costs
             // more than one classic fullscreen pass — fall back to it.
@@ -100,6 +104,13 @@
             if (window.__brushTipOn && !window.__remoteStroke && window.BrushShapes
                 && typeof window.BrushShapes.stampPending === 'function'
                 && window.BrushShapes.stampPending()) return;
+            // An Everything take (03 recTapDab) hears every dab at multiSplat
+            // (05g). A source that calls this directly — the pen's release
+            // burst, the burst, star and portal animations — is heard here,
+            // as the one plain dab it is.
+            if (window.__recTap && !window.__inMultiSplat) {
+                try { window.__recTap(x, y, dx, dy, color, true, false, 0, null, 0, 0, null, null, true); } catch (_) {}
+            }
             // Assert the blend baseline rather than inheriting it. splatFrag
             // composites by hand (it samples uTarget and writes the result), so
             // blending is never wanted here — but unlike every other pass in the
@@ -118,7 +129,7 @@
             // Dab bounding half-width in p-space (canvas-height-normalized).
             // Covers every splatFrag branch: gaussian tail, clay/chisel/streak
             // rims (≤2.6·√r), and the ring tip (ringRadius + band ≤ 2.2·√r).
-            const _scK = (typeof config.SPLAT_SCISSOR_K === 'number') ? config.SPLAT_SCISSOR_K : 5.0;
+            const _scK = (typeof config.SPLAT_SCISSOR_K === 'number') ? config.SPLAT_SCISSOR_K : 6.0;
             const _scOn = (config.SPLAT_SCISSOR !== false) && _scK > 0;
             const _u = x / canvas.width, _v = 1.0 - y / canvas.height;
             const _dHalf = _scK * Math.sqrt(Math.max(baseRadius, 0));
@@ -202,7 +213,7 @@
                     // whole pass, and every arm of a stroke shares the mode.
                     _bp.sign = _pSign;
                     _bp.force = velStr * Math.sqrt(Math.max(baseRadius, 1e-6))
-                                * (config.BRUSH_PUSH_DYE_RATE || 2.5);
+                                * (config.BRUSH_PUSH_DYE_RATE || 0.5);
                     _bp.ts = (window.performance && performance.now) ? performance.now() : Date.now();
                     // 12 is attractorFrag's uAtt ceiling (05b MAX_ATTRACTORS).
                     // Transforms per dab, measured: radial and rake are 1:1 with
@@ -251,7 +262,7 @@
             // Material modes may scale the dab (clay Depth): applies to both the
             // dye footprint and the velocity push so they stay congruent.
             gl.uniform1f(splatProg.uniforms.radius, baseRadius);
-            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 2);
             gl.uniform1f(splatProg.uniforms.velocityScale,
                 1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
             // Clay stamp (material modes): 0 = classic gaussian. Fresh seed per
@@ -259,7 +270,7 @@
             if (brushTip >= 1 && brushTip <= 3) {
                 // Blob/chisel/streak tips reuse the clay stamp machinery:
                 // shape from the tip, roughness from the Texture slider.
-                const tex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 0.7;
+                const tex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 1;
                 gl.uniform1f(splatProg.uniforms.stampNoise, Math.max(0, Math.min(1, tex)));
                 gl.uniform1i(splatProg.uniforms.stampShape, brushTip - 1);
                 // The tip's footprint is absolute: Texture roughens it, it never
@@ -313,7 +324,7 @@
                 // from it regardless of which tip is nominally selected, or
                 // the slider is inert with the Soft/Ring tips and material
                 // modes override it.
-                const stex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 0.7;
+                const stex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 1;
                 gl.uniform1f(splatProg.uniforms.stampNoise, Math.max(0, Math.min(1, stex)));
             }
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
@@ -378,6 +389,15 @@
             gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
             gl.uniform3fv(splatProg.uniforms.color, color);
+            // The narrowest dab the grid can hold (splatFrag dyeRadiusFloor):
+            // σ of half a dye texel or half a canvas px, whichever is wider,
+            // in the shader's radius units (2σ², canvas-height-normalized).
+            // Read from the live sizes, so it follows the boot ramp and the
+            // governor. config.SPLAT_DYE_FLOOR=false turns it off.
+            const _dyeTexP = Math.max(1 / dyeTexHeight, aspectRatio / dyeTexWidth);
+            const _floorSigma = 0.5 * Math.max(_dyeTexP, 1 / canvas.height);
+            const _dyeFloor = (config.SPLAT_DYE_FLOOR === false) ? 0 : 2 * _floorSigma * _floorSigma;
+            gl.uniform1f(splatProg.uniforms.dyeRadiusFloor, _dyeFloor);
             // Down here, past the Push return: only a dab that lays dye counts
             // as a landing.
             let _hold = null;
@@ -415,7 +435,9 @@
                 gl.uniform1f(splatProg.uniforms.stampNoise, 0);
             }
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
-            const _dyeRect = _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, dyeTexWidth, dyeTexHeight) : 'full';
+            // A floored dab is wider than its radius says: clip to the wider one.
+            const _dyeHalf = (_dyeFloor > baseRadius) ? _scK * Math.sqrt(_dyeFloor) : _dHalf;
+            const _dyeRect = _scOn ? splatScissorRect(_u, _v, _dyeHalf, aspectRatio, dyeTexWidth, dyeTexHeight) : 'full';
             splatPass(density, dyeTexWidth, dyeTexHeight, _dyeRect);
             // Additive dabs maintain pigment memory as a GLOBAL running peak
             // (newMem has no shape factor — see splatFrag). A fullscreen dab
@@ -474,11 +496,12 @@
             gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform2f(splatProg.uniforms.point, cx / canvas.width, 1.0 - cy / canvas.height);
             gl.uniform1f(splatProg.uniforms.radius, thickness);
+            gl.uniform1f(splatProg.uniforms.dyeRadiusFloor, 0); // the scenes' bands as drawn; never splat()'s floor
             // p-space distances are canvas-height-normalized (p.x carries the
             // aspect correction), so pixels convert via /canvas.height
             gl.uniform1f(splatProg.uniforms.ringRadius, ringRadiusPx / canvas.height);
             gl.uniform1f(splatProg.uniforms.ringSquash, squash || 1);
-            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 2);
             gl.uniform1f(splatProg.uniforms.velocityScale,
                 1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
             gl.uniform1f(splatProg.uniforms.stampNoise, 0);
@@ -524,6 +547,69 @@
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // belt-and-braces: no leak into classic splats
         }
         window.applyRingSplat = ringSplat;
+        // ─── A push the shape of a line of text ──────────────────────
+        // A held text key pouring at the brush (23 holdTick) laid dye and
+        // nothing else, so moving the hand dragged a smear of the words
+        // across still fluid, with no stroke behind it (2026-10-14). This
+        // is the push a dab carries, stretched over the line: splat()'s
+        // velocity pass with the round gaussian made a soft ellipse
+        // (splatFrag velEllipse) whose rim, at the semi-axes, reads e^-2 of
+        // the centre, where a dab's ring sits (Spread's r = √(2·radius)
+        // note above). Velocity only: the pour lays its own dye, and the
+        // paper gets wet where paint lands, not where it is pushed.
+        //   x/y — canvas px; dx/dy — the push in a dab's units (10 × canvas
+        //   px of travel, 05d0's momentum rule); a/b — the semi-axes in
+        //   canvas px; ux/uy — the long axis, a unit vector on screen (y down).
+        function pushEllipse(x, y, dx, dy, a, b, ux, uy) {
+            if (!velocity || !splatProg.uniforms.velEllipse) return false;
+            if (!(a > 0) || !(b > 0) || !(dx || dy) || !isFinite(dx) || !isFinite(dy)) return false;
+            gl.disable(gl.BLEND);   // splat()'s contract: this runs outside update()
+            const aspectRatio = canvas.width / canvas.height;
+            const ea = a / Math.max(1, canvas.height), eb = b / Math.max(1, canvas.height);
+            const ax = ux, ay = -uy;                  // p-space is y-up
+            const u = x / canvas.width, v = 1.0 - y / canvas.height;
+            splatProg.bind();
+            gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
+            gl.uniform2f(splatProg.uniforms.point, u, v);
+            gl.uniform1f(splatProg.uniforms.radius, 0.5);   // exp(-2|q|²): e^-2 on the rim
+            gl.uniform4f(splatProg.uniforms.velEllipse, ax, ay, ea, eb);
+            gl.uniform1f(splatProg.uniforms.ringRadius, 0);
+            gl.uniform1f(splatProg.uniforms.barHalfW, 0);
+            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 2);
+            gl.uniform1f(splatProg.uniforms.velocityScale,
+                1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
+            // Walls refuse it the way they refuse a dab's push.
+            const _obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
+            gl.uniform1i(splatProg.uniforms.hasObstacle, _obsActive ? 1 : 0);
+            if (_obsActive) {
+                gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                gl.uniform1f(splatProg.uniforms.uVelCovBlock,
+                    config.OBS_VEL_COVERAGE_BLOCK === false ? 0.0 : 1.0);
+                gl.uniform1i(splatProg.uniforms.uObstacle, 1);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            }
+            gl.viewport(0, 0, simTexWidth, simTexHeight);
+            gl.uniform1i(splatProg.uniforms.isVelocity, 1);
+            gl.uniform1i(splatProg.uniforms.uTarget, 0);
+            gl.uniform3f(splatProg.uniforms.color, dx, -dy, 1.0);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+            // Scissored like a dab: the ellipse's box out to the dab's own
+            // cut (SPLAT_SCISSOR_K standard deviations of the falloff).
+            let rect = 'full';
+            const _scK = (typeof config.SPLAT_SCISSOR_K === 'number') ? config.SPLAT_SCISSOR_K : 6.0;
+            if (config.SPLAT_SCISSOR !== false && _scK > 0) {
+                const c = _scK * Math.sqrt(0.5);
+                rect = scissorRectUV(u, v,
+                    c * Math.hypot(ea * ax, eb * ay) / Math.max(aspectRatio, 1e-6),
+                    c * Math.hypot(ea * ay, eb * ax), simTexWidth, simTexHeight);
+            }
+            try { splatPass(velocity, simTexWidth, simTexHeight, rect); }
+            finally { gl.uniform4f(splatProg.uniforms.velEllipse, 0, 0, 0, 0); }   // the next dab is round
+            return true;
+        }
+        window.__pushEllipse = pushEllipse;
         // ─── Custom brush shapes on the raster/mask stamp ────────────
         // The collider and raster brushes run rasterStampProg, which was a plain
         // disc — so a custom shape was silently ignored the moment you pointed
@@ -1290,12 +1376,12 @@
                 gl.uniform2f(scatterProg.uniforms.origin, _so.x, _so.y);
                 gl.uniform2f(scatterProg.uniforms.aspect,
                     canvas.width / Math.max(1, canvas.height), 1.0);
-                const _density = (config.SCATTER_DENSITY != null) ? config.SCATTER_DENSITY : 0.6;
+                const _density = (config.SCATTER_DENSITY != null) ? config.SCATTER_DENSITY : 1.0;
                 gl.uniform1f(scatterProg.uniforms.density, _density);
                 gl.uniform1f(scatterProg.uniforms.decay,
                     (config.SCATTER_DECAY != null) ? config.SCATTER_DECAY : 0.94);
                 gl.uniform1f(scatterProg.uniforms.weight,
-                    (config.SCATTER_AMOUNT != null) ? config.SCATTER_AMOUNT : 0.7);
+                    (config.SCATTER_AMOUNT != null) ? config.SCATTER_AMOUNT : 0.5);
                 gl.uniform1f(scatterProg.uniforms.dispersion,
                     (config.SCATTER_DISPERSION != null) ? config.SCATTER_DISPERSION : 0.03);
                 // Colliders block light (Scatter panel toggle). The whole glow

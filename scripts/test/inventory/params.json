@@ -83,7 +83,7 @@
       "min": 1,
       "max": 50,
       "step": 1,
-      "def": 17,
+      "def": 25,
       "mapping": "config.PRESSURE_ITERATIONS = parseInt(value); QualityGovernor.effIters() may reduce the effective count",
       "section": "simulation",
       "consumer": "sim-shader",
@@ -264,23 +264,6 @@
       "registered": true
     },
     {
-      "id": "velocityCap",
-      "kind": "slider",
-      "configKey": "VELOCITY_CAP",
-      "min": 5,
-      "max": 60,
-      "step": 1,
-      "def": 30,
-      "mapping": "config.VELOCITY_CAP = parseFloat(value) (canvas-widths/s, soft knee from 70%)",
-      "section": "simulation",
-      "consumer": "sim-shader",
-      "gatedBy": null,
-      "sweepRelevant": true,
-      "expectedEffect": "Max Speed ceiling: lower = calmer bounded motion (growth presets settle lower), higher = wilder motion before the cap reins it in.",
-      "binding": "js/05e-effect-controls.js:114-121; consumed js/05j-update-loop.js:626,791",
-      "registered": true
-    },
-    {
       "id": "sharpness",
       "kind": "slider",
       "configKey": "SHARPNESS",
@@ -355,7 +338,7 @@
       "min": 0.001,
       "max": 100,
       "step": 0.001,
-      "def": 11,
+      "def": 1,
       "mapping": "config.SPLAT_RADIUS = value / 1000 (variance-like: dab footprint scales with sqrt of value)",
       "section": "brush",
       "consumer": "splat",
@@ -1723,7 +1706,7 @@
       "min": null,
       "max": null,
       "step": null,
-      "def": "512",
+      "def": "2048",
       "options": [
         "2048",
         "1536",
@@ -1865,52 +1848,6 @@
       "sweepRelevant": true,
       "expectedEffect": "Blend mode of the Color Shift recolor.",
       "binding": "js/14-light-shift.js:53-68; consumed js/05j-update-loop.js:1245-1246",
-      "registered": true
-    },
-    {
-      "id": "recMode",
-      "kind": "select",
-      "configKey": null,
-      "min": null,
-      "max": null,
-      "step": null,
-      "def": "off",
-      "options": [
-        "off",
-        "min",
-        "full"
-      ],
-      "mapping": "recording feature mode",
-      "section": "recording",
-      "consumer": "other",
-      "gatedBy": null,
-      "sweepRelevant": false,
-      "expectedEffect": "Stroke-recording UI mode; does not alter sim behavior by itself.",
-      "binding": "js/03-recording.js:1487,1609",
-      "registered": true
-    },
-    {
-      "id": "recPlaybackSpeed",
-      "kind": "select",
-      "configKey": null,
-      "min": null,
-      "max": null,
-      "step": null,
-      "def": "0.25",
-      "options": [
-        "0.25",
-        "0.5",
-        "1",
-        "2",
-        "4"
-      ],
-      "mapping": "recorded-timeline playback speed",
-      "section": "recording",
-      "consumer": "other",
-      "gatedBy": "recMode active + a recorded timeline",
-      "sweepRelevant": false,
-      "expectedEffect": "Playback pacing of recorded strokes (splat timing during replay only).",
-      "binding": "js/03-recording.js:1536,1612",
       "registered": true
     },
     {

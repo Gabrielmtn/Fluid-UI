@@ -219,10 +219,10 @@
     var METHODS = ['onset', 'level', 'beat', 'pitch'];
     var METHOD_LABEL = { onset: 'Onset', level: 'Level', beat: 'Beat', pitch: 'Pitch', pattern: 'Shape' };
     var METHOD_TIP = {
-        onset: 'Onset — fires on attacks (vibrato-suppressed spectral flux vs an adaptive threshold). Box edge = sensitivity. Best default for real music.',
-        level: 'Level — fires when the band crosses the box’s top edge, exactly like the live gates.',
-        beat:  'Beat — locks a steady grid to this band’s tempo; the box edge mutes ticks where the band goes quiet.',
-        pitch: 'Pitch — follows the band’s dominant note: a cue lands on each note change, and the bar’s position across the lane tracks how high the note is. Box edge mutes quiet passages.',
+        onset: 'Onset - fires on attacks (vibrato-suppressed spectral flux vs an adaptive threshold). Box edge = sensitivity. Best default for real music.',
+        level: 'Level - fires when the band crosses the box’s top edge, exactly like the live gates.',
+        beat:  'Beat - locks a steady grid to this band’s tempo; the box edge mutes ticks where the band goes quiet.',
+        pitch: 'Pitch - follows the band’s dominant note: a cue lands on each note change, and the bar’s position across the lane tracks how high the note is. Box edge mutes quiet passages.',
         pattern: 'Shape — every place the track repeats a shape you boxed in the cue editor (Full Audio). Its cues are found once and kept; edit them there.'
     };
     // A 'pattern' lane's cues come from the cue editor's matcher (40b) and
@@ -1573,7 +1573,7 @@
         gr.appendChild(lbl);
         var ed = document.createElement('canvas');
         ed.className = 'audio-gates-editor';
-        ed.title = 'Drag a box: width = the frequency band, top edge = threshold / sensitivity. Each box is one lane.';
+        ed.title = '';
         gr.appendChild(ed);
         if (window.AudioScenes && window.AudioScenes.mountGatesEditor) {
             window.AudioScenes.mountGatesEditor(ed, gateStore, 'gates', function () {
@@ -1696,13 +1696,13 @@
         var saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'atv-reread';
-        saveBtn.textContent = 'Save cues…';
+        saveBtn.textContent = '';
         saveBtn.title = 'Save this track\'s lanes and what they do as a .swirlcues file';
         saveBtn.addEventListener('click', exportCues);
         var openBtn = document.createElement('button');
         openBtn.type = 'button';
         openBtn.className = 'atv-reread';
-        openBtn.textContent = 'Open cues…';
+        openBtn.textContent = '';
         openBtn.title = 'Load lanes from a .swirlcues file onto this track';
         var picker = document.createElement('input');
         picker.type = 'file';
@@ -1813,7 +1813,7 @@
             var lbl = document.createElement('span');
             lbl.className = 'atv-lane-label';
             lbl.textContent = (g.name ? g.name + ' · ' : '') + laneLabel(g) + ' Hz';
-            lbl.title = 'This lane’s frequency band — redraw the box above to change it';
+            lbl.title = 'This lane’s frequency band - redraw the box above to change it';
             row.appendChild(lbl);
 
             var mb = document.createElement('button');
@@ -1871,7 +1871,7 @@
             actSel.value = laneAct(g);
             var evSel = document.createElement('select');
             evSel.className = 'atv-every';
-            evSel.title = 'Thin a busy lane: act on every Nth cue only';
+            evSel.title = '';
             EVERY.forEach(function (k) {
                 var o = document.createElement('option');
                 o.value = String(k); o.textContent = EVERY_LABEL[k];

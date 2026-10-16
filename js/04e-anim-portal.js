@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/04e-anim-portal.js — part 5/7 of former 04-ui-interactions.js (lines 2103–2920)
+// js/04e-anim-portal.js
 // LOAD ORDER: after 04d-anim-ascend-star.js, before 04f-canvas-actions.js
 // PROVIDES: playPortalAnimation, playPortalExpandAnimation, playPortraitAnimation
 // REQUIRES: config (04a)

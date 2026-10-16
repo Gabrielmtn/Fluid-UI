@@ -189,10 +189,10 @@
         var el = document.getElementById('stat-idlevram');
         if (!el) return;
         if (!enabled) { el.textContent = 'off'; return; }
-        if (asleep) { el.textContent = 'asleep — ' + stats.lastFreedMB + ' MB freed'; return; }
+        if (asleep) { el.textContent = 'asleep - ' + stats.lastFreedMB + ' MB freed'; return; }
         var why = document.hidden ? busyReason() : null;
         el.textContent = why ? 'held (' + why + ')'
-            : (stats.sleeps ? 'awake — slept ' + stats.sleeps + '×' : 'awake');
+            : (stats.sleeps ? 'awake - slept ' + stats.sleeps + '×' : 'awake');
     }
     setInterval(updateStatusLine, 1000);
 

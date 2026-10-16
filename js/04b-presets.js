@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/04b-presets.js — part 2/7 of former 04-ui-interactions.js (lines 271–454)
+// js/04b-presets.js
 // LOAD ORDER: after 04a-canvas-gl-config.js, before 04c-anim-burst.js
 // PROVIDES: built-in presets, window.applyPreset (registry-clamped), updatePresetButtons, clearActivePreset, window.toggleFreeze
 // REQUIRES: config/gl (04a), ParamRegistry (01a), QualityGovernor (08a, guarded)
@@ -260,7 +260,7 @@
 
             const isUnfreezing = freezeBtn.classList.contains('active');
 
-            freezeBtn.title = isUnfreezing ? 'Stop the fluid where it is; you can still paint (Space)' : 'Stopped: click or press Space to let it move again';
+            freezeBtn.title = isUnfreezing ? 'Stop fluid motion, you can still paint (Space)' : 'Stopped: click or press Space to let it move again';
             freezeBtn.setAttribute('aria-pressed', isUnfreezing ? 'false' : 'true');
 
             if (isUnfreezing) {

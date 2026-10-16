@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05g-arm-colors.js — part 7/14 of former 05-fluid-sim.js (lines 2194–2439)
+// js/05g-arm-colors.js
 // LOAD ORDER: after 05f-kaleido-controls.js, before 05h-slider-bindings.js
 // PROVIDES: multiArmColors, resolveArmColor, advanceArmColors, multiSplat, applyMultiSplatWith, color pickers, generateVibrantColor, advanceColor; calls initPaletteUI/preseedPaletteOnLoad (01-config)
 // REQUIRES: splatWithRadius (05d), config (04), palettes (01/02)
@@ -21,8 +21,10 @@
             // Randomness): the stroke's own colour for this arm, ahead of
             // whatever the panel says now. Arms past the first only — arm 0's
             // roll rides the event colour itself.
+            // A recorded dab of everything on the canvas (03 recEmitTapDab)
+            // pins every arm it painted, arm 0 included, as it resolved then.
             var pin = window.__armColorPin;
-            if (pin && armIndex > 0 && pin[armIndex]) return pin[armIndex];
+            if (pin && pin[armIndex] && (armIndex > 0 || pin.all)) return pin[armIndex];
             var cfg = multiArmColors[armIndex];
             if (!cfg || cfg.mode === 'main') return fallbackColor;
             // Arm 0's random/step DEFER to the legacy pointer.color pipeline:
@@ -226,8 +228,13 @@
                 // Local, not centre-based: copies ride alongside the stroke like
                 // the bristles of a rake. Pure translation, so every bristle
                 // pushes the fluid exactly the way the real tip does.
-                var gap = symCfg('SYM_RAKE_SPACING', 1) * symBrushDiameterPx();
-                var sp = Math.hypot(dx, dy);
+                // A recorded dab (03 recEmitTapDab) pins the heading and
+                // spacing it was laid with, [ux, uy, spacing], and leaves the
+                // live brush's carried heading alone.
+                var rpin = window.__rakePin;
+                var pinned = !!(rpin && rpin.length === 3 && isFinite(rpin[0]) && isFinite(rpin[1]) && isFinite(rpin[2]));
+                var gap = (pinned ? rpin[2] : symCfg('SYM_RAKE_SPACING', 1)) * symBrushDiameterPx();
+                var sp = pinned ? 0 : Math.hypot(dx, dy);
                 if (sp > 1e-6) {
                     var ux = dx / sp, uy = dy / sp;
                     // Dragging back along the stroke shouldn't spin the rake 180°
@@ -252,8 +259,8 @@
                 }
                 // A press has no travel of its own: inherit the carried heading
                 // rather than snapping to vertical and then jumping on first move.
-                var px = rakeHas ? -rakeUy : 0;
-                var py = rakeHas ?  rakeUx : 1;
+                var px = pinned ? -rpin[1] : (rakeHas ? -rakeUy : 0);
+                var py = pinned ?  rpin[0] : (rakeHas ?  rakeUx : 1);
                 var rk = [];
                 for (var r = 0; r < n; r++) {
                     var off = (r - (n - 1) / 2) * gap;
@@ -560,6 +567,9 @@
             // list has to be rebuilt per multiSplat rather than accumulated
             // across a frame's worth of dabs — see the note there.
             window.__dabSeq = (window.__dabSeq | 0) + 1;
+            // Its splats are this call's: the recorder hears the call (the
+            // tap below), not each arm again in splat() (05i).
+            window.__inMultiSplat = (window.__inMultiSplat | 0) + 1;
             try {
             // Per-arm Pressure rides the same gate as the tip and the shape:
             // user strokes only. A programmatic source (audio scene, path
@@ -590,8 +600,19 @@
             // Stay oriented to the center: the SOURCE dab's pose offset, for
             // splat() to add to BRUSH_ANGLE on every arm. User strokes only —
             // a programmatic source prints gaussian and must not move the
-            // carried pose.
-            window.__faceTurn = window.__brushTipOn ? faceCenterTurn(x, y, true) : 0;
+            // carried pose. A recorded dab pins the pose it was laid with
+            // (__faceTurnPin) and leaves the live brush's carried one alone.
+            window.__faceTurn = !window.__brushTipOn ? 0
+                : (typeof window.__faceTurnPin === 'number') ? window.__faceTurnPin
+                : faceCenterTurn(x, y, true);
+            // The recorder's tap (03 recTapDab): set only while a take is
+            // recording everything on the canvas, so an ordinary dab pays
+            // this one test. Every dye source funnels through here — the
+            // live brush, its replays, peers' strokes, animations — so this
+            // is the one place that sees them all, with the pins each one
+            // painted under still in force.
+            const tap = (typeof window.__recTap === 'function') ? window.__recTap : null;
+            const tapArms = (tap && !exactColor) ? {} : null;
             const relX = x - centerX;
             const relY = y - centerY;
             for (let i = 0; i < transforms.length; i++) {
@@ -604,6 +625,7 @@
                 const armDx = m[0] * dx + m[1] * dy;
                 const armDy = m[3] * dx + m[4] * dy;
                 const armColor = exactColor ? color : resolveArmColor(transforms[i].arm, color);
+                if (tapArms) tapArms[transforms[i].arm] = armColor;
                 // Two things splat() cannot work out for itself, published for
                 // the length of this one dab and cleared in the finally:
                 //  · __armVelOnly — true forces the velocity-only path for a
@@ -634,6 +656,21 @@
                     finally { unpinArmTip(tipSaved); }
                 }
             }
+            if (tap) {
+                // What decided this dab, as multiSplat resolved it: the arm
+                // mask, tips and mirror after their pins, the face pose, the
+                // rake heading, and each arm's colour.
+                let rake = null;
+                if (config.SYMMETRY_MODE === 'rake') {
+                    const rp = window.__rakePin;
+                    rake = (rp && rp.length === 3) ? rp.slice()
+                        : [rakeHas ? rakeUx : 1, rakeHas ? rakeUy : 0, symCfg('SYM_RAKE_SPACING', 1)];
+                }
+                try {
+                    tap(x, y, dx, dy, color, !!exactColor, !!withFootprint, armPushMask,
+                        armTips, strokeMir, window.__faceTurn, rake, tapArms);
+                } catch (_) {}
+            }
             window.__armVelOnly = null;
             window.__armFlip = false;
             window.__armTurn = null;
@@ -650,6 +687,7 @@
                 );
             }
             } finally {
+                window.__inMultiSplat = Math.max(0, (window.__inMultiSplat | 0) - 1);
                 window.__brushTipOn = false;
                 window.__armVelOnly = null;
                 window.__armFlip = false;
@@ -783,7 +821,7 @@
             });
         }
         // The single hub every LEGACY colour path funnels through: hotkeys
-        // ('r'/'a' via toggleCheckbox), applyPalette's auto-step, and snapshot
+        // ('r'/'p' via toggleCheckbox), applyPalette's auto-step, and snapshot
         // restore all dispatch 'change' on these checkboxes and land here, so
         // arm0.mode (canonical for painting + recording) stays in step without
         // each caller knowing about it. Guarded so the reflector's own

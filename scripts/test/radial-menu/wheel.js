@@ -107,7 +107,9 @@ const BS = 0, VISC = 2, CB = 4, MB = 5, TIME = 6, DENS = 7;
         await d.move(W[BS].x, W[BS].y); await sleep(40);
         await wheelAt(W[BS].x, W[BS].y, -100);
         const b1 = await val('brushSize');
-        check('T3 Brush Size steps by about 8%, not by 1% of 100', b1 / b0 > 1.04 && b1 / b0 < 1.13, { b0, b1 });
+        // 1% of the log fader: ×1.12 on 0.001–100, ×1.14 since the floor
+        // went to 0.00017 (5.8 decades).
+        check('T3 Brush Size steps by about 8%, not by 1% of 100', b1 / b0 > 1.04 && b1 / b0 < 1.16, { b0, b1 });
         check('T3 ...and the brush follows', Math.abs((await d.ev('window.config.SPLAT_RADIUS')) - b1 / 1000) < 1e-9);
         await wheelAt(W[BS].x, W[BS].y, 100);
         const snap = await vals();
@@ -267,10 +269,12 @@ const BS = 0, VISC = 2, CB = 4, MB = 5, TIME = 6, DENS = 7;
         check('T15 lock hidden by default', !(await lock()).shown);
         await d.ev(`window.ButtonModes.setMode('left', 'replay')`);
         const l1 = await lock();
-        check('T15 left+right replay, middle radial = painting lock', l1.shown && /painting lock/.test(l1.text), l1);
+        // The line no longer names the replay case: it shows, with the same
+        // words, whether or not a button replays.
+        check('T15 left+right replay, middle radial = line shows', l1.shown && l1.text.trim().length > 0, l1);
         await d.ev(`window.ButtonModes.setMode('left', 'radial'); window.ButtonModes.setMode('right', 'radial')`);
         const l2 = await lock();
-        check('T15 all radial = no button paints, no lock claim', l2.shown && !/painting lock/.test(l2.text), l2);
+        check('T15 all radial = no button paints, line shows', l2.shown && l2.text.trim().length > 0, l2);
         await d.ev(`window.ButtonModes.reset()`);
         const sel = await d.ev(`['left','right','middle'].map(function(k){ return document.getElementById('buttonMode_' + k).value; })`);
         check('T15 reset: selects follow (paint, replay, radial), no warning', sel.join() === 'paint,replay,radial' && !(await lock()).shown, sel);

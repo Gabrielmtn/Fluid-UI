@@ -28,10 +28,11 @@ async function dragSlider(main, r, chordBase) {
     await main.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y, button: 'left', buttons: chordBase, clickCount: 1, pointerType: 'mouse' });
     await sleep(80);
 }
-// Open the sidebar section holding #id (the accordion animates), scroll the
+// Open the sidebar section holding #id (the accordion animates; a folded
+// left bar unfolds first, as js/20 openSidebarSection does), scroll the
 // control into view and return its centre plus what a hit test finds there.
 function reveal(main, id) {
-    return main.eval("(async function(){ var s=function(ms){return new Promise(function(r){setTimeout(r,ms);});}; var el=document.getElementById('" + id + "'); if(!el) return null; var sec=el.closest('.sidebar-section'); if (sec && sec.classList.contains('collapsed')) { sec.querySelector('.section-header').click(); await s(800); } el.scrollIntoView({block:'center', behavior:'instant'}); var r=el.getBoundingClientRect(); for (var k=0;k<12;k++){ await s(120); var r2=el.getBoundingClientRect(); if (Math.abs(r2.top-r.top)<0.5 && Math.abs(r2.left-r.left)<0.5) { r=r2; break; } r=r2; } var hit=document.elementFromPoint(r.left+r.width/2, r.top+r.height/2); return { x: r.left+r.width/2, y: r.top+r.height/2, w: r.width, h: r.height, hit: hit ? (hit.id || hit.tagName) : null, checked: el.checked, on: el.checked }; })()");
+    return main.eval("(async function(){ var s=function(ms){return new Promise(function(r){setTimeout(r,ms);});}; var el=document.getElementById('" + id + "'); if(!el) return null; var sec=el.closest('.sidebar-section'); if (sec && sec.closest('.collapsed')) { if (window.openSidebarSection) window.openSidebarSection(sec); else sec.querySelector('.section-header').click(); await s(800); } el.scrollIntoView({block:'center', behavior:'instant'}); var r=el.getBoundingClientRect(); for (var k=0;k<12;k++){ await s(120); var r2=el.getBoundingClientRect(); if (Math.abs(r2.top-r.top)<0.5 && Math.abs(r2.left-r.left)<0.5) { r=r2; break; } r=r2; } var hit=document.elementFromPoint(r.left+r.width/2, r.top+r.height/2); return { x: r.left+r.width/2, y: r.top+r.height/2, w: r.width, h: r.height, hit: hit ? (hit.id || hit.tagName) : null, checked: el.checked, on: el.checked }; })()");
 }
 
 function getJSON(url) {
@@ -142,8 +143,19 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         await sleep(120);
         const hover = await main.eval("({ mainRing: document.getElementById('brushCursor').style.display, hoverInside: window.PenWindow.__state().hoverInside })");
         // The popup's cursor: the hotspot dot (#ring) over the brush ghost
-        // (#ghost). `px` = the ghost's centre pixel — the tint at full coverage.
-        const GHOST = "(function(){ var g=document.getElementById('ghost'); var px=null; try { if (g.width && g.height) px=Array.from(g.getContext('2d').getImageData(g.width>>1, g.height>>1, 1, 1).data); } catch (e) {} return { ghost: g.style.display, tf: g.style.transform, w: parseFloat(g.style.width), opacity: parseFloat(g.style.opacity), px: px, ring: document.getElementById('ring').style.display, dot: !!document.querySelector('#ring svg') }; })()";
+        // (#ghost), an outline with a clear centre. `px` = the ghost's centre
+        // pixel (transparent), `edge` = the most opaque pixel on its middle
+        // row, which is on the outline's line.
+        const GHOST = "(function(){ var g=document.getElementById('ghost'); var px=null, edge=null; try { if (g.width && g.height) { var c=g.getContext('2d'); px=Array.from(c.getImageData(g.width>>1, g.height>>1, 1, 1).data); var row=c.getImageData(0, g.height>>1, g.width, 1).data; for (var i=0;i<row.length;i+=4) if (!edge || row[i+3]>edge[3]) edge=[row[i],row[i+1],row[i+2],row[i+3]]; } } catch (e) {} return { ghost: g.style.display, tf: g.style.transform, w: parseFloat(g.style.width), opacity: parseFloat(g.style.opacity), px: px, edge: edge, ring: document.getElementById('ring').style.display, dot: !!document.querySelector('#ring svg') }; })()";
+        // The line is antialiased over a dark halo (light paint colours get a
+        // dark one), which darkens it but keeps the hue: compare RGB scaled
+        // to its brightest channel.
+        function outlineIs(s, hex) {
+            if (!s.px || s.px[3] !== 0 || !s.edge || s.edge[3] < 200) return false;
+            const want = [1, 3, 5].map(function (i) { return parseInt(hex.slice(i, i + 2), 16); });
+            const wm = Math.max.apply(null, want), em = Math.max.apply(null, s.edge.slice(0, 3));
+            return em > 0 && want.every(function (w, i) { return Math.abs(w / wm - s.edge[i] / em) < 0.04; });
+        }
         const popRing = await pop.eval(GHOST);
         check('hover inside the box: main brush cursor shows + popup dot and ghost follow', hover.mainRing === 'block' && hover.hoverInside && popRing.ring === 'block' && popRing.dot && popRing.ghost === 'block', { hover, popRing });
         // The ghost carries the brush angle and the paint colour: turn the brush, it turns.
@@ -151,21 +163,21 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx + 5, y: cy + 3, pointerType: 'pen' });
         await sleep(60);
         const ang = await pop.eval(GHOST);
-        check('popup ghost turns to the brush angle (rotate(45deg)) in the paint colour', /rotate\(45deg\)/.test(ang.tf) && ang.ghost === 'block' && ang.px && ang.px.join() === '0,255,136,255', ang);
+        check('popup ghost turns to the brush angle (rotate(45deg)), outlined in the paint colour with a clear centre', /rotate\(45deg\)/.test(ang.tf) && ang.ghost === 'block' && outlineIs(ang, '#00ff88'), ang);
         // The pen sits STILL; the angle, the next colour and the brush size
         // change in the main window — the popout ghost must follow on its own.
-        await main.eval("window.config.BRUSH_ANGLE = 77; var cp=document.getElementById('colorPicker'); if (cp) cp.value='#123456'; var b=document.getElementById('brushSize'); b.value='40'; b.dispatchEvent(new Event('input',{bubbles:true})); 1");
+        await main.eval("window.config.BRUSH_ANGLE = 77; var cp=document.getElementById('colorPicker'); if (cp) cp.value='#88ccff'; var b=document.getElementById('brushSize'); b.value='40'; b.dispatchEvent(new Event('input',{bubbles:true})); 1");
         const sizeBefore = await pop.eval("parseFloat(document.getElementById('ghost').style.width)");
         await sleep(150);
         const still = await pop.eval(GHOST);
-        check('pen still: angle, next colour and size changed in the main window reach the popout ghost within a tick', /rotate\(77deg\)/.test(still.tf) && still.px && still.px.join() === '18,52,86,255' && still.w > sizeBefore, { still, sizeBefore });
+        check('pen still: angle, next colour and size changed in the main window reach the popout ghost within a tick', /rotate\(77deg\)/.test(still.tf) && outlineIs(still, '#88ccff') && still.w > sizeBefore, { still, sizeBefore });
         await main.eval("window.config.BRUSH_ANGLE = 0; var b=document.getElementById('brushSize'); b.value='11'; b.dispatchEvent(new Event('input',{bubbles:true})); 1");
         // Brush Ghost Opacity reaches the popup too.
         await main.eval("(function(){ var s=document.getElementById('brushGhostOpacity'); s.value='70'; s.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
         await sleep(80);
         const op = await pop.eval(GHOST);
         check('Brush Ghost Opacity on the main window sets the popup ghost opacity', Math.abs(op.opacity - 0.7) < 1e-6, op);
-        await main.eval("(function(){ var s=document.getElementById('brushGhostOpacity'); s.value='30'; s.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+        await main.eval("(function(){ var s=document.getElementById('brushGhostOpacity'); s.value='100'; s.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
         // With the main window's Show Cursor OFF (Focus mode does this too), the
         // pen window keeps its cursor and hides the OS cursor over the stage.
         await main.eval("(function(){ var c=document.getElementById('cursorToggle'); if (c.checked) { c.checked=false; c.dispatchEvent(new Event('change',{bubbles:true})); } return 1; })()");
@@ -201,7 +213,7 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         const ox = ax - (bx + bw / 2), oy = ay - (by + bh / 2);
         const want = [[-oy, ox, 120], [-ox, -oy, 210], [oy, -ox, 300]].map(function (w) { return { x: w[0] + bw / 2, y: w[1] + bh / 2, rot: w[2] }; });
         const armsOk = multi.arms.length === 3 && want.every(function (w, i) { const a = multi.arms[i]; return a && Math.abs(a.x - w.x) < 1.5 && Math.abs(a.y - w.y) < 1.5 && a.rot === w.rot; });
-        check('Multi-Brush 4x: popup shows the 3 other arms’ ghosts at their landing spots, turned with their arms (120/210/300)', multi.host === 'block' && multi.main === 'block' && multi.mainRot === 30 && armsOk && Math.abs(multi.opacity - 0.3) < 1e-6, { multi, want });
+        check('Multi-Brush 4x: popup shows the 3 other arms’ ghosts at their landing spots, turned with their arms (120/210/300)', multi.host === 'block' && multi.main === 'block' && multi.mainRot === 30 && armsOk && Math.abs(multi.opacity - 1) < 1e-6, { multi, want });
         await main.eval("(function(){ var c=document.getElementById('symmetrySameAngle'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await sleep(80);
         const same = await pop.eval(ARMS);
@@ -238,6 +250,11 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         await sleep(30);
         const mid = await main.eval("({ down: !!window.pointer.down, pid: window.__paintPointerId, engine: !!(window.BrushEngine && window.BrushEngine.isActive()), held: window.PenWindow.__state().heldCount, x: window.pointer.x, y: window.pointer.y })");
         check('press: main stroke opened with the synthetic pointer id', mid.down && mid.pid >= 5000 && mid.held === 1, mid);
+        // The brush outline stays up while the pen paints, as Krita's does:
+        // in the popup and in the main window the pen is drawing into.
+        await sleep(60);
+        const heldGhost = Object.assign(await pop.eval(GHOST), await main.eval("({ mainGhost: document.getElementById('brushCursorGhost').style.display })"));
+        check('pen down: the brush outline stays up in the popup and the main window', heldGhost.ghost === 'block' && heldGhost.mainGhost === 'block', heldGhost);
         // Blur guard: a blur arriving mid-stroke must not abort it.
         await main.eval("window.dispatchEvent(new Event('blur')); 1");
         const afterBlur = await main.eval("({ down: !!window.pointer.down, pid: window.__paintPointerId })");

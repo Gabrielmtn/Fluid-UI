@@ -16,7 +16,8 @@
  * in normal flow, so every Ctrl hold pushed the canvas down and back up
  * again. Its "F1 — ALL HOTKEYS" pill was also the only VISIBLE way into the
  * hotkey reference on desktop — F1 and Shift+? are now keyboard-only there
- * (the How-do-I modal's Hotkeys button opens it too). Worth replacing when the way
+ * (the How-do-I modal's Hotkeys button did too, until js/44 was parked
+ * 2026-10-14). Worth replacing when the way
  * hotkeys are surfaced gets its rethink.
  *
  * ALSO REMOVED 2026-08-17: the dim pass. A held combo used to drop every
@@ -111,15 +112,15 @@
     var CAPS = [
         // Ctrl+Shift+← → switches palette; the colour keys are in the hint
         // line under the colours (2026-10-08).
-        { keys: '⌃⇧←→',   mod: 'ctrlshift',  title: 'Ctrl+Shift+← / → — previous / next palette', where: paletteRow() },
+        { keys: '⌃⇧←→',   mod: 'ctrlshift',  title: 'Ctrl+Shift ←→ previous / next palette', where: paletteRow() },
         { keys: 'C',      mod: '',           title: 'Toggle brush cursor',                where: checkboxRow('cursorToggle') },
         { keys: 'H',      mod: '',           title: 'Toggle canvas border & handles',     where: checkboxRow('showCanvasHandles') },
         { keys: 'L',      mod: '',           title: 'Lock canvas borders',                where: checkboxRow('lockCanvasBorders') },
         { keys: 'F',      mod: '',           title: 'Toggle focus mode',                  where: checkboxRow('focusModeToggle') },
-        { keys: 'F11',    mod: '',           title: 'F11 — toggle borderless fullscreen', where: groupLabel('windowMode') },
-        { keys: '⌥↑↓',    mod: 'alt',        title: 'Alt+↑ / ↓ — image sharpness',        where: groupLabel('visualResolution') },
-        { keys: '⌥⇧↑↓',   mod: 'altshift',   title: 'Alt+Shift+↑ / ↓ — motion detail',    where: groupLabel('physicsResolution') },
-        { keys: 'M',      mod: '',           title: 'M — mutate',                         where: idEl('mutationGenerate') }
+        { keys: 'F11',    mod: '',           title: 'Toggle borderless fullscreen', where: groupLabel('windowMode') },
+        { keys: '⌥↑↓',    mod: 'alt',        title: 'Alt+↑ / ↓ - raise/lower image sharpness',        where: groupLabel('visualResolution') },
+        { keys: '⌥⇧↑↓',   mod: 'altshift',   title: 'Alt+Shift+↑ / ↓ - raise/lower motion detail',   where: groupLabel('physicsResolution') },
+        { keys: 'M',      mod: '',           title: 'M - mutate',                         where: idEl('mutationGenerate') }
     ];
     // The caps shipped with macOS modifier glyphs (⌃⌥⇧) on what is mostly a
     // Windows app — glyph soup to anyone who never used a Mac. Everywhere

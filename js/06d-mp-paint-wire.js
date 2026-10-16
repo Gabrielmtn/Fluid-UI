@@ -1676,6 +1676,11 @@ function broadcastReplayStroke(events) {
         // even though the events carried the shape locally (05d).
         if (typeof ev.tip === 'number') o.tip = ev.tip | 0;
         if (ev.shape && shapeRevs[ev.shape]) o.shape = ev.shape;
+        // ...and the Angle the tip was turned by, at the live wire's precision
+        // (brushWireFields `angle`). The one footprint field a replay never
+        // carried: a stranger's replay printed the tip turned the way the
+        // VIEWER's slider pointed (2026-10-16). Omitted at 0, like the rest.
+        if (typeof ev.ang === 'number' && isFinite(ev.ang) && ev.ang) o.ang = +(+ev.ang).toFixed(1);
         // Push dabs deposit no dye — same reason the footprint rides along.
         if (ev.push) o.push = { m: ev.push.m, s: +(+ev.push.s || 1).toFixed(2) };
         // ...and WHICH arms pushed, for a stroke whose brush was painting.
@@ -1778,8 +1783,9 @@ function handleStrokeChunk(data) {
 //     line; an edit re-sends only the lines whose rev changed.
 //   * POURS (text-pour): a line poured into the dye — Fluidize, a hotkey's
 //     strike, each pour of a held key's flow. They ride like dabs: the look
-//     once per message and [x, y, amount, t] per pour, played back at the
-//     painter's cadence through the same paced queue as the dab train.
+//     once per message and [x, y, amount, t] per pour (plus [vx, vy], the
+//     push, on a pour laid on the move), played back at the painter's
+//     cadence through the same paced queue as the dab train.
 // Positions are fractions of the painter's CANVAS and type is in their CSS
 // px beside their canvas size, so a receiver maps text per axis exactly as it
 // maps strokes (see SWIRL TOGETHER in 23-text-overlays).
@@ -1868,7 +1874,7 @@ function publishTextLines(force) {
 
 // 23 calls this (window.__mpTextPour) for every pour it lays. Batched per
 // line like the dab train; a different line (or a canvas resize) flushes.
-function queueTextPour(look, cw, ch, nx, ny, amount) {
+function queueTextPour(look, cw, ch, nx, ny, amount, pvx, pvy) {
     if (!mpSocketOpen() || isProcessingRemoteEvent) return;
     // Fluidize hides its line two frames before it pours. That removal has
     // to reach the room FIRST: a receiver still holding the line's wall (a
@@ -1883,7 +1889,13 @@ function queueTextPour(look, cw, ch, nx, ny, amount) {
     var a = (typeof amount === 'number' && isFinite(amount)) ? Math.max(0, Math.min(1, amount)) : 1;
     // Amount in significant digits: a held key's pour at low Time, split
     // along a fast stroke, carries well under 0.001 (23 sampleAmount).
-    _textPourQ.pours.push([+nx.toFixed(4), +ny.toFixed(4), +a.toPrecision(4), now - _textPourQ.t0]);
+    var pour = [+nx.toFixed(4), +ny.toFixed(4), +a.toPrecision(4), now - _textPourQ.t0];
+    // The push a held key lays on the move (23 pushAt), fractions of the
+    // canvas like the spot. A pour without one sends four numbers, as before.
+    if (typeof pvx === 'number' && typeof pvy === 'number' && isFinite(pvx) && isFinite(pvy) && (pvx || pvy)) {
+        pour.push(+pvx.toPrecision(4), +pvy.toPrecision(4));
+    }
+    _textPourQ.pours.push(pour);
     _textPourQ.last = now;
     if (_textPourQ.pours.length >= TEXT_POUR_MAX_PER_MSG || now - _textPourQ.t0 >= TEXT_POUR_FLUSH_MS) {
         flushTextPours();
@@ -1923,12 +1935,20 @@ function enqueueRemoteTextPour(data) {
     for (var i = 0; i < d.pours.length && pours.length < TEXT_POUR_MAX_PER_MSG; i++) {
         var p = d.pours[i];
         if (!Array.isArray(p)) continue;
-        pours.push([
+        var pour = [
             Math.max(-1, Math.min(2, sanitizeRemoteNum(p[0], 0.5))),
             Math.max(-1, Math.min(2, sanitizeRemoteNum(p[1], 0.5))),
             Math.max(0, Math.min(1, sanitizeRemoteNum(p[2], 1))),
             pourTime(p)
-        ]);
+        ];
+        // The push: a real one carries a few % of the canvas at most, so a
+        // quarter is the ceiling on whatever force a bad client asks for.
+        if (p.length >= 6) {
+            var vx = Math.max(-0.25, Math.min(0.25, sanitizeRemoteNum(p[4], 0)));
+            var vy = Math.max(-0.25, Math.min(0.25, sanitizeRemoteNum(p[5], 0)));
+            if (vx || vy) pour.push(vx, vy);
+        }
+        pours.push(pour);
     }
     if (!pours.length) return;
     var e = { kind: 'text', owner: data.clientId, look: d.look, cw: cw, ch: ch, pours: pours, n: pours.length, idx: 0, base: 0 };

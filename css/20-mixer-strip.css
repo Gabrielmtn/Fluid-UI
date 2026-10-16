@@ -103,8 +103,12 @@
     cursor: pointer;
     white-space: nowrap;
 }
+/* Keyboard focus: a white ring with a dark edge, because the bar sits on the
+   painting and either colour alone vanishes on some dye. */
 #quality-underbar .qub-dd-btn:focus-visible {
-    outline: none;
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.6);
 }
 #quality-underbar .qub-dd-chev {
     font-size: 9px;
@@ -198,6 +202,12 @@
 #quality-underbar .qub-dd-opt.sel {
     background: var(--accent, #ec3013);
     color: #fff;
+}
+/* The arrows move focus through the options (20 makeQubDropdown). */
+#quality-underbar .qub-dd-opt:focus { outline: none; }
+#quality-underbar .qub-dd-opt:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: -2px;
 }
 /* Compact window (js/13): the height goes to the canvas. */
 body.compact-ui #quality-underbar { display: none; }
@@ -357,27 +367,6 @@ body > .controls {
     min-height: 16px;
     letter-spacing: 0.3px;
     font-weight: 700;
-}
-
-/* Multiplier value doubles as the per-arm-colors button (raised cell = editable) */
-.ch-value.arm-colors-trigger {
-    cursor: pointer;
-    padding: 1px 8px;
-    min-height: 0;
-    border-radius: 0;
-    color: var(--ink-100, #f2f3f5);
-    background: var(--ground-600, #232830);
-    border: 1px solid var(--ground-500, #2a2e37);
-    transition: background 0.15s, border-color 0.15s;
-    user-select: none;
-}
-.ch-value.arm-colors-trigger:hover {
-    border-color: rgba(236, 48, 19, 0.6);
-}
-.ch-value.arm-colors-trigger.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
 }
 
 /* Fader cells in the bar share its width evenly (2026-10-07). With the
@@ -646,17 +635,6 @@ body > .controls {
     border-right: 4px solid transparent;
     border-top: 5px solid currentColor;
 }
-/* margin-left: ? stays at the right end, over Stop, when Presets is hidden. */
-.mixer-stack .mixer-help {
-    padding: 0;
-    margin-left: auto;
-    align-self: auto;
-}
-/* The bar's icon width: ?, Pause and the Ignite latch are all 28px. */
-#mixer-strip .mixer-stack .mixer-help button {
-    width: 28px;
-    padding: 0;
-}
 
 /* ── Transport row (clear · play/pause · stop) ── */
 .mixer-actions {
@@ -858,27 +836,6 @@ body > .controls {
     border-color: rgba(236, 48, 19, 0.7);
 }
 
-/* ── Arm Colors Dropdown Toggle ── */
-.arm-colors-toggle {
-    box-sizing: border-box;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    font-size: 12px;
-    background: var(--ground-600, #232830) !important;
-    border: 1px solid var(--ground-500, #2a2e37) !important;
-    border-radius: 0;
-    color: var(--ink-100, #f2f3f5) !important;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: 4px;
-}
-.arm-colors-toggle:hover {
-    border-color: rgba(236, 48, 19, 0.6) !important;
-}
-
 /* Arm Colors Panel */
 .arm-colors-panel {
     background: rgba(15, 20, 27, 0.98);
@@ -898,28 +855,6 @@ body > .controls {
     margin-bottom: 8px;
     padding-bottom: 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-/* Title-less variant (Multi-Brush popup): the header carries no text and no
-   close button, only the grab handle the drag needs — a 28px bar, the one
-   mark that says "this moves". */
-.arm-colors-header.arm-colors-grip {
-    height: 10px;
-    margin: -4px 0 4px;
-    padding: 0;
-    border-bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: move;
-}
-.arm-colors-header.arm-colors-grip::before {
-    content: '';
-    width: 28px;
-    height: 2px;
-    background: rgba(255, 255, 255, 0.14);
-}
-.arm-colors-header.arm-colors-grip:hover::before {
-    background: rgba(255, 255, 255, 0.32);
 }
 .arm-colors-rows {
     display: flex;
@@ -1465,17 +1400,6 @@ input[type="color"].arm-picker::-moz-color-swatch { border: 0; border-radius: 3p
 .app-confirm-modal { z-index: 10060; }
 .app-confirm-modal .delete-modal-content { max-width: 420px; }
 .app-confirm-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
-
-/* ── Help cell (js/20-mixer-layout.js buildHelpChannel → js/44-recipes.js) ── */
-.mixer-help {
-    display: flex;
-    align-items: center;
-    padding: 2px 6px;
-    align-self: stretch;
-    flex: 0 0 auto;
-}
-/* Its size, weight and corners are the bar's shared button (.mixer-stack
-   rules): it was a bold 20px circle, the one round button on the bar. */
 
 /* ── Presets popup, 2026-09-02: thumbnails, collapsible groups, save form ── */
 .mixer-presets-panel { width: 236px; }

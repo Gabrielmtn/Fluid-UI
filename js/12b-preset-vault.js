@@ -132,9 +132,115 @@
                  dir: dir, historyDir: HISTORY, trashDir: TRASH };
     }
 
+    /**
+     * Saved animations on disk (2026-10-14): one <name>.fluidanim each, read
+     * once and then held in memory, so listing the library costs no disk.
+     * A write goes to a temp file and is renamed over. Delete moves the file
+     * to .trash. Two names that clean to one file name ("a/b", "a_b", or
+     * only the case differing on Windows) get files of their own.
+     */
+    var ANIM_EXT = '.fluidanim';
+    var ANIM_FORMAT = 'fluidanim';
+    function createAnimFS(fs, path, dir) {
+        var TRASH = path.join(dir, '.trash');
+        var byName = null;   // name -> { data, file }
+
+        function ensure() { try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {} }
+        function load() {
+            if (byName) return byName;
+            byName = new Map();
+            ensure();
+            var files = [];
+            try { files = fs.readdirSync(dir); } catch (_) {}
+            files.sort().forEach(function (fn) {
+                if (fn.charAt(0) === '.' || fn.slice(-ANIM_EXT.length) !== ANIM_EXT) return;
+                var fp = path.join(dir, fn);
+                try {
+                    var env = JSON.parse(fs.readFileSync(fp, 'utf8'));
+                    if (!env || !env.animation || typeof env.animation !== 'object') return;
+                    var name = (typeof env.name === 'string' && env.name) ? env.name : fn.slice(0, -ANIM_EXT.length);
+                    if (!byName.has(name)) byName.set(name, { data: env.animation, file: fp });
+                } catch (e) { /* unreadable or corrupt: skipped, never thrown */ }
+            });
+            return byName;
+        }
+        // `mine` is a file the name may keep (its own, on a rename)
+        function freeFile(name, mine) {
+            var used = {};
+            load().forEach(function (e) { if (e.file !== mine) used[e.file.toLowerCase()] = true; });
+            var base = sanitizeName(name), n = 2;
+            var fp = path.join(dir, base + ANIM_EXT);
+            while (used[fp.toLowerCase()] || (fp.toLowerCase() !== String(mine).toLowerCase() && fs.existsSync(fp))) {
+                fp = path.join(dir, base + ' (' + (n++) + ')' + ANIM_EXT);
+            }
+            return fp;
+        }
+        function write(fp, name, data) {
+            var tmp = fp + '.tmp';
+            fs.writeFileSync(tmp, JSON.stringify({ format: ANIM_FORMAT, v: 1, name: name, savedAt: Date.now(), animation: data }));
+            fs.renameSync(tmp, fp);
+        }
+
+        function all() {
+            var out = {};
+            load().forEach(function (e, name) { out[name] = e.data; });
+            return out;
+        }
+        function has(name) { return load().has(name); }
+        function get(name) { var e = load().get(name); return e ? e.data : null; }
+        function put(name, data) {
+            var m = load(), e = m.get(name);
+            var fp = e ? e.file : freeFile(name, null);
+            try { ensure(); write(fp, name, data); } catch (err) { return false; }
+            m.set(name, { data: data, file: fp });
+            return true;
+        }
+        function remove(name) {
+            var m = load(), e = m.get(name);
+            if (!e) return false;
+            try {
+                fs.mkdirSync(TRASH, { recursive: true });
+                fs.renameSync(e.file, path.join(TRASH, sanitizeName(name) + '-' + stamp() + ANIM_EXT));
+            } catch (err) { return false; }
+            m.delete(name);
+            return true;
+        }
+        function rename(from, to) {
+            var m = load(), e = m.get(from);
+            if (!e || m.has(to)) return false;
+            var fp = freeFile(to, e.file);
+            try {
+                if (fp.toLowerCase() === e.file.toLowerCase()) {
+                    // Same file name, the case at most changed
+                    write(e.file, to, e.data);
+                    if (fp !== e.file) fs.renameSync(e.file, fp);
+                } else {
+                    write(fp, to, e.data);
+                    // The new file holds all of it
+                    try { fs.unlinkSync(e.file); } catch (_) {}
+                }
+            } catch (err) { return false; }
+            m.delete(from);
+            m.set(to, { data: e.data, file: fp });
+            return true;
+        }
+        // Read back from disk, past the in-memory copy
+        function onDisk(name) {
+            var e = load().get(name);
+            if (!e) return false;
+            try {
+                var env = JSON.parse(fs.readFileSync(e.file, 'utf8'));
+                return !!(env && env.name === name && env.animation && typeof env.animation === 'object');
+            } catch (_) { return false; }
+        }
+
+        return { ensure: ensure, all: all, has: has, get: get, put: put, remove: remove, rename: rename,
+                 onDisk: onDisk, dir: dir, trashDir: TRASH };
+    }
+
     // ── Node unit-test export (only in a pure-Node context, never in a page) ──
     if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) {
-        module.exports = { createVaultFS: createVaultFS, sanitizeName: sanitizeName };
+        module.exports = { createVaultFS: createVaultFS, createAnimFS: createAnimFS, sanitizeName: sanitizeName };
     }
 
     // ── Browser / Electron-renderer wiring ─────────────────────────────────
@@ -151,6 +257,8 @@
             remove: function () { return false; }, openFolder: function () { return false; },
             syncStartup: function () {}
         };
+        // Animations stay in localStorage (03's recWebStore)
+        window.AnimationVault = { available: false, dir: null };
         return;
     }
 
@@ -189,6 +297,7 @@
         window.PresetVault = { available: false, dir: null, list: function () { return []; },
             save: function () { return false; }, remove: function () { return false; },
             openFolder: function () { return false; }, syncStartup: function () {} };
+        window.AnimationVault = { available: false, dir: null };
         return;
     }
 
@@ -284,6 +393,55 @@
     };
     window.PresetVault = Vault;
 
+    // ── Animation vault (2026-10-14) ────────────────────────────────────────
+    // Saved animations lived in localStorage with everything else, inside
+    // its quota, so a few long takes filled it and Keep said storage was
+    // full. On desktop they are files in an Animations folder beside this
+    // vault, with no quota; 03's recStore() picks this when it is there.
+    // The first time it is asked for anything, the animations still in
+    // localStorage move across, packed again on the way (03's
+    // recRepackAnimation); each key goes only once its file reads back.
+    var animDir = path.join(path.dirname(vaultDir), 'Animations');
+    var afs = createAnimFS(fs, path, animDir);
+    var animMoved = false;
+    function animReady() {
+        if (animMoved) return afs;
+        animMoved = true;
+        try {
+            var sm = window.settingsManager;
+            var all = (sm && typeof sm.getAll === 'function') ? sm.getAll() : {};
+            var moved = 0;
+            Object.keys(all).forEach(function (key) {
+                if (key.indexOf('recPreset.') !== 0) return;
+                var data = all[key];
+                if (!data || typeof data !== 'object') return;
+                var packed = data;
+                try { packed = (typeof window.recRepackAnimation === 'function' && window.recRepackAnimation(data)) || data; } catch (_) {}
+                // A name already on disk with other content (a folder synced
+                // from another PC) keeps its own; this one takes the next free name.
+                var name = key.slice('recPreset.'.length), base = name, n = 2;
+                while (afs.has(name) && JSON.stringify(afs.get(name)) !== JSON.stringify(packed)) name = base + ' ' + (n++);
+                if (!afs.has(name) && !afs.put(name, packed)) return;
+                if (!afs.onDisk(name)) return;
+                sm.remove(key);
+                moved++;
+            });
+            if (moved) console.log('[AnimationVault] moved ' + moved + ' animation(s) from localStorage to ' + animDir);
+        } catch (e) { console.warn('[AnimationVault] moving animations failed:', e && e.message); }
+        return afs;
+    }
+    window.AnimationVault = {
+        available: true,
+        dir: animDir,
+        all: function () { return animReady().all(); },
+        has: function (name) { return animReady().has(name); },
+        get: function (name) { return animReady().get(name); },
+        put: function (name, data) { return animReady().put(name, data); },
+        remove: function (name) { return animReady().remove(name); },
+        rename: function (from, to) { return animReady().rename(from, to); },
+        openFolder: function () { try { afs.ensure(); return shell.openPath(animDir); } catch (e) { return false; } }
+    };
+
     // ── Mirror every preset write/delete to the vault, whatever the caller ──
     // Wrap Settings.savePreset/deletePreset so BOTH the sidebar and mixer paths
     // (and any future caller) keep the disk vault in sync automatically.
@@ -291,7 +449,11 @@
         if (origSave) {
             window.Settings.savePreset = function (name, data) {
                 var ok = origSave(name, data);
-                if (ok !== false) { try { vfs.save(name, data); } catch (_) {} }
+                if (ok !== false) {
+                    var backed = false, err = null;
+                    try { backed = vfs.save(name, data); } catch (e) { err = e; }
+                    if (!backed) console.warn('[PresetVault] disk copy of "' + name + '" failed:', err ? err.message : 'save returned false');
+                }
                 return ok;
             };
         }

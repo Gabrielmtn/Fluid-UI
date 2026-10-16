@@ -458,9 +458,12 @@
             cleanupFns.push(() => ro.disconnect());
         }
 
+        // Enter = Done, except on its own focused button, which presses
+        // itself: Enter on Cancel used to keep the move instead.
+        const onOwnButton = () => { const a = document.activeElement; return !!(a && a.tagName === 'BUTTON' && overlay && overlay.contains(a)); };
         const onKey = (e) => {
             if (e.key === 'Escape') cancel();
-            else if (e.key === 'Enter') close();
+            else if (e.key === 'Enter' && !onOwnButton()) { e.preventDefault(); close(); }   // and a button still focused behind it doesn't press too
         };
         document.addEventListener('keydown', onKey);
         cleanupFns.push(() => document.removeEventListener('keydown', onKey));

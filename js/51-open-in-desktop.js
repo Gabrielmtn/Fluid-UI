@@ -74,7 +74,7 @@
         return /^[A-Z0-9]{6}$/.test(h) ? h : null;
     }
 
-    var modal = null, els = null, keyHandler = null, handoff = null;
+    var modal = null, els = null, keyHandler = null, handoff = null, hold = null;
 
     function build() {
         if (modal) return modal;
@@ -126,6 +126,7 @@
         if (els && els.never.checked) { try { localStorage.setItem(LS_NEVER, '1'); } catch (_) {} }
         if (modal) modal.classList.remove('show');
         if (keyHandler) { document.removeEventListener('keydown', keyHandler, true); keyHandler = null; }
+        if (hold) { hold.release(); hold = null; }
         clearHandoff();
     }
 
@@ -134,7 +135,7 @@
         try { sessionStorage.setItem(SS_ASKED, kind + ':' + value); } catch (_) {}
         var what = (kind === 'join') ? (look ? 'This room, with the settings in the link,' : 'This room') : 'These settings';
         els.title.textContent = 'Open in the desktop app?';
-        els.msg.textContent = what + ' can open in Swirl Together for Windows — the desktop app runs at full speed, with your pen and your screens. Or keep going right here.';
+        els.msg.textContent = what + ' can open in Swirl Together for Windows - the desktop app runs at full speed, with your pen and your screens. Or keep going right here.';
         els.go.textContent = 'Open in desktop';
         els.go.disabled = false;
         els.go.style.display = '';
@@ -149,12 +150,13 @@
         // The app's hotkeys listen on document; nothing typed at this
         // question may reach them (same as the startup fork).
         keyHandler = function (e) {
+            if (window.DialogFocus.top() !== modal) return;   // a dialog over this one has the keys
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
             if (e.key !== 'Tab') e.stopPropagation();
         };
         document.addEventListener('keydown', keyHandler, true);
         modal.classList.add('show');
-        try { els.go.focus(); } catch (_) {}
+        hold = window.DialogFocus.hold(modal, { initial: els.go });   // Tab kept inside, focus back after (00b)
     }
 
     // Fired from the click, so the browser treats it as a user gesture.
@@ -187,7 +189,7 @@
                 els.store.style.display = '';
                 els.stay.textContent = 'Stay in browser';
             } else {
-                els.msg.textContent = 'Nothing opened — the desktop app does not seem to be installed on this PC. Swirl Together for Windows is on Steam.';
+                els.msg.textContent = 'Nothing opened - the desktop app does not seem to be installed on this PC. Swirl Together for Windows is on Steam.';
                 els.store.style.display = '';
                 els.stay.textContent = 'Stay in browser';
             }

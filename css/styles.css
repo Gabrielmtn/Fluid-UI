@@ -474,7 +474,7 @@
         
         /* Slider styles moved to slider-styles.css */
 
-        /* Mandala Studio: quiet divider between the symmetry rig and the
+        /* Mandala Overlay: quiet divider between the symmetry rig and the
            paint-feel sliders, so the panel reads as two groups not eight
            loose controls. */
         .mandala-radio {
@@ -876,55 +876,6 @@
             min-width: 30px;
         }
         
-        .collapsible-section {
-            margin-bottom: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            overflow: hidden;
-            /* Grid-based collapse: scales to any content height.
-               Not transitioned — animated grid rows re-layout everything
-               below on every frame (see 21-sidebar.css .sidebar-section) */
-            display: grid;
-            grid-template-rows: auto 1fr;
-        }
-        .collapsible-section.collapsed {
-            grid-template-rows: auto 0fr;
-        }
-        
-        .collapsible-header {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 10px 12px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-        }
-        
-        .collapsible-header .title {
-            font-weight: bold;
-            font-size: 13px;
-        }
-        
-        .collapsible-header .icon {
-            font-size: 12px;
-        }
-        
-        .collapsible-section.collapsed .icon {
-            transform: rotate(-90deg);
-        }
-        
-        .collapsible-content {
-            overflow: hidden;
-            min-height: 0; /* Required for grid 0fr collapse */
-            padding: 10px;
-        }
-        
-        .collapsible-section.collapsed .collapsible-content {
-            padding: 0 10px;
-            display: none;
-        }
-        
         @keyframes borderRotate {
             0% {
                 border-image-source: linear-gradient(0deg, 
@@ -986,7 +937,8 @@
         #brushGhostOpacity:disabled,
         .control-group:has(#brushGhostOpacity:disabled) #brushGhostOpacityValue { opacity: 0.4; }
         
-        /* Recorded Layers Drawer (full-width, slide-up) */
+        /* The Audio drawer (full-width, slide-up). It held the animation
+           editor too until 2026-10-13, hence the rec names. */
         .rec-drawer {
             position: fixed;
             left: 0;
@@ -1005,107 +957,30 @@
             color: #1a1f2a;
         }
         .rec-drawer.open { display: flex; }
-        /* Shared studio drawer: tab bar + swappable panels (Record / Audio) */
+        /* Its tab bar + panel (Audio is the one tab now) */
         .studio-tabbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 10px 0; }
         .studio-tabs { display: flex; gap: 6px; align-items: flex-end; }
         .studio-tabbar .studio-tab { border-radius: 10px 10px 0 0; padding: 7px 18px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .studio-tab-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
         .studio-tab-panel.active { display: flex; }
         .studio-tab-panel[data-tab="audio"] { overflow-y: auto; overflow-x: hidden; padding: 6px 14px 16px; }
-        .rec-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 12px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(240,240,245,0.7));
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-            box-shadow: inset 0 1px rgba(255,255,255,0.9);
-        }
-        .rec-header .rec-left, .rec-header .rec-right { display: flex; gap: 6px; align-items: center; }
-        .rec-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; cursor: grab; }
-        .rec-body:active { cursor: grabbing; }
-        .rec-body #recLayersList { display: flex; flex-direction: column; gap: 5px; overflow-x: hidden; }
-        .rec-layers-container { display: flex; flex-direction: column; gap: 10px; }
-        .rec-item {
-            background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(230,235,245,0.9));
-            border-radius: 8px;
-            padding: 10px;
-            border: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15), inset 0 1px rgba(255,255,255,0.8);
-            overflow: hidden;
-        }
-        .rec-item-header { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
-        .rec-item-title { display: flex; gap: 8px; align-items: center; flex: 1; }
-        .rec-controls { display: flex; gap: 4px; }
-        .rec-timeline { width: 100%; max-width: 100%; height: 36px; display: block; margin-top: 6px; background: linear-gradient(180deg, #f6f7fb, #e6eaf3); border-radius: 6px; box-shadow: inset 0 1px rgba(255,255,255,0.9), inset 0 -1px rgba(0,0,0,0.04); position: relative; box-sizing: border-box; }
 .rec-drawer label { color: #2a3142; font-weight: 600; }
         .rec-drawer select, .rec-drawer .time-input { background: linear-gradient(#ffffff, #f2f4f9); color: #1a1f2a; border: 1px solid rgba(0,0,0,0.15); border-radius: 6px; box-shadow: inset 0 1px #fff; padding: 6px 8px; }
         .rec-resize-handle { height: 10px; cursor: ns-resize; touch-action: none; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(240,240,245,0.7)); border-bottom: 1px solid rgba(0,0,0,0.06); }
         .rec-grabber { width: 48px; height: 4px; border-radius: 3px; background: linear-gradient(90deg, rgba(150,158,172,0.9), rgba(200,206,220,0.9)); box-shadow: inset 0 1px rgba(255,255,255,0.8), 0 1px rgba(0,0,0,0.1); }
-        .rec-timeline-wrap { position: relative; margin: 8px 12px; }
-        .rec-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #1a7cff; box-shadow: 0 0 0 2px rgba(26,124,255,0.15); pointer-events: none; }
-        .rec-playhead::before { content: ''; position: absolute; top: -7px; left: -5px; width: 12px; height: 12px; background: #1a7cff; border-radius: 50%; box-shadow: 0 0 0 2px rgba(26,124,255,0.15), inset 0 1px rgba(255,255,255,0.9); }
-        .rec-recordhead { position: absolute; top: 0; bottom: 0; width: 3px; background: #ff3b30; box-shadow: 0 0 0 2px rgba(255,59,48,0.15); pointer-events: none; display: none; }
-        .rec-recordhead::before { content: ''; position: absolute; top: -8px; left: -6px; width: 14px; height: 14px; background: #ff3b30; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,59,48,0.2), inset 0 1px rgba(255,255,255,0.9); }
-        .time-input { font-family: 'Courier New', monospace; font-size: 13px; letter-spacing: 0.5px; }
-        .rec-drawer .layer-title { background: linear-gradient(#ffffff, #eef2f8); color: #1a1f2a; border: 1px solid rgba(0,0,0,0.12); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-        .rec-drawer .layer-item-header { flex-wrap: wrap; align-items: flex-start; }
-        .rec-drawer .layer-controls { flex-wrap: wrap; flex-shrink: 0; row-gap: 4px; }
-        .rec-item.active-layer { border-color: rgba(26,124,255,0.4); box-shadow: 0 0 0 2px rgba(26,124,255,0.12), inset 0 1px rgba(255,255,255,0.9); }
         
-        /* Dark mode overrides for Recorded Layers Drawer */
+        /* Dark mode overrides for the drawer */
         .rec-drawer { background: linear-gradient(180deg, #0d1117, #0b0f14); color: #e6edf3; border-top: 1px solid rgba(255,255,255,0.06); box-shadow: 0 -10px 30px rgba(0,0,0,0.6), inset 0 1px rgba(255,255,255,0.04); }
-        .rec-header { background: linear-gradient(180deg, rgba(22,27,34,0.9), rgba(13,17,23,0.9)); border-bottom: 1px solid rgba(255,255,255,0.06); box-shadow: inset 0 1px rgba(255,255,255,0.04); }
 .rec-drawer label { color: #c9d1d9; }
         .rec-drawer select, .rec-drawer .time-input { background: linear-gradient(#0e1319, #0b0f14); color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; box-shadow: inset 0 1px rgba(255,255,255,0.08); }
-        .rec-item { background: linear-gradient(180deg, rgba(25,31,41,0.95), rgba(15,20,29,0.95)); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 3px 10px rgba(0,0,0,0.6), inset 0 1px rgba(255,255,255,0.04); }
-        .rec-item.active-layer { border-color: rgba(26,124,255,0.5); box-shadow: 0 0 0 2px rgba(26,124,255,0.15), inset 0 1px rgba(255,255,255,0.04); }
-        .rec-timeline { background: linear-gradient(180deg, #0f141b, #0b0f14); box-shadow: inset 0 1px rgba(255,255,255,0.04), inset 0 -1px rgba(0,0,0,0.4); }
-        .rec-mini-timeline { width: 100%; height: 28px; display: block; margin-top: 6px; border-radius: 6px; }
         .rec-resize-handle { background: linear-gradient(180deg, rgba(22,27,34,0.9), rgba(13,17,23,0.9)); border-bottom: 1px solid rgba(255,255,255,0.06); }
         .rec-grabber { background: linear-gradient(90deg, rgba(120,130,145,0.9), rgba(80,90,105,0.9)); box-shadow: inset 0 1px rgba(255,255,255,0.08), 0 1px rgba(0,0,0,0.5); }
-        .rec-playhead { background: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.2); }
-        .rec-playhead::before { background: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.2), inset 0 1px rgba(255,255,255,0.2); }
-        .rec-recordhead { background: #ff7b72; box-shadow: 0 0 0 2px rgba(255,123,114,0.2); }
-        .rec-recordhead::before { background: #ff7b72; box-shadow: 0 0 0 2px rgba(255,123,114,0.25), inset 0 1px rgba(255,255,255,0.2); }
-        .rec-drawer .layer-title { background: #0b0f14; color: #e6edf3; border: 1px solid rgba(255,255,255,0.08); }
-        /* The minimized recorder's 150px squares went with Recording Mode
-           (2026-10-04); the record strip's layout is in 21-sidebar.css. */
-
-        /* ── The editor's toolbar: Play · Edit · File (03, 2026-10-04) ──
-           Three groups on one row with a hairline between them, File on the
-           right edge. It wraps on a narrow window instead of scrolling. */
-        .rec-toolbar { justify-content: flex-start; flex-wrap: wrap; row-gap: 8px; padding: 8px 12px; }
-        .rec-group { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
-        .rec-group:first-child { padding-left: 0; }
-        .rec-group + .rec-group { border-left: 1px solid rgba(255,255,255,0.08); }
-        .rec-group-file { margin-left: auto; padding-right: 0; }
-        .rec-drawer .rec-anim-name { width: 180px; box-sizing: border-box; padding: 6px 8px; font-size: 12px; font-family: inherit; border-radius: 6px; background: #0b0f14; color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); }
-        .rec-drawer .rec-anim-name::placeholder { color: rgba(230,237,243,0.45); }
-        .rec-drawer .rec-anim-name:focus { outline: none; border-color: #58a6ff; }
-        /* A part card: name, ▶ 👁 🔁 ⋯, one line of state, its timeline */
-        .rec-part-meta { font-size: 12px; opacity: 0.85; margin: 2px 0 4px; }
-        .rec-drawer .rec-part-more { font-size: 16px; line-height: 1; }
-
-        /* The editor's menus (a part's ⋯, File ▾) wear the .brush-shape-menu
-           skin (20-mixer-strip.css). Rows are ghost buttons like the room
-           menu's (21-sidebar.css), so only their layout is set here. */
-        .rec-menu { min-width: 200px; }
-        .rec-menu .rec-menu-item { display: block; width: 100%; padding: 7px 10px; text-align: left; white-space: nowrap; }
-        .rec-menu .rec-menu-item[role="menuitemradio"]::before { content: ''; display: inline-block; width: 16px; }
-        .rec-menu .rec-menu-item[aria-checked="true"]::before { content: '\2713'; }
-        .rec-menu-sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,0.08); }
-        .rec-menu-label { padding: 6px 10px 3px; font-size: 11px; font-weight: 600; color: #8b949e; }
-        .rec-menu-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 10px 6px; font-size: 12px; }
-        .rec-menu-field .time-input { width: 100px; box-sizing: border-box; padding: 4px 6px; border-radius: 6px; background: #0b0f14; color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); }
-        .rec-menu-field .time-input:focus { outline: none; border-color: #58a6ff; }
-        .rec-menu-field .time-input:disabled { opacity: 0.5; }
 
         /* ── Recording color-mode dropdown (1.3 rework) ── */
         /* Styled select replacing the raw native control ("looks bad"). Scoped
            to out-specify `#sidebar-right select`, which otherwise wins. Dark
            fill, soft border, custom chevron drawn as an inline-SVG background.
-           The editor's part cards set colours from their ⋯ menu now. */
+           The Saved Animations library's rows wear it. */
         #sidebar-right .rec-color-mode {
             -webkit-appearance: none; -moz-appearance: none; appearance: none;
             width: 100%; box-sizing: border-box;
@@ -1117,6 +992,8 @@
             transition: border-color 0.15s, background-color 0.15s;
         }
         #sidebar-right .rec-color-mode:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* The outline:none above out-specifies the sidebar select's ring. */
+        #sidebar-right .rec-color-mode:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 
         /* ── Global recording/playback visual feedback ── */
         /* PERF: Removed box-shadow on canvas-area - causes compositor overhead */
@@ -1493,119 +1370,6 @@
     color: #fff;
     background: var(--accent, #ec3013);
     border-color: var(--accent, #ec3013);
-}
-
-/* ── COS Oscillator UI ────────────────────────────────────────────────── */
-
-/* Tiny row that holds the hidden checkbox + the pill button */
-.cos-check-row {
-    display: flex;
-    justify-content: center;
-    margin-top: 4px;
-}
-
-/* Pill button inside the mixer channel */
-.cos-btn {
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 15px;
-    padding: 0 7px;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-    line-height: 1;
-}
-/* Active border on the host ch-fader when oscillator is ON */
-.ch-fader.cos-active {
-    border-left: 2px solid rgba(167, 139, 250, 0.5);
-    padding-left: 4px;
-}
-
-/* ── Floating dropdown panel ── */
-.cos-panel {
-    position: fixed;
-    z-index: 9999;
-    width: 188px;
-    background: #12161e;
-    border: 1px solid rgba(167, 139, 250, 0.3);
-    border-radius: 7px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0,0,0,0.4);
-    padding: 0 0 8px;
-    font-family: inherit;
-    color: #e6edf3;
-}
-
-.cos-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 7px 10px 6px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    margin-bottom: 6px;
-}
-
-.cos-panel-title {
-    font-size: 9.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: rgba(167, 139, 250, 0.85);
-}
-
-.cos-enable-toggle {
-    box-sizing: border-box;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.6px;
-    padding: 2px 7px;
-    border-radius: 3px;
-    border: 1px solid rgba(255,255,255,0.12);
-    color: rgba(255,255,255,0.3);
-    cursor: pointer;
-    user-select: none;
-    line-height: 1.4;
-}
-
-.cos-enable-toggle.active {
-    color: #a78bfa;
-    border-color: rgba(167, 139, 250, 0.5);
-    background: rgba(167, 139, 250, 0.12);
-}
-
-/* Each slider row inside the panel */
-.cos-panel-row {
-    display: grid;
-    grid-template-columns: 36px 1fr 38px;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-}
-
-.cos-sub-label {
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: rgba(255, 255, 255, 0.35);
-    white-space: nowrap;
-}
-
-.cos-panel-val {
-    font-family: 'Courier New', monospace;
-    font-size: 9px;
-    font-weight: 700;
-    color: #a78bfa;
-    text-align: right;
-    white-space: nowrap;
-}
-
-/* COS range sliders inside the panel */
-.cos-range-input {
-    width: 100%;
-    accent-color: #a78bfa;
-    cursor: pointer;
 }
 
 /* ── PhotoSafe DOM guard ──────────────────────────────────────────────

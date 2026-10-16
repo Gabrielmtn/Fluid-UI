@@ -62,9 +62,9 @@
     // are not in its hidden list), while a fresh Simple hides them.
     var SIMPLE_NEW_HIDDEN = { 3: ['section:Multi-Brush'] };
     var KEY_SIMPLE_VER = 'ui.simpleVersion';   // last SIMPLE_VERSION this profile's Simple was reconciled to
-    // Never hideable: Settings is the way back, and the ? cell is how you
-    // find what Simple hid.
-    var PINNED = { 'section:Settings': true, 'strip:Help': true };
+    // Never hideable: Settings is the way back. (The ? cell, 'strip:Help',
+    // was pinned too until "How do I…" was parked on 2026-10-14.)
+    var PINNED = { 'section:Settings': true };
 
     var items = [];            // [{ key, kind, label, el }] in on-screen order
     var hidden = {};           // key -> true
@@ -372,8 +372,8 @@
         // Simple | Everything — the same two-cell switch the Mutate scope uses.
         var seg = document.createElement('div');
         seg.className = 'ch-seg-switch ui-vis-presets';
-        [['simple', 'Simple', 'The painting basics: colour, pause and clear, Presets, Mutate, Swirl Together and Export. Everything else waits here, in Settings.'],
-         ['full',   'Everything', 'The whole mixer: every section, every fader.']
+        [['simple', 'Simple', 'Enables Color, Pause/Clear, Presets, Mutate, Swirl Together and Export. Re-Enable UI in Settings menu.'],
+         ['full',   'Everything', 'Enables every piece of UI.']
         ].forEach(function (p) {
             var b = document.createElement('button');
             b.type = 'button';
@@ -496,18 +496,18 @@
         m.innerHTML =
             '<div class="delete-modal-content ui-fork-content">' +
                 '<div class="delete-modal-title" id="uiForkTitle">How much of the mixer do you want to see?</div>' +
-                '<div class="delete-modal-message">Two ways in. Pick one now; switch any time under Settings → Interface.</div>' +
+                '<div class="delete-modal-message">Start with a reduced set of menus, or see everything (you can add more in Settings → Interface)</div>' +
                 '<div class="ui-fork-cards">' +
                     '<button type="button" class="ui-fork-card" data-choice="simple">' +
                         '<span class="ui-fork-card-title">Simple</span>' +
-                        '<span class="ui-fork-card-desc">The canvas and the basics: colour, Presets, Mutate, Swirl Together, Export. Paint, pick a look, share it. Everything else waits in Settings.</span>' +
+                        '<span class="ui-fork-card-desc">The canvas and the basics: color, Presets, Mutate, Swirl Together, Export. Paint, pick a look, share it. Everything else waits in Settings.</span>' +
                     '</button>' +
                     '<button type="button" class="ui-fork-card" data-choice="full">' +
                         '<span class="ui-fork-card-title">Everything</span>' +
-                        '<span class="ui-fork-card-desc">The whole mixer: every section and every fader on screen from the start.</span>' +
+                        '<span class="ui-fork-card-desc">See every setting from the start.</span>' +
                     '</button>' +
                 '</div>' +
-                '<div class="ui-fork-foot">← → to move · Enter to choose · Esc keeps Everything</div>' +
+                '<div class="ui-fork-foot">Use tab to change options, and space/enter to submit. Swirl Together proudly prioritizes accessibility</div>' +
             '</div>';
         document.body.appendChild(m);
         forkModal = m;

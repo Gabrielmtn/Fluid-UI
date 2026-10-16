@@ -79,7 +79,7 @@
     var usedMs = 0, lastMs = null, expiredAt = 0;
     var pointerDown = false;
     var clock = null, btnEl = null;
-    var modal = null, els = null, keyHandler = null, armedAt = 0, askKind = null;
+    var modal = null, els = null, keyHandler = null, armedAt = 0, askKind = null, hold = null;
     var ticker = null;
 
     function modalUp() { return !!(modal && modal.classList.contains('show')); }
@@ -132,8 +132,7 @@
         btnEl = document.createElement('button');
         btnEl.type = 'button';
         btnEl.className = 'btn--ghost demo-clock-btn';
-        btnEl.title = 'Demo time left — the clock only runs while Swirl Together is on screen. ' +
-                      'Click to wishlist the full game on Steam.';
+        btnEl.title = 'Demo time left - the clock only runs while Swirl Together is on screen. Click to wishlist the full game on Steam.';
         btnEl.addEventListener('click', function () {
             if (!modalUp()) ask(expired ? 'timeup' : 'early');
         });
@@ -256,6 +255,7 @@
             // question may reach them (same as the startup fork). Keyups pass,
             // so a key held when the ask appeared still hears its release.
             keyHandler = function (e) {
+                if (window.DialogFocus.top() !== modal) return;   // a dialog over this one has the keys
                 if (e.key === 'Escape') {
                     e.preventDefault();
                     e.stopPropagation();
@@ -266,7 +266,7 @@
             };
             document.addEventListener('keydown', keyHandler, true);
         }
-        try { els.go.focus({ preventScroll: true }); } catch (_) {}
+        hold = window.DialogFocus.hold(modal, { initial: els.go });   // Tab kept inside, focus back after (00b)
         render();
     }
 
@@ -283,6 +283,7 @@
         }
         modal.classList.remove('show');
         if (keyHandler) { document.removeEventListener('keydown', keyHandler, true); keyHandler = null; }
+        if (hold) { hold.release(); hold = null; }
         fold();
         render();
     }
@@ -304,7 +305,7 @@
             window.open(STORE_URL, '_blank', 'noopener');
         }
         els.msg.textContent = (inSteam ? 'Opening Swirl Together in Steam' : 'Opening Swirl Together’s Steam page') +
-            ' — thank you! Your painting will be right here.';
+            ' - thank you! Your painting will be right here.';
         // The best sign of a wishlist the demo can get: no more asks once
         // this one is closed.
         askState.wished = true;

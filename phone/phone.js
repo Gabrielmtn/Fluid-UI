@@ -152,9 +152,9 @@
     var r5 = function (v) { return Math.round(v * 1e5) / 1e5; };
     // A brush radius (Brush Size / 1000) in significant digits: five decimals
     // sent anything under size 0.005 as 0, and the room painted it at its own
-    // size. MIN_RADIUS is the app's slider floor (size 0.001).
+    // size. MIN_RADIUS is the app's slider floor (size 0.00017, 01a).
     var sig4 = function (v) { return +(+v).toPrecision(4); };
-    var MIN_RADIUS = 0.000001;
+    var MIN_RADIUS = 0.00000017;
     function num(v, lo, hi, dflt) {
         return (typeof v === 'number' && isFinite(v)) ? clamp(v, lo, hi) : dflt;
     }

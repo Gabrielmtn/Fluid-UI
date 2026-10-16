@@ -439,7 +439,7 @@ body.cp-sampling #customCursor { visibility: hidden !important; }
 }
 .palette-option + .palette-option { border-top: 1px solid rgba(255, 255, 255, 0.04); }
 .palette-option:hover,
-.palette-option:focus-visible { background: var(--ground-700); }
+.palette-option:focus-visible { background: var(--ground-700); outline: 2px solid #fff; outline-offset: -2px; }
 .palette-option.active { background: var(--ground-800); }
 .palette-option.active::before {
     content: '';
@@ -492,6 +492,24 @@ body.cp-sampling #customCursor { visibility: hidden !important; }
     border-color: rgba(255, 255, 255, 0.22);
 }
 .palette-add { border-radius: 3px; font-size: 16px; }
+/* The "+" glyph sat low and off-centre (font metrics), so it is drawn as
+   two bars on the box's centre; the text stays as the button's name. */
+.palette-add {
+    position: relative;
+    font-size: 0;
+}
+.palette-add::before,
+.palette-add::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 12px;
+    height: 2px;
+    background: currentColor;
+    transform: translate(-50%, -50%);
+}
+.palette-add::after { transform: translate(-50%, -50%) rotate(90deg); }
 /* Active: a white ring standing off the colour, and an accent bar under
    it. Nothing else in the row is white-ringed at rest. */
 .palette-chip-wrap.is-active .palette-chip {
@@ -509,6 +527,13 @@ body.cp-sampling #customCursor { visibility: hidden !important; }
 .palette-chip-wrap.is-editing .palette-chip {
     outline: 2px dashed #fff;
     outline-offset: 3px;
+}
+/* Keyboard focus (01-config roveChip): blue, outside the white active ring,
+   so "where focus is" and "what paints next" read as two things. */
+.palette-chip:focus { outline: none; }
+.palette-chip:focus-visible {
+    outline: 2px solid #58a6ff;
+    outline-offset: 5px;
 }
 
 /* ── What steps back: hints and Export / Import ── */

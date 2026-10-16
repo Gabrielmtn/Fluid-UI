@@ -443,7 +443,7 @@
     // While a lock is held: the centre, the circle or spoke the brush is
     // held to, and a small ring on the HAND tied to the spot it puts the
     // brush on. Inside #canvas-wrapper one step above the canvas, like
-    // Mandala Studio's guides (34), so Zoom View carries it and the side
+    // Mandala Overlay's guides (34), so Zoom View carries it and the side
     // panels stay on top. The marks are redrawn on a change; the hand's
     // ring just moves (once a frame at most).
     // Off unless Show guides is ticked (Stroke Locks): the brush cursor

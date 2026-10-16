@@ -33,7 +33,7 @@
 //   the blit never carried them. The pen window draws its own over the
 //   mirror, from each guide's own markup at this box's size — Stroke locks
 //   (the circle or spoke a held lock keeps the brush on, plus the ring on
-//   the lock's hand) and Mandala Studio (the paintable wedge, seams and
+//   the lock's hand) and Mandala Overlay (the paintable wedge, seams and
 //   rings) — each ticked on or off in the toolbar's Guides menu, whatever
 //   the main window shows. "Always show cursor" (on by default) keeps the
 //   brush cursor here when the main window hides its own (C, Focus mode,
@@ -160,8 +160,8 @@
               // picture under the lines is that frame, not the live one.
               return K.paint(g, W, H, (mirrorCtx && mirrorKAngle !== null) ? mirrorKAngle : undefined);
           } },
-        { id: 'mandala', name: 'Mandala Studio',
-          about: 'The wedge you paint in, its seams and rings, while Mandala Studio is on.',
+        { id: 'mandala', name: 'Mandala Overlay',
+          about: 'The wedge you paint in, its seams and rings, while Mandala Overlay is on.',
           markup: function (W, H) {
               var M = window.MandalaStudio;
               return (M && typeof M.guideMarkup === 'function') ? M.guideMarkup(W, H) : '';
@@ -271,7 +271,7 @@
     function popupHtml() {
         return [
             '<!doctype html><html><head><meta charset="utf-8">',
-            '<title>Swirl Together — Pen input</title>',
+            '<title>Swirl Together - Pen input</title>',
             '<style>',
             'html,body{margin:0;height:100%;background:#000;overflow:hidden;color:#cfd6e0;',
             'font:13px system-ui,-apple-system,Segoe UI,sans-serif;user-select:none;-webkit-user-select:none}',
@@ -322,7 +322,7 @@
             '<svg class="guide" id="guide-strokeLock" aria-hidden="true"><g></g><g></g></svg>',
             '</div><div id="ghostArms"></div><canvas id="ghost"></canvas><div id="ring"></div></div>',
             '<div id="bar"><b>Swirl Together · pen input</b>',
-            '<span class="grow" id="status">Draw here — the paint lands on your main monitor.</span>',
+            '<span class="grow" id="status">Draw here - the paint lands on your main monitor.</span>',
             // Buttons only: in the desktop build this window never takes
             // focus (so the mouse keeps working in the app while the pen is
             // down), and a <select> needs focus to open. The Guides menu is
@@ -492,7 +492,7 @@
                     pop.moveTo(s.availLeft, s.availTop);
                     pop.resizeTo(s.availWidth, s.availHeight);
                 } catch (_) {}
-                setStatus('Moved — press Fullscreen (F11) here.');
+                setStatus('Moved - press Fullscreen (F11) here.');
                 syncScreenRadios();
             };
             if (pdoc.fullscreenElement && pdoc.exitFullscreen) {
@@ -538,7 +538,7 @@
                     placeOnWebScreen(next);
                 }
             } catch (_) {}
-        }).catch(function () { setStatus('Screen access declined — drag the window over instead.'); });
+        }).catch(function () { setStatus('Screen access declined - drag the window over instead.'); });
     }
 
     // ── Sidebar: the Pen Window Screen radios ────────────────────────
@@ -599,7 +599,7 @@
             return;
         }
         if (typeof window.getScreenDetails !== 'function') {
-            host.appendChild(hintNode('This browser cannot list screens — drag the window onto your pen display and press Fullscreen there.'));
+            host.appendChild(hintNode('This browser cannot list screens - drag the window onto your pen display and press Fullscreen there.'));
             return;
         }
         if (!screenDetails) {
@@ -613,7 +613,7 @@
                 try { q = window.getScreenDetails(); } catch (_) { q = null; }
                 if (!q || !q.then) return;
                 q.then(adoptScreenDetails).catch(function () {
-                    setHint('Screen access declined — drag the window onto your pen display instead.');
+                    setHint('Screen access declined - drag the window onto your pen display instead.');
                 });
             });
             host.appendChild(b);
@@ -628,7 +628,7 @@
                 saveScreenKeyWeb(webScreenKey(s));
                 if (isOpen()) {
                     placeOnWebScreen(s);
-                    setHint('Moved the pen window — press Fullscreen (F11) there.');
+                    setHint('Moved the pen window - press Fullscreen (F11) there.');
                 } else {
                     setHint('The pen window will open on ' + webScreenLabel(s, i, cur) + '.');
                 }
@@ -710,7 +710,7 @@
             try {
                 pop.moveTo(place.x, place.y);
                 pop.resizeTo(place.w, place.h);
-                setStatus('Moved to your other screen — press Fullscreen (F11) there.');
+                setStatus('Moved to your other screen - press Fullscreen (F11) there.');
                 syncScreenRadios();
             } catch (_) {}
         }).catch(function () { /* declined: the window stays where it opened */ });
@@ -768,7 +768,7 @@
                 var el = pdoc.documentElement;
                 if (!pdoc.fullscreenElement && el.requestFullscreen) {
                     var p = el.requestFullscreen();
-                    if (p && p.catch) p.catch(function () { setStatus('Fullscreen was refused — press F11 in this window.'); });
+                    if (p && p.catch) p.catch(function () { setStatus('Fullscreen was refused - press F11 in this window.'); });
                 }
             } else if (pdoc.fullscreenElement && pdoc.exitFullscreen) {
                 var q = pdoc.exitFullscreen();
@@ -1209,8 +1209,8 @@
     // P badge in pressure mode — with Multi-Brush on, every arm's ghost too. Read live rather than copied off the main
     // cursor — that one only renders while the main canvas is hovered, and a
     // copy could be a frame stale while the angle turns (Shift+Scroll from
-    // the tablet). It takes Brush Ghost Opacity, and steps aside while the
-    // pen is down.
+    // the tablet). It takes Brush Ghost Opacity, and stays up while the pen
+    // paints, as 31's does.
     //
     // Shown whatever the main window does while "Always show cursor" is
     // ticked (the default). The first cut followed the main window's Show
@@ -1287,7 +1287,7 @@
         var BE = window.BrushEngine;
         var steadyLive = !!(BE && typeof BE.head === 'function' && BE.head());
         // box.h is the canvas's full height in this window's CSS px.
-        ui.ghostPaint.paint(heldCount === 0 && !steadyLive && ghostOn, BC.radiusRoot() * box.h,
+        ui.ghostPaint.paint(!steadyLive && ghostOn, BC.radiusRoot() * box.h,
             (pop && pop.devicePixelRatio) || 1, ringX, ringY,
             { left: box.x, top: box.y, width: box.w, height: box.h });
     }
@@ -1345,7 +1345,7 @@
     function guideOn(id) { return guidesOn[id] !== false; }
     // Every ticked guide's marks at this box's size, rewritten only when
     // they change; an unticked guide, or one with nothing to show right now
-    // (no lock held, Mandala Studio off), is hidden.
+    // (no lock held, Mandala Overlay off), is hidden.
     function guidesSync() {
         if (!ui || !ui.guides) return;
         for (var i = 0; i < GUIDES.length; i++) guideSync(GUIDES[i]);
@@ -1536,7 +1536,7 @@
             stopMirror();
             ui.mirror.hidden = true;
             ui.blank.hidden = false;
-            setStatus('Mirror unavailable here — watch your main monitor.');
+            setStatus('Mirror unavailable here - watch your main monitor.');
             return false;
         }
         var dt = performance.now() - t0;
@@ -1568,7 +1568,7 @@
         if (!spec) {
             ui.mirror.hidden = true;
             ui.blank.hidden = false;
-            setStatus('Mirror off — watch your main monitor.');
+            setStatus('Mirror off - watch your main monitor.');
             return;
         }
         try {
@@ -1579,7 +1579,7 @@
             console.warn('Pen window: mirror unavailable:', e);
             ui.mirror.hidden = true;
             ui.blank.hidden = false;
-            setStatus('Mirror unavailable here — watch your main monitor.');
+            setStatus('Mirror unavailable here - watch your main monitor.');
             return;
         }
         mirrorSpec = spec;
@@ -1587,7 +1587,7 @@
         ui.blank.hidden = true;
         sizeMirror();
         mirrorTick();
-        setStatus(spec.label + ' — the paint lands on your main monitor.');
+        setStatus(spec.label + ' - the paint lands on your main monitor.');
     }
 
     // ── Open / close ─────────────────────────────────────────────────
@@ -1701,7 +1701,7 @@
         hookGuides();
         guidesSync();
         clearInterval(guideTimer);
-        // Mandala Studio has no change events to follow (a wedge count, the
+        // Mandala Overlay has no change events to follow (a wedge count, the
         // angle, Paint Only In Wedge...): its marks are re-read four times a
         // second and rewritten only when they differ. Stroke locks also say
         // when they change (hookGuides).
@@ -1714,13 +1714,13 @@
         placeAfterOpen();
         syncButton();
         if (place && place.fullscreen) {
-            setStatus('Fullscreen on ' + (place.label || 'your other screen') + ' — draw here. Screen ▸ moves it, F11 leaves fullscreen.');
+            setStatus('Fullscreen on ' + (place.label || 'your other screen') + ' - draw here. Screen ▸ moves it, F11 leaves fullscreen.');
             setHint('Open on ' + (place.label || 'your other screen') + '. Wrong screen? Pick another below and it moves at once.');
         } else if (place && place.sameScreen) {
             setHint('Opened as a window on this screen (your choice below). Pick another screen there to send it over.');
         } else if (!place) {
             setHint(isElectron
-                ? 'Only one display found — the window opened here. Plug in the pen display and reopen, or drag it over.'
+                ? 'Only one display found - the window opened here. Plug in the pen display and reopen, or drag it over.'
                 : 'Drag the window onto your pen display (or press Screen ▸ in it) and press Fullscreen there.');
         }
         return true;
@@ -1758,7 +1758,7 @@
 
     function button() { return document.getElementById('penWindowBtn'); }
     function hintEl() { return document.getElementById('penWindowHint'); }
-    var DEFAULT_HINT = 'A second window for your pen display. Drag it there, press Fullscreen, draw — the paint stays on this monitor.';
+    var DEFAULT_HINT = 'A second window for external drawing display';
     function setHint(text) { var h = hintEl(); if (h) h.textContent = text; }
     function syncButton() {
         var b = button();

@@ -64,8 +64,7 @@ var ROOM_LOOK_PERSONAL = {
     // sim mid-stroke is an interruption, not a setting). kaleido: the same
     // numbers as the kaleido controls, plus the live spin angle, which every
     // screen advances on its own clock.
-    sections: ['brushState', 'brushTip', 'armColors', 'userPalettes', 'transport',
-        'cosOscillator', 'kaleido']
+    sections: ['brushState', 'brushTip', 'armColors', 'userPalettes', 'transport', 'kaleido']
 };
 
 function isPersonalSlider(id) {

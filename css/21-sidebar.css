@@ -72,6 +72,13 @@
     cursor: pointer;
     user-select: none;
 }
+/* The title is the keyboard's button (20 makeSection); the ring goes round
+   the whole header row, which is what a click toggles. */
+.section-title:focus { outline: none; }
+.section-header:has(> .section-title:focus-visible) {
+    outline: 2px solid #fff;
+    outline-offset: -2px;
+}
 
 .section-title {
     font-size: 12.5px;
@@ -117,13 +124,18 @@
     opacity: 1;
     /* opacity ONLY — padding was animated too, which is a per-frame
        layout just like the grid rows (see .sidebar-section note) */
-    transition: opacity 0.15s ease;
+    transition: opacity 0.15s ease, visibility 0s linear 0s;
 }
 
+/* visibility as well as opacity: a folded section's controls are still in
+   the page, and at opacity 0 alone Tab walked through every one of them
+   unseen. Hidden once the fade has run, back at once on open. */
 .sidebar-section.collapsed .section-body {
     padding: 0 12px;
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
+    transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 }
 
 /* ── Section group colours ──
@@ -283,10 +295,15 @@
     color: #e6edf3;
 }
 :is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select:focus,
-.mixer-channel .ch-label select.material-mode-select:focus,
+.mixer-channel .ch-label select.material-mode-select:focus {
+    outline: none;
+}
+/* ...but the keyboard sees where it is (it had no ring at all). */
 :is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select:focus-visible,
 .mixer-channel .ch-label select.material-mode-select:focus-visible {
-    outline: none;
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    border-radius: 3px;
 }
 :is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select option,
 .mixer-channel .ch-label select.material-mode-select option {
@@ -314,6 +331,12 @@
 :is(#sidebar-right, #sidebar-left) select:focus {
     outline: none;
     box-shadow: 0 0 0 2px rgba(88,166,255,0.25);
+}
+/* The faint glow above is the mouse's; from the keyboard, the same ring
+   as every button. */
+:is(#sidebar-right, #sidebar-left) select:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
 }
 
 :is(#sidebar-right, #sidebar-left) input[type="color"] {
@@ -668,11 +691,20 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
 }
+/* Collider sits in a wrapper that also holds its source menu, so the menu
+   hangs below the button without being inside it (inside, its items wore
+   Collider's tooltip and From Canvas flickered). The one-cell grid
+   stretches the button to fill its slot like the other three. */
+.collision-btn-wrap {
+    position: relative;
+    display: grid;
+    min-width: 0;
+}
 /* In a narrow sidebar "Visible to layer" breaks onto two lines rather than
    running out of its button; the grid stretches its neighbour to match.
-   No overflow clipping: Collider's source menu is a child of the button
-   and hangs below it. */
-.layers-toolbar-grid > button {
+   No overflow clipping: Collider's source menu hangs below its button. */
+.layers-toolbar-grid > button,
+.collision-btn-wrap > button {
     min-width: 0;
     white-space: normal;
     text-wrap: balance;
@@ -893,11 +925,6 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack {
 body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-actions {
     flex: 0 0 auto;
 }
-body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-}
 
 /* ── Sidebar content polish ── */
 
@@ -923,7 +950,7 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
 
 /* ── Record strip (top of Animations, 03 runs it) ──
    ● Record · ▶ Play · ■ Stop, then the clock and the length chips, then
-   the status line and Edit ⤢. Layout only: colour is 01-buttons.css's. */
+   the status line. Layout only: colour is 01-buttons.css's. */
 #sidebar-right .rec-strip {
     display: flex;
     flex-direction: column;
@@ -937,10 +964,21 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
     gap: 5px;
     min-width: 0;
 }
+/* A button never gets narrower than its label: "● Recording" is ~96px
+   and a third of the row is ~82px, so it used to spill out of its
+   plate. Record takes a bigger share, sized for "Recording", so the row
+   doesn't move when a take starts; a sidebar dragged too narrow for all
+   three wraps Stop to a second line instead of overflowing. */
+.rec-strip-transport {
+    flex-wrap: wrap;
+}
 .rec-strip-transport > button {
     flex: 1 1 0;
-    min-width: 0;
+    min-width: max-content;
     white-space: nowrap;
+}
+.rec-strip-transport > #recMiniRecordBtn {
+    flex-grow: 1.5;
 }
 /* The glyphs sit outside the words, so the labels stay plain text for
    tours, hotkey binds and the copy pass. */
@@ -964,6 +1002,11 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
     padding: 4px 6px;
     white-space: nowrap;
 }
+.rec-strip-label {
+    flex: 0 0 auto;
+    font-size: 12px;
+    opacity: 0.9;
+}
 .rec-strip-foot {
     justify-content: space-between;
 }
@@ -973,10 +1016,6 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
     font-size: 11px;
     line-height: 1.3;
     opacity: 0.75;
-}
-#recOpenFullBtn {
-    flex: 0 0 auto;
-    white-space: nowrap;
 }
 /* Keep · Discard, while the strip asks after a take: the question on its
    own line, the two answers side by side under it */
@@ -1151,6 +1190,10 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
     outline: none;
     border-color: oklch(62% 0.12 var(--sec-h, 242));
     box-shadow: 0 0 0 2px oklch(62% 0.12 var(--sec-h, 242) / 0.25);
+}
+.mp-join-row input:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
 }
 .mp-join-row button {
     flex: 0 0 auto;
@@ -1502,7 +1545,7 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-help button {
 }
 
 /* ── Feature switch + its panel (the checkable group box) ──
-   Mandala Studio and Kaleido were the same small checkbox as Paint Only In
+   Mandala Overlay and Kaleido were the same small checkbox as Paint Only In
    Wedge and Show Guides inside them, so the switch that turns a whole mode
    on read as one more setting (Gabriel, 2026-10-07). Krita's checkable group
    box / Blender's subpanel header: the master row becomes a header bar with
@@ -2170,7 +2213,7 @@ select option {
 #sidebar-right .fx-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 #sidebar-right .fx-thumb.is-empty img { display: none; }
 #sidebar-right .fx-thumb:hover,
-#sidebar-right .fx-thumb:focus-visible { border-color: rgba(255, 255, 255, 0.45); outline: none; }
+#sidebar-right .fx-thumb:focus-visible { border-color: rgba(255, 255, 255, 0.45); outline: 2px solid #fff; outline-offset: 2px; }
 /* Lighting cluster: tight rows, one rule below the group. */
 #sidebar-right .fx-cluster .checkbox-group { margin-bottom: 4px; }
 #sidebar-right .fx-cluster {
@@ -2251,6 +2294,20 @@ select option {
     display: inline-block;
     min-width: calc(4ch + 2px);
     text-align: right;
+}
+/* Interval's readout gains " @1.18x" whenever Time isn't 1 (js/20): 19
+   characters, about 5px more than the 248px bar has beside the hotkey slot,
+   so "@1.18x" broke onto a second line and dropped the name half a line.
+   One line always: the label's 0.4px tracking comes off these 19 characters,
+   which pays for a gap after the name, and an unbound slot gives up the rest. */
+#brushDabIntervalValue {
+    white-space: nowrap;
+    letter-spacing: 0;
+    padding-left: 6px;
+}
+#brushDabIntervalValue + .hk-cap-empty {
+    flex: 0 1 30px;
+    min-width: 0;
 }
 /* Steady under Brush Size, dressed like it: same inset, the channel label's
    type, the channel value's type (css/20-mixer-strip.css .ch-label/.ch-value). */
@@ -2379,7 +2436,8 @@ body.compact-ui #sidebar-right.collapsed > .rsb-rail { display: flex; }
     max-height: none;
     overflow: visible;
     transform: none;
-    visibility: visible;
+    /* inherit, not visible: it has to fold away with its section */
+    visibility: inherit;
     transition: none;
     background: transparent;
     border: 0;

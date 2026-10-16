@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/04g-hover-capture.js — part 7/7 of former 04-ui-interactions.js (lines 3321–3909)
+// js/04g-hover-capture.js
 // LOAD ORDER: after 04f-canvas-actions.js, before 05a-shader-core.js (async loader)
 // PROVIDES: hover-capture region system (capture area, resize, debounce, region capture)
 // REQUIRES: 04f

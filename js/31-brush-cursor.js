@@ -3,12 +3,13 @@
 // LOAD ORDER: plain <script> after 20-mixer-layout.js. Self-contained and
 //   lazy: reads window.config / DOM live, so it is safe to run before the
 //   async sim chunks (04a etc.) have defined config/pointer.
-// PROVIDES: #brushCursorGhost — a faint print of the selected tip at its real
-//   size and angle, in the colour about to be painted (#brushGhostToggle, on
-//   by default; #brushGhostOpacity) — and #brushCursor on top of it: a small
-//   hotspot dot, or the P badge while the brush pushes paint instead of
-//   laying it. The ghost replaced the old ring + angle line (2026-09-23): it
-//   shows the size, the angle and the next colour by itself. With Multi-Brush
+// PROVIDES: #brushCursorGhost — the outline of the selected tip at its real
+//   size and angle, drawn in the colour about to be painted with the inside
+//   left clear (#brushGhostToggle, on by default; #brushGhostOpacity) — and
+//   #brushCursor on top of it: a small hotspot dot, or the P badge while the
+//   brush pushes paint instead of laying it. The ghost replaced the old
+//   ring + angle line (2026-09-23): it shows the size, the angle and the next
+//   colour by itself. With Multi-Brush
 //   on, #brushCursorArms holds a ghost for every other arm's dab too, each
 //   turned the way that arm prints (ghostSet, shared with js/47's popup).
 //
@@ -25,7 +26,7 @@
 
     // ── Hotspot (built once) ──────────────────────────────────────────
     // A fixed-size dot at the exact point a dab lands. The ghost around it
-    // can be faint, soft-edged or the same colour as the paint under it, so
+    // is a thin line, faint or the same colour as the paint under it, so
     // the dot is what the eye finds — and with the ghost switched off it is
     // the whole cursor.
     var el = document.getElementById('brushCursor');
@@ -160,12 +161,15 @@
     // pointer) pushes.
     function pressureActive() { return armPushes(0); }
 
-    // ── Ghost: a faint print of the next dab (2026-09-22) ─────────────
-    // What the brush will leave: the selected tip's own footprint at its real
-    // size and angle, in the colour about to be painted, so a Chisel or a
-    // custom shape can be aimed before any paint goes down. Hidden while a
-    // button is held — by then the paint itself is the preview, and a tint
-    // over it would misreport its colour.
+    // ── Ghost: the outline of the next dab (2026-09-22) ───────────────
+    // What the brush will leave: the edge of the selected tip's own footprint
+    // at its real size and angle, in the colour about to be painted, so a
+    // Chisel or a custom shape can be aimed before any paint goes down. Only
+    // the edge (2026-10-15, after Krita's brush outline): a filled print sat
+    // over the paint under the cursor and tinted it. And, as Krita's does, it
+    // stays up while a stroke paints, showing the brush the stroke is using
+    // (an alternate brush's pinned tip, the stroke's own mirror). Only a
+    // Steady stroke hides it (see the string above).
     //
     // The footprints are the shaders' own, re-derived in their size-normalized
     // frame q = p / √radius (p = offset from the dab centre in canvas-height
@@ -174,11 +178,13 @@
     // eyeballed circle. Per-dab randomness (rim jitter, grain) is drawn at its
     // mean — the ghost is where a dab lands on average, not one roll of it.
     // Viewer-local (localStorage, like the old ring's settings): never
-    // preset-carried, never mirrored to a room.
+    // preset-carried, never mirrored to a room. The opacity key is new with
+    // the outline: a value tuned for the old filled print left a thin line
+    // too faint to find, so it starts over at full strength.
     var GHOST_KEY = 'ui.brushCursorGhost';
-    var GHOST_OPACITY_KEY = 'ui.brushCursorGhostOpacity';
+    var GHOST_OPACITY_KEY = 'ui.brushCursorOutlineOpacity';
     var ghostOn = true;
-    var ghostOpacity = 0.3;
+    var ghostOpacity = 1;
     try { if (localStorage.getItem(GHOST_KEY) === '0') ghostOn = false; } catch (_) {}
     try {
         var savedGo = parseFloat(localStorage.getItem(GHOST_OPACITY_KEY));
@@ -205,7 +211,6 @@
     armWrap.style.cssText = 'position:fixed;left:0;top:0;overflow:hidden;pointer-events:none;' +
         'z-index:10049;display:none;';
     document.body.insertBefore(armWrap, ghostClip);
-    var pressed = false;
 
     var ghostToggle = document.getElementById('brushGhostToggle');
     var ghostOpacityInput = document.getElementById('brushGhostOpacity');
@@ -261,8 +266,8 @@
     // window rather than print the tip underneath, so neither guesses.
     // Keyed by URL since Multi-Brush arms can print shapes of their own (05g
     // per-arm tips): the brush's shape and an arm's are on screen together.
-    // `id` names the decoded bitmap in the mask key, so a re-edited shape
-    // (new art, new URL) is a new mask. A handful at most; cleared past 16.
+    // `id` names the decoded bitmap in the outline key, so a re-edited shape
+    // (new art, new URL) is traced again. A handful at most; cleared past 16.
     var stampCache = {}, stampN = 0, stampSeq = 0;
     function stampBitmap(url) {
         var e = stampCache[url];
@@ -299,12 +304,17 @@
     }
 
     // What the next dab prints: hx/hy = the footprint's half-extents in q,
-    // a(x, y) = its coverage there (unrotated: the angle turns the element).
-    // `neutral` footprints carry no colour of their own — a push, a collider
-    // wall, an eraser — and draw white. null = nothing to show. `arm` is the
-    // Multi-Brush arm whose dab this is (default 0, the one under the pointer):
-    // only whether it pushes differs between arms.
-    var PUSH_SPEC = { key: 'push', hx: 2.1, hy: 2.1, neutral: true,
+    // a(x, y) = its coverage there (unrotated: the angle turns the element),
+    // level = the share of its peak coverage the outline is drawn at (see
+    // footprintOutline; 0.5 when absent). `neutral` footprints carry no
+    // colour of their own — a push, a collider wall, an eraser — and draw
+    // white. null = nothing to show. `arm` is the Multi-Brush arm whose dab
+    // this is (default 0, the one under the pointer): only whether it pushes
+    // differs between arms.
+    // A gaussian has no rim to trace, so soft footprints draw theirs lower,
+    // out where the paint thins (|q| ≈ 1.18), not at its half-strength core.
+    var SOFT_LEVEL = 0.25;
+    var PUSH_SPEC = { key: 'push', hx: 2.1, hy: 2.1, neutral: true, level: SOFT_LEVEL,
                       a: function (x, y) { return Math.exp(-(x * x + y * y)); } };
     function ghostSpec(arm) {
         var c = window.config;
@@ -338,6 +348,7 @@
             // r2 = |p|² / (0.5·radius) = 2|q|².
             var hard = clamp01(num(c.BRUSH_HARDNESS, 0.8));
             return { key: 'disc|' + hard.toFixed(2), hx: 0.9, hy: 0.9, neutral: neutralRaster,
+                     level: SOFT_LEVEL + (0.5 - SOFT_LEVEL) * hard,
                      a: function (x, y) {
                          var r2 = 2 * (x * x + y * y);
                          var soft = Math.exp(-3 * r2), h = 1 - smoothstep(0.72, 1, r2);
@@ -368,39 +379,102 @@
             var se = tipExtent(ss);
             return { key: 'clay|' + ss + '|' + sn.toFixed(2),
                      hx: Math.max(sn < 1 ? 2.1 : 0, se[0]), hy: Math.max(sn < 1 ? 2.1 : 0, se[1]),
+                     level: SOFT_LEVEL + (0.5 - SOFT_LEVEL) * sn,
                      a: function (x, y) {
                          var g = Math.exp(-(x * x + y * y));
                          var st = 1 - smoothstep(1.4 * 0.72, 1.4, tipMetric(ss, x, y));
                          return g + (st - g) * sn;
                      } };
         }
-        return { key: 'soft', hx: 2.1, hy: 2.1,
+        return { key: 'soft', hx: 2.1, hy: 2.1, level: SOFT_LEVEL,
                  a: function (x, y) { return Math.exp(-(x * x + y * y)); } };
     }
 
-    // Rasterize the footprint at D px per q unit into a white mask canvas.
-    function buildGhostMask(mask, spec, D) {
-        var W = Math.max(2, Math.ceil(2 * spec.hx * D));
-        var H = Math.max(2, Math.ceil(2 * spec.hy * D));
-        mask.width = W; mask.height = H;
-        var mctx = mask.getContext('2d');
+    // The footprint's coverage sampled at n×m cell centres over its box, in
+    // a grid framed by one ring of zeros so every outline closes — even a
+    // shape whose bitmap runs to its own edge. Row-major, (n+2)×(m+2).
+    function coverageGrid(spec, n, m) {
+        var cols = n + 2, v = new Float32Array(cols * (m + 2));
         if (spec.img) {
+            var cv = document.createElement('canvas');
+            cv.width = n; cv.height = m;
+            var g = cv.getContext('2d', { willReadFrequently: true });
             // Upright: the stamp is uploaded Y-flipped, which puts the
             // image's top row at the top of the dab.
-            mctx.clearRect(0, 0, W, H);
-            mctx.drawImage(spec.img, 0, 0, W, H);
-            return;
+            g.drawImage(spec.img, 0, 0, n, m);
+            var d = g.getImageData(0, 0, n, m).data;
+            for (var j = 0; j < m; j++)
+                for (var i = 0; i < n; i++) v[(j + 1) * cols + i + 1] = d[(j * n + i) * 4 + 3] / 255;
+            return v;
         }
-        var im = mctx.createImageData(W, H), d = im.data, a = spec.a;
-        var sx = 2 * spec.hx / W, sy = 2 * spec.hy / H;
-        for (var j = 0, o = 0; j < H; j++) {
-            var y = (j + 0.5) * sy - spec.hy;
-            for (var i = 0; i < W; i++, o += 4) {
-                d[o] = d[o + 1] = d[o + 2] = 255;
-                d[o + 3] = Math.round(255 * clamp01(a((i + 0.5) * sx - spec.hx, y)));
+        var sx = 2 * spec.hx / n, sy = 2 * spec.hy / m;
+        for (var jj = 0; jj < m; jj++) {
+            var y = (jj + 0.5) * sy - spec.hy;
+            for (var ii = 0; ii < n; ii++) v[(jj + 1) * cols + ii + 1] = clamp01(spec.a((ii + 0.5) * sx - spec.hx, y));
+        }
+        return v;
+    }
+
+    // Marching squares: which cell edges the outline crosses, per case
+    // (corner bits tl 8, tr 4, br 2, bl 1 set where coverage reaches the
+    // level; edges 0 top, 1 right, 2 bottom, 3 left). The two saddles (5,
+    // 10) are settled by the cell's mean in traceOutline.
+    var MS_EDGES = [null, [3, 2], [2, 1], [3, 1], [0, 1], null, [0, 2], [3, 0],
+                    [3, 0], [0, 2], null, [0, 1], [3, 1], [2, 1], [3, 2], null];
+
+    // The footprint's edge as line segments in q units, {seg: [x0, y0, x1,
+    // y1, …], ex, ey: the half-extents it reaches}, or null when there is
+    // none. Traced where coverage crosses spec.level of its peak, so a faint
+    // custom stamp still gets its edge.
+    var OUTLINE_GRID = 160;   // cells along the box's long side
+    function traceOutline(spec) {
+        var big = Math.max(spec.hx, spec.hy);
+        var n = Math.max(8, Math.round(OUTLINE_GRID * spec.hx / big));
+        var m = Math.max(8, Math.round(OUTLINE_GRID * spec.hy / big));
+        var v;
+        try { v = coverageGrid(spec, n, m); } catch (_) { return null; }
+        var cols = n + 2, peak = 0;
+        for (var p = 0; p < v.length; p++) if (v[p] > peak) peak = v[p];
+        if (!(peak > 0)) return null;
+        var T = (spec.level || 0.5) * peak;
+        var sx = 2 * spec.hx / n, sy = 2 * spec.hy / m;
+        var x0 = -spec.hx - 0.5 * sx, y0 = -spec.hy - 0.5 * sy;   // grid corner (0, 0)
+        var seg = [], ex = 0, ey = 0;
+        var tl, tr, br, bl, cx, cy;
+        function at(e) {
+            // Where the level crosses edge e of the cell at (cx, cy).
+            switch (e) {
+                case 0: return [cx + sx * (T - tl) / (tr - tl), cy];
+                case 1: return [cx + sx, cy + sy * (T - tr) / (br - tr)];
+                case 2: return [cx + sx * (T - bl) / (br - bl), cy + sy];
+                default: return [cx, cy + sy * (T - tl) / (bl - tl)];
             }
         }
-        mctx.putImageData(im, 0, 0);
+        function emit(e0, e1) {
+            var a = at(e0), b = at(e1);
+            seg.push(a[0], a[1], b[0], b[1]);
+            ex = Math.max(ex, Math.abs(a[0]), Math.abs(b[0]));
+            ey = Math.max(ey, Math.abs(a[1]), Math.abs(b[1]));
+        }
+        for (var j = 0; j <= m; j++) {
+            for (var i = 0; i <= n; i++) {
+                var o = j * cols + i;
+                tl = v[o]; tr = v[o + 1]; bl = v[o + cols]; br = v[o + cols + 1];
+                var c = (tl >= T ? 8 : 0) | (tr >= T ? 4 : 0) | (br >= T ? 2 : 0) | (bl >= T ? 1 : 0);
+                if (c === 0 || c === 15) continue;
+                cx = x0 + i * sx; cy = y0 + j * sy;
+                if (c === 5 || c === 10) {
+                    // Saddle: a centre at the level joins the two inside
+                    // corners, so the cut goes round the outside ones.
+                    var joined = (tl + tr + br + bl) / 4 >= T;
+                    if ((c === 5) === joined) { emit(3, 0); emit(2, 1); }
+                    else { emit(3, 2); emit(0, 1); }
+                    continue;
+                }
+                emit(MS_EDGES[c][0], MS_EDGES[c][1]);
+            }
+        }
+        return seg.length ? { seg: seg, ex: ex, ey: ey } : null;
     }
 
     // √radius in canvas-height units: × a surface's CSS height of the canvas
@@ -410,32 +484,35 @@
         return Math.sqrt(Math.max(0, num(c.SPLAT_RADIUS, 0.011) * num(c.STAMP_RADIUS_SCALE, 1)));
     }
 
-    // Rasterized footprints (white, alpha = coverage), keyed by footprint and
-    // density and holding the newest `cap`. One store serves every painter on
-    // a surface, so eight arms cost one rasterize, not eight; a surface shows
-    // at most two footprints at once (the paint and a push arm's).
-    function maskStore(cap) {
-        var masks = Object.create(null), order = [];
-        return function (spec, D) {
-            var key = spec.key + '|' + D;
-            var m = masks[key];
-            if (!m) {
-                m = document.createElement('canvas');
-                buildGhostMask(m, spec, D);
-                m.ghostKey = key;
-                masks[key] = m;
-                order.push(key);
-                while (order.length > cap) delete masks[order.shift()];
-            }
-            return m;
-        };
+    // Traced outlines by footprint, the newest eight. They are in q units, so
+    // one trace serves every painter on every surface at any size: eight arms
+    // cost one trace, not eight.
+    var outlines = Object.create(null), outlineOrder = [];
+    function footprintOutline(spec) {
+        if (spec.key in outlines) return outlines[spec.key];
+        var o = traceOutline(spec);
+        outlines[spec.key] = o;
+        outlineOrder.push(spec.key);
+        while (outlineOrder.length > 8) delete outlines[outlineOrder.shift()];
+        return o;
+    }
+
+    // The outline's stroke, in CSS px: a line in the paint colour over a
+    // wider halo that contrasts with it, so it reads on any paint, its own
+    // colour included.
+    var OUTLINE_W = 1.25, HALO_W = 3.25;
+    function haloFor(hex) {
+        var lum = 0.2126 * parseInt(hex.slice(1, 3), 16) + 0.7152 * parseInt(hex.slice(3, 5), 16) +
+                  0.0722 * parseInt(hex.slice(5, 7), 16);
+        return lum < 90 ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)';
     }
 
     // A painter owns one <canvas> — the main cursor's, one per Multi-Brush
-    // arm, or the Pen Input Window's (js/47) — and tints it from a mask store:
-    // `masks` when given (painters on one surface share one), else its own,
-    // so two surfaces at different sizes never make each other re-rasterize.
-    // The target may live in another same-origin document.
+    // arm, or the Pen Input Window's (js/47) — and strokes the footprint's
+    // outline into it at the surface's own device resolution, so the line
+    // stays sharp at any brush size. It redraws only when the outline, its
+    // size or its colour changes; moving it is a CSS transform. The target
+    // may live in another same-origin document.
     //   paint(spec, k, dpr, x, y, opt): draw `spec` for a surface showing k
     //   CSS px per q unit at device ratio dpr, centred on (x, y) in the
     //   target's containing block. opt (all optional): color (default: the
@@ -443,40 +520,51 @@
     //   (default: the brush's), flip (mirror the tip in its own frame first,
     //   as a mirrored Multi-Brush arm prints it).
     //   hide(): take it off screen.
-    function ghostPainter(target, masks) {
-        if (!masks) masks = maskStore(1);
-        var shapeKey = '', tint = '';
+    function ghostPainter(target) {
+        var drawn = '', tint = '', boxW = 0, boxH = 0;
         function hide() { if (target.style.display !== 'none') target.style.display = 'none'; }
         function paint(spec, k, dpr, x, y, opt) {
             opt = opt || {};
-            if (!spec || !(k > 0)) { hide(); return; }
-            // Mask resolution: the next power of two over the on-screen density
-            // (so it only re-rasterizes when the size crosses an octave),
-            // bounded so a huge brush can't make one rebuild expensive.
-            var want = k * (dpr || 1), D = 16;
-            while (D < want && D < 256) D *= 2;
-            while (D > 16 && 4 * spec.hx * spec.hy * D * D > 600000) D /= 2;
-            var mask = masks(spec, D);
-            if (mask.ghostKey !== shapeKey) {
-                shapeKey = mask.ghostKey;
-                tint = '';
-            }
+            var o = (spec && k > 0) ? footprintOutline(spec) : null;
+            if (!o) { hide(); return; }
             var col = spec.neutral ? '#ffffff' : (opt.color || paintColorHex());
-            if (col !== tint) {
-                var W = mask.width, H = mask.height;
+            // The bitmap: the outline's reach plus room for the halo, centred
+            // on the dab so rotate() turns it about the right point; at
+            // device pixels, but never past ~4 MP for an enormous brush
+            // (that draws softer, never bigger).
+            var pad = HALO_W / 2 + 1;
+            var cw = 2 * (o.ex * k + pad), ch = 2 * (o.ey * k + pad);
+            var s = (dpr || 1);
+            s *= Math.min(1, Math.sqrt(4e6 / (cw * ch * s * s)));
+            var W = Math.max(2, Math.ceil(cw * s)), H = Math.max(2, Math.ceil(ch * s));
+            var key = spec.key + '|' + k + '|' + s + '|' + col;
+            if (key !== drawn) {
+                drawn = key; tint = col;
                 if (target.width !== W) target.width = W;
                 if (target.height !== H) target.height = H;
                 var g = target.getContext('2d');
-                g.globalCompositeOperation = 'copy';
-                g.drawImage(mask, 0, 0);
-                g.globalCompositeOperation = 'source-in';
-                g.fillStyle = col;
-                g.fillRect(0, 0, W, H);
-                g.globalCompositeOperation = 'source-over';
-                tint = col;
+                g.setTransform(1, 0, 0, 1, 0, 0);
+                g.clearRect(0, 0, W, H);
+                // q units in, canvas px out; line widths are CSS px / k.
+                g.setTransform(k * s, 0, 0, k * s, W / 2, H / 2);
+                g.lineCap = 'round';
+                g.lineJoin = 'round';
+                g.beginPath();
+                var seg = o.seg;
+                for (var i = 0; i < seg.length; i += 4) {
+                    g.moveTo(seg[i], seg[i + 1]);
+                    g.lineTo(seg[i + 2], seg[i + 3]);
+                }
+                g.strokeStyle = haloFor(col);
+                g.lineWidth = HALO_W / k;
+                g.stroke();
+                g.strokeStyle = col;
+                g.lineWidth = OUTLINE_W / k;
+                g.stroke();
+                boxW = W / s; boxH = H / s;
             }
-            target.style.width = (2 * spec.hx * k) + 'px';
-            target.style.height = (2 * spec.hy * k) + 'px';
+            target.style.width = boxW + 'px';
+            target.style.height = boxH + 'px';
             // CSS rotate() is clockwise on screen — the same sense the shader's
             // stampAngle turns the stamp, so ghost and painted streak agree.
             // Transforms apply right to left: scaleX(-1) mirrors the tip in
@@ -501,8 +589,11 @@
 
     // A left button bound to "mirror brushstroke" folds its mirror into the
     // stroke it starts (41 pins it at the press), so the preview folds it in.
+    // While a stroke is live it is that stroke's own pin, whichever button
+    // started it — what 05g multiSplat lays the paint with.
     function hoverMirror() {
         var BM = window.ButtonModes;
+        if (BM && typeof BM.isPinned === 'function' && BM.isPinned()) return window.__strokeMirrorPin | 0;
         var s = (BM && typeof BM.side === 'function') ? BM.side('left') : null;
         if (!s || s.mode !== 'mirror' || typeof BM.mirrorCode !== 'function') return 0;
         return BM.mirrorCode(s.mirror) || 1;
@@ -552,8 +643,7 @@
     // lays over the canvas and that clips to it, as armHost does for the arms,
     // so the dab under the pointer can't spill onto the UI around the canvas.
     function ghostSet(mainTarget, armHost, mainClip) {
-        var masks = maskStore(2);
-        var main = ghostPainter(mainTarget, masks);
+        var main = ghostPainter(mainTarget);
         var arms = [];
         var hostBox = '', clipBox = '';
         // Where the main ghost is drawn: the pointer itself, or relative to
@@ -576,7 +666,7 @@
                 cv.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;' +
                     'display:none;will-change:transform,width,height;';
                 armHost.appendChild(cv);
-                arms[i] = ghostPainter(cv, masks);
+                arms[i] = ghostPainter(cv);
             }
             return arms[i];
         }
@@ -642,9 +732,11 @@
     }
 
     var mainGhost = ghostSet(ghostEl, armWrap, ghostClip);
-    function renderGhost(x, y, painting) {
+    // steady = a Steady stroke is live: the dot rides its head, and the
+    // ghost stays off until it settles.
+    function renderGhost(x, y, steady) {
         var r = canvas.getBoundingClientRect();
-        mainGhost.paint(ghostOn && !pressed && !painting, radiusRoot() * r.height,
+        mainGhost.paint(ghostOn && !steady, radiusRoot() * r.height,
             window.devicePixelRatio || 1, x, y, r);
     }
 
@@ -729,26 +821,10 @@
     canvas.addEventListener('pointermove', function (e) {
         if (!ownedBy(e)) return;
         lastX = e.clientX; lastY = e.clientY;
-        // A move with no button down means no stroke, whatever the up
-        // listeners below missed — the ghost can never stay stuck hidden.
-        if (!e.buttons) pressed = false;
         if (!visible) show(); else requestRender();
     });
     canvas.addEventListener('pointerleave', function (e) { if (ownedBy(e)) hide(); });
-    // The ghost steps aside while a button is held (see renderGhost).
-    canvas.addEventListener('pointerdown', function (e) {
-        if (!ownedBy(e)) return;
-        pressed = true;
-        requestRender();
-    });
-    function release(e) {
-        if (!ownedBy(e) || !pressed) return;
-        pressed = false;
-        requestRender();
-    }
-    window.addEventListener('pointerup', release);
-    window.addEventListener('pointercancel', release);
-    // Pointer capture during a stroke can suppress leave — a global up re-checks.
+    // Leaving the window by keyboard (Alt+Tab) sends no pointerleave.
     // Not while a remote pen owns the cursor: this window losing focus says
     // nothing about a pen that is drawing through the Pen Input Window.
     window.addEventListener('blur', function () { if (owner == null) hide(); });

@@ -4,8 +4,9 @@
 // Checks: an ordinary hotkey picker still refuses the app's keys (E with its
 // new reason) and Delete still removes a binding; Ctrl+Shift+H still puts a
 // control on a key end to end (bind mode grew a destination for the menu);
-// the recipes; the F1 sheet; and a touch with Left Click set to Radial menu
-// (tap to open, drag a slider with the finger, tap off to close).
+// the F1 sheet; and a touch with Left Click set to Radial menu (tap to open,
+// drag a slider with the finger, tap off to close). R2, the recipes, went
+// with js/44, parked 2026-10-14.
 'use strict';
 const { boot, sleep } = require('./driver');
 const results = [];
@@ -51,16 +52,6 @@ const E = ['e', 'KeyE', 69];
         await d.tap('j', 'KeyJ', 74, [], 'j'); await sleep(100);
         check('R5 ...and works', (await d.ev(`document.getElementById('strokeLockGuides').checked`)) === !g0);
         await d.ev(`window.HotkeyBinds.list().forEach(function(b){ window.HotkeyBinds.remove(b.id); }); document.getElementById('strokeLockGuides').click()`);
-
-        // ── Recipes ──
-        const rec = await d.ev(`(function(){ var r = window.Recipes.search('radial'); return r.map(function(x){ return x.id || (x.recipe && x.recipe.id); }); })()`);
-        check('R2 "radial" finds the recipe', rec.indexOf('radial-menu') >= 0, rec);
-        const rec2 = await d.ev(`(function(){ var r = window.Recipes.search('export video'); return r.slice(0,3).map(function(x){ return x.id || (x.recipe && x.recipe.id); }); })()`);
-        check('R2 export recipe still found', rec2.indexOf('export-video') >= 0, rec2);
-        await d.ev(`window.Recipes.demo('radial-menu')`); await sleep(200);
-        check('R2 the recipe demo opens the menu', await d.ev('window.RadialMenu.isOpen()'));
-        await d.tap('Escape', 'Escape', 27);
-        check('R2 Esc closes it', !(await d.ev('window.RadialMenu.isOpen()')));
 
         // ── F1 sheet ──
         const sheet = await d.ev(`(function(){ window.showHotkeys(); var t = [].map.call(document.querySelectorAll('#hotkeyOverlay li'), function(l){ return l.textContent; }); window.toggleHotkeys(); return { radial: t.filter(function(x){ return /Radial/.test(x); }), quick: t.filter(function(x){ return /Quick Export/.test(x); }) }; })()`);

@@ -179,7 +179,7 @@ function roomStatusParts() {
     var parts = [], tips = [];
     var open = !!currentRoom && roomSocketOpen();
     if (open) {
-        tips.push('Everyone here shares one set of settings: what anyone changes, changes for everyone. Each person keeps their own brush.');
+        tips.push('Everyone here shares one set of settings but keeps their own brush.');
         parts.push(connectedClients >= 2 ? connectedClients + ' here' : 'just you');
         if (!isStrangerRoom() && roomLocked) {
             parts.push('locked');
@@ -649,6 +649,7 @@ var ROOM_POPS = {
     menu:   { pop: 'mpRoomMenu', btn: 'mpMenuBtn', align: 'right' }
 };
 var _openPop = null;
+var _popFocus = null;   // 00b popup: focus in from the keyboard, Tab out closes, back to the button
 
 function mountRoomPops() {
     Object.keys(ROOM_POPS).forEach(function (k) {
@@ -686,6 +687,7 @@ function openRoomPop(which) {
     btn.classList.add('active');
     if (_openPop !== which) {
         _openPop = which;
+        _popFocus = window.DialogFocus.popup(pop, btn, { close: closeRoomPop });
         // Added straight away: the press that opened it is over by the time
         // its click runs, so it cannot close it, and an Esc pressed the
         // moment it appears has to land.
@@ -704,6 +706,7 @@ function closeRoomPop() {
     var pop = document.getElementById(cfg.pop), btn = document.getElementById(cfg.btn);
     if (pop) pop.hidden = true;
     if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.classList.remove('active'); }
+    if (_popFocus) { var pf = _popFocus; _popFocus = null; pf.release(); }
     document.removeEventListener('mousedown', onRoomPopOutside, true);
     document.removeEventListener('keydown', onRoomPopKey, true);
     document.removeEventListener('scroll', onRoomPopScroll, true);
@@ -726,9 +729,8 @@ function onRoomPopOutside(e) {
 }
 function onRoomPopKey(e) {
     if (e.key !== 'Escape') return;
-    var btn = _openPop && document.getElementById(ROOM_POPS[_openPop].btn);
-    closeRoomPop();
-    if (btn) { try { btn.focus(); } catch (_) {} }
+    e.stopPropagation();   // a close, not 05n's stop-everything Escape
+    closeRoomPop();        // focus back to the button (00b popup)
 }
 // The sidebar scrolling (a wheel, a guide step bringing the panel into
 // view) carries the button away: the popover follows it while the button is
@@ -830,13 +832,17 @@ function initMultiplayerUI() {
     // Who changed what (06b calls this after every change from the room).
     window.__mpRoomLookChanged = onRoomLookChanged;
 
-    // Auto-join if URL has room hash. Not when the link carries settings as
-    // well (?look=…#CODE, Room link + current settings): 50 puts them on first
-    // and then joins, since they are never applied inside a room. The test
-    // reads the URL like 50's, so it holds whichever of the two loads first.
+    // Auto-join if URL has room hash: a 6-char room code, the only kind
+    // connectToRoom and the invite links write. Any other hash (DEFAULT-ROOM,
+    // the copy sink's #locate=…) is not an invitation and opens no socket.
+    // Not when the link carries settings as well (?look=…#CODE, Room link +
+    // current settings): 50 puts them on first and then joins, since they are
+    // never applied inside a room. The test reads the URL like 50's, so it
+    // holds whichever of the two loads first.
     var hashRoom = getRoomFromHash();
-    var lookFirst = /^[A-Z0-9]{6}$/.test(hashRoom || '') && /(?:^\?|&)look=/.test(window.location.search || '');
-    if (hashRoom && hashRoom !== 'DEFAULT-ROOM' && !lookFirst) {
+    var hashIsCode = /^[A-Z0-9]{6}$/.test(hashRoom || '');
+    var lookFirst = hashIsCode && /(?:^\?|&)look=/.test(window.location.search || '');
+    if (hashIsCode && !lookFirst) {
         connectToRoom(hashRoom);
     }
 }

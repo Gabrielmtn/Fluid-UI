@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05c-programs-framebuffers.js — part 3/14 of former 05-fluid-sim.js (lines 967–1191)
+// js/05c-programs-framebuffers.js
 // LOAD ORDER: after 05b-shader-sim.js, before 05d-input-replay.js
 // PROVIDES: all Program instances (incl. macAdvectProg/macCorrectProg, mg*Prog), exposeSimStats, createFBO, createDoubleFBO, initFramebuffers (+load-time call), mgSolvePressure, updateObstacleTexture, blit; lexical: dyeTexWidth/.., density, velocity, pressure, mgLevels, ..
 // REQUIRES: gl, config (04); Program + frag sources (05a/05b); QualityGovernor hooks (08a, guarded)
@@ -218,8 +218,8 @@
             });
             // [GOVERNOR HOOK] scale internal resolution (config untouched)
             const _gov = window.QualityGovernor;
-            const dyeBase = Math.max(64, Math.round((config.DYE_RESOLUTION || 1024) * (_gov ? _gov.dyeScale() : 1)));
-            const simBase = Math.max(32, Math.round((config.SIM_RESOLUTION || 128) * (_gov ? _gov.simScale() : 1)));
+            const dyeBase = Math.max(64, Math.round((config.DYE_RESOLUTION || 2048) * (_gov ? _gov.dyeScale() : 1)));
+            const simBase = Math.max(32, Math.round((config.SIM_RESOLUTION || 2048) * (_gov ? _gov.simScale() : 1)));
             // Check WebGL texture size limits
             const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
             // Compute absolute internal sizes: long side = base, short side scaled by aspect

@@ -593,9 +593,9 @@
                             <div class="stat-row"><span class="stat-label">Display:</span> <span id="stat-displayhz">--</span></div>
                             <div class="stat-row"><label class="stat-label" for="governorToggle">Adaptive Quality:</label> <input type="checkbox" id="governorToggle"></div>
                             <div class="stat-row"><label class="stat-label" for="governorAllowRes">&nbsp;&nbsp;Resolution Tiers:</label> <input type="checkbox" id="governorAllowRes"></div>
-                            <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="Allow the governor's last rung to disable sharpen/micro-detail/glow/Crisp Advection under extreme load — changes the look, so it's opt-in">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
+                            <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="During low FPS moments, allows sharpen/micro-detail/glow/Crisp Advection to automatically deactivate (opt in only)">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
                             <div class="stat-row"><span class="stat-label">Adaptive State:</span> <span id="stat-governor">--</span></div>
-                            <div class="stat-row"><label class="stat-label" for="idleVramToggle" title="Extra VRAM saving while the window is minimized or fully covered: park the artwork in system memory and shrink the GPU buffers to nothing much. Windows already reclaims most of it on its own once the window stops drawing, so this is worth roughly 14 MB more — useful on a VRAM-starved machine or at the high fidelity tiers. Paused automatically while exporting, in a room, or with the pen window open.">Release VRAM When Hidden:</label> <input type="checkbox" id="idleVramToggle"></div>
+                            <div class="stat-row"><label class="stat-label" for="idleVramToggle" title="Slightly useful on a low VRAM machine or at the high fidelity tiers. Paused automatically while exporting, in a room, or with the pen window open.">Release VRAM When Hidden:</label> <input type="checkbox" id="idleVramToggle"></div>
                             <div class="stat-row"><span class="stat-label">Hidden State:</span> <span id="stat-idlevram">--</span></div>
                         </div>
                         <div class="stats-section">
@@ -633,7 +633,7 @@
     <div class="controls">
         <div class="control-group">
             <label for="brushSize">Brush Size</label>
-            <input type="range" id="brushSize" min="0.001" max="100" value="1.3" step="0.0001">
+            <input type="range" id="brushSize" min="0.00017" max="100" value="1" step="0.00001">
         </div>
         <div class="control-group">
             <label for="colorPicker">Fluid Color</label>
@@ -644,7 +644,7 @@
             </div>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
                 <input type="checkbox" id="colorGate" checked>
-                <label for="colorGate" style="margin: 0" title="Limit: each stroke stops at its own colour, so repeated strokes can't blow out to white">Limit</label>
+                <label for="colorGate" style="margin: 0" title="Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white).">Limit</label>
             </div>
             <div style="margin-top: 10px;" data-palette-drop>
                 <label class="palette-label">Palettes <span id="paletteImportStatus" class="import-status"></span></label>
@@ -655,7 +655,7 @@
                     <div class="palette-preview" id="palettePreview"></div>
                     <div class="palette-note" id="paletteNote" role="status" aria-live="polite" hidden></div>
                     <div class="palette-picker-host" id="palettePickerHost" hidden></div>
-                    <div class="palette-keys" id="paletteKeys">Ctrl+← → or N: next colour · ⇧S add · ⇧X remove</div>
+                    <div class="palette-keys" id="paletteKeys">Ctrl ←→ prev / next color · ⇧S add color · ⇧X remove color</div>
                 </div>
                 <div class="palette-actions">
                     <button class="btn--ghost" onclick="exportCurrentPaletteFluid()">Export this</button>
@@ -674,31 +674,31 @@
             <!-- Option VALUES are load-bearing (registry-validated, presets
                  match numerically, undo snapshots store them) — text only. -->
             <select id="visualResolution">
-                <option value="8192">8192 — Overkill (24GB VRAM class)</option>
-                <option value="6144">6144 — Extreme (12GB+ VRAM)</option>
-                <option value="4096">4096 — Sharpest (heavy GPU)</option>
-                <option value="2048" selected>2048 — Sharp (default)</option>
-                <option value="1536">1536 — Medium</option>
-                <option value="1024">1024 — Soft (fast)</option>
-                <option value="512">512 — Softer (faster)</option>
-                <option value="256">256 — Softest (fastest)</option>
+                <option value="8192">8192</option>
+                <option value="6144">6144</option>
+                <option value="4096">4096</option>
+                <option value="2048" selected>2048</option>
+                <option value="1536">1536</option>
+                <option value="1024">1024</option>
+                <option value="512">512</option>
+                <option value="256">256</option>
             </select>
         </div>
         <div class="control-group">
             <label for="physicsResolution">Motion Detail</label>
             <select id="physicsResolution">
-                <option value="4096">4096 — Overkill (heavy GPU)</option>
-                <option value="3072">3072 — Extreme</option>
-                <option value="2048">2048 — Ultra-fine (heavy GPU)</option>
-                <option value="1536">1536 — Extra-fine</option>
-                <option value="1024">1024 — Very fine</option>
-                <option value="512" selected>512 — Fine (default)</option>
-                <option value="384">384 — Medium-fine</option>
-                <option value="256">256 — Medium</option>
-                <option value="192">192 — Medium-coarse</option>
-                <option value="128">128 — Coarse</option>
-                <option value="64">64 — Very coarse (fast)</option>
-                <option value="32">32 — Coarsest (fastest)</option>
+                <option value="4096">4096</option>
+                <option value="3072">3072</option>
+                <option value="2048" selected>2048</option>
+                <option value="1536">1536</option>
+                <option value="1024">1024</option>
+                <option value="512">512</option>
+                <option value="384">384</option>
+                <option value="256">256</option>
+                <option value="192">192</option>
+                <option value="128">128</option>
+                <option value="64">64</option>
+                <option value="32">32</option>
             </select>
         </div>
         <div class="control-group">
@@ -707,18 +707,18 @@
                  field Surface Shading lights (05c). Values are load-bearing
                  like the two above (registry-validated) — text only. -->
             <select id="shadeFormResolution">
-                <option value="2048">2048 — Finest</option>
-                <option value="1024">1024 — Fine</option>
-                <option value="512">512 — Medium</option>
-                <option value="256" selected>256 — Smooth (default)</option>
-                <option value="128">128 — Softest</option>
+                <option value="2048">2048</option>
+                <option value="1024">1024</option>
+                <option value="512">512</option>
+                <option value="256" selected>256</option>
+                <option value="128">128</option>
             </select>
         </div>
         <div class="control-group">
             <label for="fpsCap">FPS Limit</label>
             <select id="fpsCap">
-                <option value="30">30 fps — Battery Saver</option>
-                <option value="60" selected>60 fps — Standard</option>
+                <option value="30">30 fps - Battery Saver</option>
+                <option value="60" selected>60 fps - Standard</option>
                 <option value="120">120 fps</option>
                 <option value="144">144 fps</option>
                 <option value="165">165 fps</option>
@@ -740,28 +740,24 @@
             <input type="range" id="pressureDissipation" min="0.9" max="1" value="0.95" step="0.001">
         </div>
         <div class="control-group">
-            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">47</span></label>
-            <input type="range" id="pressureIteration" min="1" max="50" value="47" step="1">
+            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">25</span></label>
+            <input type="range" id="pressureIteration" min="1" max="50" value="25" step="1">
         </div>
         <div class="control-group">
-            <label for="velocityCap" title="Speed ceiling in canvas-widths/sec (soft limit). Growth presets (velocity > 1) settle at this ceiling inside closed mask pockets — lower = calmer bounded swirls, higher = wilder motion. Also the fp16 overflow guard.">Max Speed <span id="velocityCapValue" class="value-display">30</span></label>
-            <input type="range" id="velocityCap" min="5" max="60" value="30" step="1">
-        </div>
-        <div class="control-group">
-            <label for="grainCleanup" title="Smooths the finest grain out of paint while it moves. Lower keeps more of it: crisper strands and fine veins (pairs with Shading Detail). Keep it up when paint never fades (Density Sustain 1.0 or higher) — there, speckle can build up without it, especially around colliders.">Grain Cleanup <span id="grainCleanupValue" class="value-display">0.75</span></label>
+            <label for="grainCleanup" title="Smooths the finest grain out of paint while it moves. Lower: keeps more of the grain">Grain Cleanup <span id="grainCleanupValue" class="value-display">0.75</span></label>
             <input type="range" id="grainCleanup" min="0" max="0.85" value="0.75" step="0.05">
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="macCormackToggle" checked>
-            <label for="macCormackToggle" style="margin: 0" title="MacCormack error-corrected dye advection — sharper strokes, less smearing (2 extra GPU passes)">Crisp Advection</label>
+            <label for="macCormackToggle" style="margin: 0" title="Adds MacCormack passes to Pavel's original shader for sharper strokes, less smearing.">Crisp Advection</label>
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="multigridToggle" checked>
-            <label for="multigridToggle" style="margin: 0" title="Multigrid pressure solve — much better incompressibility (crisper vortices, less mushy expansion) at lower GPU cost than high iteration counts">Multigrid Pressure</label>
+            <label for="multigridToggle" style="margin: 0" title="Adds options to fiddle with Pavel's original shader behaviors (vortex crispness, expansion/compression behaviors)">Multigrid Pressure</label>
         </div>
         <div id="multigridPanel">
             <div class="control-group">
-                <label for="mgCycles" title="Full V-cycles per frame — each adds accuracy at ~10-15 Jacobi iterations of GPU cost. Minimum 2: a single cycle is unstable around colliders (the second cycle cleans up the first's overcorrection)">V-Cycles <span id="mgCyclesValue" class="value-display">2</span></label>
+                <label for="mgCycles" title="Allows you to set how many down and back trips per frame. More makes the fluid feel a bit firmer. (min 2 as colliders destroy the shader otherwise)">V-Cycles <span id="mgCyclesValue" class="value-display">2</span></label>
                 <input type="range" id="mgCycles" min="2" max="4" value="2" step="1">
             </div>
             <div class="control-group">
@@ -777,7 +773,7 @@
                 <input type="range" id="mgCoarse" min="2" max="32" value="8" step="1">
             </div>
             <div class="control-group">
-                <label for="mgRelax" title="Smoother damping ω — 1.0 is the classic behavior; lower values are the textbook damped-Jacobi smoother, exposed for experiments">Relaxation <span id="mgRelaxValue" class="value-display">1.00</span></label>
+                <label for="mgRelax" title="How much of each sweep’s change to keep. 1.0 keeps all of it, like Pavel’s sweep. Lower is gentler and slower to settle.">Relaxation <span id="mgRelaxValue" class="value-display">1.00</span></label>
                 <input type="range" id="mgRelax" min="0.5" max="1" value="1" step="0.01">
             </div>
         </div>
@@ -787,7 +783,7 @@
         </div>
         <div class="control-group">
             <label>
-                <select id="materialMode" class="material-mode-select" title="Material — swaps what this slider controls">
+                <select id="materialMode" class="material-mode-select" title="Material - Changes settings to give a few different feels">
                     <option value="fluid" selected>Material Type - Fluid</option>
                     <option value="acrylic">Material Type - Paint (Wet)</option>
                     <option value="clay">Material Type - Paint (Thick)</option>
@@ -797,19 +793,19 @@
             <input type="range" id="curl" min="0" max="60" value="0" step="1">
         </div>
         <div class="control-group">
-            <label for="viscosity" title="How thick the fluid is. 0 flows like water; higher smooths the small swirls away, so strokes flow on in broad, smooth ribbons.">Viscosity <span id="viscosityValue" class="value-display">0.30</span></label>
+            <label for="viscosity" title="How thick the fluid feels">Viscosity <span id="viscosityValue" class="value-display">0.30</span></label>
             <input type="range" id="viscosity" min="0" max="1" value="0.3" step="0.01">
         </div>
         <div class="control-group">
-            <label for="colorBlend" title="Whether colours keep apart or run together. Left of the middle (Laminar), colours slide past each other in layers without mixing: stirring and smudging stretch them into finer streaks instead of smearing them. Right of the middle (Blend), touching colours run into each other like wet paint while it is wet, then settle as it dries (Dry Time); churning and colliding paint blends more. The middle is the usual look. The flow itself is unchanged.">Laminar / Blend <span id="colorBlendValue" class="value-display">0.00</span></label>
+            <label for="colorBlend" title="Whether colors keep apart or run together. When set to Laminar, colors slide past each other in layers, when set to blend touching colors run into each other blending their colors together.">Laminar / Blend <span id="colorBlendValue" class="value-display">0.00</span></label>
             <input type="range" id="colorBlend" min="-1" max="1" value="0" step="0.01">
         </div>
         <div class="control-group">
-            <label for="wetInfluence" title="Drying — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Drying <span id="wetInfluenceValue" class="value-display">0.14</span></label>
+            <label for="wetInfluence" title="0 = off (pure fluidity). Higher = more paint-like.">Drying <span id="wetInfluenceValue" class="value-display">0.14</span></label>
             <input type="range" id="wetInfluence" min="0" max="1" value="0.14" step="0.01">
         </div>
         <div class="control-group">
-            <label for="wetDrying" title="Drying speed — half-life in seconds for wet paint to set. Lower = paint dries and holds faster.">Dry Time <span id="wetDryingValue" class="value-display">4.5s</span></label>
+            <label for="wetDrying" title="Drying time in seconds for wet paint to set. Lower = paint dries and holds faster.">Dry Time <span id="wetDryingValue" class="value-display">4.5s</span></label>
             <input type="range" id="wetDrying" min="0.5" max="20" value="4.5" step="0.5">
         </div>
         <div class="control-group checkbox-group">
@@ -830,7 +826,7 @@
                 <input type="range" id="shadeGloss" min="0" max="1" value="0.05" step="0.05">
             </div>
             <div class="control-group">
-                <label for="ridges" title="Sharpening on moving paint. Up to 1 turns it up at a fine radius; past 1 the kernel widens into coarse embossed ridges. Needs Ridge Strength above 0.">Ridges <span id="ridgesValue" class="value-display">6.0</span></label>
+                <label for="ridges" title="Post-Processing to sharpen ridges on moving paint">Ridges <span id="ridgesValue" class="value-display">6.0</span></label>
                 <input type="range" id="ridges" min="0" max="6" value="6" step="0.1">
             </div>
             <div class="control-group">
@@ -838,7 +834,7 @@
                 <input type="range" id="sharpness" min="0" max="2" value="2" step="0.1">
             </div>
             <div class="control-group">
-                <label for="vibrance" title="Selective saturation: muted colours get richer, already-vivid ones are left alone. 0 = off, 0.50 = the default, above that is extra.">Vibrance <span id="vibranceValue" class="value-display">0.50</span></label>
+                <label for="vibrance" title="Boosts color vibrance ">Vibrance <span id="vibranceValue" class="value-display">0.50</span></label>
                 <input type="range" id="vibrance" min="0" max="1" value="0.5" step="0.01">
             </div>
         </div>
@@ -857,7 +853,7 @@
             </div>
             <div class="control-group checkbox-group">
                 <input type="checkbox" id="scatterToggle">
-                <label for="scatterToggle" style="margin: 0" title="Volumetric light shafts: glow spreads outward from every bright pixel, Scatter sends it travelling from one source across the canvas">Scatter</label>
+                <label for="scatterToggle" style="margin: 0" title="Volumetric light ">Scatter</label>
             </div>
             <div id="scatterPanel" class="collapsible" style="display:none;">
                 <div class="control-group">
@@ -874,7 +870,7 @@
                 </div>
                 <div class="control-group">
                     <label for="scatterSource">Source</label>
-                    <select id="scatterSource" title="Where the shafts radiate from. Light Source follows the draggable light dot; Brush follows your cursor.">
+                    <select id="scatterSource" title="Control light source origin. Light Source connects light origin to &quot;Light Source&quot; feature. Brush makes the origin your cursor.">
                         <option value="light">Light Source</option>
                         <option value="brush">Brush</option>
                     </select>
@@ -903,12 +899,12 @@
              On: every arm prints at the brush's own angle. Moved into the
              Multi-Brush dropdown under Symmetry, like the group above. -->
         <div class="control-group checkbox-group" id="symmetrySameAngleGroup"
-             title="Off: each arm's tip turns with its arm around the centre of the canvas, so the arms form one symmetric shape. On: every arm uses the brush's own angle.">
+             title="Off: Each brush turns around the center of the canvas symmetrically. On: every arm has the same brush angle from the settings menu.">
             <input type="checkbox" id="symmetrySameAngle">
             <label for="symmetrySameAngle" style="margin: 0">Same angle on every arm</label>
         </div>
         <div class="control-group checkbox-group" id="symmetryFaceCenterGroup"
-             title="The brush turns as you move around the center of the canvas, so it always points the same way relative to the center. Right at the center it holds its angle.">
+             title="The brush maintains its angle relative to the center.">
             <input type="checkbox" id="symmetryFaceCenter">
             <label for="symmetryFaceCenter" style="margin: 0">Stay oriented to the center</label>
         </div>
@@ -916,7 +912,7 @@
              of each other. Moved into the Multi-Brush dropdown with the two
              groups above. -->
         <div class="control-group" id="symmetryHoldGroup">
-            <label for="symmetryHold" title="Keeps the arms' swirls mirror images of each other as the fluid moves, so a symmetric painting stays symmetric. 0 lets the fluid drift apart on its own; higher pulls it back harder. Each arm keeps its own color. Near the canvas edges and around colliders the fluid stays free.">Hold symmetry <span id="symmetryHoldValue" class="value-display">0.00</span></label>
+            <label for="symmetryHold" title="Strength of symmetry assist force near center of the canvas, weaker at edges.">Hold symmetry <span id="symmetryHoldValue" class="value-display">0.00</span></label>
             <input type="range" id="symmetryHold" min="0" max="1" value="0" step="0.01">
         </div>
         <div class="control-group">
@@ -932,7 +928,7 @@
         </div>
         <div class="control-group checkbox-group feature-head">
             <input type="checkbox" id="mandalaToggle" role="switch">
-            <label for="mandalaToggle" style="margin: 0">Mandala Studio</label>
+            <label for="mandalaToggle" style="margin: 0">Mandala Overlay</label>
         </div>
         <div id="mandalaPanel" class="collapsible feature-body" style="display:none;">
             <div class="control-group">
@@ -948,7 +944,7 @@
                 <label for="mandalaHideGuides" style="margin: 0" title="Hide the spokes and dimming for a clean look. Captures never include guides.">Hide Guides</label>
             </div>
             <div class="control-group">
-                <label title="Blow the working wedge up to fill the view so you can paint fine detail at a comfortable size. Purely a view scale — drop back to Off and the same strokes read as one fine slice of the mandala.">Fill</label>
+                <label title="Zoom the working area up to fill the view.">Fill</label>
                 <div class="mandala-radio" id="mandalaFill">
                     <label><input type="radio" name="mandalaFill" value="off" checked> Off</label>
                     <label><input type="radio" name="mandalaFill" value="fit"> Fit</label>
@@ -957,7 +953,7 @@
             </div>
             <div class="control-group checkbox-group">
                 <input type="checkbox" id="zoomModeToggle">
-                <label for="zoomModeToggle" style="margin: 0" title="Z — the wheel zooms and dragging pans instead of painting. Press 0 to reset the view.">Zoom Mode&nbsp;<span style="opacity:.5">(Z)</span></label>
+                <label for="zoomModeToggle" style="margin: 0" title="Activates Zoom mode (hotkey: Z). When active the wheel zooms and dragging pans instead of painting. 0 resets the view.">Zoom Mode&nbsp;<span style="opacity:.5">(Z)</span></label>
             </div>
             <div class="mandala-sub">Paint feel</div>
             <div class="control-group">
@@ -977,7 +973,7 @@
                 <input type="range" id="mandalaDryTime" min="0.5" max="20" value="0.5" step="0.5">
             </div>
             <div class="control-group">
-                <button id="mandalaCaptureBtn" style="width:100%" title="Save a PNG of the mandala as you see it — background, layers and text included (same as Export → Save picture)">Save picture</button>
+                <button id="mandalaCaptureBtn" style="width:100%" title="Save a PNG of the mandala as you see it.">Save picture</button>
             </div>
         </div>
         <div id="kaleidoPanel" class="collapsible feature-body">
@@ -1055,7 +1051,7 @@
         </div>
         <div class="control-group checkbox-group" style="margin-top: 5px;">
             <input type="checkbox" id="photoSafeToggle" checked>
-            <label for="photoSafeToggle" style="margin: 0" title="Photosensitivity protection: rapid flashes become fades, the rate of brightness change is capped and kaleidoscope spin is limited (WCAG 2.3.1 thresholds). It lowers the risk; it does not remove it. On by default.">Reduce flashing and rapid brightness changes</label>
+            <label for="photoSafeToggle" style="margin: 0" title="Photosensitivity protection: reduces rapid flashes, slow rate of brightness change, kaleidoscope spin is limited (WCAG 2.3.1 thresholds).">Reduce flashing and rapid brightness changes</label>
         </div>
         <div class="control-group">
             <button id="photoWarnShowBtn" type="button" style="width:100%">Show photosensitivity warning</button>
@@ -1066,11 +1062,12 @@
             <label for="cursorToggle" style="margin: 0">Show Cursor</label>
         </div>
         <!-- Brush Ghost: the switch is the row's checkbox, the slider its
-             opacity. js/20 moves the row into Brush, above Tip. -->
+             opacity. js/20 moves the row into Brush, above Tip, with Show
+             Cursor over it. -->
         <div class="control-group brush-ghost-group"
-             title="A faint print of the selected brush tip under the cursor: its shape, its real size, its angle and the colour about to be painted, so you can see where a dab will land before you paint. It hides while you paint. The checkbox shows or hides it; the slider sets how strongly it shows.">
-            <label for="brushGhostToggle" class="brush-ghost-head"><input type="checkbox" id="brushGhostToggle" checked> Brush Ghost <span id="brushGhostOpacityValue" class="value-display">30%</span></label>
-            <input type="range" id="brushGhostOpacity" min="5" max="100" value="30" step="5" aria-label="Brush ghost opacity">
+             title="Show a preview of the current brush, size and angle.  ">
+            <label for="brushGhostToggle" class="brush-ghost-head"><input type="checkbox" id="brushGhostToggle" checked> Brush Ghost <span id="brushGhostOpacityValue" class="value-display">100%</span></label>
+            <input type="range" id="brushGhostOpacity" min="5" max="100" value="100" step="5" aria-label="Brush ghost opacity">
         </div>
         <div class="control-group">
             <label for="windowMode">Window Mode</label>
@@ -1085,21 +1082,21 @@
              the sim keeps THIS monitor's frame rate. Placed in Display by 20;
              behaviour in js/47-pen-window.js. -->
         <div class="control-group"
-             title="Opens a second window you can drag onto a pen display or tablet screen and make fullscreen. Draw there: the paint lands on this monitor, at this monitor's frame rate. Hotkeys, right-click replay and the scroll wheel work from that window too. In the desktop app the window never takes focus, so the mouse keeps working here — you can aim the Gravity pad or move a slider while the pen is still down.">
+             title="Open a window you can drag onto a drawing tablet or touch screen to use with a stylus">
             <label for="penWindowBtn">Pen Input Window</label>
             <button id="penWindowBtn" type="button" style="width:100%">Pop Out Pen Input</button>
-            <div class="pen-window-hint" id="penWindowHint">A second window for your pen display. Drag it there, press Fullscreen, draw — the paint stays on this monitor.</div>
+            <div class="pen-window-hint" id="penWindowHint">A second window for external drawing display</div>
         </div>
         <div class="control-group">
-            <label for="penWindowMirror" title="What the pen window shows under your pen. The mirror is one small GPU copy of the canvas per update — Light redraws 12 times a second while you draw there and twice a second otherwise; Smooth 24 and 4. Off leaves a blank surface and you watch this monitor.">Pen Window Mirror</label>
+            <label for="penWindowMirror" title="Select the visual mode to show in the stylus window">Pen Window Mirror</label>
             <select id="penWindowMirror">
-                <option value="light" selected>Light — 12 fps while drawing, 2 idle</option>
-                <option value="smooth">Smooth — 24 fps while drawing, 4 idle</option>
-                <option value="off">Off — blank surface</option>
+                <option value="light" selected>Light - 12 fps drawing, 2 idle</option>
+                <option value="smooth">Smooth - 24 fps drawing, 4 idle</option>
+                <option value="off">Off - blank surface</option>
             </select>
         </div>
         <div class="control-group">
-            <label title="Which screen the pen window opens on. Pick another to move it there right away — the way back if it ever lands on the wrong one. Picking the app's own screen opens it as a window instead of fullscreen.">Pen Window Screen</label>
+            <label title="Select screen the pen window opens on.">Pen Window Screen</label>
             <div class="pen-window-screens" id="penWindowScreens"></div>
         </div>
         <!-- Desktop app on Windows only (47 removes it elsewhere): the first
@@ -1119,7 +1116,7 @@
             <label for="statsToggle" style="margin: 0">Debug Info</label>
         </div>
         <div class="control-group checkbox-group"
-             title="A steady pressure across the whole canvas, pointed with the pad below — paint drifts that way on its own and drains off the edge it reaches. Down reads as gravity, up as lift. Applies to every brush.">
+             title="A steady pressure across the whole canvas, pointed with the pad below - paint drifts that way on its own and drains off the edge it reaches. Down reads as gravity, up as lift. Applies to every brush.">
             <input type="checkbox" id="pressureConstant">
             <label for="pressureConstant" style="margin: 0">Gravity Direction</label>
         </div>
@@ -1128,27 +1125,27 @@
              20-mixer-layout (wirePressureField) and the pass is 05j. -->
         <div id="pressureFieldControls" class="pressure-pad-wrap" style="display: none;">
             <div class="pressure-pad" id="pressurePad"
-                 title="Drag to aim the constant pressure. Centre is off; further out is stronger. Double-click to recentre.">
+                 title="Drag to change the gravity direction">
                 <span class="pressure-pad-h"></span>
                 <span class="pressure-pad-v"></span>
                 <span class="pressure-pad-ring"></span>
                 <span class="pressure-pad-arm"></span>
                 <span class="pressure-pad-dot"></span>
             </div>
-            <div class="pressure-pad-read" id="pressurePadRead">centred — no push</div>
+            <div class="pressure-pad-read" id="pressurePadRead">Centered - no gravity</div>
         </div>
         <!-- Overflow: open canvas edges. The divergence/gradient passes stop
              treating the border as a wall, and a drain band at the rim kills
              whatever crosses it so nothing washes back in off the clamped edge
              texels. Was a Tunnel-scene-only audio toggle until 2026-08-24. -->
         <div class="control-group checkbox-group"
-             title="Open canvas edges — fluid that reaches the border vents off-canvas instead of bouncing back in.">
+             title="Open canvas edges - fluid that reaches the border vents off-canvas instead of bouncing back in.">
             <input type="checkbox" id="overflowToggle">
             <label for="overflowToggle" style="margin: 0">Border</label>
         </div>
         <div id="overflowPanel" class="collapsible" style="display:none;">
             <div class="control-group">
-                <label for="overflowBand" title="How much of the canvas the draining border takes. Wider = fluid is nulled further in from the rim; narrower keeps the drain a hairline at the very edge.">Width <span id="overflowBandValue" class="value-display">2.5%</span></label>
+                <label for="overflowBand" title="Control border width ">Width <span id="overflowBandValue" class="value-display">2.5%</span></label>
                 <input type="range" id="overflowBand" min="0.5" max="15" value="2.5" step="0.5">
             </div>
         </div>
@@ -1160,8 +1157,8 @@
             <div class="control-group">
                 <label for="breathPattern">Pattern</label>
                 <select id="breathPattern" title="Seconds in, hold, out, hold">
-                    <option value="relaxed" selected>Relaxed 4 · 4</option>
-                    <option value="box">Box 4 · 4 · 4 · 4</option>
+                    <option value="relaxed" selected>Relaxed - 4 in, 4 out</option>
+                    <option value="box">Box - In 4, Hold 4, Out 4, Hold 4</option>
                     <option value="478">4 · 7 · 8</option>
                 </select>
             </div>
@@ -1170,16 +1167,12 @@
                 <input type="range" id="breathStrength" min="0" max="1" value="0.5" step="0.05">
             </div>
             <div class="control-group">
-                <label for="breathColorMode" title="When the paint takes a new color. Each cycle: one new color per full in · hold · out · hold. Each breath: a new color on every breath in and every breath out. New colors step around the color wheel from the brush color.">Color</label>
-                <select id="breathColorMode" title="Stays the same: the brush color, every breath. Each cycle: a new color per full cycle. Each breath: a new color on every breath in and every breath out.">
+                <label for="breathColorMode" title="Select to change the color mode to either stay the same, change per cycle, or change per breath.">Color</label>
+                <select id="breathColorMode" title="Color stays the same">
                     <option value="same" selected>Stays the same</option>
                     <option value="cycle">Changes each cycle</option>
                     <option value="breath">Changes each breath</option>
                 </select>
-            </div>
-            <div class="control-group checkbox-group">
-                <input type="checkbox" id="breathFadeToggle" checked>
-                <label for="breathFadeToggle" style="margin: 0" title="Checked: each breath's paint fades away, paced to the pattern (a quarter of it is left by the next cycle), whatever Density Sustain says. Unchecked: paint never fades while Breathing runs. Your slider is left alone either way.">Fades</label>
             </div>
             <div class="control-group checkbox-group">
                 <input type="checkbox" id="breathCueToggle" checked>
@@ -1236,10 +1229,10 @@
         <!-- Light Shift Controls -->
         <div id="lightShiftControls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(255, 150, 100, 0.05); border-left: 2px solid rgba(255, 150, 100, 0.3); border-radius: 4px;">
             <div style="text-align: center; margin-bottom: 8px;">
-                <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending.">Draw a path through colors</label>
+                <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);" title="Draw a path through colors to create a color gradient. Hold Shift while drawing to skip sections.">Draw a path through colors</label>
             </div>
             <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-                <canvas id="lightShiftWheel" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending." style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
+                <canvas id="lightShiftWheel" title="Draw a path through colors to create a color gradient. Hold Shift while drawing to skip sections." style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
             </div>
             <div class="control-group" style="margin-bottom: 8px;">
                 <label style="font-size: 12px; margin-bottom: 4px;">Blend Mode</label>
@@ -1248,7 +1241,7 @@
                     <option value="tint" title="Tints bright areas with the color while keeping their brightness.">Tint</option>
                     <option value="overlay" title="Contrast-blends the color into bright areas (Photoshop Overlay).">Overlay</option>
                     <option value="multiply" title="Darkens bright areas toward the color.">Multiply</option>
-                    <option value="screen" title="Lightens bright areas toward the color — good for glows.">Screen</option>
+                    <option value="screen" title="Lightens bright areas toward the color, good for glow.">Screen</option>
                     <option value="add" title="Adds the color to bright areas for a glowing bloom.">Additive</option>
                 </select>
             </div>
@@ -1291,7 +1284,7 @@
             <div style="display: flex; gap: 8px;">
                 <!-- "Save settings", not "Save" (2026-09-14): the bare word next to
                      Export → Save picture and the preset Save read as the same thing. -->
-                <button id="saveSettingsBtn" style="flex: 1;" title="Keep every slider, colour and switch as they are now — your starting point when Load saved on start is ticked">Save settings</button>
+                <button id="saveSettingsBtn" style="flex: 1;" title="Save current settings to be loaded by default upon reset. Can be reset">Save settings</button>
                 <button id="loadSettingsBtn" style="flex: 1;" title="Bring back the settings you saved">Load</button>
                 <button class="btn--destructive" id="clearSettingsBtn" style="flex: 1;" title="Forget the saved settings">Clear</button>
             </div>
@@ -1334,7 +1327,7 @@
             <div id="userPresetStatus" style="display: none; font-size: 10px; margin-top: 4px; color: #3fb950; text-align: center;"></div>
             <div id="userPresetBulkRow" style="display: flex; gap: 6px; margin-top: 6px;">
                 <button id="exportAllPresetsBtn" style="flex: 1" title="Download every saved preset as a portable .fluidpresets file (backup / move between the desktop and web builds)">⤓ Export Presets</button>
-                <button id="importPresetsBtn" style="flex: 1" title="Import presets from a .fluidpresets file — merges into your library">⤒ Import Presets</button>
+                <button id="importPresetsBtn" style="flex: 1" title="Import presets from a .fluidpresets file">⤒ Import Presets</button>
                 <input type="file" id="importPresetsInput" accept=".fluidpresets,.json,application/json" style="display: none">
             </div>
             <button id="openPresetsFolderBtn" style="display: none; width: 100%; margin-top: 6px" title="Open your presets folder in File Explorer">Open Presets Folder</button>
@@ -1347,8 +1340,8 @@
                      one does lives in its tooltip: the panel is for doing,
                      and three paragraphs of explanation buried the buttons. -->
                 <div class="mp-door-row">
-                    <button id="createRoomBtn" class="mp-btn-primary btn--emphasis" title="A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want.">Start a room</button>
-                    <button id="strangerBtn" class="mp-btn-primary btn--emphasis" title="Swirl with a stranger: pairs you with one other person who is also looking, and you share settings while you paint. When either of you leaves, the swirl ends.">Stranger</button>
+                    <button id="createRoomBtn" class="mp-btn-primary btn--emphasis" title="A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want">Start a room</button>
+                    <button id="strangerBtn" class="mp-btn-primary btn--emphasis" title="Connect to a stranger and share settings.">Stranger</button>
                 </div>
                 <div class="mp-join-row">
                     <input type="text" id="joinRoomInput" placeholder="Paste a code" maxlength="48" spellcheck="false" autocomplete="off" aria-label="Room code to join">
@@ -1357,7 +1350,7 @@
                 <!-- Link to current settings (06e copyLookLink → js/50-look-links.js):
                      no room needed, the link itself carries the look. 54
                      puts Sync phone above it; errors show below both. -->
-                <button type="button" id="shareLookBtn" class="mp-btn-share-look" title="Copies a link to your current settings: fluid, colours, brush, symmetry, light and gravity. It opens Swirl Together with them, in the browser or the desktop app. It shares your settings, not your painting.">Link to current settings</button>
+                <button type="button" id="shareLookBtn" class="mp-btn-share-look" title="Create a shareable link to your current settings ">Link to current settings</button>
                 <div id="mpError" class="mp-error" style="display:none" role="alert"></div>
                 <button id="reconnectBtn" style="display:none; width:100%; margin-top:8px;">Reconnect</button>
             </div>
@@ -1400,7 +1393,7 @@
                         <div class="mp-invite-head">
                             <span class="mp-room-label">Room code</span>
                             <div class="mp-share-modes" role="group" aria-label="How to share this room">
-                                <button type="button" id="shareModeCode" class="mp-share-mode" aria-pressed="true" title="Show the code so you can read it out or type it">Code</button>
+                                <button type="button" id="shareModeCode" class="mp-share-mode" aria-pressed="true" title="Show the code">Code</button>
                                 <button type="button" id="shareModeQr" class="mp-share-mode" aria-pressed="false" title="Show a QR code someone can scan with a phone camera to join">QR</button>
                                 <button type="button" id="shareModeHidden" class="mp-share-mode" aria-pressed="false" title="Hide the code, so it is safe to show on a stream or a shared screen">Hide</button>
                             </div>
@@ -1437,12 +1430,12 @@
         <button onclick="toggleFreeze()" id="freezeBtn" style="width: 100%; margin-top: 10px">Stop</button>
         <button id="jellyfishBtn" style="width: 100%; margin-top: 10px">
             <div style="font-size: 1.1em; margin-bottom: 2px;">Jellyfish</div>
-            <div style="font-size: 0.7em; opacity: 0.7;">Left: Single | Right: Swarm</div>
+            <div style="font-size: 0.7em; opacity: 0.7;"></div>
         </button>
         <button onclick="playPortraitAnimation()" style="width: 100%; margin-top: 10px;">Portrait</button>
         <button id="portalBtn" style="width: 100%; margin-top: 10px">
             <div style="font-size: 1.1em; margin-bottom: 2px;">Portal</div>
-            <div style="font-size: 0.7em; opacity: 0.7;">Left: Swoop | Right: Expand</div>
+            <div style="font-size: 0.7em; opacity: 0.7;"></div>
         </button>
         <button id="chimeraBtn" onclick="playChimeraAnimation()" style="width: 100%; margin-top: 10px">
             <div style="font-size: 1.1em; margin-bottom: 2px;">Chimera</div>
@@ -1508,9 +1501,8 @@
             <div style="font-size: 11px;">Hover to view stacked PNGs</div>
         </div>
         <!-- The record strip: 20 mounts it at the top of Animations; 03 runs it.
-             It replaced Recording Mode Off / Minimized / Full (2026-10-04).
-             #recMode stays, hidden, for 28, 12 and the Audio tab; the strip
-             writes it ('min' = editor closed, 'full' = editor open). -->
+             It replaced Recording Mode Off / Minimized / Full (2026-10-04),
+             and the animation editor behind Edit went 2026-10-13. -->
         <div id="recMini" class="rec-strip" data-group="expressive">
             <div class="rec-strip-row rec-strip-transport">
                 <button type="button" id="recMiniRecordBtn" class="btn--record" title="Record what you paint, after a 3-2-1 countdown (F9). Shift+F9 starts at once.">Record</button>
@@ -1518,7 +1510,7 @@
                 <button type="button" id="recMiniStopBtn" title="Stop recording and playback (Esc)">Stop</button>
             </div>
             <div class="rec-strip-row rec-strip-length">
-                <span id="recMiniTime" class="rec-strip-time" title="How far it is, and how long it runs">0:00 / 0:08</span>
+                <span id="recMiniTime" class="rec-strip-time" title="">0:00 / 0:08</span>
                 <div class="rec-strip-chips btn-sm" role="group" aria-label="Length">
                     <button type="button" id="recLen4" title="Record up to 4 seconds">4 s</button>
                     <button type="button" id="recLen8" title="Record up to 8 seconds">8 s</button>
@@ -1526,197 +1518,143 @@
                     <button type="button" id="recLen30" title="Record up to 30 seconds">30 s</button>
                 </div>
             </div>
+            <div class="rec-strip-row rec-strip-source">
+                <span class="rec-strip-label">Records</span>
+                <div class="rec-strip-chips btn-sm" role="group" aria-label="What a take records">
+                    <button type="button" id="recSrcMe" title="Your brush only">Local Only</button>
+                    <button type="button" id="recSrcAll" title="Record your brush and anyone you're in a room with.">Everything</button>
+                </div>
+            </div>
             <div id="recKeepRow" class="rec-strip-row rec-strip-keep" style="display: none;">
                 <span class="rec-strip-ask">Keep what you painted?</span>
                 <button type="button" id="recKeepBtn" class="btn--emphasis" title="Save it as an animation, in the first empty slot">Keep</button>
-                <button type="button" id="recDiscardBtn" class="btn--destructive" title="Throw away what you just recorded">Discard</button>
+                <button type="button" id="recDiscardBtn" class="btn--destructive" title="Discard the temporary recording">Discard</button>
             </div>
             <div class="rec-strip-row rec-strip-foot">
                 <span id="recStripStatus" class="rec-strip-status" aria-live="polite"></span>
-                <button type="button" id="recOpenFullBtn" class="btn--sm" title="Open the animation editor: parts, speed, colours and saving">Edit ⤢</button>
             </div>
-            <select id="recMode" style="display: none;" aria-hidden="true" tabindex="-1">
-                <option value="min" selected>Strip</option>
-                <option value="full">Editor</option>
-            </select>
         </div>
         <div class="control-group" style="margin-top: 20px">
             <label>Layers</label>
             <div class="layers-panel" id="layersPanel"></div>
         </div>
     </div>
-    <!-- Animation editor drawer (full-width), shared with Audio -->
-    <div id="recDrawer" class="rec-drawer studio-drawer" data-group="expressive" data-active-tab="record">
+    <!-- The Audio drawer (full-width), 28 runs it. It had an Animation tab
+         too until the animation editor went (2026-10-13); the ids kept
+         their rec names. -->
+    <div id="recDrawer" class="rec-drawer studio-drawer" data-group="expressive" data-active-tab="audio">
         <div id="recResizeHandle" class="rec-resize-handle"><div class="rec-grabber"></div></div>
         <div class="studio-tabbar">
             <div class="studio-tabs">
-                <button type="button" class="studio-tab active" data-tab="record">Animation</button>
-                <button type="button" class="studio-tab" data-tab="audio">Audio</button>
+                <button type="button" class="studio-tab active" data-tab="audio">Audio</button>
             </div>
             <button id="studioCloseBtn" class="rec-close" title="Close">✕</button>
         </div>
-        <div class="studio-tab-panel active" data-tab="record">
-        <div class="rec-header">
-            <div class="rec-left">
-                <strong>Parts</strong>
-                <span id="recStatus" style="font-size:12px; opacity:0.7; margin-left:8px;">Ready</span>
-            </div>
-            <div class="rec-right">
-                <label for="recPlaybackSpeed" style="font-size:12px; opacity:0.8;" title="How fast the parts play here in the editor. Saved animations in the slots play at their own pace.">Preview speed</label>
-                <select id="recPlaybackSpeed">
-                    <option value="0.25">0.25x</option>
-                    <option value="0.5">0.5x</option>
-                    <option value="1" selected>1x</option>
-                    <option value="2">2x</option>
-                    <option value="4">4x</option>
-                </select>
-                <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;" title="How long the next part records for. The strip's 4, 8, 15 and 30 s chips set it too.">Record length</label>
-                <input type="text" id="recMaxDuration" class="time-input" value="00:08:000" placeholder="mm:ss:ms" style="width:110px;">
-            </div>
-        </div>
-        <!-- Play · Edit · File (2026-10-04). What acts on one part sits on its
-             card instead: ▶ plays it alone, ⋯ holds Duplicate, Clear, Delete,
-             Loop length and Colours (03 recRenderUI / recOpenPartMenu). Opening
-             a saved animation is the library's ⤢ in Animations. -->
-        <div class="rec-header rec-toolbar">
-            <div class="rec-group" role="group" aria-label="Play">
-                <button type="button" class="btn--record" id="recRecordBtn" title="Record a new part, after a 3-2-1 countdown (F9)">Record</button>
-                <button type="button" id="recPlayAllBtn" title="Play / pause every part together (Shift+F8)">Play all</button>
-                <button type="button" id="recStopBtn" title="Stop recording and playback (Esc)">Stop</button>
-            </div>
-            <div class="rec-group" role="group" aria-label="Edit">
-                <button type="button" id="recAddLayerBtn" title="Add an empty part (Ctrl+Shift+N)">+ New part</button>
-            </div>
-            <div class="rec-group rec-group-file" role="group" aria-label="File">
-                <input type="text" id="recAnimName" class="rec-anim-name" maxlength="60" placeholder="Animation 1" aria-label="Animation name" title="This animation's name. Save keeps it under this name.">
-                <button type="button" id="recSaveBtn" title="Save this animation under the name beside it">Save</button>
-                <button type="button" id="recSavePresetBtn" title="Save these parts as a new animation, leaving the one you opened as it was">Save as new</button>
-                <button type="button" id="recFileBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="recFileMenu" title="Open a file, save to a file, or start empty">File ▾</button>
-                <input type="file" id="recImportFile" accept=".json" style="display:none;" />
-            </div>
-        </div>
-        <div id="recFileMenu" class="brush-shape-menu rec-menu" role="menu" aria-label="File" data-group="expressive" hidden>
-            <button type="button" id="recImportBtn" class="btn--ghost rec-menu-item" role="menuitem" title="Open parts from a file. They replace the parts here.">Open file…</button>
-            <button type="button" id="recExportBtn" class="btn--ghost rec-menu-item" role="menuitem" title="Save these parts to a file">Save to file…</button>
-            <button type="button" id="recStartEmptyBtn" class="btn--ghost rec-menu-item" role="menuitem" title="Clear the editor for a new animation. Saved animations stay as they are.">Start empty</button>
-        </div>
-        <div class="rec-timeline-wrap">
-            <canvas id="recTimelineCanvas" class="rec-timeline"></canvas>
-            <div id="recPlayhead" class="rec-playhead" style="left:0;"></div>
-            <div id="recRecordhead" class="rec-recordhead" style="left:0;"></div>
-        </div>
-        <div class="rec-body">
-            <div id="recLayersList" class="layers-panel"></div>
-        </div>
-        </div><!-- /studio-tab-panel record -->
-        <div class="studio-tab-panel" data-tab="audio" id="audioDrawerPanel"></div>
+        <div class="studio-tab-panel active" data-tab="audio" id="audioDrawerPanel"></div>
     </div>
     <div id="hotkeyOverlay">
         <div class="hotkey-modal">
             <div class="hotkey-header">
                 <h2>Hotkeys</h2>
-                <button class="close-btn" id="hotkeyClose">×</button>
+                <button type="button" class="close-btn" id="hotkeyClose" aria-label="Close">×</button>
             </div>
             <div class="hotkey-body">
                 <div>
                     <h3>Simulation</h3>
                     <ul>
-                        <li>Space — Stop / Unstop Fluid (Freeze)</li>
-                        <li>Shift+Space — Pause / Resume Simulation</li>
+                        <li>Space: Freeze / Unfreeze Fluid</li>
+                        <li>Shift+Space: Pause/Resume Sim </li>
                     </ul>
                 </div>
                 <div>
                     <h3>Animations</h3>
                     <ul>
-                        <li>F8 — Play / Pause Part</li>
-                        <li>Shift+F8 — Play / Pause Every Part</li>
-                        <li>F9 — Record (3-2-1 countdown)</li>
-                        <li>Shift+F9 — Record Immediately</li>
-                        <li>Esc — Stop Recording and Playback</li>
-                        <li>↑ / ↓ — Previous / Next Part (editor open)</li>
-                        <li>Delete — Clear Part (editor open)</li>
-                        <li>Ctrl+Shift+N — New Part (editor open)</li>
+                        <li>F8 - Play / Pause</li>
+                        <li>F9 - Record (start countdown)</li>
+                        <li>Shift+F9 - Start Recording</li>
+                        <li>Esc - Stop Recording / Playback</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Undo/Redo</h3>
                     <ul>
-                        <li>Ctrl+Z — Undo</li>
-                        <li>Ctrl+Y / Ctrl+Shift+Z — Redo</li>
+                        <li>Ctrl+Z - Undo</li>
+                        <li>Ctrl+Y / Ctrl+Shift+Z - Redo</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Canvas/Display</h3>
                     <ul>
-                        <li>C — Toggle Cursor</li>
-                        <li>Ctrl+V — Paste Image as a New Layer</li>
-                        <li>Ctrl+Shift+V — Paste Image as a Hidden Collider</li>
-                        <li>H — Toggle Border & Handles</li>
-                        <li>L — Lock/Unlock Borders</li>
-                        <li>F — Focus Mode</li>
-                        <li>K — Kaleidoscope On / Off (unless one of your hotkeys uses K)</li>
+                        <li>C - Toggle Cursor Visibility</li>
+                        <li>Ctrl+V - Paste Image as a New Layer</li>
+                        <li>Ctrl+Shift+V - Paste Image as a Collider layer</li>
+                        <li>H - Toggle Border & Handles</li>
+                        <li>L - Toggle Border lock</li>
+                        <li>F - Remove all UI "Focus Mode"</li>
+                        <li>K - Kaleidoscope On / Off</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Export & Mutation</h3>
                     <ul>
-                        <li>E — Radial Menu at the pointer: drag a slider, or hover it and scroll</li>
-                        <li>M — Mutate Settings</li>
-                        <li>Right Shift+Enter — Visible to layer</li>
+                        <li>E - Open Radial Menu</li>
+                        <li>M - Mutate Settings</li>
+                        <li>Right Shift+Enter - all visible to new layer</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Brush</h3>
                     <ul>
-                        <li>Tab — Fluid → Pressure → Collider (Shift+Tab goes back)</li>
-                        <li>[ / ] — Brush Size − / + (Shift: three steps)</li>
-                        <li>Shift+[ / Shift+] — Coarse − / +</li>
-                        <li>Scroll — Brush Size − / +</li>
-                        <li>Hold right-click (Replay) — the left button still works the menus</li>
-                        <li>Middle-click — Radial Menu (each button's job: Stroke and replay)</li>
-                        <li>Shift+Scroll — Rotate Brush (angle)</li>
+                        <li>~ - cycles between Fluid → Pressure → Collider</li>
+                        <li>[ / ] - Brush Size − / +</li>
+                        <li>Scroll - Brush Size up / down</li>
+                        <li>Hold right-click (Replay)</li>
+                        <li>Middle-click - Radial Menu</li>
+                        <li>Shift+Scroll - Rotate Brush Angle</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Colors & Palettes</h3>
                     <ul>
-                        <li>R — Toggle Random Colors</li>
-                        <li>A — Toggle Palette Mode (new colour each stroke)</li>
-                        <li>Ctrl+← / Ctrl+→ or N / Shift+N — Previous / Next Palette Color</li>
-                        <li>Alt+click the canvas — Pick a colour from it</li>
-                        <li>Shift+S — Add the brush colour to the palette</li>
-                        <li>Shift+X — Remove the brush colour from the palette</li>
-                        <li>Ctrl+Shift+← / Ctrl+Shift+→ — Previous / Next Palette</li>
+                        <li>R - Toggle Random Color</li>
+                        <li>P - Toggle Palette Mode (steps through palette color each stroke)</li>
+                        <li>Ctrl+← / Ctrl+→ (or N) - Previous / Next Palette Color</li>
+                        <li>Alt+click - Color Dropper picks from canvas</li>
+                        <li>Shift+S - Add the brush color to the palette</li>
+                        <li>Shift+X - Removes the current color from the palette</li>
+                        <li>Ctrl+Shift+← / Ctrl+Shift+→ - Previous / Next Palette</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Resolution</h3>
                     <ul>
-                        <li>Alt+↑ / Alt+↓ — Image Sharpness + / −</li>
-                        <li>Alt+Shift+↑ / Alt+Shift+↓ — Motion Detail + / −</li>
+                        <li>Alt+↑ / Alt+↓ - Image Sharpness raise/lower</li>
+                        <li>Alt+Shift+↑ / Alt+Shift+↓ - Motion Detail raise/lower</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Physics</h3>
                     <ul>
-                        <li>Ctrl+Scroll — Density − / +</li>
-                        <li>Ctrl+Shift+Scroll — Motion Isolation (Velocity Influence) − / +</li>
+                        <li>Ctrl+Scroll - Density Raise/Lower</li>
+                        <li>Ctrl+Shift+Scroll - Motion Isolation (Velocity Influence) Raise/Lower</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Multiplier</h3>
                     <ul>
-                        <li>1..8 — Set Multiplier to 1x..8x</li>
-                        <li>Numpad 1..8 — Set Multiplier to 1x..8x</li>
+                        <li>1-8 - Set multibrush to 1-8</li>
+                        <li>Numpad 1-8 - Set multibrush to 1-8</li>
                     </ul>
                 </div>
                 <div>
                     <h3>Help</h3>
                     <ul>
-                        <li>F1 or ? — Toggle Hotkeys</li>
-                        <li>Ctrl+Shift+H — Put Any Button or Slider on a Key</li>
-                        <li>Slider's Key, then Scroll — Fine-Tune That Slider</li>
-                        <li>Esc — Close / Stop All</li>
+                        <li>F1 or ? - Toggle Hotkeys</li>
+                        <li>Tab - Move focus to a sidebar or nav bar</li>
+                        <li>Ctrl+Shift+Tab - Bring the focus menu back</li>
+                        <li>Ctrl+Shift+H - Put Any Button or Slider on a Key</li>
+                        <li>Slider's Key, then Scroll - Fine-Tune That Slider</li>
+                        <li>Esc - Close / Stop All</li>
                     </ul>
                 </div>
             </div>
@@ -1726,14 +1664,16 @@
                     <a href="https://github.com/PavelDoGreat/WebGL-Fluid-Simulation" target="_blank" rel="noopener">Pavel Dobryakov</a> (MIT),
                     <a href="https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu" target="_blank" rel="noopener">Mark Harris</a> (GPU Gems ch. 38),
                     <a href="https://github.com/mharrys/fluids-2d" target="_blank" rel="noopener">Mattias Harrysson</a> (fluids-2d) and
-                    <a href="https://github.com/haxiomic/GPU-Fluid-Experiments" target="_blank" rel="noopener">George Corney</a> (GPU-Fluid-Experiments)
-                    · AI imports: Transformers.js (Apache-2.0) · Built on Electron</span>
+                    <a href="https://github.com/haxiomic/GPU-Fluid-Experiments" target="_blank" rel="noopener">George Corney</a> </span>
             </div>
         </div>
     </div>
     <!-- Dependency-free QR encoder; the Swirl Together room panel renders
          through it, so it loads before the multiplayer UI. -->
     <script src="js/39-qrcode.js"></script>
+    <!-- Dialogs hold the keyboard: focus in, Tab kept inside, focus back on
+         close, and the "is a dialog up?" every app-wide hotkey asks first. -->
+    <script src="js/00b-dialog-focus.js"></script>
     <script src="js/00-window-controls.js"></script>
     <script src="js/01-config.js"></script>
     <script src="js/01a-param-registry.js"></script>
@@ -1856,7 +1796,6 @@
     <script type="module" src="js/16-sam-integration.js"></script>
     <!-- Depth Collision (shares Transformers.js with SAM) -->
     <script type="module" src="js/23-depth-collision.js"></script>
-    <script src="js/electron-performance.js"></script>
     <script src="js/21-focus-mode.js"></script>
     <script src="js/22-audio-reactive.js"></script>
     <script src="js/23-text-overlays.js"></script>
@@ -1911,14 +1850,14 @@
          loads after 20-mixer-layout. -->
     <script src="js/43-ui-visibility.js"></script>
     <!-- Narrow monitors: the top bar's faders park, from the right, into a
-         "More ▾" cell when the window can't fit them all; Color, Transport,
-         Presets and Help never move. Works on the built strip and hands 43
+         "More ▾" cell when the window can't fit them all; Color, Transport
+         and Presets never move. Works on the built strip and hands 43
          its cell list, so it loads after both. -->
     <script src="js/46-strip-more.js"></script>
-    <!-- "How do I…": the recipe / solution modal — searchable tasks that reveal
-         and point at the control that does them. Reveals through 43, so it
-         loads after it. -->
-    <script src="js/44-recipes.js"></script>
+    <!-- js/44-recipes.js ("How do I…") is parked 2026-10-14: not loaded, so
+         it has no ? cell and no '/' key. To bring it back, load it here
+         (after 43, it reveals through it) and restore 20's buildHelpChannel
+         and its .mixer-help CSS from git. -->
     <!-- Breathing effect (Effects → Breathing): a guided breath the canvas
          follows. Binds its controls by id after 20 has placed them. -->
     <script src="js/45-breathing.js"></script>
@@ -1932,10 +1871,18 @@
          on it too (49's bind mode, 48's press). Its list lives in Settings
          under 49's Hotkeys block, so it loads after both. -->
     <script src="js/58-radial-menu.js"></script>
-    <!-- Tab steps the brush through Fluid, Pressure and Collider (Shift+Tab
-         back): the brush drawer's Paint Into row, with the drawer shut.
-         Calls window.BrushType, which 20 builds with the drawer. -->
+    <!-- ~ steps the brush through Fluid, Pressure and Collider: the brush
+         drawer's Paint Into row, with the drawer shut. Calls
+         window.BrushType, which 20 builds with the drawer. -->
     <script src="js/59-brush-type-key.js"></script>
+    <!-- The skip menu: Tab with nothing focused (Ctrl+Shift+Tab from
+         anywhere in the desktop app) opens the four places at the top left
+         and moves focus into the one picked. Tab was 59's brush key until
+         2026-10-15. -->
+    <script src="js/66-skip-menu.js"></script>
+    <!-- Arrow keys on a slider move at least 1% of its travel, Shift+arrow
+         10% (the step attributes stay fine for the mouse). -->
+    <script src="js/67-slider-keys.js"></script>
     <!-- "Try this look" links: ?look=opal opens the app with a curated look
          applied, on top of the saved session and never written into it;
          Copy link to this look lives in the Presets popup. -->

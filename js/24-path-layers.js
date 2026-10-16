@@ -250,7 +250,7 @@
     function flashPathCapHint(id) {
         const info = document.querySelector(`.path-layer-item[data-id="${id}"] .path-layer-info`);
         if (!info) return;
-        info.textContent = `Max ${MAX_PATHS} paths — Clear paths to add more`;
+        info.textContent = `Max ${MAX_PATHS} paths - Clear paths to add more`;
         info.style.color = '#ffb74d';
         setTimeout(renderPathLayersUI, 1600);
     }
@@ -861,6 +861,7 @@
 
     // ── Delete confirmation modal (app-styled, reuses .delete-modal theme) ──
     let _deleteResolve = null;
+    let _deleteHold = null;   // 00b: focus on Cancel, Tab kept inside, focus back
 
     function ensureDeleteModal() {
         let modal = document.getElementById('pathDeleteModal');
@@ -882,6 +883,7 @@
 
         const close = (result) => {
             modal.classList.remove('show');
+            if (_deleteHold) { _deleteHold.release(); _deleteHold = null; }
             if (_deleteResolve) { _deleteResolve(result); _deleteResolve = null; }
         };
         modal.querySelector('#pathDeleteCancel').addEventListener('click', () => close(false));
@@ -889,7 +891,7 @@
         // Backdrop click cancels
         modal.addEventListener('click', (e) => { if (e.target === modal) close(false); });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('show')) close(false);
+            if (e.key === 'Escape' && modal.classList.contains('show') && window.DialogFocus.top() === modal) close(false);
         });
         return modal;
     }
@@ -899,6 +901,7 @@
         const msg = modal.querySelector('#pathDeleteModalMessage');
         if (msg) msg.textContent = `Are you sure you want to delete "${name}"? This cannot be undone.`;
         modal.classList.add('show');
+        _deleteHold = window.DialogFocus.hold(modal, { initial: modal.querySelector('#pathDeleteCancel') });
         return new Promise((resolve) => { _deleteResolve = resolve; });
     }
 
@@ -954,7 +957,7 @@
                 statusEl.textContent = msg;
                 statusEl.style.color = '#ffb74d';
             } else {
-                statusEl.textContent = `Draw your paths on the canvas — ${layer.paths.length}/${MAX_PATHS} paths`;
+                statusEl.textContent = `Draw your paths on the canvas - ${layer.paths.length}/${MAX_PATHS} paths`;
                 statusEl.style.color = '';
             }
         };
@@ -994,7 +997,7 @@
             e.preventDefault();
             const pos = getPos(e);
             if (!startDrawing(pos.x, pos.y)) {
-                updateStatus(`Max ${MAX_PATHS} paths — Clear paths to draw more`);
+                updateStatus(`Max ${MAX_PATHS} paths - Clear paths to draw more`);
                 return;
             }
             drawCtx.strokeStyle = 'rgba(100, 200, 255, 0.9)';
@@ -1245,9 +1248,12 @@
         const onResize = () => { sizeCanvas(); draw(); };
         window.addEventListener('resize', onResize);
 
+        // Enter = Done, except on its own focused button, which presses
+        // itself (Enter on Cancel used to keep the edit instead).
+        const onOwnButton = () => { const a = document.activeElement; return !!(a && a.tagName === 'BUTTON' && transformOverlay && transformOverlay.contains(a)); };
         const onKey = (e) => {
             if (e.key === 'Escape') { cancel(); }
-            else if (e.key === 'Enter') { done(); }
+            else if (e.key === 'Enter' && !onOwnButton()) { e.preventDefault(); done(); }
         };
         document.addEventListener('keydown', onKey);
 

@@ -2,8 +2,8 @@
 // js/01a-param-registry.js — single source of truth for UI parameters
 // LOAD ORDER: after 01-config.js, before everything that reads params
 // PROVIDES: window.ParamRegistry
-// CONSUMERS: 12-save-load.js (clamping on preset apply), 04-ui-interactions.js
-//   (clampConfigObject in applyPreset), 05-fluid-sim.js (toSliderConfig),
+// CONSUMERS: 12-save-load.js (clamping on preset apply), 04b-presets.js
+//   (clampConfigObject in applyPreset), 05h-slider-bindings.js (toSliderConfig),
 //   25-mutation-engine.js (toMutationSchemas)
 //
 // Data is keyed by DOM control id (the universal join key across
@@ -32,7 +32,7 @@
         // 1.0333) and the field winds up until the clamp bends it into false
         // gradients. hard.max also clamps old presets that saved more.
         pressureDissipation: {configKey: "PRESSURE_DISSIPATION", ui: {min: 0.9, max: 1, step: 0.001}, hard: {min: 0.75, max: 1}, def: 0.95, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1, step: 0.001, scope: "basic"}},
-        pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 47, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
+        pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 25, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
         // Multigrid V-cycle internals — deliberately no `mut`: the mutation
         // engine randomizing solver shape reads as a bug, not a style variant
         mgCycles: {configKey: "MG_CYCLES", ui: {min: 2, max: 4, step: 1}, hard: {min: 2, max: 4}, def: 2, decimals: 0, category: "simulation", perfTier: 3},
@@ -54,7 +54,9 @@
         breathStrength: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "effects", perfTier: 0, simSlider: false},
         velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 0, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
-        velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
+        // velocityCap (Max Speed) REMOVED 2026-10-14: VELOCITY_CAP stays 30 as
+        // a fixed safety limit (04a). Without an entry here, saves, presets,
+        // look links, rooms and Mutate can no longer move it.
         // Grain Cleanup (2026-09-18): the M2 dye spectral floor, HF_FLOOR_DYE
         // (05b advection). Lower keeps the stir's fine grain, the veined look;
         // 0.85 is the shader's own per-frame cap. No `mut`: the floor exists
@@ -88,9 +90,14 @@
         // Detail work (mandala tracery, fine linework) needs far finer tips
         // than the old 0.1 floor allowed: the splat radius is variance-like,
         // so footprint scales with sqrt(size) — 0.1 still painted a ~31px dab
-        // on a 900px canvas. 0.001 reaches ~3px. Step matches the min so every
-        // previously-saved value (11, 3, 0.1 …) stays on-step and survives a
-        // preset round-trip. Mutation keeps the old 0.1 floor — mutating to a
+        // on a 900px canvas. 0.001 reaches ~3px. Floor 0.001 -> 0.00017
+        // (2026-10-11, Gabriel: "2.4 px as a min is odd, aim for 1"): the
+        // readout's e^-1 diameter, 2·√(size/1000)·canvas height, is 1.0 px on
+        // a 1200 px tall canvas. Below half a texel splatFrag widens the dab
+        // and thins it to the same paint (dyeRadiusFloor), so the bottom of
+        // the range paints fainter, not dotted. Step 0.00001 keeps every
+        // previously-saved value (11, 3, 0.1, 0.0035 …) on-step and puts the
+        // [ ] ladder's 0.00025-style rungs on the grid. Mutation keeps the old 0.1 floor — mutating to a
         // hairline would just look like the brush stopped working.
         // Ceiling raised 30 -> 100 (2026-08-16): 30 capped the dab at ~35% of
         // canvas height, too small for a full-canvas gesture; 100 reaches ~63%.
@@ -100,7 +107,7 @@
         // hard.max/1000, and wheel-zoom, row-drag, the printed scale and brush
         // presets all read the live attrs. Mutation keeps the old 30 ceiling — a
         // random jump to a canvas-swallowing brush is not a style.
-        brushSize: {configKey: null, ui: {min: 0.001, max: 100, step: 0.0001}, hard: {min: 0.001, max: 100}, def: 1.3, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended", log: true}},
+        brushSize: {configKey: null, ui: {min: 0.00017, max: 100, step: 0.00001}, hard: {min: 0.00017, max: 100}, def: 1, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended", log: true}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
         // No mut (Gabriel 2026-08-06): a mutated timeScale can slow the whole
         // sim to near-frozen, which reads as "mutate broke it", not a style.
@@ -204,7 +211,6 @@
         // mode you choose, not a variation to be dealt.
         breathingToggle: {def: false, mutScope: null},
         breathCueToggle: {def: true, mutScope: null},
-        breathFadeToggle: {def: true, mutScope: null},
         scatterToggle: {def: false, mutScope: "extended"},
         // Colliders block light. mutScope null: with no collision layer it is a
         // no-op, so mutating it would spend a variation slot on nothing.
@@ -244,7 +250,7 @@
     };
     var SELECTS = {
         visualResolution: {options: ["4096", "2048", "1536", "1024", "512", "256"], def: "2048", mut: null},
-        physicsResolution: {options: ["2048", "1536", "1024", "512", "384", "256", "192", "128", "64", "32"], def: "512", mut: null},
+        physicsResolution: {options: ["2048", "1536", "1024", "512", "384", "256", "192", "128", "64", "32"], def: "2048", mut: null},
         // Shading Detail (SHADE_FORM_RESOLUTION). A LOOK param, not a machine
         // one: unlike the two resolutions above it stays out of 12's
         // BASELINE_SKIP and 50's link SKIP, so look links carry it and a
@@ -271,9 +277,6 @@
         breathPattern: {options: ["relaxed", "box", "478"], def: "relaxed", mut: null},
         breathColorMode: {options: ["same", "cycle", "breath"], def: "same", mut: null},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
-        // Off went 2026-10-04 (the record strip): a saved 'off' coerces to the strip.
-        recMode: {options: ["min", "full"], def: "min", mut: null},
-        recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},
         // 'ferro' removed 2026-08-16 — dropping it from options is what makes
         // a saved/mirrored audioMode:'ferro' coerce to the default instead of
         // selecting a scene that no longer exists.
@@ -387,7 +390,7 @@
         return out;
     }
 
-    // Exact shape 05-fluid-sim.js expects for its sliderConfig
+    // Exact shape 05h-slider-bindings.js expects for its sliderConfig
     function toSliderConfig() {
         var out = {};
         Object.keys(SLIDERS).forEach(function (id) {

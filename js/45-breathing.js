@@ -22,13 +22,10 @@
 // alone: the walls, and the paint's travel with them, keep the pattern's
 // time whatever it is set to. Color says when the paint takes a new
 // colour: the brush colour every breath, or a step around the wheel from
-// it each cycle or each breath in and out. Fades runs the dye at a rate
-// of Breathing's own while the breath runs (window.__dyeSustainOverride,
-// read by 05j): on, a breath's paint is a quarter by the next cycle,
-// whatever Density Sustain says; off, nothing fades. The slider is
-// untouched either way. A word under the rings keeps time. Nothing is
-// written to config; the controls are registry-backed and read live, so
-// presets carry them.
+// it each cycle or each breath in and out. The paint fades at Density
+// Sustain's rate like any other paint; Breathing never sets the dye
+// rate. A word under the rings keeps time. Nothing is written to config;
+// the controls are registry-backed and read live, so presets carry them.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -52,7 +49,6 @@
     const FILL_OUT = 0.5;                  // the exhale's share of it, so the ring is never empty
     const GATE_FILL_K = 1.6;               // Gate converges (1 − e^−fill); ask for more to land near the same tone
     const HUE_STEP = 40;                   // degrees around the wheel per colour change (Color: each cycle / each breath)
-    const FADE_HALF_LIFE = 0.5;            // Fades on: a breath's paint halves every this much of a cycle (a quarter is left by the next)
     // WALL STRENGTH — the collider collapse (measured 2026-09-02, pane sim
     // 167×256): a MOVING wall at coverage ≥ 0.5 with any tangential velocity
     // beside it (swirl 1 was enough) drives the whole velocity field to the
@@ -78,23 +74,6 @@
     // Swirl strength (the breathStrength slider): scales the swirl only, never the push.
     function swirlStrength() { const s = $('breathStrength'); const v = s ? parseFloat(s.value) : 0.5; return isFinite(v) ? v : 0.5; }
     function cueWanted() { const c = $('breathCueToggle'); return c ? c.checked : true; }
-    function fadesWanted() { const c = $('breathFadeToggle'); return c ? c.checked : true; }
-    // The dye rate Fades asks 05j for while the breath runs (a per-frame
-    // sustain at the 60 fps reference, like the slider's): on, a half-life
-    // of FADE_HALF_LIFE cycles, so the look is the same at every pattern;
-    // off, 1.0 or the slider's own growth, so nothing fades. Kept in step
-    // every tick and on start/stop, so a preset flipping the box or the
-    // pattern behind our back is honoured too; never written to config.
-    function fadeRate() {
-        const p = pattern();
-        const cycle = Math.max(1, p.in + p.holdIn + p.out + p.holdOut);
-        return Math.pow(0.5, 1 / (cycle * FADE_HALF_LIFE * 60));
-    }
-    function syncFade() {
-        if (!on) { window.__dyeSustainOverride = null; return; }
-        const slider = (window.config && typeof window.config.DENSITY_DISSIPATION === 'number') ? window.config.DENSITY_DISSIPATION : 1;
-        window.__dyeSustainOverride = fadesWanted() ? fadeRate() : Math.max(1, slider);
-    }
     function colorMode() { const s = $('breathColorMode'); const v = s && s.value; return (v === 'cycle' || v === 'breath') ? v : 'same'; }
     function paused() { const b = $('pauseBtn'); return !!(b && (b.classList.contains('active') || b.textContent.trim() === '▶')); }
     function pickerColor() {
@@ -217,7 +196,6 @@
                 if (window.collisionLayers && !window.collisionLayers.enabled) { wallsOn = false; walls(true); }
             }
         }
-        syncFade();
         curFrac = radiusFrac(ph);
         const canvas = $('canvas');
         const live = !!(canvas && typeof window.applyRingSplat === 'function'
@@ -305,7 +283,6 @@
         t0 = performance.now();
         lastPhase = ''; lastR = null; lastSerial = -1; curFrac = 0; colorChanges = 0;
         walls(true);
-        syncFade();
         raf = requestAnimationFrame(tick);
     }
     function stop() {
@@ -314,7 +291,6 @@
         raf = 0;
         cueHide();
         walls(false);
-        syncFade();
     }
     // Jump to `sec` seconds into the cycle (previews, tests).
     function seek(sec) { if (on && isFinite(sec)) { t0 = performance.now() - sec * 1000; lastR = null; } }
@@ -340,8 +316,6 @@
         // Pattern change restarts the cycle so the cue matches the first phase.
         const pat = $('breathPattern');
         if (pat) pat.addEventListener('change', () => { if (on) { t0 = performance.now(); lastPhase = ''; lastR = null; } });
-        const fade = $('breathFadeToggle');
-        if (fade) fade.addEventListener('change', syncFade);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
     else wire();

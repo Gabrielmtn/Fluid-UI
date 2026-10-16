@@ -248,6 +248,7 @@
         if (window.__isTypingTarget ? window.__isTypingTarget(t)
             : (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable))) return;
         if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (window.DialogFocus.hasKeyboard()) return;   // a dialog has the keyboard (00b)
         // Z alone — 'Z' is Caps Lock, not Shift. Shift+Z was a silent copy
         // of Z; it is left free for the hotkeys people bind (js/48-hotkeys.js).
         if ((e.key === 'z' || e.key === 'Z') && !e.shiftKey) { e.preventDefault(); setZoomMode(!zoomMode); }

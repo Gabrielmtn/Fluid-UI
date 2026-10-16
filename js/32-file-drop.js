@@ -184,7 +184,7 @@
     function colliderize(layer) {
         var cl = window.collisionLayers;
         if (!cl || typeof cl.createFromLayerMask !== 'function') {
-            flash('Colliders unavailable — pasted as a plain layer');
+            flash('Colliders unavailable - pasted as a plain layer');
             recordCreate([layer.index], 'paste layer');
             return;
         }
@@ -252,7 +252,7 @@
         flashTimer = setTimeout(function () { flashEl.style.display = 'none'; }, ms || 1400);
     }
 
-    var NO_IMAGE = 'Nothing to paste — copy an image first';
+    var NO_IMAGE = 'Nothing to paste - copy an image first';
 
     var pasteSeq = 0; // bumped by every real paste event (see the watchdog)
 

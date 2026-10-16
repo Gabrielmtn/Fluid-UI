@@ -284,7 +284,7 @@ async function openPopup(env) {
         await click('#guidesMenu input[data-guide="kaleido"]');
         const k5 = await pop.eval("({ disp: document.getElementById('guide-kaleido').style.display, btn: document.getElementById('guidesBtn').textContent })");
         const k5m = await main.eval("({ disp: document.getElementById('kaleidoGuides').style.display, saved: window.settingsManager.get('display.penWindowGuides', null) })");
-        check('unticking Kaleidoscope hides it here only, button reads "Guides: Stroke locks, Mandala Studio", saved', k5.disp === 'none' && /Guides: Stroke locks, Mandala Studio/.test(k5.btn) && k5m.disp === 'block' && k5m.saved && k5m.saved.kaleido === false, { k5, k5m });
+        check('unticking Kaleidoscope hides it here only, button reads "Guides: Stroke locks, Mandala Overlay", saved', k5.disp === 'none' && /Guides: Stroke locks, Mandala Overlay/.test(k5.btn) && k5m.disp === 'block' && k5m.saved && k5m.saved.kaleido === false, { k5, k5m });
         await click('#guidesMenu input[data-guide="kaleido"]');
         await click('#guidesBtn');
         await sleep(300);
@@ -301,7 +301,7 @@ async function openPopup(env) {
         await main.eval("(function(){ var t=document.getElementById('mandalaToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await sleep(600);
         const m1 = await pop.eval("(function(){ var s=document.getElementById('guide-mandala'); return { disp: s.style.display, lines: s.querySelectorAll('line').length, paths: s.querySelectorAll('path').length, kaleido: document.getElementById('guide-kaleido').style.display }; })()");
-        check('Mandala Studio on: popout shows its wedge, seams and rings, and the kaleidoscope guide steps aside', m1.disp === 'block' && m1.lines >= 6 && m1.paths >= 2 && m1.kaleido === 'none', m1);
+        check('Mandala Overlay on: popout shows its wedge, seams and rings, and the kaleidoscope guide steps aside', m1.disp === 'block' && m1.lines >= 6 && m1.paths >= 2 && m1.kaleido === 'none', m1);
         // Main Hide Guides does not hide the popout's (its own choice).
         await setMain('mandalaHideGuides', true);
         await sleep(400);
@@ -319,7 +319,7 @@ async function openPopup(env) {
         await click('#guidesMenu input[data-guide="mandala"]');
         const m3 = await pop.eval("({ disp: document.getElementById('guide-mandala').style.display, btn: document.getElementById('guidesBtn').textContent, open: !document.getElementById('guidesMenu').hidden })");
         const saved = await main.eval("window.settingsManager.get('display.penWindowGuides', null)");
-        check('unticking Mandala Studio hides it here, button reads "Guides: Stroke locks, Kaleidoscope", saved', m3.disp === 'none' && /Guides: Stroke locks, Kaleidoscope/.test(m3.btn) && m3.open && saved && saved.mandala === false && saved.strokeLock === true && saved.kaleido === true, { m3, saved });
+        check('unticking Mandala Overlay hides it here, button reads "Guides: Stroke locks, Kaleidoscope", saved', m3.disp === 'none' && /Guides: Stroke locks, Kaleidoscope/.test(m3.btn) && m3.open && saved && saved.mandala === false && saved.strokeLock === true && saved.kaleido === true, { m3, saved });
         // Dismiss by pressing on the surface: no stroke.
         await pop.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy + 40, button: 'left', buttons: 1, clickCount: 1, pointerType: 'pen', force: 0.5 });
         await sleep(60);

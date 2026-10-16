@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/04d-anim-ascend-star.js — part 4/7 of former 04-ui-interactions.js (lines 1319–2102)
+// js/04d-anim-ascend-star.js
 // LOAD ORDER: after 04c-anim-burst.js, before 04e-anim-portal.js
 // PROVIDES: shooting star system + sliders + origin picker (Ascend removed 2026-08-15)
 // REQUIRES: config (04a)

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05k-layers-render.js — part 11/14 of former 05-fluid-sim.js (lines 3490–3897)
+// js/05k-layers-render.js
 // LOAD ORDER: after 05j-update-loop.js, before 05l-layers-transform.js
 // PROVIDES: renderLayers, layer drag&drop handlers, buildEncapsulatedRange, updateLayerZIndices
 // REQUIRES: layers/layerOrder lexical (declared here or earlier)
@@ -237,7 +237,7 @@
                     const w = document.querySelector(`.layer-item[data-layer-index="${layer.index}"] .collider-colour-input`);
                     if (w) w.value = v;
                 };
-                H.push({ label: 'collider colour', undo: () => set(from), redo: () => set(to) });
+                H.push({ label: 'collider color', undo: () => set(from), redo: () => set(to) });
             });
         }
         function renderLayers() {
@@ -334,7 +334,7 @@
                                         <option value="add" ${layer.blendMode === 'add' ? 'selected' : ''}>Add</option>
                                     </select>`)}
                                 <div class="layer-action-row">
-                                    <button type="button" class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer (the brush's 'Paint Into: Sketch' route lands here)">Paint into this layer</button>
+                                    <button type="button" class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer ">Paint into this layer</button>
                                 </div>
                                 <div class="layer-group">
                                     <div class="layer-group-head"><span class="layer-group-title">Mask</span></div>
@@ -383,7 +383,7 @@
                     // It used to be a button that turned blue, sitting among
                     // Edit/Clear as if it were a third verb.
                     const maskOn = !!layer.mask?.enabled;
-                    const maskToggle = `<label class="layer-check" title="${isCol ? (maskOn ? 'Collision ON — uncheck to disable this collider' : 'Collision OFF — check to enable') : (maskOn ? 'Mask on — uncheck to show the whole layer' : 'Mask off — check to apply it')}">
+                    const maskToggle = `<label class="layer-check" title="${isCol ? (maskOn ? 'Collision ON - uncheck to disable this collider' : 'Collision OFF - check to enable') : (maskOn ? 'Mask on - uncheck to show the whole layer' : 'Mask off - check to apply it')}">
                                 <input type="checkbox" class="layer-mask-check" data-layer="${layer.index}"${maskOn ? ' checked' : ''}>
                                 <span class="layer-vis-box"></span>
                                 <span class="layer-check-label">${isCol ? 'Collision' : 'Mask'}</span>
@@ -451,7 +451,7 @@
                                         <option value="slow" ${layer.collisionMode === 'slow' ? 'selected' : ''}>Slow</option>
                                     </select>`, 'What the fluid does when it meets this shape')}
                                 ${sliderRowHTML('layer-row-strength', 'Strength', (layer.collisionStrength || 0.7).toFixed(2),
-                                    'Block / Deflect: how solid the wall is — low values leak flow and take some paint, 1 is rigid. Slow: how thick the syrup is — from a faint drag to stopping dead.')}
+                                    'Block / Deflect: how solid the wall is. Slow: how much the paint is slowed.')}
                                 ${(painted || !depthShape) ? '' : `
                                 ${sliderRowHTML('layer-row-cthresh', 'Threshold', depthShape.threshold || 128)}
                                 ${fieldRowHTML('layer-row-invert', 'Invert', `<label class="layer-vis" title="Swap which side of the threshold is wall"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${depthShape?.invert ? 'checked' : ''}><span class="layer-vis-box"></span></label>`)}
@@ -477,9 +477,9 @@
                         })}
                         <div class="layer-item-body">
                         ${sliderRowHTML('layer-row-opacity', 'Opacity', Math.round(layerOpacityOf(layer) * 100) + '%',
-                            isCol ? 'How strongly the colour shows: a tint over what is under the wall, or at 100% exactly the colour picked' : '')}
-                        ${isCol ? fieldRowHTML('layer-row-colour', 'Colour', `<input type="color" class="collider-colour-input text-swatch" value="${colliderColourOf(layer)}" aria-label="Collider colour" title="The colour this wall is drawn in on the canvas">`,
-                            'The colour this wall is drawn in on the canvas. Looks only: the fluid behaves the same.') : ''}
+                            isCol ? 'How strongly the color shows ' : '')}
+                        ${isCol ? fieldRowHTML('layer-row-colour', 'Color', `<input type="color" class="collider-colour-input text-swatch" value="${colliderColourOf(layer)}" aria-label="Collider color" title="The color this wall is drawn in on the canvas">`,
+                            'The color of the collider') : ''}
                         <div class="layer-action-row">${actionBtns}</div>
                         ${isCol ? collisionGroup : maskGroup}
                         </div>

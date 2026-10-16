@@ -53,23 +53,23 @@
         radial: 'Radial menu'
     };
     var MODE_HINTS = {
-        paint:  'Paints normally with the brush in the Brush panel.',
-        replay: 'Hold to replay the last stroke (or the last few seconds, in Time mode). Paints nothing new: leave no button on a brush and a rehearsed motion is locked in.',
+        paint:  'normal brush with settings from the brush panel',
+        replay: 'Trigger replay with settings from the Replay Mode section ',
         // The caveat is in the hint rather than left to be discovered: the
         // mirror rides the fluid dab loop (05g multiSplat), and collider /
         // raster-layer strokes stamp through their own routes, so a mirror-
         // bound button paints an ordinary single stroke on those targets.
-        mirror: 'Paints normally AND stamps a mirrored twin across the canvas — a bilateral stroke from one hand. Fluid strokes only; Collider painting is not mirrored.',
-        alt:    'Paints with the separate brush configured below, leaving the main brush untouched.',
-        radial: 'Opens the radial menu at the pointer: the main sliders in a ring. Drag one away from the middle for more, or hover it and scroll. Paints nothing.'
+        mirror: 'Paints normally adding a mirrored twin across the canvas. Fluid and Pressure strokes only (Collider not mirrored)',
+        alt:    'Set this brush to be different from main, leaving the main brush untouched',
+        radial: 'Opens the radial menu at the pointer'
     };
     // Axis codes ride the wire and the recorded dab, so they are small ints,
     // not strings: 1 = across the vertical axis (a left/right mirror),
     // 2 = across the horizontal axis, 3 = both (four-up).
     var MIRROR_AXES = [
-        { code: 1, id: 'x',    label: '↔',  title: 'Mirror left ↔ right (across the vertical centre line)' },
-        { code: 2, id: 'y',    label: '↕',  title: 'Mirror up ↕ down (across the horizontal centre line)' },
-        { code: 3, id: 'quad', label: '✛',  title: 'Mirror both ways — four copies of every stroke' }
+        { code: 1, id: 'x',    label: '↔',  title: 'Mirror left ↔ right (across the vertical center line)' },
+        { code: 2, id: 'y',    label: '↕',  title: 'Mirror up ↕ down (across the horizontal center line)' },
+        { code: 3, id: 'quad', label: '✛',  title: 'Mirror both ways, four copies of every stroke' }
     ];
     var MIRROR_CODE = { x: 1, y: 2, quad: 3 };
     var MIRROR_ID = { 1: 'x', 2: 'y', 3: 'quad' };
@@ -136,7 +136,11 @@
                 return Math.max(0, Math.min(4, v | 0));
             case 'num':
                 if (typeof v !== 'number' || !isFinite(v)) return undefined;
-                if (key === 'SPLAT_RADIUS') return Math.max(0.000001, Math.min(0.1, v));
+                if (key === 'SPLAT_RADIUS') {
+                    var rb = (window.ParamRegistry && window.ParamRegistry.CONFIG_BOUNDS
+                              && window.ParamRegistry.CONFIG_BOUNDS.SPLAT_RADIUS) || { min: 0.00000017, max: 0.1 };
+                    return Math.max(rb.min, Math.min(rb.max, v));
+                }
                 // Degrees, and the rest of the app keeps it in [0, 360): the
                 // Brush panel slider is 0..360, 12-save-load clamps a brush
                 // preset to [0, 360] and Shift+Scroll (05h) wraps. Wrap here

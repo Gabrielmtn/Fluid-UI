@@ -99,9 +99,33 @@
     }
 
     // ─── FOCUS MODE TOGGLE ──────────────────────────────────────
+    // Keyboard focus in the UI that focus mode hides (display:none) drops to
+    // the page; it comes back on the way out. Not for a control the mouse
+    // pressed: handed back by script it would count as keyboard focus (05n)
+    // and take Space from Freeze.
+    var focusBefore = null;
+    function giveFocusBack() {
+        var el = focusBefore;
+        focusBefore = null;
+        if (!el || !el.isConnected) return;
+        // After the UI's own fade back in has a frame to lay out.
+        setTimeout(function () {
+            var a = document.activeElement;
+            if (a && a !== document.body) return;          // somewhere already
+            if (!el.getClientRects().length || getComputedStyle(el).visibility === 'hidden') return;
+            try { el.focus({ preventScroll: true }); } catch (_) {}
+        }, 60);
+    }
+
     function toggleFocus() {
         isFocused = !isFocused;
+        if (isFocused) {
+            var a = document.activeElement;
+            var byPointer = window.__pointerFocused ? window.__pointerFocused(a) : false;
+            focusBefore = (a && a !== document.body && !byPointer) ? a : null;
+        }
         applyFocus();
+        if (!isFocused) giveFocusBack();
         if (isFocused) borrowFullscreen();
         else returnFullscreen();
     }
@@ -183,6 +207,7 @@
                 var tag = e.target.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
             }
+            if (window.DialogFocus.hasKeyboard()) return;   // a dialog has the keyboard (00b)
             // 'F' without any modifiers = focus mode (CapsLock-proof)
             if ((e.key === 'f' || e.key === 'F') && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
                 e.preventDefault();

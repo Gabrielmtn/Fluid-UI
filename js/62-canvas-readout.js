@@ -70,8 +70,7 @@
         if (!barEl) {
             barEl = document.createElement('div');
             barEl.className = 'qub-size';
-            barEl.title = 'The canvas in pixels, and its shape. Pictures and videos come out at this size; ' +
-                'drag the canvas handles or pick a Focus → Format to change it.';
+            barEl.title = 'The canvas in pixels, and its shape. Pictures and videos come out at this size. Drag the canvas handles or pick a Focus → Format to change it.';
             var cap = document.createElement('div');
             cap.className = 'qub-dd-cap';
             cap.textContent = 'Canvas';
@@ -95,9 +94,7 @@
         if (!exportEl) {
             exportEl = document.createElement('div');
             exportEl.className = 'export-size-readout';
-            exportEl.title = 'Video and pictures come out at the canvas size; a video rounds an odd side ' +
-                'down by one pixel. A GIF is at most ' + gifMaxW() + ' px wide, with even sides; when that makes it ' +
-                'smaller, its size is in brackets.';
+            exportEl.title = 'Video and pictures come out at the canvas size. Max GIF is ' + gifMaxW() + ' pixels wide.';
         }
         if (exportEl.parentElement !== row.parentElement) row.parentElement.insertBefore(exportEl, row);
         return true;

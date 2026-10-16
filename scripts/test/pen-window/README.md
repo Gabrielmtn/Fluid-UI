@@ -17,7 +17,7 @@ Neither ships (electron-builder drops `scripts/`).
   Background Color shows under it, the first input after idle redraws at
   once. 14 of its 15 checks fail on the code before 2026-09-14.
 - `node scripts/test/pen-window/guides.js` — the popup toolbar's Guides menu
-  (Stroke locks + Mandala Studio drawn over the box, each on or off here
+  (Stroke locks + Mandala Overlay drawn over the box, each on or off here
   whatever the main window shows, persisted; Kaleidoscope too, while the main
   window's Show Guides is ticked, its fold turning with a spin at the angle
   the mirror copied, or every frame with the mirror off) and Always show

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/04c-anim-burst.js — part 3/7 of former 04-ui-interactions.js (lines 455–1318)
+// js/04c-anim-burst.js
 // LOAD ORDER: after 04b-presets.js, before 04d-anim-ascend-star.js
 // PROVIDES: playJellyfishAnimation/Swarm + its button
 //   (Smash, Expand and Vortex removed 2026-10-04: no stock animations,

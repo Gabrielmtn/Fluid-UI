@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05f-kaleido-controls.js — part 6/14 of former 05-fluid-sim.js (lines 1966–2193)
+// js/05f-kaleido-controls.js
 // LOAD ORDER: after 05e-effect-controls.js, before 05g-arm-colors.js
 // PROVIDES: kaleido globals (window.kaleido*), kaleidoscope control wiring
 // REQUIRES: —
@@ -34,7 +34,7 @@
                     if (e.target.checked) window._prevMultiplier = animationMultiplier;
                     return;
                 }
-                // Mandala Studio (34) holds its one-brush rig while it is on,
+                // Mandala Overlay (34) holds its one-brush rig while it is on,
                 // and Kaleido is a view switch inside it: flipping it to see
                 // the unmirrored wedge must not swap the arm count. 34 hands
                 // the arm count back when the mode closes.
@@ -100,7 +100,7 @@
         // window, so a drag that STARTS at 0 can still leave it for a small
         // value. Keyboard steps and programmatic writes are never held: the
         // old Angle stick held ANY near-zero write for 1.5 s, which trapped
-        // the arrow keys at 0 and swallowed Mandala Studio's angle pin.
+        // the arrow keys at 0 and swallowed Mandala Overlay's angle pin.
         const STICK_MS = 600;
         const STICK_TOL = 3;
         function stickyZero(el) {

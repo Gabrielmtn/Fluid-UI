@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05e-effect-controls.js — part 5/14 of former 05-fluid-sim.js (lines 1741–1965)
+// js/05e-effect-controls.js
 // LOAD ORDER: after 05d-input-replay.js, before 05f-kaleido-controls.js
 // PROVIDES: turbulence/glow control wiring, background color, canvas opacity, display shading, capture dimming, multiplier, timeScale, setMultiplierHotkey
 // REQUIRES: config (04)
@@ -121,15 +121,6 @@
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1) + 's';
             });
         }
-        // Max Speed slider (velocity ceiling, canvas-widths/s — soft knee)
-        const velocityCapSlider = document.getElementById('velocityCap');
-        if (velocityCapSlider) {
-            velocityCapSlider.addEventListener('input', (e) => {
-                config.VELOCITY_CAP = parseFloat(e.target.value);
-                const sp = document.getElementById('velocityCapValue');
-                if (sp) sp.textContent = Math.round(parseFloat(e.target.value));
-            });
-        }
         // Ridges slider (sharpen kernel scale, 2048-reference texels)
         const ridgesSlider = document.getElementById('ridges');
         if (ridgesSlider) {
@@ -233,12 +224,14 @@
             // a cancelled click leaves a checkbox as it was and fires no
             // change, so nothing listening ever sees a half-made choice.
             // Synthetic clicks pass as before (session only, never persisted).
-            let offModal = null, offKeys = null, offArmedAt = 0;
+            let offModal = null, offKeys = null, offArmedAt = 0, offHold = null;
             const closeOffQuestion = () => {
                 if (!offModal) return;
                 offModal.classList.remove('show');
                 if (offKeys) { document.removeEventListener('keydown', offKeys, true); offKeys = null; }
-                try { photoSafeToggle.focus({ preventScroll: true }); } catch (_) {}
+                // Back to the toggle after a keyboard answer (00b); after a click
+                // focus stays put, so Space still freezes.
+                if (offHold) { offHold.release(); offHold = null; }
             };
             const askPhotoSafeOff = () => {
                 if (!offModal) {
@@ -275,19 +268,15 @@
                 offModal.classList.add('show');
                 offArmedAt = performance.now() + 400;
                 // Nothing typed at the question reaches the app's hotkeys;
-                // Escape is Keep, Tab stays between the two buttons.
+                // Escape is Keep. Tab stays between the two buttons (00b's hold).
                 if (offKeys) document.removeEventListener('keydown', offKeys, true);
                 offKeys = (e) => {
+                    if (window.DialogFocus.top() !== offModal) return;   // a dialog over this one has the keys
                     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeOffQuestion(); return; }
-                    if (e.key === 'Tab') {
-                        e.preventDefault();
-                        const keep = offModal.querySelector('#photoSafeOffKeep'), go = offModal.querySelector('#photoSafeOffGo');
-                        (document.activeElement === keep ? go : keep).focus();
-                    }
-                    if (e.key !== 'Enter') e.stopPropagation();
+                    if (e.key !== 'Enter' && e.key !== 'Tab') e.stopPropagation();
                 };
                 document.addEventListener('keydown', offKeys, true);
-                try { offModal.querySelector('#photoSafeOffKeep').focus({ preventScroll: true }); } catch (_) {}
+                offHold = window.DialogFocus.hold(offModal, { initial: offModal.querySelector('#photoSafeOffKeep'), fallback: photoSafeToggle });
             };
             photoSafeToggle.addEventListener('click', (e) => {
                 clickTrusted = e.isTrusted;
@@ -460,6 +449,7 @@
             // Shift+1..8 used to set the multiplier too: a second copy of
             // every bare digit that nothing else could ever use.
             if (e.shiftKey) return;
+            if (window.DialogFocus.hasKeyboard()) return;   // a dialog has the keyboard (00b)
             const code = e.code;
             if (code && (code.startsWith('Digit') || code.startsWith('Numpad'))) {
                 const d = code.replace(/^(Digit|Numpad)/, '');

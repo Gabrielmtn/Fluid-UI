@@ -726,7 +726,7 @@ function onMultiplayerClose(event) {
         stopRoomLook();
         history.replaceState(null, '', window.location.pathname + window.location.search);
         showMpError(event.code === 4001
-            ? 'This room is locked — ask the host for an invite.'
+            ? 'This room is locked - ask the host for an invite.'
             : 'That room is full.');
         showDisconnectedUI();
         return;

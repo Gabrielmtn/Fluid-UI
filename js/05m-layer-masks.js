@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05m-layer-masks.js — part 13/14 of former 05-fluid-sim.js (lines 4302–4644)
+// js/05m-layer-masks.js
 // LOAD ORDER: after 05l-layers-transform.js, before 05n-hotkeys-init.js
 // PROVIDES: applyLayerMask, drawMaskShape, featherMaskAlpha, polygon/star, updateLayerThreshold, applyRudimentaryMask
 // REQUIRES: 05k/05l
@@ -64,9 +64,9 @@
                 if (mid == null || l.clipMaskId === mid) window.applyLayerClip(l.index, cache);
             });
         };
-        // Live refresh: __onMaskMutated is a single-slot hook already OWNED by
-        // 23-depth-collision (live collider). CHAIN it (never clobber) and install
-        // only after __scriptsReady so we wrap the final owner. readPixels+toDataURL
+        // Live refresh: __onMaskMutated is a single slot shared with
+        // 23-depth-collision (live collider). Both CHAIN whatever is already
+        // there (never clobber), so either may load first. readPixels+toDataURL
         // is a GPU stall, but mask mutations fire at stroke-END, so a light debounce
         // coalesces bursts (undo/redo, restore's per-mask async loads).
         (function installImageClipRefresh() {
@@ -94,11 +94,7 @@
                     schedule(mid);
                 };
             }
-            if (window.__scriptsReady) { install(); return; }
-            let tries = 0;
-            const poll = setInterval(function () {
-                if (window.__scriptsReady || ++tries > 200) { clearInterval(poll); install(); }
-            }, 50);
+            install();
         })();
 
         // The masked composite itself: the artwork kept where the shapes cover

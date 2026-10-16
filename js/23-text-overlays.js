@@ -802,7 +802,7 @@
         document.getElementById('textArrangeDone').onclick = function (ev) { ev.preventDefault(); closeArrange(); };
 
         onKeyArrange = function (e) {
-            if (e.key === 'Escape') { closeArrange(); }
+            if (e.key === 'Escape') { e.preventDefault(); closeArrange(); }   // used: 66 leaves focus be
             else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId != null) {
                 e.preventDefault(); removeOverlay(selectedId);
             }
@@ -1197,6 +1197,40 @@
         var kx = ps.dw / g.cssW, ky = ps.dh / g.cssH;
         var x = Math.round(cx * kx - ps.ox), y = Math.round(cy * ky - ps.oy);
         return !!window.__splatImageToDye(ps.stamp, amount, { x: x, y: y, w: ps.w, h: ps.h });
+    }
+
+    // ── The push behind a moving pour ───────────────────────────
+    // A pour is dye and nothing else, so a held key moving with the hand
+    // laid the words along the path through still fluid: a smear with no
+    // stroke behind it (2026-10-14). The brush pushes the fluid along its
+    // travel at every dab (05d0: 10 × the px travelled), and a held line now
+    // does the same over a soft ellipse the size of its box (05i
+    // __pushEllipse), so the words move the fluid they land in and leave a
+    // wake. config.TEXT_POUR_PUSH scales it; 0 is the dye-only pour.
+    function pushScale() {
+        var k = window.config && window.config.TEXT_POUR_PUSH;
+        return (typeof k === 'number' && isFinite(k)) ? Math.max(0, Math.min(5, k)) : 1;
+    }
+
+    // The line's box as an ellipse in its own px: semi-axes along and across
+    // the baseline, and the baseline's direction on screen.
+    function pushShape(ov) {
+        var box = measureBox(ov, false);
+        var rot = (ov.rotation || 0) * Math.PI / 180;
+        return { a: box.w / 2, b: box.h / 2, ux: Math.cos(rot), uy: Math.sin(rot) };
+    }
+
+    // One push centred on (cx, cy) carrying (vx, vy) of travel, all in CSS px
+    // of the canvas `g` measures (a room's pour: the painter's), mapped per
+    // axis onto this canvas the way the pour itself is.
+    function pushAt(shape, cx, cy, vx, vy, g) {
+        if (typeof window.__pushEllipse !== 'function' || !shape) return false;
+        var cv = document.getElementById('canvas');
+        if (!cv || !cv.width || !cv.height || !(g.cssW > 0) || !(g.cssH > 0)) return false;
+        var kx = cv.width / g.cssW, ky = cv.height / g.cssH;
+        var ax = shape.ux * kx, ay = shape.uy * ky, al = Math.hypot(ax, ay) || 1;
+        return !!window.__pushEllipse(cx * kx, cy * ky, 10 * vx * kx, 10 * vy * ky,
+            shape.a * al, shape.b * Math.hypot(shape.uy * kx, shape.ux * ky), ax / al, ay / al);
     }
 
     // The pre-stamp path: the line painted into a dye-sized canvas at its
@@ -1855,6 +1889,9 @@
     // held key paints a continuous sweep with the text instead of printing
     // separate copies of it at speed ("text hotkeys still have the stagger",
     // 2026-09-28: 4ms at 2500px/s left copies 10px apart, 50px at Time 0.2).
+    // Moving, it pushes as well as pours: the hand's travel goes into the
+    // fluid along the path, as a brush stroke's does (pushAt), so the words
+    // stream off the brush instead of smearing across still fluid.
     // Arranged, the line is a fountain at its own spot. One upload per hold:
     // every pour reuses the stamp.
     //
@@ -1866,7 +1903,8 @@
     // of the strike's letters had left the brush by 200ms). The brush has no
     // wait either. A tap is now what a click on the hose is: a short pour.
     var HOLD_FULL_PASSES = 8;         // per-frame ceiling on a hold's pours, in whole-dye passes
-    var holds = {};                   // overlay id → { pace, credit, ps, last, flowing }
+    var HOLD_PUSHES_PER_FRAME = 16;   // per-frame ceiling on a hold's pushes
+    var holds = {};                   // overlay id → { pace, credit, ps, shape, last, flowing }
     var holdRaf = 0;
 
     // How many pours a frame may lay: the brush's dab budget (05j
@@ -1928,7 +1966,7 @@
         if (!ov) return;
         endHold(id);
         if (ov.hotkeyAction === 'toggle') { triggerHotkey(id); return; }   // nothing to keep doing
-        var h = holds[id] = { pace: null, credit: 0, ps: null, last: null, flowing: false };
+        var h = holds[id] = { pace: null, credit: 0, ps: null, shape: null, last: null, flowing: false };
         // The flow picks up where and when the strike lands; a strike that
         // fails takes its flow with it.
         function landed(ok) {
@@ -1987,6 +2025,7 @@
                 if (h.ps) { try { h.ps.stamp.dispose(); } catch (_) {} }
                 h.ps = makeStamp(ov, g);
                 if (!h.ps) return;
+                h.shape = pushShape(ov);
             }
             var cap = poursPerFrame(h.ps.w, h.ps.h, dye);
             var spot = pourSpot(ov, g);
@@ -2008,11 +2047,26 @@
                 Math.ceil((seglen / n) / floorPx)));
             var total = n * m;
             var a = sampleAmount(amount, share / m);
+            // The push rides the same samples: on kp of them, at least one a
+            // frame the hand moved and no further apart than the line's half
+            // height (twice the falloff's spread across it, so the pushes run
+            // together), each carrying the travel since the last one.
+            var pk = (seglen > 0 && h.shape) ? pushScale() : 0;
+            var kp = (pk > 0) ? Math.min(total, HOLD_PUSHES_PER_FRAME,
+                Math.max(1, Math.ceil(seglen / Math.max(1, h.shape.b)))) : 0;
+            var pushed = 0, pushT = 0;
             try {
                 for (var i = 1; i <= total; i++) {
                     var t = i / total;
                     var px = from.x + segx * t, py = from.y + segy * t;
-                    if (pourStamp(h.ps, px, py, g, a)) mpPoured(ov, px, py, g, a);
+                    var pv = null;
+                    if (kp && Math.floor(i * kp / total) > pushed) {
+                        pushed++;
+                        pv = { x: segx * (t - pushT) * pk, y: segy * (t - pushT) * pk };
+                        pushT = t;
+                        pushAt(h.shape, px, py, pv.x, pv.y, g);
+                    }
+                    if (pourStamp(h.ps, px, py, g, a)) mpPoured(ov, px, py, g, a, pv);
                 }
             } catch (e) {
                 console.warn('⚠️ Text held pour failed for overlay', ov.id, e);
@@ -2123,12 +2177,14 @@
     }
 
     // One pour of ours, told to the room: the line's look, this canvas's CSS
-    // size, and the pour's centre as a fraction of it.
-    function mpPoured(ov, cx, cy, g, amount) {
+    // size, the pour's centre as a fraction of it, and the push laid with it
+    // (pushAt's travel, CSS px), if any, as a fraction of it too.
+    function mpPoured(ov, cx, cy, g, amount, push) {
         if (typeof window.__mpTextPour !== 'function' || !g || !(g.cssW > 0) || !(g.cssH > 0)) return;
         try {
             window.__mpTextPour(wireLook(ov), round(g.cssW, 2), round(g.cssH, 2),
-                cx / g.cssW, cy / g.cssH, amount);
+                cx / g.cssW, cy / g.cssH, amount,
+                push ? push.x / g.cssW : 0, push ? push.y / g.cssH : 0);
         } catch (_) {}
     }
 
@@ -2464,9 +2520,11 @@
 
     // ── The room's pours ───────────────────────────────────────
     // A batch of one painter's pours of one line (06d, from its paced queue):
-    // [x, y, amount] per pour, x/y fractions of their canvas. The bitmap is
-    // built once at this dye's resolution and kept while the pours keep
-    // coming — a held key sends ~125 a second — then dropped oldest-first.
+    // [x, y, amount, t] per pour, x/y fractions of their canvas, and on a
+    // pour laid on the move [vx, vy] after them, its push (pushAt) as
+    // fractions of it too. The bitmap is built once at this dye's resolution
+    // and kept while the pours keep coming — a held key sends ~125 a second —
+    // then dropped oldest-first.
     function peerPour(owner, look, cw, ch, pours) {
         if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') return false;
         cw = num(cw, 20, 20000, 0);
@@ -2476,10 +2534,17 @@
         // makeStamp and pourStamp read only these two: set in the painter's
         // CSS px, landed on this dye.
         var g = { cssW: cw, cssH: ch };
-        var ok = false, i, p;
+        var ok = false, i, p, shape = null;
+        // A push goes in ahead of its pour, as a dab's does.
+        function pushOf(p) {
+            if (p.length < 6 || !(p[4] || p[5])) return;
+            if (!shape) shape = pushShape(line);
+            pushAt(shape, p[0] * cw, p[1] * ch, p[4] * cw, p[5] * ch, g);
+        }
         if (!canStamp()) {
             for (i = 0; i < pours.length; i++) {
                 p = pours[i];
+                pushOf(p);
                 if (pourWhole(line, p[0] * cw, p[1] * ch, g, p[2])) ok = true;
             }
             return ok;
@@ -2503,6 +2568,7 @@
         }
         for (i = 0; i < pours.length; i++) {
             p = pours[i];
+            pushOf(p);
             if (pourStamp(e.ps, p[0] * cw, p[1] * ch, g, p[2])) ok = true;
         }
         return ok;

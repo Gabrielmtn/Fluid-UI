@@ -13,8 +13,7 @@
         "js/21-focus-mode.js:124-137 (F)",
         "js/35-zoom-view.js:168-225 (Z, 0, zoom wheel/drag, capture phase)",
         "js/32-file-drop.js:300-312,399-436 (Ctrl+V, Ctrl+Shift+V)",
-        "js/comfyui-bridge.js:231-238 (Ctrl+Enter)",
-        "js/electron-performance.js:29-38 (Ctrl+Shift+G, unpackaged Electron only)"
+        "js/comfyui-bridge.js:231-238 (Ctrl+Enter)"
       ]
     },
     "synthesis": {
@@ -75,7 +74,7 @@
       "keys": "Space",
       "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": false, "altKey": false },
       "guard": "typing target; e.repeat ignored; acts the same with the recorder open (recEnabled) — rec playback moved to F8 on 2026-09-23",
-      "effect": "window.toggleFreeze() (js/04b-presets.js): raises window.__fluidFrozen and nothing else. Since 2026-09-29 the freeze lives in the 05j step, which feeds the advection passes a dye rate of 1.0 and FREEZE_VELOCITY_BRAKE (0.9 per 1/60 s) while the flag is up; config and the Sustain sliders keep the user's values (it used to write 1.0/0.9 into config and restore saved copies, so Save, presets and the room mirror captured the brake). 2026-09-12: while window.__fluidFrozen the 05j sub-step loop also skips the curl + vorticity-confinement passes and the ambient-force (Gravity Direction pad) pass, so once the 0.9/frame brake runs out no autonomous force moves the paint; the projection, the brake and the splat path stay live, so painting on a frozen canvas is unchanged",
+      "effect": "window.toggleFreeze() (js/04b-presets.js): raises window.__fluidFrozen and nothing else. Since 2026-09-29 the freeze lives in the 05j step, which feeds the advection passes a dye rate of 1.0 and FREEZE_VELOCITY_BRAKE (0.8 per 1/60 s, 0.9 until 2026-10-14) while the flag is up; config and the Sustain sliders keep the user's values (it used to write 1.0/0.9 into config and restore saved copies, so Save, presets and the room mirror captured the brake). 2026-09-12: while window.__fluidFrozen the 05j sub-step loop also skips the curl + vorticity-confinement passes and the ambient-force (Gravity Direction pad) pass, so once the 0.9/frame brake runs out no autonomous force moves the paint; the projection, the brake and the splat path stay live, so painting on a frozen canvas is unchanged",
       "assertion": "window.__fluidFrozen toggles (js/04b-presets.js:196); #freezeBtn.classList.contains('active') toggles; while frozen window.config.DENSITY_DISSIPATION and window.config.VELOCITY_DISSIPATION are UNCHANGED (the user's values); the picture holds still after the brake — scenarios.json invariants freeze-halts-the-sim / freeze-stops-gravity / freeze-stops-swirl (braked → held window, NEAR by design)",
       "source": "js/05n-hotkeys-init.js:338-360",
       "sheet": "index.html:1059"
@@ -92,20 +91,11 @@
     {
       "keys": "F8",
       "event": { "key": "F8", "code": "F8", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "typing target; e.repeat ignored; no-op unless recEnabled; active layer must have timeline.interactions.length>0 to start playing (js/03-recording.js:313)",
-      "effect": "recTogglePlayback(): toggles active rec layer playback, stops other layers' playback",
-      "assertion": "recLayers.find(l=>l.id===recActiveLayerId).timeline.isPlaying toggles (js/03-recording.js:307-322)",
-      "source": "js/05n-hotkeys-init.js:344-351",
-      "sheet": "index.html:1066"
-    },
-    {
-      "keys": "Shift+F8",
-      "event": { "key": "F8", "code": "F8", "ctrlKey": false, "shiftKey": true, "altKey": false },
-      "guard": "typing target; e.repeat ignored; no-op unless recEnabled; at least one layer with interactions (js/03-recording.js:329-330)",
-      "effect": "recTogglePlaybackAll(): play/pause every layer that has interactions",
-      "assertion": "bare-global recIsPlayingAll toggles (js/03-recording.js:324-342)",
-      "source": "js/05n-hotkeys-init.js:345-348",
-      "sheet": "index.html:1067"
+      "guard": "typing target; e.repeat ignored; Shift+F8 is unbound (freed 2026-10-14) and falls through to the hotkey maker; at least one part with interactions to start playing",
+      "effect": "recStripTogglePlay() (js/03-recording.js), same as the strip's Play: pauses whatever plays, else recTogglePlaybackAll() plays every part that has interactions",
+      "assertion": "bare-global recIsPlayingAll toggles",
+      "source": "js/05n-hotkeys-init.js:441-451",
+      "sheet": "index.html:1575"
     },
     {
       "keys": "Ctrl+Z",
@@ -133,24 +123,6 @@
       "assertion": "Same as Ctrl+Shift+Z",
       "source": "js/05n-hotkeys-init.js:370-374",
       "sheet": "index.html:1080"
-    },
-    {
-      "keys": "Ctrl+Shift+N",
-      "event": { "key": "N", "code": "KeyN", "ctrlKey": true, "shiftKey": true, "altKey": false },
-      "guard": "typing target; no-op unless recEnabled (js/05n-hotkeys-init.js:378)",
-      "effect": "recAddLayer() — creates a new recording layer (js/03-recording.js:207)",
-      "assertion": "bare-global recLayers.length increments by 1; window.recGetLayersSnapshot().length increments",
-      "source": "js/05n-hotkeys-init.js:376-380",
-      "sheet": "index.html:1073"
-    },
-    {
-      "keys": "Delete",
-      "event": { "key": "Delete", "code": "Delete", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "typing target; requires no ctrl/alt/shift (js/05n-hotkeys-init.js:382); no-op unless recEnabled",
-      "effect": "recClearActive(): wipes active rec layer timeline (js/03-recording.js:1138-1149)",
-      "assertion": "Active layer timeline.interactions.length===0, duration===0, playbackPosition===0",
-      "source": "js/05n-hotkeys-init.js:382-388",
-      "sheet": "index.html:1072"
     },
     {
       "keys": "C",
@@ -189,13 +161,13 @@
       "sheet": "index.html:1113"
     },
     {
-      "keys": "A",
-      "event": { "key": "a", "code": "KeyA", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "keys": "P",
+      "event": { "key": "p", "code": "KeyP", "ctrlKey": false, "shiftKey": false, "altKey": false },
       "guard": "same as C",
-      "effect": "toggleCheckbox('stepPalette')",
+      "effect": "toggleCheckbox('stepPalette') (2026-10-14; was A)",
       "assertion": "document.getElementById('stepPalette').checked flips",
-      "source": "js/05n-hotkeys-init.js:398",
-      "sheet": "index.html:1114"
+      "source": "js/05n-hotkeys-init.js:499",
+      "sheet": "index.html:1624"
     },
     {
       "keys": "E",
@@ -216,28 +188,37 @@
       "sheet": "index.html:1098"
     },
     {
-      "keys": "Tab",
-      "event": { "key": "Tab", "code": "Tab", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "typing target; !ctrl/meta && !alt; defaultPrevented (the dialogs trap Tab in their own capture handlers); ignored, Tab left native, while a dialog (.delete-modal.show) is up, Ctrl+Shift+H bind mode is active, or the Layer Transform / Mask Editor overlay is open; e.repeat swallowed; no-op until window.BrushType exists (js/59-brush-type-key.js, document keydown, bubble). A listening hotkey picker cancels on Tab and stops it at window capture (js/48)",
-      "effect": "Steps the brush drawer's Paint Into row: Fluid -> Pressure -> Collider -> Fluid, through window.BrushType.set (js/20-mixer-layout.js), the same function the three buttons call. Painting a raster layer (BRUSH_TARGET sketch) steps to Fluid. Pressed during a stroke (window.pointer.down) the switch waits for the lift. Shows #brushTypePill (Tab cap + the three names, current lit) for 1.4 s",
+      "keys": "~",
+      "event": { "key": "~", "code": "Backquote", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "matched by place: e.code Backquote (or e.key ~ / `), Shift or not; typing target; !ctrl/meta && !alt (AltGr arrives as Ctrl+Alt); defaultPrevented; ignored while the skip menu (js/66), a dialog (.delete-modal.show), Ctrl+Shift+H bind mode, or the Layer Transform / Mask Editor overlay is up; e.repeat swallowed; no-op until window.BrushType exists (js/59-brush-type-key.js, document keydown, bubble)",
+      "effect": "Steps the brush drawer's Paint Into row forward: Fluid -> Pressure -> Collider -> Fluid, through window.BrushType.set (js/20-mixer-layout.js), the same function the three buttons call. No back key. Painting a raster layer (BRUSH_TARGET sketch) steps to Fluid. Pressed during a stroke (window.pointer.down) the switch waits for the lift. Shows #brushTypePill (~ cap + the three names, current lit) for 1.4 s",
       "assertion": "window.BrushType.get() goes fluid -> pressure -> collider -> fluid; config.BRUSH_VELOCITY_ONLY true only on pressure, config.BRUSH_TARGET === 'mask' only on collider; #brushTypePill not hidden",
       "source": "js/59-brush-type-key.js",
       "sheet": "index.html (Brush)"
     },
     {
-      "keys": "Shift+Tab",
-      "event": { "key": "Tab", "code": "Tab", "ctrlKey": false, "shiftKey": true, "altKey": false },
-      "guard": "same as Tab",
-      "effect": "Steps the Paint Into row backwards: Fluid -> Collider -> Pressure -> Fluid",
-      "assertion": "window.BrushType.get() goes fluid -> collider -> pressure -> fluid",
-      "source": "js/59-brush-type-key.js",
-      "sheet": "index.html (Brush)"
+      "keys": "Tab",
+      "event": { "key": "Tab", "code": "Tab", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "only when nothing is focused (activeElement body/html, or not a focusable control); !ctrl/meta && !alt; defaultPrevented; left native while a dialog is up ([aria-modal=true] shown / .delete-modal.show), Ctrl+Shift+H bind mode, or the Layer Transform / Mask Editor overlay is open (js/66-skip-menu.js, document keydown, bubble). Anywhere else Tab walks focus natively",
+      "effect": "Opens #skipMenu (top left): Left sidebar, Top nav, Right sidebar, Bottom nav. Focus lands on the first region that has something to focus",
+      "assertion": "#skipMenu.show; document.activeElement is a .skip-menu-option",
+      "source": "js/66-skip-menu.js",
+      "sheet": "index.html (Help)"
+    },
+    {
+      "keys": "Ctrl+Shift+Tab",
+      "event": { "key": "Tab", "code": "Tab", "ctrlKey": true, "shiftKey": true, "altKey": false },
+      "guard": "same as Tab, minus the nothing-focused rule: works from any control, text fields included. Desktop app only in practice: Chrome keeps Ctrl+Shift+Tab (previous tab) and never sends it to a page. Plain Shift+Tab steps back natively (it opened the menu until 2026-10-15), except with nothing focused, where it opens the menu like Tab",
+      "effect": "Opens #skipMenu from anywhere; Escape puts focus back where it was. Inside the menu Tab / Shift+Tab / arrows move, Space / Enter move focus into the chosen region",
+      "assertion": "#skipMenu.show; choosing Right sidebar focuses an element inside #sidebar-right",
+      "source": "js/66-skip-menu.js",
+      "sheet": "index.html (Help)"
     },
     {
       "keys": "[",
       "event": { "key": "[", "code": "BracketLeft", "ctrlKey": false, "shiftKey": false, "altKey": false },
       "guard": "typing target; !ctrl/meta && !alt; handler matches e.key==='[' EXACTLY (js/05n-hotkeys-init.js:412)",
-      "effect": "adjustBrush(-1): #brushSize.value -1 (clamped to element min/max = 0.001/100 per index.html:261), config.SPLAT_RADIUS = value/1000; pushes UI undo",
+      "effect": "adjustBrush(-1): #brushSize.value -1 (clamped to element min/max = 0.00017/100 per index.html:636), config.SPLAT_RADIUS = value/1000; pushes UI undo",
       "assertion": "parseFloat(#brushSize.value) decreased by 1 and window.config.SPLAT_RADIUS === new value/1000 (js/05n-hotkeys-init.js:216-228)",
       "source": "js/05n-hotkeys-init.js:412",
       "sheet": "index.html:1104"
@@ -286,24 +267,6 @@
       "assertion": "bare-global savedColors.length===0; #savedColors has no children",
       "source": "js/05n-hotkeys-init.js:416",
       "sheet": "index.html:1117"
-    },
-    {
-      "keys": "ArrowUp",
-      "event": { "key": "ArrowUp", "code": "ArrowUp", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "typing target; no ctrl/meta/alt/shift; no-op unless recEnabled (js/05n-hotkeys-init.js:419-423)",
-      "effect": "recCycleLayer(-1): previous rec layer, wraps (js/03-recording.js:1660-1667)",
-      "assertion": "window.recGetActiveLayerId() changes (needs >=2 layers)",
-      "source": "js/05n-hotkeys-init.js:420-423",
-      "sheet": "index.html:1071"
-    },
-    {
-      "keys": "ArrowDown",
-      "event": { "key": "ArrowDown", "code": "ArrowDown", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "same as ArrowUp",
-      "effect": "recCycleLayer(1): next rec layer, wraps",
-      "assertion": "window.recGetActiveLayerId() changes (needs >=2 layers)",
-      "source": "js/05n-hotkeys-init.js:425-428",
-      "sheet": "index.html:1071"
     },
     {
       "keys": "Ctrl+ArrowLeft",
@@ -453,18 +416,9 @@
       "keys": "Ctrl+Enter",
       "event": { "key": "Enter", "code": "Enter", "ctrlKey": true, "shiftKey": false, "altKey": false },
       "guard": "NO typing-target guard; capture phase with stopPropagation (js/comfyui-bridge.js:231-238) — fires even while focused in a text field",
-      "effect": "sendToComfyUI(): captures the canvas and posts it to the ComfyUI relay (network side effect when a bridge is configured)",
+      "effect": "saveFrameToFolder(): captures the canvas and posts it to the ComfyUI relay (network side effect when a bridge is configured)",
       "assertion": "Behavior depends on bridge configuration; without a relay it errors/toasts. HARNESS: avoid synthesizing this chord",
       "source": "js/comfyui-bridge.js:231-238",
-      "sheet": "NOT LISTED in the F1 modal"
-    },
-    {
-      "keys": "Ctrl+Shift+G",
-      "event": { "key": "G", "code": "KeyG", "ctrlKey": true, "shiftKey": true, "altKey": false },
-      "guard": "Only bound in UNPACKAGED Electron builds (js/electron-performance.js:29-32); no typing guard",
-      "effect": "window.electronPerf.forceGC() — window.gc() if exposed",
-      "assertion": "No observable state; dev-only. Exclude from sweep",
-      "source": "js/electron-performance.js:29-38",
       "sheet": "NOT LISTED in the F1 modal"
     }
   ],

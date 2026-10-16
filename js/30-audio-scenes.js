@@ -340,7 +340,7 @@
               title: 'How loud the music reads, in dB. 0 is as heard; raise it for a quiet track, lower it for a loud one.' },
             { type: 'slider', key: 'volume', label: 'Volume', min: 0, max: 2, step: 0.01,
               fmt: function (v) { return Math.round(v * 100) + '%'; },
-              title: 'How strong each ring is: its thickness, its push and its colour. It no longer changes how fast rings travel.' },
+              title: 'How strong each ring is: its thickness, its push and its color.' },
             { type: 'slider', key: 'speed', label: 'Speed', min: 0.25, max: 2, step: 0.05,
               fmt: function (v) { return v.toFixed(2) + '×'; },
               title: 'How fast each ring travels, and how soon the next one can follow.' },
@@ -859,7 +859,7 @@
                 ctx.fillStyle = 'rgba(255,255,255,0.35)';
                 ctx.font = Math.round(h * 0.12) + 'px sans-serif';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('drag a box to gate a band · drag its edges to retune · dbl-click deletes', w / 2, h * 0.5);
+                ctx.fillText('drag a box to gate a band · drag its edges to retune · double-click deletes', w / 2, h * 0.5);
             }
         }
         requestAnimationFrame(draw);
@@ -951,7 +951,7 @@
             } else if (spec.type === 'gate') {
                 var meter = document.createElement('canvas');
                 meter.className = 'audio-gate-meter';
-                meter.title = 'Drag to set the trigger gate — double-click or ✕ to clear';
+                meter.title = 'Drag to set the trigger gate - double-click or ✕ to clear';
                 row.appendChild(meter);
                 wireGateMeter(meter, spec, opts, changed);
                 // 13.4: dbl-click is unreliable on touch — honest Clear button
@@ -963,7 +963,7 @@
                 row.classList.add('audio-gates-row');
                 var editor = document.createElement('canvas');
                 editor.className = 'audio-gates-editor';
-                editor.title = 'Drag a box: width = frequency band, top edge = threshold. Double-click a box (or ✕) to delete.';
+                editor.title = 'Drag a box to pick frequency band (width) and threshold (top edge). Double-click a box (or ✕) to delete.';
                 row.appendChild(editor);
                 wireGatesEditor(editor, spec, opts, changed, name);
                 row.appendChild(makeGateClearBtn(function () {

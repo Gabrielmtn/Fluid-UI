@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
+// js/05b-shader-sim.js
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
 // PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/colorBlendStir/colorBlend/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter/scatterSmooth/shadeWall/shadeForm frag sources
 // REQUIRES: PRECISION (05a)
@@ -175,6 +175,7 @@
             uniform vec3 color;
             uniform float radius, aspectRatio, velocityInfluence;
             uniform float velocityScale;
+            uniform float dyeRadiusFloor; // dye pass only: the narrowest footprint the grid can hold (radius units); 0 = off
             uniform float stampNoise;  // 0 = classic gaussian splat; >0 blends in the clay stamp
             uniform float stampTipOn;  // 1 = explicit brush tip: the SHAPE is absolute and stampNoise is grain only
             uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
@@ -185,6 +186,7 @@
             uniform float ringSquash;  // ring ellipse squash (1 = circle, <1 = flattened vertically)
             uniform float barHalfW;    // >0: crisp bar stamp this half-width wide (aspect-corrected UV); EQ lane slabs
             uniform float barPoint;    // bar stamp tip lift: 0 = flat slab, >0 = pointed arch (flame tongue)
+            uniform vec4 velEllipse;   // velocity pass: (axis.xy, a, b) — a soft ellipse instead of the round push (05i pushEllipse); a 0 = round
             uniform sampler2D uStampTex; // custom brush-shape stamp (alpha = coverage), bound on unit 2
             uniform float stampTexOn;    // 1 = the dye footprint comes from the stamp texture
             uniform float stampAspect;   // stamp width/height, so non-square stamps keep their aspect
@@ -271,6 +273,13 @@
                     // Range: 1.0 (no isolation) to 5.0 (maximum isolation)
                     // Calculate splat intensity
                     float dist = dot(p, p);
+                    if (velEllipse.z > 0.0) {
+                        // A line of text pushing as one (05i pushEllipse): p in
+                        // the ellipse's own frame, over its semi-axes.
+                        vec2 q = vec2(dot(p, velEllipse.xy), dot(p, vec2(-velEllipse.y, velEllipse.x)));
+                        q /= max(velEllipse.zw, vec2(1e-5));
+                        dist = dot(q, q);
+                    }
                     float splatIntensity = exp(-dist / radius);
                     vec3 splat = splatIntensity * color;
                     if (ringRadius > 0.0) {
@@ -319,21 +328,40 @@
                     impactReduction = max(0.15, impactReduction); // Minimum 15% impact always allowed
                     fragColor = vec4(base + splat * impactReduction * obsBlock, 1.0);
                 } else {
+                    // A dab narrower than the grid (2026-10-11). Below about
+                    // half a texel the gaussian falls between texel centres:
+                    // a line beads into dots, and at a lower dye resolution
+                    // (the boot ramp, the governor) a dab can land nowhere.
+                    // So the footprint stops at dyeRadiusFloor (half a dye
+                    // texel or half a canvas px, whichever is wider, from
+                    // 05i) and the dab is thinned by the same ratio: the
+                    // same paint spread over the narrowest width the grid
+                    // can draw. A finer brush paints fainter, not dotted.
+                    // Gaussian mass goes as radius, so the gain is r/rEff;
+                    // the ring and bar profiles are 1-D, so theirs is the
+                    // root. At or above the floor rEff IS radius and the
+                    // gain is exactly 1, so every larger dab is unchanged.
+                    float rEff = radius, gain = 1.0;
+                    if (dyeRadiusFloor > radius) {
+                        rEff = dyeRadiusFloor;
+                        gain = radius / rEff;
+                        if (ringRadius > 0.0 || barHalfW > 0.0) gain = sqrt(gain);
+                    }
                     // ─── Additive mixing (original) ───────────────────────
-                    float r2 = dot(p, p) / radius;
+                    float r2 = dot(p, p) / rEff;
                     float shape = exp(-r2);
                     if (ringRadius > 0.0) {
                         // Ring band: dye deposits only along the thin ellipse
                         vec2 ps = vec2(p.x, p.y / max(ringSquash, 0.05));
                         float rr = length(ps) - ringRadius;
-                        shape = exp(-(rr * rr) / radius);
+                        shape = exp(-(rr * rr) / rEff);
                     } else if (barHalfW > 0.0) {
                         // Bar stamp: lane-wide at the base, pointed arch on top
                         float q = clamp(abs(p.x) / barHalfW, 0.0, 1.0);
                         float bx = 1.0 - smoothstep(0.8, 1.0, q);
                         float cy = barPoint * (1.0 - q * q);
                         float dy2 = p.y - cy;
-                        shape = bx * exp(-(dy2 * dy2) / radius);
+                        shape = bx * exp(-(dy2 * dy2) / rEff);
                     }
                     // Clay stamp never applies to the analytic ring/bar shapes —
                     // they define their own alpha and a stamp overwrite paints
@@ -344,7 +372,7 @@
                         // and surface grain instead of the gaussian bloom. Dye only —
                         // the velocity pass stays gaussian, or motion reads as glitch.
                         // Noise domain scales with splat size so grain tracks the brush.
-                        vec2 q = p / sqrt(radius);
+                        vec2 q = p / sqrt(rEff);
                         float n = sn_noise(q * 3.0 + stampSeed);
                         // Rotate the metric frame so asymmetric tips can be angled.
                         // stampAngle is screen-space radians (p-space is aspect-
@@ -394,7 +422,7 @@
                     // Texture slider's grain still applies, so custom shapes
                     // can be roughened like the built-in tips.
                     if (stampTexOn > 0.5 && ringRadius <= 0.0 && barHalfW <= 0.0) {
-                        vec2 q = p / sqrt(radius);
+                        vec2 q = p / sqrt(rEff);
                         vec2 qr = q;
                         if (stampAngle != 0.0) {
                             float ca = cos(stampAngle), sa = sin(stampAngle);
@@ -436,6 +464,7 @@
                         }
                         shape = cov;
                     }
+                    shape *= gain;
                     // Wet pickup (2026-10-01). Two Multi-Brush arms laying two
                     // colours into one spot, 250 dabs a second, left a fuzzy
                     // patchwork at Color Blend 1: every dab snapped its texels
@@ -754,7 +783,7 @@
             uniform float dt, dissipation;
             uniform vec2 uVelToUv; // velocity units → UV per axis (rk2Backtrace)
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
-            uniform float uVelCap; // speed ceiling in canvas-widths/s (Max Speed slider)
+            uniform float uVelCap; // speed ceiling in canvas-widths/s (VELOCITY_CAP, 04a)
             uniform float srcGate; // M1: 1 = taper growth amplification by speed headroom
             uniform float hfFloorDye; // M2: dye Nyquist-removal strength (0 = off)
             uniform float hfFloorDyeWall; // ...within a few texels of a collider or the canvas
@@ -1090,7 +1119,7 @@
                     // energy forever inside closed pockets — either rides to
                     // Inf → NaN → total field breakdown without a ceiling.
                     // Resolution-proportional (cells/s scale with sim res;
-                    // uVelCap is in canvas-widths/s, user slider "Max Speed").
+                    // uVelCap is in canvas-widths/s, fixed VELOCITY_CAP).
                     // SOFT KNEE (2026-07-15): a hard clamp pinned growth-preset
                     // pockets at exactly max speed — chaotic jitter-churn in
                     // whichever mask pocket reached the ceiling while its

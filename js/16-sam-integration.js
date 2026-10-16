@@ -293,7 +293,7 @@ class SAMSegmenter {
                         Downloading Instant Roto Model
                     </h2>
                     <p id="samDownloadMessage" style="color: #8b949e; margin: 0 0 24px 0; font-size: 14px;">
-                        First-time setup: Downloading EdgeTAM (Segment Anything 2 family)...
+                        First-time setup: Downloading Instant Roto Segmenting Model 
                     </p>
                     <div style="
                         background: rgba(0, 0, 0, 0.3);

@@ -31,11 +31,8 @@
         let isPaused = false;
         let animationMultiplier = 1;
         
-        let mousePositions = [];
         let isRightMouseDown = false;
         let isReplayActive = false;
-        const FADE_START = 333;
-        const FADE_END = 555;
         
         let showCursor = true;
         
@@ -52,10 +49,10 @@
         if (lockCanvasBorders) bordersLocked = lockCanvasBorders.checked;
         
         const defaultPalettes = [
-            { name: "Mountain Majesty", colors: { primary: "#4A90A4", secondary: "#E8E8D0", accent1: "#5F4E3B", accent2: "#2C5F2D", highlight: "#FFFACD" } },
+            { name: "Ross' Mountain ", colors: { primary: "#4A90A4", secondary: "#E8E8D0", accent1: "#5F4E3B", accent2: "#2C5F2D", highlight: "#FFFACD" } },
             { name: "Forest Serenity", colors: { primary: "#2C5F2D", secondary: "#4A7856", accent1: "#8B4513", accent2: "#FFD700", highlight: "#F0EAD6" } },
-            { name: "Sunset Dreams", colors: { primary: "#FF6347", secondary: "#FFD700", accent1: "#FF8C00", accent2: "#8B4789", highlight: "#FFF5EE" } },
-            { name: "Ocean Waves", colors: { primary: "#4A90A4", secondary: "#5F9EA0", accent1: "#E8E8D0", accent2: "#2F4F4F", highlight: "#87CEEB" } }
+            { name: "Ross' Sunset", colors: { primary: "#FF6347", secondary: "#FFD700", accent1: "#FF8C00", accent2: "#8B4789", highlight: "#FFF5EE" } },
+            { name: "Ross' Ocean", colors: { primary: "#4A90A4", secondary: "#5F9EA0", accent1: "#E8E8D0", accent2: "#2F4F4F", highlight: "#87CEEB" } }
         ];
         const curatedPalettes = [...defaultPalettes];
         // The palette a fresh install starts on: "Forest Serenity" (index 1), the
@@ -225,13 +222,17 @@
         let paletteMenuEl = null;
         function closePaletteMenu() {
             if (!paletteMenuEl) return;
+            // Focus back on the chip or palette after a keyboard close (00b
+            // menu), released while focus is still inside the menu.
+            if (paletteMenuFocus) { const pf = paletteMenuFocus; paletteMenuFocus = null; pf.release(); }
             paletteMenuEl.remove();
             paletteMenuEl = null;
             document.removeEventListener('mousedown', onPaletteMenuOutside, true);
             document.removeEventListener('keydown', onPaletteMenuKey, true);
         }
         function onPaletteMenuOutside(e) { if (paletteMenuEl && !paletteMenuEl.contains(e.target)) closePaletteMenu(); }
-        function onPaletteMenuKey(e) { if (e.key === 'Escape') closePaletteMenu(); }
+        let paletteMenuFocus = null;
+        function onPaletteMenuKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closePaletteMenu(); } }
         function openPalMenu(title, items, x, y, swatch) {
             closePaletteMenu();
             const m = document.createElement('div');
@@ -261,6 +262,7 @@
             m.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
             m.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
             paletteMenuEl = m;
+            paletteMenuFocus = window.DialogFocus.menu(m, document.activeElement, closePaletteMenu);
             setTimeout(() => {
                 document.addEventListener('mousedown', onPaletteMenuOutside, true);
                 document.addEventListener('keydown', onPaletteMenuKey, true);
@@ -280,8 +282,8 @@
             const pick = pickerHex();
             openPalMenu(hex, [
                 { label: 'Paint with this colour', fn: () => window.setColor(hex) },
-                window.ColourPicker ? { label: 'Change colour…', fn: () => window.ColourPicker.openInline({ mode: 'edit', hex }) } : null,
-                pick !== hex ? { label: 'Replace with the brush colour', fn: () => replacePaletteColor(hex, pick) } : null,
+                window.ColourPicker ? { label: 'Change color…', fn: () => window.ColourPicker.openInline({ mode: 'edit', hex }) } : null,
+                pick !== hex ? { label: 'Replace with the brush color', fn: () => replacePaletteColor(hex, pick) } : null,
                 { label: 'Remove', cls: 'danger', fn: () => window.removeColorFromPalette(hex) }
             ], x, y, hex);
         }
@@ -329,7 +331,7 @@
         function keepUnsavedColors() {
             const colors = uniqueColors((savedColors || []).map(hexToFull));
             if (!colors.length) return;
-            const idx = addOwnPalette(freeName('Look colours'), colors);
+            const idx = addOwnPalette(freeName('Look colors'), colors);
             renameInline(idx);
         }
         function renamePalette(idx, newName) {
@@ -440,13 +442,13 @@
             trig.setAttribute('aria-label', 'Palette');
             const name = document.createElement('span');
             name.className = 'palette-select-name';
-            name.textContent = unsaved ? 'Unsaved colours' : getPaletteName(currentPaletteIndex);
+            name.textContent = unsaved ? 'Unsaved colors' : getPaletteName(currentPaletteIndex);
             const chev = document.createElement('span');
             chev.className = 'palette-select-chev';
             chev.setAttribute('aria-hidden', 'true');
             trig.appendChild(name);
             trig.appendChild(chev);
-            trig.title = 'Your palettes, and New palette. Ctrl+Shift+← → switches palette; right-click to rename, duplicate or delete this one.';
+            trig.title = 'Palette select. Ctrl+Shift ← → to switch palette. Right-click to rename, duplicate or delete.';
             trig.addEventListener('click', () => {
                 if (trig.classList.contains('editing')) return;
                 if (paletteListEl) closePaletteList(); else openPaletteList();
@@ -575,7 +577,7 @@
             const btns = document.createElement('div');
             btns.className = 'palette-new-btns btn-sm';
             [
-                { id: 'paletteNewBtn', label: 'Brush colour', title: 'A new palette that starts with the brush colour', fn: newPalette },
+                { id: 'paletteNewBtn', label: 'Brush color', title: 'A new palette that starts with the brush color', fn: newPalette },
                 PFI ? { label: 'Image…', title: 'A new palette from a picture. You can also drop one on the Palettes section.', fn: () => PFI.pickFile() } : null,
                 PFI ? { label: 'Canvas', title: 'A new palette from what you have painted', fn: () => PFI.openCanvas() } : null
             ].forEach((o) => {
@@ -733,7 +735,7 @@
         window.removeColorFromPalette = function (hex) {
             const h = hexToFull(hex || pickerHex());
             editActiveColors((list) => {
-                if (!list.includes(h)) { paletteNote('That colour isn\'t in this palette'); return null; }
+                if (!list.includes(h)) { paletteNote('That color isn\'t in this palette'); return null; }
                 return list.filter(c => c !== h);
             });
         };
@@ -741,11 +743,6 @@
         function replacePaletteColor(oldHex, newHex) {
             const o = hexToFull(oldHex), n = hexToFull(newHex);
             editActiveColors((list) => list.includes(n) ? list.filter(c => c !== o) : list.map(c => c === o ? n : c));
-        }
-        function removePaletteColor(index, hex) {
-            const list = getPaletteColorsForIndex(index);
-            const next = list.filter(c => c.toUpperCase() !== hexToFull(hex).toUpperCase());
-            setPaletteColorsForIndex(index, next);
         }
 
         // ── Drag to reorder (user test 3: "drag to reorder") ──
@@ -873,7 +870,7 @@
                 keep.type = 'button';
                 keep.className = 'palette-keep btn--ghost';
                 keep.textContent = 'Keep';
-                keep.title = 'Keep these colours as a palette of your own';
+                keep.title = 'Keep these colors as a palette of your own';
                 keep.addEventListener('click', keepUnsavedColors);
                 head.appendChild(keep);
             }
@@ -885,6 +882,10 @@
             const unsaved = trayIsUnsaved();
             const list = unsaved ? uniqueColors(savedColors.map(hexToFull)) : getPaletteColorsForIndex(currentPaletteIndex);
             renderActiveHead(unsaved);
+            // A re-render (a pick repaints the row) must not drop keyboard focus.
+            const fa = document.activeElement;
+            const hadChip = fa && el.contains(fa) && fa.classList.contains('palette-chip') ? fa.parentNode.dataset.hex : null;
+            const hadAdd = fa && fa.id === 'paletteAddChip';
             el.innerHTML = '';
             list.forEach(hex => {
                 const wrap = document.createElement('div');
@@ -893,6 +894,12 @@
                 const chip = document.createElement('div');
                 chip.className = 'palette-chip';
                 chip.style.backgroundColor = hex;
+                // A button to the keyboard: the arrows move along the row, Enter
+                // or Space paints with it, the menu key / Shift+F10 opens its
+                // menu (the same contextmenu event a right-click fires).
+                chip.setAttribute('role', 'button');
+                chip.setAttribute('aria-label', hexToFull(hex));
+                chip.tabIndex = -1;
                 chip.title = hex + '. Click to paint with it, double-click to change it, drag to move it, right-click for more.';
                 chip.onclick = () => window.setColor(hex);
                 chip.ondblclick = () => { if (window.ColourPicker) window.ColourPicker.openInline({ mode: 'edit', hex: hex }); };
@@ -919,7 +926,12 @@
                 window.addColorToPalette();
             });
             el.appendChild(add);
+            wireChipKeys(el);
             updatePaletteStepIndicator();
+            if (hadChip) {
+                const w = el.querySelector('.palette-chip-wrap[data-hex="' + hadChip + '"]');
+                if (w && w.firstChild) roveChip(el, w.firstChild, true);
+            } else if (hadAdd) add.focus();
             if (window.ColourPicker) window.ColourPicker.onPaletteRender();
         }
 
@@ -928,6 +940,34 @@
         // palette colour, in One mode the brush colour when the palette has
         // it. Random's next colour is a surprise, so nothing is marked.
         // Everything that moves the brush colour calls this (05g, 05n, 12).
+        // One chip of the row takes Tab (tabIndex 0): the one focus was last
+        // on, else the colour the next stroke paints, else the first.
+        function roveChip(row, chip, focus) {
+            row.querySelectorAll('.palette-chip').forEach((c) => { c.tabIndex = c === chip ? 0 : -1; });
+            if (focus && chip) chip.focus();
+        }
+        function wireChipKeys(row) {
+            if (row.__chipKeys) return;
+            row.__chipKeys = true;
+            row.addEventListener('keydown', (e) => {
+                const chip = e.target.classList && e.target.classList.contains('palette-chip') ? e.target : null;
+                if (!chip || e.altKey || e.metaKey) return;
+                const chips = Array.from(row.querySelectorAll('.palette-chip'));
+                const i = chips.indexOf(chip), k = e.key;
+                if (!e.ctrlKey && (k === 'ArrowRight' || k === 'ArrowLeft' || k === 'ArrowDown' || k === 'ArrowUp' || k === 'Home' || k === 'End')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const next = k === 'Home' ? 0 : k === 'End' ? chips.length - 1
+                        : Math.max(0, Math.min(chips.length - 1, i + ((k === 'ArrowRight' || k === 'ArrowDown') ? 1 : -1)));
+                    roveChip(row, chips[next], true);
+                } else if ((k === 'Enter' || k === ' ') && !e.ctrlKey && !e.shiftKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!e.repeat) chip.click();
+                }
+            });
+        }
+
         function updatePaletteStepIndicator() {
             const el = document.getElementById('paletteStepIndicator');
             if (el) { el.style.display = 'none'; el.innerHTML = ''; }
@@ -943,6 +983,12 @@
                     else w.firstChild.removeAttribute('aria-current');
                 }
             });
+            // The Tab stop follows the marked colour, unless focus is in the row.
+            const row = document.getElementById('palettePreview');
+            if (row && !row.contains(document.activeElement)) {
+                const mark = row.querySelector('.palette-chip[aria-current]') || row.querySelector('.palette-chip');
+                if (mark) roveChip(row, mark, false);
+            }
         }
 
         function getCurrentPaletteHexList() {
@@ -1017,6 +1063,9 @@
         }
 
         let pendingDeleteIndex = -1;
+        // The question holds the keyboard (00b): focus on Cancel, Tab kept
+        // inside, Esc is Cancel, focus back to the palette button after.
+        let deleteHold = null;
         
         window.showDeleteModal = function(idx, name) {
             closePaletteList(false);   // the list sits above the dialog
@@ -1024,13 +1073,17 @@
             const modal = document.getElementById('deletePaletteModal');
             const msg = document.getElementById('deleteModalMessage');
             if (msg) msg.textContent = `Are you sure you want to delete "${name}"?`;
-            if (modal) modal.classList.add('show');
+            if (modal) {
+                modal.classList.add('show');
+                deleteHold = window.DialogFocus.hold(modal, { initial: modal.querySelector('.delete-modal-cancel'), onEscape: window.hideDeleteModal, fallback: paletteTrigger() });
+            }
         };
         
         window.hideDeleteModal = function() {
             pendingDeleteIndex = -1;
             const modal = document.getElementById('deletePaletteModal');
             if (modal) modal.classList.remove('show');
+            if (deleteHold) { deleteHold.release(); deleteHold = null; }
         };
         
         window.confirmDeletePalette = function() {

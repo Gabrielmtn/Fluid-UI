@@ -86,37 +86,6 @@
         // the bar's inner edge (see buildRightFold).
         mainArea.insertBefore(buildRightFold(sidebar), sidebar);
 
-        // Move any remaining dynamic content from .controls to sidebar
-        // (e.g., component system)
-        const remaining = controls.querySelectorAll('.collapsible-section, #component-controls');
-        remaining.forEach(function(el) {
-            // Convert .collapsible-section to .sidebar-section format
-            if (el.classList.contains('collapsible-section')) {
-                el.classList.remove('collapsible-section');
-                el.classList.add('sidebar-section');
-                // Convert header
-                var hdr = el.querySelector('.section-header, .collapsible-header');
-                if (hdr) {
-                    hdr.removeAttribute('onclick');
-                    hdr.addEventListener('click', function() {
-                        this.parentElement.classList.toggle('collapsed');
-                    });
-                    // Convert toggle icon to chevron
-                    var toggle = hdr.querySelector('.section-toggle, .icon');
-                    if (toggle) {
-                        toggle.className = 'section-chevron';
-                        toggle.textContent = '▾';
-                    }
-                }
-                // Convert content to section-body
-                var content = el.querySelector('.section-content, .collapsible-content');
-                if (content) {
-                    content.className = 'section-body';
-                }
-            }
-            sidebar.appendChild(el);
-        });
-
         // Hide old controls (CSS also hides it, but belt-and-suspenders)
         controls.style.display = 'none';
 
@@ -143,7 +112,7 @@
                     var px = 2 * Math.sqrt(n / 1000 * (c.STAMP_RADIUS_SCALE || 1)) * cv.height;
                     v = (px < 10 ? px.toFixed(1) : String(Math.round(px))) + ' px';
                 } else {
-                    v = (n < 0.01) ? n.toFixed(4) : (n < 1) ? n.toFixed(3) : n.toFixed(1);
+                    v = (n < 0.001) ? n.toFixed(5) : (n < 0.01) ? n.toFixed(4) : (n < 1) ? n.toFixed(3) : n.toFixed(1);
                 }
                 if (brushDisplay.textContent !== v) brushDisplay.textContent = v;
             }
@@ -171,11 +140,6 @@
 
         // ── Splash → entrance animation sequence ──
         orchestrateEntrance(strip, sidebar, canvasArea);
-
-        // ── COS Oscillator UI: inject after sliders are in their final positions ──
-        if (window.cosOscillator && typeof window.cosOscillator.buildUI === 'function') {
-            window.cosOscillator.buildUI();
-        }
 
         // This build is what shrinks the drawing area: the strip and the fixed
         // bottom nav take height off it and the sidebar takes width. 01-config
@@ -370,11 +334,11 @@
     // Brush Size fader both read this list, so a tip can never be drawn as
     // one shape in one place and another shape somewhere else.
     var BRUSH_TIPS = [
-        { v: 0, glyph: '◌', name: 'Soft',   title: 'Soft — the classic gaussian dab' },
-        { v: 1, glyph: '⬤', name: 'Blob',   title: 'Blob — noise-notched round stamp' },
-        { v: 2, glyph: '■', name: 'Chisel', title: 'Chisel — squared press' },
-        { v: 3, glyph: '▬', name: 'Streak', title: 'Streak — elongated smear' },
-        { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring — thin dye band, hollow center' }
+        { v: 0, glyph: '◌', name: 'Soft',   title: 'Soft Dab' },
+        { v: 1, glyph: '⬤', name: 'Blob',   title: 'Solid Circle' },
+        { v: 2, glyph: '■', name: 'Chisel', title: 'Square brush' },
+        { v: 3, glyph: '▬', name: 'Streak', title: 'Chisel brush' },
+        { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring brush' }
     ];
 
     // The Brush panel's preset-dirty flag, for the shape tiles (renderShapeTiles
@@ -433,15 +397,26 @@
             // (and every alert) came out the same neutral panel colour.
             okEl.classList.toggle('btn--destructive', opts.danger !== false);
 
+            var hold = null;   // 00b: role, Tab kept inside, focus back
             var done = function (val) {
                 modal.classList.remove('show');
+                if (hold) { hold.release(); hold = null; }
                 okEl.onclick = cancelEl.onclick = modal.onmousedown = null;
                 document.removeEventListener('keydown', onKey, true);
                 resolve(val);
             };
+            // Enter and Space press the FOCUSED button, natively: Enter used to
+            // mean OK wherever focus was, so Enter on Keep deleted. They stop
+            // here (default kept) so Space can't also freeze the canvas behind.
+            // Off the buttons Enter does nothing; Esc is the safe answer.
             var onKey = function (e) {
+                if (window.DialogFocus.top() !== modal) return;   // a dialog over this one has the keys
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
-                else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(true); }
+                else if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    var a = document.activeElement;
+                    if (a !== okEl && a !== cancelEl) e.preventDefault();
+                }
             };
             okEl.onclick = function () { done(true); };
             cancelEl.onclick = function () { done(false); };
@@ -449,7 +424,7 @@
             modal.onmousedown = function (e) { if (e.target === modal) done(false); };
             document.addEventListener('keydown', onKey, true);
             modal.classList.add('show');
-            (opts.cancelLabel === null ? okEl : cancelEl).focus();
+            hold = window.DialogFocus.hold(modal, { initial: opts.cancelLabel === null ? okEl : cancelEl });
         });
     };
 
@@ -465,9 +440,12 @@
     // Right-click used to go straight to a delete confirm, which made the
     // only thing you could do to a saved shape destroy it. It opens this
     // instead, so editing one is a normal thing to do.
-    var _shapeMenuEl = null;
+    var _shapeMenuEl = null, _shapeMenuFocus = null;
     function closeShapeMenu() {
         if (!_shapeMenuEl) return;
+        // Focus back on the shape's tile after a keyboard close (00b menu);
+        // released before the menu leaves the page, while focus is still in it.
+        if (_shapeMenuFocus) { var sf = _shapeMenuFocus; _shapeMenuFocus = null; sf.release(); }
         _shapeMenuEl.remove();
         _shapeMenuEl = null;
         document.removeEventListener('mousedown', _onShapeMenuOutside, true);
@@ -475,7 +453,7 @@
         window.removeEventListener('resize', closeShapeMenu);
     }
     function _onShapeMenuOutside(e) { if (_shapeMenuEl && !_shapeMenuEl.contains(e.target)) closeShapeMenu(); }
-    function _onShapeMenuKey(e) { if (e.key === 'Escape') closeShapeMenu(); }
+    function _onShapeMenuKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closeShapeMenu(); } }
 
     function openShapeMenu(shape, x, y) {
         closeShapeMenu();
@@ -517,6 +495,9 @@
         m.style.left = Math.max(8, px) + 'px';
         m.style.top = Math.max(8, py) + 'px';
         _shapeMenuEl = m;
+        // The menu key or Shift+F10 on a focused tile opens it too (the same
+        // contextmenu event): then focus goes to its first item.
+        _shapeMenuFocus = window.DialogFocus.menu(m, document.activeElement, closeShapeMenu);
         // Deferred so the click that opened it doesn't immediately close it
         setTimeout(function () {
             document.addEventListener('mousedown', _onShapeMenuOutside, true);
@@ -532,7 +513,7 @@
     function importShapeFromClipboard() {
         if (!window.BrushShapes) return;
         if (typeof window.readClipboardImage !== 'function') {
-            window.appAlert('One moment', 'The clipboard reader is still loading — try again in a moment.');
+            window.appAlert('One moment', 'The clipboard reader is still loading - try again in a moment.');
             return;
         }
         window.readClipboardImage(function (img) {
@@ -549,8 +530,7 @@
                 return;
             }
             window.appAlert('Nothing to paste',
-                'Copy an image first — a screenshot, or "Copy image" from anywhere — then press this again. ' +
-                'You can also drag an image straight onto this row.');
+                'Copy an image first - a screenshot, or "Copy image" from anywhere - then press this again. You can also drag an image straight onto this row.');
         });
     }
 
@@ -597,7 +577,7 @@
             b.style.backgroundSize = 'contain';
             b.style.backgroundRepeat = 'no-repeat';
             b.style.backgroundPosition = 'center';
-            b.title = s.name + ' — click to paint with this shape · right-click to edit or delete';
+            b.title = s.name + ' - click to paint with this shape · right-click to edit or delete';
             b.addEventListener('click', function () {
                 if (!window.BrushShapes) return;
                 window.BrushShapes.setActive(window.BrushShapes.activeId() === s.id ? null : s.id);
@@ -621,7 +601,7 @@
         addB.type = 'button';
         addB.className = 'brush-tip-btn brush-shape-add';
         addB.textContent = '＋';
-        addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Instant Roto). You can also drop an image anywhere on this row.';
+        addB.title = 'Add brush shape';
         addB.addEventListener('click', function () { if (opts.onImport) opts.onImport(); });
         row.appendChild(addB);
 
@@ -629,7 +609,7 @@
         pasteB.type = 'button';
         pasteB.className = 'brush-tip-btn brush-shape-paste';
         pasteB.textContent = 'Clipboard';
-        pasteB.title = 'New brush shape from the clipboard — takes the image you last copied and opens the same cut-out editor as ＋.';
+        pasteB.title = 'New brush shape from the clipboard';
         pasteB.addEventListener('click', importShapeFromClipboard);
         row.appendChild(pasteB);
     }
@@ -689,12 +669,8 @@
         // Tips are dye-only: a pushing arm lays the push's soft round
         // whatever its tip, so the square greys like the Pressure switch.
         btn.style.opacity = inert ? '0.45' : '';
-        btn.title = (own
-            ? 'Arm ' + (idx + 1) + ' tip: ' + look.name + ' (its own; the other arms keep theirs).'
-            : 'Arm ' + (idx + 1) + ' tip: the brush’s (' + look.name + ').')
-            + (inert ? ' A Pressure arm pushes with a soft round whatever its tip.' : '')
-            + ' Click to choose.';
-        btn.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' tip: ' + (own ? look.name : 'same as the brush'));
+        btn.title = '';
+        btn.setAttribute('aria-label', 'Brush ' + (idx + 1) + ' tip: ' + (own ? look.name : 'same as the brush'));
     }
 
     var _armTipMenu = null;
@@ -797,7 +773,7 @@
                 b.style.backgroundSize = 'contain';
                 b.style.backgroundRepeat = 'no-repeat';
                 b.style.backgroundPosition = 'center';
-                b.title = s.name + ' — arm ' + (idx + 1) + ' prints this shape';
+                b.title = s.name + ' - arm ' + (idx + 1) + ' prints this shape';
                 b.addEventListener('click', function () { pick(s.id); });
                 row.appendChild(b);
             });
@@ -883,21 +859,18 @@
 
         strip.appendChild(divider());
 
-        // The right-hand stack (2026-10-07): Presets and Help on top, Clear ·
-        // Pause · Stop under them, two rows at the colour cluster's height.
+        // The right-hand stack (2026-10-07): Presets on top, Clear · Pause ·
+        // Stop under it, two rows at the colour cluster's height.
         // It used to be three cells side by side; stacked, the bar keeps that
         // width free for a section to come. The cells keep their own
         // data-ui-key, so 43 lists and hides each one (it looks inside
-        // .mixer-stack), and 44's recipes find them with a descendant query.
+        // .mixer-stack). The ? cell (Help → "How do I…", js/44) sat beside
+        // Presets until 44 was parked on 2026-10-14.
         const stack = document.createElement('div');
         stack.className = 'mixer-stack';
         const stackTop = document.createElement('div');
         stackTop.className = 'mixer-stack-top';
         stackTop.appendChild(buildPresetsChannel(controls));
-        // Help: the one visible way into "How do I…" (js/44-recipes.js) on
-        // desktop; the '/' key is the other. Pinned by 43-ui-visibility so
-        // Simple mode keeps it — it is the way to find what Simple hid.
-        stackTop.appendChild(buildHelpChannel());
         stack.appendChild(stackTop);
         stack.appendChild(buildActionsChannel(controls));
         strip.appendChild(stack);
@@ -905,34 +878,19 @@
         return strip;
     }
 
-    function buildHelpChannel() {
-        const wrap = document.createElement('div');
-        wrap.className = 'mixer-help';
-        wrap.dataset.uiKey = 'Help';   // 43-ui-visibility (pinned)
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.id = 'recipeHelpBtn';
-        btn.className = 'btn--icon';
-        btn.textContent = '?';
-        btn.title = 'How do I… — search every task and get pointed at the control ( / )';
-        btn.setAttribute('aria-label', 'How do I…');
-        wrap.appendChild(btn);
-        return wrap;
-    }
-
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Brush Size': 'Brush size for painting fluid; the readout gives it in px on this canvas. Fine lines soften as the paint moves: Stop (Space) or a layer keeps them. The brush settings and presets are right under it, in Brush',
-        'Fluid': 'Material type (Fluid, Paint (Wet) or Paint (Thick)) and its amount. Click the name to pick the material.',
-        'Viscosity': 'How thick the fluid is — 0 flows like water, higher smooths the swirls into broad ribbons',
+        'Brush Size': 'Brush size in pixels, a smaller brush means less paint and less pressure as well',
+        'Fluid': 'Material Types: Fluid/Vorticity, Paint/Wetness, Paint/Thickness. ',
+        'Viscosity': 'Controls how thick the paint feels. 0 feels more like dye in water, 1 more like acrylic paint.',
         // User test 3: Isolation's tip had been wrong since June, and Density and
         // Velocity read backwards for faders where right means lasts longer.
-        'Isolation': 'Shields paint that is already moving from a new stroke’s push. Left, every stroke stirs whatever it touches; right, moving paint keeps its own path (up to 85% less push).',
-        'Color Blend': 'Left of the middle (Laminar), colours slide past each other in layers without mixing: a smudge stretches them into finer streaks instead of smearing them. Right of the middle (Blend), they blend where they meet, like wet paint, and settle as they dry (Dry Time). The flow itself is unchanged',
-        'Multi-Brush': 'Brush arms (1-8x mirrored strokes). Symmetry and each arm\'s colour are in its section on the left',
-        'Time': 'How fast the fluid runs: left is slow motion, 1 is real time, right is fast forward.',
-        'Density': 'How long colour lasts. Further right, it fades more slowly; at 1.000 it never fades.',
-        'Velocity': 'How long motion lasts. Further right, the swirls keep moving longer.'
+        'Isolation': 'Isolate the motion transfer of your strokes on existing paint.',
+        'Color Blend': 'Laminar prevents colors from mixing. Blend causes colors to blend where they meet (affected by dry time, density, and time)',
+        'Multi-Brush': ' settings for 1 to 8 brushes',
+        'Time': 'Simulation time value: left is slower 1 is real time, right is faster',
+        'Density': 'Color density, at 1.000 it never fades (and you can try above 1...)',
+        'Velocity': 'How much velocity to preserve. Can go above 1...'
     };
     // What a channel is CALLED where people see it, when that differs from
     // its key. The key (data-ui-key) stays put: show/hide choices (43), the
@@ -963,12 +921,12 @@
     // registered in ParamRegistry, because the persistence format IS the
     // canonical element's value — maps fader position through the curve and
     // drives it with a dispatched 'input'. Presets, the multiplayer mirror,
-    // COS, undo and save/load all still read the same element and cannot
-    // tell the difference.
+    // undo and save/load all still read the same element and cannot tell
+    // the difference.
     //
     // Reflection runs one way only, FROM the canonical, via its 'input' plus
-    // a poll: Ctrl+scroll and the COS oscillator both write .value with no
-    // event at all, and if the proxy ever pushed back the two would fight.
+    // a poll: Ctrl+scroll writes .value with no event at all, and if the
+    // proxy ever pushed back the two would fight.
 
     function curveCfg(key, fallback) {
         const v = (window.config || {})[key];
@@ -984,9 +942,9 @@
     // the DOM/registry pair the way a copied constant would.
     const FADER_CURVES = {
         // Brush Size (2026-10-07) on the radial menu's log scale (58
-        // LOG_SLIDERS): value = min × (max/min)^p, i.e. 0.001 × 10^(5p) on
-        // 0.001–100. Each fifth of the travel is ×10 in size (×3.16 in
-        // width); 1.3 sits at 62%. Linear, every size up to 1 was squeezed
+        // LOG_SLIDERS): value = min × (max/min)^p on 0.00017–100, about
+        // 5.8 decades. Each sixth of the travel is ~×10 in size (×3.16 in
+        // width); 1.3 sits at 67%. Linear, every size up to 1 was squeezed
         // into the bottom 1% of the fader.
         brushSize: {
             toCanonical: function (p, el) {
@@ -1074,15 +1032,32 @@
 
     const _faderProxies = [];
 
-    function attachPerceptualProxy(fader, canonical) {
+    // A fader's name to a screen reader: the channel's own label when the
+    // input has none (most bar faders had an empty name; the curved ones read
+    // their code id, "brushSize (perceptual)"), and the channel's readout as
+    // its value text ("47 px"), kept in step as it changes. A curved fader's
+    // 0–1 value means nothing on its own.
+    function nameFader(input, name, valEl) {
+        if (name && !input.getAttribute('aria-label') && !(input.labels && input.labels.length)) {
+            input.setAttribute('aria-label', name);
+        }
+        if (!valEl) return;
+        const sync = function () {
+            const t = valEl.textContent.trim();
+            if (t) input.setAttribute('aria-valuetext', t);
+        };
+        sync();
+        new MutationObserver(sync).observe(valEl, { childList: true, characterData: true, subtree: true });
+    }
+
+    function attachPerceptualProxy(fader, canonical, name, valEl) {
         const curve = FADER_CURVES[canonical.id];
         if (!curve) return null;
 
-        // The canonical keeps living inside .ch-fader — COS finds its host
-        // with slider.closest('.ch-fader') and would lose its button if the
-        // element moved elsewhere. Hiding it via a wrapper (rather than the
-        // input itself) also hides the printed scale the slider updater
-        // wraps around it, whenever it gets around to doing that.
+        // The canonical keeps living inside .ch-fader. Hiding it via a
+        // wrapper (rather than the input itself) also hides the printed scale
+        // the slider updater wraps around it, whenever it gets around to
+        // doing that.
         const vault = document.createElement('div');
         vault.className = 'ch-canonical';
         vault.style.display = 'none';
@@ -1097,7 +1072,7 @@
         // A 0–1 scale would print numbers that mean nothing; the channel's
         // value readout already shows the real figure.
         proxy.dataset.noScale = '1';
-        proxy.setAttribute('aria-label', canonical.id + ' (perceptual)');
+        nameFader(proxy, name || canonical.id, valEl);
         fader.appendChild(proxy);
 
         let selfWrite = false;
@@ -1133,9 +1108,9 @@
         return proxy;
     }
 
-    // Ctrl+scroll and the COS oscillator write canonical.value directly with
-    // no event, so an event listener alone would leave the thumb stale. One
-    // shared low-rate poll covers every proxy.
+    // Ctrl+scroll writes canonical.value directly with no event, so an event
+    // listener alone would leave the thumb stale. One shared low-rate poll
+    // covers every proxy.
     function startPerceptualFaderPoll() {
         if (window.__perceptualFaderPoll) return;
         window.__perceptualFaderPoll = setInterval(function () {
@@ -1213,10 +1188,11 @@
             if (FADER_CURVES[sliderId]) {
                 // Hides the canonical inside the channel and mounts the
                 // perceptual proxy in its place.
-                attachPerceptualProxy(fader, slider);
+                attachPerceptualProxy(fader, slider, CHANNEL_NAMES[label] || label, val);
                 startPerceptualFaderPoll();
             } else {
                 fader.appendChild(slider);
+                nameFader(slider, CHANNEL_NAMES[label] || label, val);
             }
             ch.appendChild(fader);
         }
@@ -1286,21 +1262,23 @@
             return btn;
         }
         segWrap.setAttribute('role', 'group');
-        segWrap.setAttribute('aria-label', 'Colour of each stroke');
+        segWrap.setAttribute('aria-label', 'Color of each stroke');
 
         var a0m = arm0Mode();
-        makeColorModeChip('One', 'fixed', 'one', 'One colour: every stroke paints the colour in the dot',
+        makeColorModeChip('One', 'fixed', 'one', 'Select a single color ',
             !(rnd && rnd.checked) && !(stepEl && stepEl.checked) && a0m !== 'random' && a0m !== 'step');
         // Hidden native checkboxes stay in the DOM as derived reflections
         // (save/load, palette auto-step, updatePaletteStepIndicator read them).
         if (rnd) {
             rnd.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+            hideMirror(rnd);
             ch.appendChild(rnd);
-            makeColorModeChip('Random', 'random', 'rnd', 'Random: a new colour each stroke (R)',
+            makeColorModeChip('Random', 'random', 'rnd', 'a new color each paint (hotkey: R)',
                 rnd.checked || a0m === 'random');
         }
         if (stepEl) {
             stepEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+            hideMirror(stepEl);
             ch.appendChild(stepEl);
             // 'Palette' (renamed from 'Step' 2026-08-15, Gabriel's pick):
             // advances one palette colour per stroke. The mode key/checkbox
@@ -1315,8 +1293,7 @@
             var palTitle = function () {
                 var name = '';
                 try { name = (window.curatedPalettes || [])[window.currentPaletteIndex].name; } catch (_) {}
-                palChip.title = 'Palette: the next colour of ' + (name || 'the palette') + ' each stroke (A). '
-                    + 'Right-click, or click the colour dot, to choose the palette.';
+                palChip.title = 'Toggles palette mode, steps through the selected palette. Right-click opens the palette.';
             };
             palTitle();
             palChip.addEventListener('mouseenter', palTitle);
@@ -1341,6 +1318,7 @@
         var gateEl = document.getElementById('colorGate');
         if (gateEl) {
             gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+            hideMirror(gateEl);
             var gateBtn = document.createElement('button');
             gateBtn.type = 'button';
             gateBtn.className = 'ch-text-toggle ch-gate-toggle';
@@ -1353,8 +1331,8 @@
                 var off = !gateEl.checked;
                 gateBtn.classList.toggle('active', off);
                 gateBtn.title = off
-                    ? 'Limit Off: paint keeps stacking, so repeated strokes build toward white. Click to turn the limit back on.'
-                    : 'Limit On: each stroke stops at its own colour, so repeated strokes can\'t blow out to white. Click to turn it off.';
+                    ? 'Limit Off: paint keeps additively building, so repeated strokes build toward white. Click to turn the limit back on.'
+                    : 'Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). ';
             };
             syncGate();
             gateBtn.addEventListener('click', function () {
@@ -1386,9 +1364,7 @@
         igniteBtnColor.type = 'button';
         igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
         igniteBtnColor.textContent = 'Ignite';
-        igniteBtnColor.title = 'Hold to perk the fluid up — faded dye is pulled back to the colour it was '
-            + 'painted at, past even Limit On. Slide right onto the lock to keep it on. '
-            + 'Your density decay setting is untouched.';
+        igniteBtnColor.title = 'If your fluid is a little tired, click to \'ignite\' it. Adds some density and brightness to tired dye.';
 
         // Latch cell (Task 7): permanently visible so the second mode is
         // discoverable — a small indicator that is hollow when unlatched and
@@ -1398,7 +1374,7 @@
         // .btn: the same plate as the buttons around it; .active (with
         // .latched) is the shared pressed state.
         igniteLock.className = 'ch-ignite-lock btn btn--icon';
-        igniteLock.title = 'Ignite latch — click to keep Ignite on hands-free';
+        igniteLock.title = 'Lock Ignite on';
         var igniteDot = document.createElement('span');
         igniteDot.className = 'ch-ignite-dot';
         igniteLock.appendChild(igniteDot);
@@ -1467,23 +1443,68 @@
         // The latch cell toggles: click latches Ignite on from idle (engage
         // and decline to release), click again unlatches. Mid-hold the button
         // owns the pointer, so releases there are handled by igniteRelease.
-        igniteLock.addEventListener('pointerdown', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
+        function toggleLatch() {
             if (igniteLocked) { igniteStop(); return; }
             if (ignitePid !== null) return;
             igniteEngage();
             igniteLocked = true;
             igniteBtnColor.classList.add('locked');
             igniteLock.classList.add('latched', 'active');
+        }
+        igniteLock.addEventListener('pointerdown', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleLatch();
         });
+
+        // The keyboard gets both halves of the gesture. Holding Enter or
+        // Space on Ignite holds the boost (the key is the mouse button: up
+        // ends it, and so does focus leaving mid-hold); the latch cell is a
+        // toggle button, Enter or Space on it latches and unlatches.
+        var igniteKey = null;
+        igniteBtnColor.addEventListener('keydown', function (e) {
+            if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.altKey || e.metaKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.repeat || igniteKey) return;
+            if (igniteLocked) { igniteStop(); return; }
+            igniteKey = e.key;
+            nudgeRow.classList.add('holding');
+            igniteEngage();
+        });
+        function igniteKeyEnd() {
+            if (!igniteKey) return;
+            igniteKey = null;
+            if (!igniteLocked) igniteStop();
+        }
+        igniteBtnColor.addEventListener('keyup', function (e) {
+            if (e.key !== igniteKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            igniteKeyEnd();
+        });
+        igniteBtnColor.addEventListener('blur', igniteKeyEnd);
+        igniteLock.tabIndex = 0;
+        igniteLock.setAttribute('role', 'button');
+        igniteLock.setAttribute('aria-label', igniteLock.title);
+        igniteLock.setAttribute('aria-pressed', 'false');
+        igniteLock.addEventListener('keydown', function (e) {
+            if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.altKey || e.metaKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (!e.repeat) toggleLatch();
+        });
+        // aria-pressed follows the latch, whichever road set it.
+        new MutationObserver(function () {
+            igniteLock.setAttribute('aria-pressed', igniteLock.classList.contains('latched') ? 'true' : 'false');
+        }).observe(igniteLock, { attributes: true, attributeFilter: ['class'] });
 
         // The swatch leads the second row: row 1 is the four colour toggles
         // at a legible width, row 2 is swatch + Ignite + latch.
         if (picker) {
             picker.className = 'ch-color-input';
             picker.style.cssText = '';
-            picker.title = 'Brush colour: the colour of the next stroke. Click to pick, with the palette. Alt+click the canvas to pick from it.';
+            picker.title = 'Color Picker. Opens color picker, you can also Alt+click the canvas to pick from it.';
             nudgeRow.appendChild(picker);
         }
         nudgeRow.appendChild(igniteBtnColor);
@@ -1526,7 +1547,7 @@
         if (freezeBtn) {
             freezeBtn.style.cssText = '';
             freezeBtn.textContent = 'Stop';
-            freezeBtn.title = 'Stop the fluid where it is; you can still paint (Space)';
+            freezeBtn.title = 'Stop the fluid where it is, you can still paint (Space)';
             freezeBtn.setAttribute('aria-pressed', freezeBtn.classList.contains('active') ? 'true' : 'false');
             transportRow.appendChild(freezeBtn);
         }
@@ -1615,9 +1636,11 @@
     // looks are listed at all. The key lives OUTSIDE the settingsManager
     // namespace on purpose (same reasoning as 43's fork ack): Settings → Clear
     // and the nuclear reset wipe every 'fluidUI:' key, and a question answered
-    // once must not come back because the sliders were reset. Either answer
-    // can be flipped later — the Built in group's ⋯ hides them, the own-path
-    // list ends with "Show the built-in presets". Hiding is the popup only:
+    // once must not come back because the sliders were reset. The own-path
+    // list ends with "Show the built-in presets", the way back from that
+    // answer; "ours" has none (the Built in head's ⋯ "Hide the built-in
+    // presets" came out 2026-10-16: a ⋯ on a heading reads as a settings
+    // menu, and this one only hid things). Hiding is the popup only:
     // applyPreset by key (hotkeys, the multiplayer broadcast, look links)
     // keeps working underneath.
     var LS_PRESET_PATH = 'fluidui.presetPath.v1';   // 'ours' | 'own'
@@ -1817,15 +1840,15 @@
                 presetGroupsSave(st);
                 block.classList.toggle('collapsed', !!st.collapsed[id]);
             });
-            if (opts.menu || opts.items) {
+            if (opts.menu) {
                 const more = document.createElement('button');
                 more.type = 'button';
                 more.className = 'preset-more btn--icon';
                 more.textContent = '⋯';
-                more.title = opts.items ? 'Show or hide' : 'Rename or delete this group';
+                more.title = 'Rename or delete this group';
                 more.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    openPresetMenu(more, opts.items || [
+                    openPresetMenu(more, [
                         { label: 'Rename group…', run: function () { inlineRename(head, id); } },
                         { label: 'Delete group (keep presets)', danger: true, run: function () { presetGroupDelete(id); renderMixerUserPresets(); } }
                     ]);
@@ -1867,8 +1890,15 @@
         }
 
         // Small context menu (reuses the brush-shape menu chrome, body-mounted).
-        let menuEl = null;
-        function closePresetMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+        // Opened from the keyboard, focus lands on its first item, the arrows
+        // walk it, and closing hands focus back to the ⋯ (00b menu).
+        let menuEl = null, menuFocus = null;
+        function closePresetMenu() {
+            if (!menuEl) return;
+            const m = menuEl; menuEl = null;
+            if (menuFocus) { const mf = menuFocus; menuFocus = null; mf.release(); }
+            m.remove();
+        }
         function openPresetMenu(anchor, items) {
             closePresetMenu();
             const m = document.createElement('div');
@@ -1886,15 +1916,24 @@
                 m.appendChild(b);
             });
             document.body.appendChild(m);
-            const z = window.UIScale ? window.UIScale.get() : 1;
+            // Under the ⋯ and right-aligned to it, above it when the bottom
+            // is near. Both rects are screen px. The menu's own left/top are
+            // read in ITS zoom, and body-mounted it has none: it is not in
+            // init-responsive.css's zoom: var(--ui-scale) list (the panel
+            // is), so dividing by the PANEL's zoom here sent it up and left
+            // of the ⋯ on any window wide enough to scale the UI (2560 wide
+            // = 1.35). Its own computed zoom keeps this right either way.
             const r = anchor.getBoundingClientRect();
-            const w = m.offsetWidth * z, h = m.offsetHeight * z;
+            const mr = m.getBoundingClientRect();
+            const z = parseFloat(getComputedStyle(m).zoom) || 1;
+            const w = mr.width, h = mr.height;
             let left = r.right - w, top = r.bottom + 4;
             if (left < 4) left = 4;
             if (top + h > window.innerHeight - 4) top = Math.max(4, r.top - h - 4);
             m.style.left = (left / z) + 'px';
             m.style.top = (top / z) + 'px';
             menuEl = m;
+            menuFocus = window.DialogFocus.menu(m, anchor, closePresetMenu);
             setTimeout(function () { document.addEventListener('click', closePresetMenu, { once: true }); }, 0);
         }
 
@@ -1949,11 +1988,11 @@
 
             // Built in — unless this profile chose its own path. The buttons
             // stay in builtinBtns either way, detached; 04b's highlighter
-            // only sees what is in the document.
+            // only sees what is in the document. No ⋯ on this head (see
+            // LS_PRESET_PATH): the named groups' ⋯ renames or deletes, and a
+            // built-in group can do neither.
             if (showBuiltin) {
-                const bi = groupBlock('__builtin', 'Built in', builtinBtns.length, { items: [
-                    { label: 'Hide the built-in presets', run: function () { presetPathSet('own'); renderMixerUserPresets(); } }
-                ] });
+                const bi = groupBlock('__builtin', 'Built in', builtinBtns.length, {});
                 builtinBtns.forEach(function (b) { bi.body.appendChild(b); });
                 list.appendChild(bi.block);
             }
@@ -2010,8 +2049,7 @@
                             window.Settings.deletePreset(name);
                             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
                         };
-                        if (window.appConfirm) window.appConfirm({ title: 'Delete "' + name + '"?', confirmLabel: 'Delete' }).then(function (ok) { if (ok) go(); });
-                        else if (confirm('Delete preset "' + name + '"?')) go();
+                        window.appConfirm({ title: 'Delete "' + name + '"?', confirmLabel: 'Delete' }).then(function (ok) { if (ok) go(); });
                     } });
                     openPresetMenu(more, items);
                 });
@@ -2190,21 +2228,44 @@
             panel.style.width = PANEL_W + 'px';
             panel.style.maxHeight = (maxH / z) + 'px';
         }
+        // Opened from the keyboard, focus goes to the preset you are on (or
+        // the first); Tab out of the panel closes it; closed with focus
+        // inside, focus goes back to the trigger (00b popup).
+        var panelFocus = null;
+        trigger.setAttribute('aria-haspopup', 'true');
+        trigger.setAttribute('aria-expanded', 'false');
+        function openPanel() {
+            panel.style.display = 'flex';
+            trigger.classList.add('active');
+            trigger.setAttribute('aria-expanded', 'true');
+            renderMixerUserPresets();
+            positionPanel();
+            panelFocus = window.DialogFocus.popup(panel, trigger, {
+                initial: function () {
+                    var on = list.querySelector('.mixer-user-preset-btn.active, .mixer-preset-btn.active');
+                    return on || list.querySelector('button');
+                },
+                close: closePanel,
+                keep: function (el) { return !!(menuEl && menuEl.contains(el)); }
+            });
+        }
+        function closePanel() {
+            if (panel.style.display === 'none') return;
+            panel.style.display = 'none';
+            trigger.classList.remove('active');
+            trigger.setAttribute('aria-expanded', 'false');
+            closePresetMenu();
+            if (panelFocus) { var pf = panelFocus; panelFocus = null; pf.release(); }
+        }
         trigger.addEventListener('click', function (e) {
             e.stopPropagation();
-            var open = panel.style.display !== 'none';
-            panel.style.display = open ? 'none' : 'flex';
-            trigger.classList.toggle('active', !open);
-            if (!open) { renderMixerUserPresets(); positionPanel(); }
-            else closePresetMenu();
+            if (panel.style.display !== 'none') closePanel(); else openPanel();
         });
         document.addEventListener('click', function (e) {
             if (panel.style.display !== 'none' && !panel.contains(e.target)
                 && e.target !== trigger && !trigger.contains(e.target)
                 && !(menuEl && menuEl.contains(e.target))) {
-                panel.style.display = 'none';
-                trigger.classList.remove('active');
-                closePresetMenu();
+                closePanel();
             }
         });
         panel.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -2217,16 +2278,13 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape' || e.defaultPrevented) return;
             if (panel.style.display === 'none' && !menuEl) return;
-            if (document.querySelector('.delete-modal.show')) return;
+            if (window.DialogFocus.hasKeyboard()) return;
             var t = e.target;
             if (t && t.closest && t.closest('.mixer-presets-panel') && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
             e.preventDefault();
             e.stopPropagation();
             if (menuEl) { closePresetMenu(); return; }
-            var inside = panel.contains(document.activeElement);
-            panel.style.display = 'none';
-            trigger.classList.remove('active');
-            if (inside) { try { trigger.focus(); } catch (_) {} }
+            closePanel();   // focus back to the trigger (00b popup)
         }, true);
         window.addEventListener('resize', function () {
             if (panel.style.display !== 'none') positionPanel();
@@ -2394,9 +2452,10 @@
             if (sec.dataset.group) b.dataset.group = sec.dataset.group;
             b.textContent = t.textContent.trim();
             b.title = 'Open ' + b.textContent;
-            b.addEventListener('click', function () {
+            b.addEventListener('click', function (e) {
                 set(false, true);
                 if (sec.classList.contains('collapsed')) toggleSection(sec, false);
+                keyIn(e, sec.querySelector('.section-title'));
             });
             rail.appendChild(b);
         });
@@ -2412,15 +2471,24 @@
             bar.classList.toggle('collapsed', !!collapsed);
             edge.classList.toggle('collapsed', !!collapsed);
             fold.textContent = collapsed ? '»' : '«';
-            fold.title = collapsed ? 'Open the brush bar' : 'Fold the brush bar to the side';
-            fold.setAttribute('aria-label', collapsed ? 'Open the brush bar' : 'Fold the brush bar');
+            fold.title = collapsed ? 'Open the brush bar' : 'Collapse the brush menu';
+            fold.setAttribute('aria-label', collapsed ? 'Open the brush bar' : 'Left-facing sideways arrows icon: collapses the brush menu');
             fold.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             syncRail();
             if (keep && !compactUI()) { try { if (window.settingsManager) window.settingsManager.set(LSB_KEY, !!collapsed); } catch (_) {} }
             if (!collapsed && compactUI() && window.Sidebars && window.Sidebars.right) window.Sidebars.right.fold(true);
         }
         fold.addEventListener('click', function () { set(!bar.classList.contains('collapsed'), true); });
-        railLabel.addEventListener('click', function () { set(false, true); });
+        railLabel.addEventListener('click', function (e) { set(false, true); keyIn(e, bar.querySelector('.lsb-head .ch-perceptual')); });
+
+        // The rail hides as the bar opens, so a rail button pressed from the
+        // keyboard (a click with detail 0: Enter or Space) hands focus on into
+        // the bar instead of dropping it on the page. A mouse click leaves
+        // focus alone: moved focus would take Space away from Freeze.
+        function keyIn(e, target) {
+            if (e.detail !== 0 || !target) return;
+            try { target.focus(); } catch (_) {}
+        }
 
         // The fold you keep, or folded below ~1280 CSS px until you pick.
         function restore() {
@@ -2500,17 +2568,17 @@
             rail.appendChild(b);
         }
         railButton('Controls', 'Open the controls', false);
-        railButton('Color', 'Brush colour and palette', true, function () {
+        railButton('Color', 'Brush color and palette', true, function () {
             unhide('strip:Color');
             var cell = document.querySelector('#sidebar-right [data-ui-key="Color"]');
             if (cell) { try { cell.scrollIntoView({ block: 'start' }); } catch (_) {} }
         });
-        railButton('Presets', 'Pick a preset: colours, brush and finish together', true, function () {
+        railButton('Presets', 'Preset picker dropdown', true, function () {
             unhide('strip:Presets');
             var t = document.getElementById('mixerPresetsTrigger');
             if (t && !t.classList.contains('active')) t.click();   // the trigger toggles: open, never shut
         });
-        railButton('Together', 'Start a room or join one: paint on the same canvas as someone else', true, function () {
+        railButton('Together', ' ', true, function () {
             if (window.Sidebars && window.Sidebars.open) window.Sidebars.open('Swirl Together');
         });
         bar.insertBefore(rail, bar.firstChild);
@@ -2519,8 +2587,8 @@
             bar.classList.toggle('collapsed', !!collapsed);
             edge.classList.toggle('collapsed', !!collapsed);
             tab.textContent = collapsed ? '«' : '»';
-            tab.title = collapsed ? 'Open the controls' : 'Fold the controls to the side';
-            tab.setAttribute('aria-label', collapsed ? 'Open the controls' : 'Fold the controls');
+            tab.title = collapsed ? 'Open the controls' : 'Collapse the settings menu';
+            tab.setAttribute('aria-label', collapsed ? 'Open the controls' : 'Right Facing sideways arrows icon: collapses the settings menu');
             tab.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             if (!collapsed && compactUI() && window.Sidebars && window.Sidebars.left) window.Sidebars.left.fold(true);
         }
@@ -2617,11 +2685,11 @@
         // nothing. Honest names + a one-line mechanism caption in the open
         // list, and a permanent micro-label above each resting pill so the
         // two aren't just two unlabeled numbers at the bottom of the screen.
-        [['visualResolution', 'Image Sharpness', 'Resolution of the paint itself — sharper costs GPU'],
-         ['physicsResolution', 'Motion Detail', 'Resolution of the motion sim — finer swirls cost GPU'],
+        [['visualResolution', 'Image Sharpness', 'Resolution of the paint itself - costs GPU'],
+         ['physicsResolution', 'Motion Detail', 'Resolution of the motion sim, higher creates finer swirls, but can be more GPU heavy'],
          // Beside Motion Detail per Gabriel (2026-09-18). Shown only while
          // Surface Shading is on (below), since on its own the pick changes nothing.
-         ['shadeFormResolution', 'Shading Detail', 'Grain of the Surface Shading relief — finer brings out the fine veins']
+         ['shadeFormResolution', 'Shading Detail', 'Surface Shading active - higher brings out the fine lines']
         ].forEach(function (pair) {
             const sel = document.getElementById(pair[0]);
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1], pair[2]));
@@ -2674,6 +2742,15 @@
         }
     }
 
+    // A native control kept, invisible, as the state-holder behind the chips
+    // a person actually uses (save/load and other code read it by id). Out of
+    // the Tab order and the screen reader's view: Tab used to stop on it, a
+    // focus ring round nothing.
+    function hideMirror(el) {
+        el.tabIndex = -1;
+        el.setAttribute('aria-hidden', 'true');
+    }
+
     // Custom themeable dropdown that drives a hidden native <select> (so all
     // existing change bindings + save/load keep working by id). Opens UPWARD
     // with a label header on top — the fix for the unstylable native popup.
@@ -2718,37 +2795,110 @@
             const o = sel.options[sel.selectedIndex];
             val.textContent = o ? o.text.replace(/\s*\([^()]*\)$/, '') : '';
         };
+        // A listbox to the keyboard and a screen reader: the button names
+        // itself from the micro-label and the value, the list says which
+        // option is chosen, and the native <select> (the state-holder, parked
+        // off screen) is out of the Tab order — Tab used to land on it unseen.
+        const ddId = (sel.id || ('qub' + Math.random().toString(36).slice(2, 7))) + 'Dd';
+        cap.id = ddId + 'Cap';
+        val.id = ddId + 'Val';
+        list.id = ddId + 'List';
+        btn.setAttribute('aria-haspopup', 'listbox');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.setAttribute('aria-controls', list.id);
+        btn.setAttribute('aria-labelledby', cap.id + ' ' + val.id);
+        list.setAttribute('role', 'listbox');
+        list.setAttribute('aria-labelledby', cap.id);
+        sel.tabIndex = -1;
+        sel.setAttribute('aria-hidden', 'true');
+
+        const choose = function (value) {
+            if (sel.value !== value) {
+                sel.value = value;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            syncVal();
+            close();
+        };
         const rebuild = function () {
             Array.prototype.slice.call(list.querySelectorAll('.qub-dd-opt')).forEach(function (o) { o.remove(); });
             Array.prototype.forEach.call(sel.options, function (opt) {
                 const o = document.createElement('div');
                 o.className = 'qub-dd-opt' + (opt.selected ? ' sel' : '');
                 o.textContent = opt.text;
+                o.setAttribute('role', 'option');
+                o.setAttribute('aria-selected', opt.selected ? 'true' : 'false');
+                o.tabIndex = -1;            // reached by the arrows, not by Tab
+                o.dataset.value = opt.value;
                 o.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    if (sel.value !== opt.value) {
-                        sel.value = opt.value;
-                        sel.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                    syncVal();
-                    close();
+                    choose(opt.value);
                 });
                 list.appendChild(o);
             });
         };
+        const opts = function () { return Array.prototype.slice.call(list.querySelectorAll('.qub-dd-opt')); };
+        let listFocus = null;
         const onDoc = function (e) { if (!wrap.contains(e.target)) close(); };
         const close = function () {
+            if (!wrap.classList.contains('open')) return;
             wrap.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
             document.removeEventListener('mousedown', onDoc);
+            if (listFocus) { const lf = listFocus; listFocus = null; lf.release(); }
         };
         const open = function () {
             rebuild();
             wrap.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
             setTimeout(function () { document.addEventListener('mousedown', onDoc); }, 0);
+            // From the keyboard, focus goes to the chosen option; Tab away
+            // closes the list; Esc or a pick hands focus back (00b popup).
+            listFocus = window.DialogFocus.popup(list, btn, {
+                initial: function () { return list.querySelector('.qub-dd-opt.sel') || opts()[0]; },
+                close: close
+            });
         };
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
             wrap.classList.contains('open') ? close() : open();
+        });
+        // Arrow keys on the closed button open it, the way a <select> does.
+        btn.addEventListener('keydown', function (e) {
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
+            const isOpen = wrap.classList.contains('open');
+            if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !isOpen) {
+                e.preventDefault();
+                e.stopPropagation();
+                open();
+            } else if (e.key === 'Escape' && isOpen) {   // opened with the mouse, focus still here
+                e.preventDefault();
+                e.stopPropagation();
+                close();
+            }
+        });
+        // In the open list: arrows, Home / End, Enter or Space picks, Esc
+        // closes. A focused list owns the keyboard, so letters don't fire
+        // hotkeys underneath; Tab is left to walk on (and close it).
+        list.addEventListener('keydown', function (e) {
+            if (e.key === 'Tab' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
+            e.stopPropagation();
+            const all = opts();
+            let i = all.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+                e.preventDefault();
+                if (e.key === 'ArrowDown') i = Math.min(all.length - 1, i + 1);
+                else if (e.key === 'ArrowUp') i = Math.max(0, i < 0 ? 0 : i - 1);
+                else if (e.key === 'Home') i = 0;
+                else i = all.length - 1;
+                if (all[i]) all[i].focus();
+            } else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (!e.repeat && i >= 0) choose(all[i].dataset.value);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                close();
+            }
         });
         // Keep the button in sync if the select is driven from elsewhere.
         sel.addEventListener('change', syncVal);
@@ -2782,6 +2932,7 @@
         scopeSel.id = 'mutationScope';
         scopeSel.innerHTML = '<option value="basic">Basic</option><option value="all">All</option>';
         scopeSel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+        hideMirror(scopeSel);
         const scopeSeg = document.createElement('div');
         scopeSeg.className = 'ch-seg-switch mutation-scope-seg';
         [['basic', 'Basic', 'Mutate the everyday look params only'],
@@ -2817,7 +2968,7 @@
         strSlider.type = 'range'; strSlider.id = 'mutationStrength';
         strSlider.min = '0.05'; strSlider.max = '1'; strSlider.step = '0.05'; strSlider.value = '0.3';
         strSlider.setAttribute('data-no-scale', '1');
-        strSlider.title = 'How far each mutation may push a param — subtle nudges left, wild swings right';
+        strSlider.title = 'Strength of mutate, larger creates wider swings in the same params. ';
         strSlider.addEventListener('input', function () {
             var disp = document.getElementById('mutationStrengthVal');
             if (disp) disp.textContent = Math.round(parseFloat(this.value) * 100) + '%';
@@ -2945,7 +3096,7 @@
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
                          'pressureIteration', 'curl', 'viscosity', 'colorBlend', 'multiplier',
-                         'velocityInfluence', 'brushSize', 'velocityCap', 'wetInfluence', 'wetDrying',
+                         'velocityInfluence', 'brushSize', 'wetInfluence', 'wetDrying',
                          'material.amount'],
             effects: ['enableLighting', 'enableLightShift',
                       'lightIntensity', 'lightAmbient', 'lightSpeed', 'lightMode', 'vibrance', 'ridges', 'sharpness',
@@ -3130,8 +3281,8 @@
         // follow the UI's own; an id missing here falls back to its control's
         // label. Kaleido's count is named as its slider is in that mode (05f).
         var CHANGE_NAMES = {
-            'color.brush': 'Brush colour', 'color.background': 'Background', 'color.arms': 'Arm colours',
-            randomColor: 'Random colour', stepPalette: 'Palette mode', palette: 'Palette',
+            'color.brush': 'Brush color', 'color.background': 'Background', 'color.arms': 'Arm colors',
+            randomColor: 'Random color', stepPalette: 'Palette mode', palette: 'Palette',
             multiplier: 'Multi-Brush', brushSize: 'Brush Size',
             kaleidoToggle: 'Kaleido', kaleidoMode: 'Kaleido Mode', kAngle: 'Kaleido Angle',
             kTwist: 'Kaleido Twist', kZoom: 'Kaleido Zoom', kBlend: 'Kaleido Opacity',
@@ -3139,7 +3290,7 @@
             densityDissipation: 'Density Sustain', velocityDissipation: 'Velocity Sustain',
             pressureDissipation: 'Pressure Dissipation', pressureIteration: 'Pressure Iterations',
             velocityInfluence: 'Motion Isolation', curl: 'Swirl', viscosity: 'Viscosity',
-            velocityCap: 'Max Speed', wetInfluence: 'Drying', wetDrying: 'Dry Time',
+            wetInfluence: 'Drying', wetDrying: 'Dry Time',
             ridges: 'Ridges', sharpness: 'Ridge Strength', vibrance: 'Vibrance',
             displayShadingToggle: 'Surface Shading', shadingIntensity: 'Shading Intensity',
             shadeRelief: 'Shading Relief', shadeGloss: 'Shading Gloss',
@@ -3248,7 +3399,8 @@
             tipEl = document.createElement('div');
             tipEl.className = 'fx-tip mutation-tip';
             document.body.appendChild(tipEl);
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') tipHide(); }, true);
+            // Esc that hides a showing card is used (66 leaves focus be).
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && tipEl.classList.contains('show')) { e.preventDefault(); tipHide(); } }, true);
             var sb = document.getElementById('sidebar-right');
             if (sb) sb.addEventListener('scroll', tipHide, { passive: true });
             return tipEl;
@@ -3511,9 +3663,14 @@
         // reworded freely.
         collisionBtn.id = 'addCollisionLayerBtn';
         collisionBtn.textContent = 'Collider';
-        collisionBtn.title = 'Add Collision Layer — pick a picture, cut the subject out, get a wall';
-        collisionBtn.style.cssText = 'position:relative;';
-        row.appendChild(collisionBtn);
+        collisionBtn.title = 'Choose a file to convert to a Collision Layer. Filter or "Instant Roto" helps cut the object out';
+        // The menu is the button's sibling, not its child: nested in the
+        // button, both entries inherited its title, and hovering From Canvas
+        // flickered that tooltip on and off.
+        var collisionWrap = document.createElement('div');
+        collisionWrap.className = 'collision-btn-wrap';
+        collisionWrap.appendChild(collisionBtn);
+        row.appendChild(collisionWrap);
 
         var collisionMenu = document.createElement('div');
         collisionMenu.className = 'collision-source-menu';
@@ -3522,9 +3679,9 @@
         // startFrom*), with step 3's collider hand-off pre-checked — the wall
         // comes from a mask the user cut, not from a depth guess.
         collisionMenu.innerHTML =
-            '<button type="button" data-src="image">From Image…</button>' +
+            '<button type="button" data-src="image">From Image</button>' +
             '<button type="button" data-src="snapshot">From Canvas</button>';
-        collisionBtn.appendChild(collisionMenu);
+        collisionWrap.appendChild(collisionMenu);
 
         var collisionFileInput = document.createElement('input');
         collisionFileInput.type = 'file';
@@ -3719,12 +3876,12 @@
                     const t = document.createElement('div');
                     t.textContent = s.name;
                     const sub = document.createElement('div');
-                    sub.textContent = missing ? 'Missing' : (playing ? 'Playing — click to stop' : 'Recorded');
+                    sub.textContent = missing ? 'Missing' : (playing ? 'Playing - click to stop' : 'Recorded');
                     btn.appendChild(t);
                     btn.appendChild(sub);
                     btn.title = missing
                         ? `The animation "${s.name}" no longer exists`
-                        : `Loop "${s.name}" — click again to stop`;
+                        : `Loop "${s.name}" - click again to stop`;
                     if (missing) btn.classList.add('anim-slot-missing');
                     // aria-pressed carries the playing state (and its styling)
                     btn.setAttribute('aria-pressed', playing ? 'true' : 'false');
@@ -3834,7 +3991,7 @@
                     const modeSel = document.createElement('select');
                     modeSel.className = 'rec-color-mode anim-lib-mode';
                     modeSel.draggable = false;
-                    modeSel.title = 'How replay colours this animation';
+                    modeSel.title = 'How replay colors this animation';
                     modes.forEach(m => {
                         const opt = document.createElement('option');
                         opt.value = m.v;
@@ -3865,20 +4022,11 @@
                 del.title = `Delete "${name}"`;
                 del.addEventListener('click', e => {
                     e.stopPropagation();
-                    if (!window.confirm(`Delete the animation "${name}"?\n\nThis cannot be undone.`)) return;
-                    if (window.recDeleteSavedAnimation) window.recDeleteSavedAnimation(name);
+                    window.appConfirm({ title: `Delete the animation "${name}"?`, message: 'This cannot be undone.' }).then(ok => {
+                        if (ok && window.recDeleteSavedAnimation) window.recDeleteSavedAnimation(name);
+                    });
                 });
-                // Open it in the editor (03 asks first when that would replace
-                // parts nobody kept), and rename it in place.
-                const edit = document.createElement('button');
-                edit.className = 'anim-lib-act anim-lib-edit';
-                edit.draggable = false;
-                edit.textContent = '⤢';
-                edit.title = `Open "${name}" in the animation editor`;
-                edit.addEventListener('click', e => {
-                    e.stopPropagation();
-                    if (window.recEditSavedAnimation) window.recEditSavedAnimation(name);
-                });
+                // Rename it in place.
                 const ren = document.createElement('button');
                 ren.className = 'anim-lib-act anim-lib-rename';
                 ren.draggable = false;
@@ -3888,7 +4036,6 @@
                     e.stopPropagation();
                     startRename(row, label, name);
                 });
-                row.appendChild(edit);
                 row.appendChild(ren);
                 row.appendChild(del);
                 libList.appendChild(row);
@@ -3986,7 +4133,7 @@
     function buildKaleidoscopeSection(controls) {
         const { sec, body } = makeSection('Kaleidoscope', 'expressive', true);
 
-        // Mandala Studio leads the section: it's the guided way in (it rigs
+        // Mandala Overlay leads the section: it's the guided way in (it rigs
         // the raw controls below for you), so it should be the first thing
         // read. Its panel keeps the toggle+collapsible pattern rather than
         // being emptied, since it only applies while the mode is on.
@@ -4014,7 +4161,6 @@
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
-        moveControlGroup('velocityCap', body);
         // P15-1 wetness: dry paint holds, wet paint flows (+ dry-time
         // half-life) — sim-behavior sliders, so they live here (moved out
         // of Effects per Gabriel 2026-07-23)
@@ -4068,7 +4214,7 @@
         // A compass, not raw numbers: nobody aims gravity by reading -0.71.
         function label(x, y) {
             var m = Math.min(1, Math.hypot(x, y));
-            if (m < 0.02) return 'centred — no push';
+            if (m < 0.02) return 'Centered - gravity off';
             var names = ['right', 'down-right', 'down', 'down-left',
                          'left', 'up-left', 'up', 'up-right'];
             var a = Math.atan2(y, x); // pad y is DOWN, so this reads as a screen compass
@@ -4182,21 +4328,21 @@
     // no emoji, no parenthetical subtitles (the old labels carried both).
     const FX_INFO = {
         'light-source': { title: 'Light Source',
-            text: 'A lamp above the canvas: paint near the dot is lit, paint far from it falls into shade. With Surface Shading on, the relief and gloss catch the lamp too, so their highlights follow the dot.' },
+            text: 'Control the origin of the light on the canvas. Influences Surface Shading relief and gloss, as well as volumetric rays.' },
         'light-shift':  { title: 'Light Shift',
             text: 'Blown-out, overexposed paint takes its colour from a path you draw on the wheel. The playhead loops along it, so your brightest areas keep shifting hue.' },
         'glow':         { title: 'Glow',
-            text: 'Bright paint bleeds light into its surroundings. Intensity sets how much; Threshold sets how bright paint has to be before it glows.' },
+            text: 'Adds a glowing light to paint.' },
         'scatter':      { title: 'Scatter',
             text: 'Light shafts. The glow travels across the canvas from the light source or your brush, and colliders cast shadows in the beams.' },
         'shading':      { title: 'Surface Shading',
-            text: 'Lights the paint as a surface: ridges and pools pick up highlight and shadow. Relief sets the height and Gloss the shine; turn on Light Source to aim the light.' },
+            text: 'Post processes the dye to pick up highlights and shadows. Relief sets the height and Gloss sets the sheen.' },
         'gravity':      { title: 'Gravity Direction',
-            text: 'A steady push across the whole canvas. Aim it with the pad: down is gravity, up is lift, sideways is wind. Paint drains off the edge it falls toward, so it never piles up. Every brush feels it.' },
+            text: 'Control gravity strength and direction.' },
         'border':       { title: 'Border',
             text: 'Open edges. Paint that reaches the rim drains off the canvas instead of bouncing back in. Width sets how far in the drain reaches.' },
         'breathing':    { title: 'Breathing',
-            text: 'The canvas breathes with you: two rings grow while you breathe in and shrink while you breathe out, and the paint between them, in your brush colour, moves with them and slowly swirls. The rings are walls, so the rest of the canvas is untouched; a word keeps time. Relaxed, Box or 4-7-8.' }
+            text: 'A simple visualizer for keeping time during breathing exercises. Relaxed, Box or 4-7-8.' }
     };
 
     let fxTipEl = null, fxTipTimer = 0;
@@ -4207,7 +4353,8 @@
         el.className = 'fx-tip';
         el.innerHTML = '<div class="fx-tip-media"></div><div class="fx-tip-title"></div><div class="fx-tip-text"></div>';
         document.body.appendChild(el);
-        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fxTipHide(); }, true);
+        // Esc that hides a showing card is used (66 leaves focus be).
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && fxTipEl && fxTipEl.classList.contains('show')) { e.preventDefault(); fxTipHide(); } }, true);
         // The card is anchored to a row; when the sidebar scrolls the anchor
         // moves and the card would float free of it.
         const sb = document.getElementById('sidebar-right');
@@ -4419,10 +4566,10 @@
         moveControlGroup('captureDimming', body);
 
         // Toggles
-        moveCheckboxGroup('cursorToggle', body);
-        // Show Brush Ghost is no longer here: it is the checkbox on the Brush
-        // Ghost row in Brush (buildBrushPanel), with the opacity it switches
-        // (2026-10-07). The opacity went over first, on 2026-09-24.
+        // Show Cursor and Show Brush Ghost are no longer here: both sit in
+        // Brush (buildBrushPanel), Show Cursor over the Brush Ghost row
+        // (2026-10-14). The ghost's opacity went over on 2026-09-24, its
+        // switch on 2026-10-07.
         moveCheckboxGroup('showCanvasHandles', body);
         moveCheckboxGroup('lockCanvasBorders', body);
         moveCheckboxGroup('statsToggle', body);
@@ -4463,7 +4610,7 @@
         var head = document.createElement('label');
         head.className = 'brush-section-label';
         head.textContent = 'Mouse Buttons';
-        head.title = 'What each mouse button does. A touchscreen follows the LEFT setting. Mouse 3 is the wheel, pressed.';
+        head.title = 'Controls for left mouse, right mouse, and mouse 3. The popout display follows the left mouse.';
         wrap.appendChild(head);
 
         // No button left painting is a deliberate, useful state (every button
@@ -4479,8 +4626,8 @@
 
         function syncLock() {
             lock.style.display = BM.isPaintLocked() ? '' : 'none';
-            lock.textContent = 'No button paints, so nothing new can be painted.'
-                + (BM.anyReplay() ? ' That is the painting lock: the last stroke can be re-triggered, but not added to.' : '');
+            lock.textContent = 'No button set to paint. '
+                + (BM.anyReplay() ? '' : '');
         }
 
         var syncAll = [];
@@ -4514,19 +4661,16 @@
         var head = document.createElement('label');
         head.className = 'brush-section-label';
         head.textContent = 'Stroke Locks';
-        head.title = 'Keys you hold while you paint. The brush stays on a circle round the centre of the canvas, '
-            + 'or on a straight line through it, even when your hand drifts off it.';
+        head.title = 'Allows locking to the brush\'s current radius, or the brush\'s current angle.';
         wrap.appendChild(head);
 
         var note = document.createElement('div');
         var pickers = {};
         [
             { kind: 'distance', name: 'Keep distance', sub: 'Circles round the centre',
-              hint: 'Hold it while you paint: the brush stays as far from the centre as it was when you pressed it, '
-                  + 'so you can swirl a clean circle. Let go to paint freely again.' },
+              hint: 'Holding causes brush to maintain distance from the center, helpful for clean circles.' },
             { kind: 'angle', name: 'Keep angle', sub: 'To and from the centre',
-              hint: 'Hold it while you paint: the brush stays on the line through the centre it was on when you pressed it, '
-                  + 'so it only moves toward or away from the centre. Good for pushing colours together.' }
+              hint: 'Holding causes the brush to stay on the line through the center. Helpful for pushing colors together.' }
         ].forEach(function (d) {
             var row = document.createElement('div');
             row.className = 'hk-row stroke-lock-row';
@@ -4568,7 +4712,7 @@
         guideLbl.setAttribute('for', 'strokeLockGuides');
         guideLbl.style.margin = '0';
         guideLbl.textContent = 'Show guides';
-        guideLbl.title = 'While a lock key is held, draw the circle or line the brush is kept on, mark the centre, and ring where your hand is (it stays beside the line however far the mouse goes).';
+        guideLbl.title = 'Shows the guide-lines for the angle / radius locks above.';
         guideRow.appendChild(guideCb);
         guideRow.appendChild(guideLbl);
         wrap.appendChild(guideRow);
@@ -4669,7 +4813,7 @@
         // where they come from is the row's tooltip.
         var shapeNote = document.createElement('div');
         shapeNote.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.35);margin:-2px 0 6px;';
-        shapeRow.title = 'Shapes come from the Brush panel’s library.';
+        shapeRow.title = 'Shapes come from the Brush Tips panel';
         altBox.appendChild(shapeNote);
 
         // Size override. Off = inherit the main brush's size, which keeps the
@@ -4685,7 +4829,7 @@
         sizeLbl.setAttribute('for', 'altSizeOn_' + side);
         sizeLbl.style.margin = '0';
         sizeLbl.textContent = 'Own size';
-        sizeLbl.title = 'Off: this button paints at the main Size fader. On: it always paints at the size set below.';
+        sizeLbl.title = 'Off: this button paints at the main Size slider. On: overrides the size with the one set below.';
         sizeRow.appendChild(sizeCb);
         sizeRow.appendChild(sizeLbl);
         altBox.appendChild(sizeRow);
@@ -4713,8 +4857,7 @@
         copyBtn.type = 'button';
         copyBtn.className = 'brush-mode-btn';
         copyBtn.textContent = 'Copy brush';
-        copyBtn.title = 'Freeze the CURRENT brush into this button — size, flow, hardness, spacing, '
-            + 'texture, angle, jitter, eraser and Pressure as well as the tip. The main brush is not changed.';
+        copyBtn.title = 'copy the properties of the CURRENT brush into this brush.';
         copyBtn.addEventListener('click', function () {
             BM.replaceAlt(side, BM.captureLiveBrush());
             sync();
@@ -4723,7 +4866,7 @@
         resetBtn.type = 'button';
         resetBtn.className = 'brush-mode-btn';
         resetBtn.textContent = 'Tip only';
-        resetBtn.title = 'Drop everything except the tip and shape, so this button follows the main brush again for size, flow and feel.';
+        resetBtn.title = 'Except the tip and shape, this button will follow the main brush settings';
         resetBtn.addEventListener('click', function () {
             var cur = BM.side(side).alt || {};
             var keep = {};
@@ -4750,7 +4893,7 @@
         radialBtn.type = 'button';
         radialBtn.className = 'brush-mode-btn';
         radialBtn.textContent = 'Edit the menu';
-        radialBtn.title = 'Settings → Radial Menu: put other sliders, buttons and keys on it, or take items off.';
+        radialBtn.title = 'Settings → Radial Menu: pick sliders, buttons and toggles, or take items off.';
         radialBtn.addEventListener('click', function () {
             if (window.RadialMenu) window.RadialMenu.openEditor();
         });
@@ -4785,7 +4928,7 @@
             shapeRow.innerHTML = '';
             var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
             if (!lst.length) {
-                shapeNote.textContent = 'No custom shapes yet — import one in the Brush panel.';
+                shapeNote.textContent = 'No custom shapes, import one in the Brush panel.';
                 shapeNote.style.display = '';
                 return;
             }
@@ -4802,7 +4945,7 @@
                 b.style.backgroundSize = 'contain';
                 b.style.backgroundRepeat = 'no-repeat';
                 b.style.backgroundPosition = 'center';
-                b.title = s.name + ' — use this shape for the ' + side + ' button';
+                b.title = s.name + ' - use this shape for the ' + side + ' button';
                 b.addEventListener('click', function () {
                     var on = (BM.side(side).alt || {}).BRUSH_SHAPE_ID === s.id;
                     BM.setAlt(side, { BRUSH_SHAPE_ID: on ? null : s.id });
@@ -4856,7 +4999,7 @@
             var n = Object.keys(alt).length;
             if (!n) {
                 altSummary.textContent = 'Nothing set yet: paints like the main brush.';
-                altSummary.title = 'This button paints exactly like the main brush until you pick a tip above, or Copy brush.';
+                altSummary.title = 'Button paints exactly like the main brush until you pick a brush tip above';
             } else if (n <= 2 && !('SPLAT_RADIUS' in alt)) {
                 altSummary.textContent = 'Overrides the tip only.';
                 altSummary.title = 'Size, flow and feel follow the main brush.';
@@ -4980,7 +5123,7 @@
         rndLbl.setAttribute('for', 'preserveRandomness');
         rndLbl.style.margin = '0';
         rndLbl.textContent = 'Preserve Randomness';
-        rndLbl.title = 'Record random-mode strokes as random, not as the colour random produced — replays re-roll a fresh colour per stroke';
+        rndLbl.title = 'Recorded strokes stay random, unchecked keeps the single color initially produced';
         rndRow.appendChild(rndCb);
         rndRow.appendChild(rndLbl);
         body.appendChild(rndRow);
@@ -5377,7 +5520,7 @@
         saveBtn.type = 'button';
         saveBtn.className = 'mixer-preset-save';
         saveBtn.textContent = SAVE_LABEL;
-        saveBtn.title = 'Save the current brush as a preset';
+        saveBtn.title = 'Save the current brush setup';
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'mixer-preset-name-input';
@@ -5555,30 +5698,28 @@
         // stroke still routes through splat() exactly like a Fluid one. Making
         // 'pressure' a BRUSH_TARGET would strand it outside every
         // target === 'fluid' test in the paint path.
-        sLabel('Paint Into').title = 'Tab switches between Fluid, Pressure and Collider; Shift+Tab goes back.';
+        sLabel('Paint Into').title = '~ steps between Fluid, Pressure and Collider';
         // Drawn as the radio group it is (2026-10-07, Gabriel: it "just looks
         // like three buttons"): one track, a ring in front of each choice, the
         // chosen ring filled (01-buttons.css .brush-radio-row). Still buttons
-        // underneath, lit by .active, so Tab (59), BrushType and the tours
+        // underneath, lit by .active, so ~ (59), BrushType and the tours
         // (44) are unchanged; role/aria-checked say "radio" to a screen reader.
         var targetRow = document.createElement('div');
         targetRow.className = 'brush-mode-row brush-radio-row';
         targetRow.setAttribute('role', 'radiogroup');
-        targetRow.setAttribute('aria-label', 'Paint into');
+        targetRow.setAttribute('aria-label', 'Paint Type (Fluid / Pressure / Collider)');
         var fluidBtn = document.createElement('button');
         fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
-        fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
+        fluidBtn.title = 'The classic fluid experience by Pavel Dobryakov';
         var pressureBtn = document.createElement('button');
         pressureBtn.type = 'button'; pressureBtn.className = 'brush-mode-btn'; pressureBtn.textContent = 'Pressure';
-        pressureBtn.title = 'Move paint that is already on the canvas without adding any. '
-            + 'The stroke pushes the fluid and deposits no colour, so the tip, shape and '
-            + 'Flow controls are replaced by the pressure modes below.';
+        pressureBtn.title = 'Move paint that is already on the canvas.';
         var colliderBtn = document.createElement('button');
         // 'Paint Collider' at three-across: the row is ~148px and the buttons
         // size to their text, so the old label pushed the row 6px over and
         // squeezed the other two. The tooltip still carries the full sentence.
         colliderBtn.type = 'button'; colliderBtn.className = 'brush-mode-btn'; colliderBtn.textContent = 'Collider';
-        colliderBtn.title = 'Paint walls with your brush: strokes build a live collider layer (see the Layers panel) that the fluid flows around — shown as a red film while painting. Click Fluid to paint dye again.';
+        colliderBtn.title = 'Paint a collider layer (appears in the Layers panel) that the fluid flows around.';
         targetRow.appendChild(fluidBtn);
         targetRow.appendChild(pressureBtn);
         targetRow.appendChild(colliderBtn);
@@ -5625,10 +5766,10 @@
         var pressureWrap = document.createElement('div');
         panel.appendChild(pressureWrap);
         var PRESSURE_MODES = [
-            [{ v: 'smudge', label: 'Smudge', title: 'Drags paint along the direction you move, like a classic smudge tool. Needs movement — standing still does nothing.' },
-             { v: 'spread', label: 'Spread', title: 'Pushes paint outward from the cursor. Works standing still: hold with Constant flow to open a clearing.' }],
-            [{ v: 'gather', label: 'Gather', title: 'Draws paint inward toward the cursor. Works standing still: hold to collect colour under the brush.' },
-             { v: 'swirl',  label: 'Swirl',  title: 'Spins paint around the cursor. Works standing still: hold to wind up a whirlpool.' }]
+            [{ v: 'smudge', label: 'Smudge', title: 'Drags paint along the direction you move.' },
+             { v: 'spread', label: 'Spread', title: 'Pushes paint outward from the cursor.' }],
+            [{ v: 'gather', label: 'Gather', title: 'Draw paint inward toward the center of the brush.' },
+             { v: 'swirl',  label: 'Swirl',  title: 'Swirls paint towards the brush like a whirlpool.' }]
         ];
         var pModeBtns = {};
         PRESSURE_MODES.forEach(function (pair) {
@@ -5648,8 +5789,7 @@
         // block shows and hides as one node.
         var pressStrGroup = pSlider('brushVelStrength', 'Strength', 0, 3, 0.05,
             'BRUSH_VEL_STRENGTH', function (v) { return (+v).toFixed(2) + '\u00d7'; }, 'velStrength');
-        pressStrGroup.title = 'How hard Spread / Gather / Swirl push, against an ordinary stroke as 1x. '
-            + 'Smudge ignores it — that mode takes its force from how fast you move.';
+        pressStrGroup.title = 'Strength control Spread / Gather / Swirl push amount (Smudge ignores this, based on speed)';
         pressureWrap.appendChild(pressStrGroup);
         var PRESSURE_MODE_OK = { smudge: 1, spread: 1, gather: 1, swirl: 1 };
         // Blow/Suck/Vortex became Spread/Gather/Swirl (2026-08-24, pre-release).
@@ -5754,7 +5894,7 @@
         fluidBtn.addEventListener('click', function () { chooseBrushType('fluid'); });
         pressureBtn.addEventListener('click', function () { chooseBrushType('pressure'); });
         colliderBtn.addEventListener('click', function () { chooseBrushType('collider'); });
-        // Tab steps through the three with the drawer shut (59-brush-type-key).
+        // ~ steps through the three with the drawer shut (59-brush-type-key).
         window.BrushType = { get: brushType, set: chooseBrushType };
         try {
             var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
@@ -5769,6 +5909,10 @@
         // and the row moved above Tip. js/31-brush-cursor.js owns both and
         // keeps them viewer-local (localStorage), never as brush preset keys.
         // Not in dyeOnlyEls: Pressure still draws the ghost (a white print).
+        // Show Cursor (C) leads it: it came over from Display on 2026-10-14
+        // (Gabriel: "This hotkey is the only place this exists"), and with
+        // it off there is no cursor for a ghost to ride on.
+        moveCheckboxGroup('cursorToggle', panel);
         moveControlGroup('brushGhostOpacity', panel);
 
         // ── Tip: the splat-shader stamp shapes as brush tips (D1) ──
@@ -5798,7 +5942,7 @@
         function setTipOpen(open, keep) {
             tipFold.classList.toggle('collapsed', !open);
             tipHead.setAttribute('aria-expanded', open ? 'true' : 'false');
-            tipHead.title = open ? 'Fold the tip settings away' : 'Show the tip settings';
+            tipHead.title = open ? 'Click to hide Brush Tips' : 'Show the tip settings';
             if (keep) { try { if (window.settingsManager) window.settingsManager.set(TIP_OPEN_KEY, !!open); } catch (_) {} }
         }
         tipFold.__setOpen = function (open) { setTipOpen(!!open, true); };
@@ -5928,7 +6072,7 @@
         // shapes. Enabled for every tip — a custom shape can sit on any of them.
         var angleGroup = pSlider('brushAngle', 'Angle', 0, 360, 1, 'BRUSH_ANGLE',
             function (v) { return Math.round(v) + '°'; }, 'angle');
-        angleGroup.title = 'Rotate the brush tip (chisel/streak/custom shapes). The brush ghost shows the angle.';
+        angleGroup.title = 'Rotate the brush tip ';
         tipBody.appendChild(angleGroup);
 
         // ── Stroke feel ──
@@ -5941,10 +6085,10 @@
         flowModeRow.className = 'brush-mode-row';
         var onMoveBtn = document.createElement('button');
         onMoveBtn.type = 'button'; onMoveBtn.className = 'brush-mode-btn active'; onMoveBtn.textContent = 'On Move';
-        onMoveBtn.title = 'Dabs are laid down along pointer travel — paint flows only while moving (Spacing applies)';
+        onMoveBtn.title = 'Paint only while moving (spacing applies)';
         var constantBtn = document.createElement('button');
         constantBtn.type = 'button'; constantBtn.className = 'brush-mode-btn'; constantBtn.textContent = 'Constant';
-        constantBtn.title = 'Paint flows at a steady rate while the pointer is held, even standing still — same on any monitor; Spacing does not apply';
+        constantBtn.title = 'Paint flows at a steady rate while the pointer is held, even standing still';
         flowModeRow.appendChild(onMoveBtn); flowModeRow.appendChild(constantBtn);
         panel.appendChild(flowModeRow);
         // Each mode owns exactly one texture control, and they are twins: Spacing
@@ -6047,9 +6191,7 @@
         };
         intervalGroup = pSlider('brushDabInterval', 'Interval', 4, 250, 1, 'BRUSH_DAB_INTERVAL_MS',
             fmtInterval, 'dabInterval');
-        intervalGroup.title = 'Constant flow: time between dabs, shown as the rate the screen gets. ' +
-            'The low end is always a solid line; higher lays visibly separate pulses. Slowing Time ' +
-            'makes each dab lighter, not further apart. Spacing is the same idea along travel.';
+        intervalGroup.title = 'Time between dabs';
         (function () {
             var ts = document.getElementById('timeScale');
             // A tick late: this listener is registered before the one in 05e
@@ -6079,16 +6221,12 @@
         // At zero it reads 0%, not "Off" (2026-10-09: clearer as a number).
         var steadyGroup = pSlider('brushSteady', 'Stabilization', 0, 1, 0.01, 'BRUSH_STEADY',
             function (v) { return Math.round(v * 100) + '%'; }, 'steady');
-        steadyGroup.title = 'The brush follows your hand on a string. Small wobbles stay inside the slack, '
-            + 'corners round off, and a fast drag is laid down at a calm, even pace. Higher = a longer, '
-            + 'lazier string. It moves with Time too: slow Time, slower brush. When you let go, the brush '
-            + 'finishes the line to where you lifted, or to the edge if you let go off the canvas. '
-            + 'At 0% the brush sits on the cursor.';
+        steadyGroup.title = 'A slider for "Pull-String" brush stabilization. Helpful to smooth input speeds. ';
         // Hide guide: paint without the line and the hand ring (31). Only
         // shown while Steady is on — with Steady off there is no guide.
         // A viewing preference, not part of the brush: no preset key.
         var guideRow = pCheckbox('brushSteadyHideGuide', 'Hide guide', 'BRUSH_STEADY_HIDE_GUIDE');
-        guideRow.title = 'Paint without the Stabilization guide: the line from the brush back to the ring at your cursor.';
+        guideRow.title = 'Hide the stabilization line.';
         function syncGuideRow() {
             var on = !!(window.config && window.config.BRUSH_STEADY > 0.001);
             guideRow.style.display = on ? '' : 'none';
@@ -6141,8 +6279,6 @@
         //    are managed in the Layers panel; Paint Collider binds live
         //  · Ignite Sketch / Capture → removed (Gabriel's call)
         //  · Sketch Undo/Redo buttons → Ctrl+Z / Ctrl+Shift+Z still work
-        // window.__onActiveRasterChanged/__onActiveMaskChanged are no
-        // longer assigned here; every caller is typeof-guarded (05l/05o).
 
         // Size fader tweaks also diverge from an applied preset
         var sizeFader = document.getElementById('brushSize');
@@ -6338,7 +6474,7 @@
 
         var arrangeHint = document.createElement('div');
         arrangeHint.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.35);margin:0 0 10px;text-align:center;line-height:1.35;';
-        arrangeHint.textContent = 'Drag text on the canvas to move; corners resize, top handle rotates. Painting pauses while arranging.';
+        arrangeHint.textContent = 'Drag, resize using controls, or rotate using the top center handle.';
         body.appendChild(arrangeHint);
 
         function syncArrangeBtn() {
@@ -6379,7 +6515,7 @@
             var room = (typeof a.getRoomLines === 'function') ? a.getRoomLines() : [];
             if (!all.length && !room.length) {
                 listEl.innerHTML = '<div style="font-size:9px;color:rgba(255,255,255,0.3);' +
-                    'text-align:center;padding:8px;">No text yet — add some above</div>';
+                    'text-align:center;padding:8px;">No text detected</div>';
                 return;
             }
             var sid = a.getSelectedId();
@@ -6407,7 +6543,7 @@
                     cap.textContent = window.Hotkeys.format(ov.hotkey);
                     cap.title = ov.hotkeyAction === 'toggle' ? 'Press ' + cap.textContent + ' to show or hide this text'
                         : 'Press ' + cap.textContent + (ov.hotkeyAt === 'arranged' ? ' to pour this text where it is arranged'
-                            : ' to pour this text at the brush') + ' — hold it to keep pouring';
+                            : ' to pour this text at the brush') + ' - hold it to keep pouring';
                     row.appendChild(cap);
                 }
                 row.appendChild(mkRowBtn('✥', 'Arrange on canvas', 'btn--ghost', function () {
@@ -6448,7 +6584,7 @@
                 row.appendChild(mkRowBtn('✥', 'Arrange on canvas', 'btn--ghost', function () {
                     a.select(pl.id); a.openArrange(pl.id); syncArrangeBtn();
                 }));
-                row.appendChild(mkRowBtn('×', 'Take it out of the room — ' + who + ' keeps it, hidden',
+                row.appendChild(mkRowBtn('×', 'Take it out of the room - ' + who + ' keeps it, hidden',
                     'btn--destructive', function () { a.remove(pl.id); }));
                 listEl.appendChild(row);
             });
@@ -6468,7 +6604,7 @@
         var contentInput = document.createElement('textarea');
         contentInput.id = 'textOverlayContent';
         contentInput.rows = 2;
-        contentInput.placeholder = 'Your text — Enter starts a new line';
+        contentInput.placeholder = 'Your text here, enter starts a new line';
         contentInput.style.cssText = FIELD + 'width:100%;box-sizing:border-box;resize:vertical;' +
                                      'font-size:12px;line-height:1.4;margin-bottom:8px;';
         contentInput.addEventListener('input', function () { commit({ content: contentInput.value }); });
@@ -6718,16 +6854,13 @@
         // (05k), shown only while the text is a collider.
         var colliderModeSel = selectInput('textOverlayColliderMode', [
             ['block', 'Block'], ['deflect', 'Deflect'], ['slow', 'Slow']
-        ], 'Block: a wall the flow piles up against and paint goes around. ' +
-           'Deflect: a smooth wall the flow slides around. ' +
-           'Slow: no wall at all — fluid and paint enter and thicken, like syrup.',
+        ], 'Block: swirls pile up against and go around. Deflect: smoother, the swirls slide around more easily. Slow: non blocking, only slows paint.',
             function (v) { commit({ colliderMode: v }); });
         var colliderStrengthSlider = slider('textOverlayColliderStrength', 'Wall Strength', 0, 1, 0.01,
             function (v) { return Math.round(v * 100) + '%'; },
             function (v) { commit({ colliderStrength: v }); });
         colliderStrengthSlider.querySelector('label').title =
-            'Block / Deflect: how solid the wall is — low values leak flow and take some paint, 100% is rigid. ' +
-            'Slow: how thick the syrup is — from a faint drag to stopping dead.';
+            'Block / Deflect: how solid the wall is. Slow: how much swirls are slowed.';
         var colliderBox = document.createElement('div');
         colliderBox.style.cssText = 'margin:0 0 8px 20px;';
         var colliderModeRow = rowEl(6);
@@ -6754,9 +6887,7 @@
         var hotkeyPicker = null, hotkeyShownFor = null, hotkeyAtRow = null;
         var hotkeyActionSel = selectInput('textOverlayHotkeyAction', [
             ['pour', 'Pour into fluid'], ['toggle', 'Show / hide']
-        ], 'Pour: the text drops into the fluid, at the brush or where it is arranged — every press pours it again, ' +
-           'and holding the key keeps pouring, like the Constant-flow brush. ' +
-           'Show / hide: the text itself appears and disappears on the canvas.',
+        ], 'Pour into Fluid: Hotkey turns the brush tip into a painting brush containing text while hotkey is being held.  Show / hide: the text itself appears and disappears on the canvas.',
             function (v) { commitHotkey({ hotkeyAction: v }); });
         var hotkeyActionField = field('When pressed', hotkeyActionSel);
         if (window.Hotkeys && typeof window.Hotkeys.picker === 'function') {
@@ -6764,7 +6895,7 @@
             hotkeyPicker = window.Hotkeys.picker({
                 noteEl: hotkeyNote,
                 selfId: function () { var id = selId(); return id == null ? null : 'text:' + id; },
-                hint: 'Pressing it anywhere, except while typing in a box, fires this text — like a typewriter that types whole lines. Hold it to keep pouring.',
+                hint: 'Pressing it anywhere, except while typing in a box, fires this text - like a typewriter that types whole lines. Hold it to keep pouring.',
                 onChange: function (combo) { commitHotkey({ hotkey: combo }); }
             });
             var hotkeyRow = rowEl(8);
@@ -6777,8 +6908,7 @@
             hotkeyAtRow = checkboxRow('textOverlayHotkeyAtBrush', 'Pour at the brush location',
                 function (v) { commitHotkey({ hotkeyAt: v ? 'brush' : 'arranged' }); });
             hotkeyAtRow.querySelector('label').title =
-                'On: the text lands centred on your brush, wherever it is when you press the key, and the line itself stays put. ' +
-                'Off: it pours where the text is arranged on the canvas and leaves the canvas, the same as Fluidize.';
+                'On: paints the text wherever the brush is. Off: Paints where the text is arranged on the canvas';
             editor.appendChild(hotkeyAtRow);
         }
 
@@ -6835,7 +6965,7 @@
         pourBtn.type = 'button';
         pourBtn.id = 'textOverlayFluidize';
         pourBtn.textContent = 'Fluidize';
-        pourBtn.title = 'Turn this text into fluid — it becomes dye in its own colour and the flow takes it from there. The text leaves the canvas once poured but stays selected here, so Fluidize again pours it again; the eye in the list brings it back. Not undoable: it dissolves on its own.';
+        pourBtn.title = 'Hides Text and paints this text into the sim as a fluid.';
         pourBtn.style.cssText = 'flex:1;cursor:pointer;';
         pourBtn.addEventListener('click', function () {
             var a = api(); var id = selId();
@@ -6864,9 +6994,7 @@
         brushBtn.type = 'button';
         brushBtn.id = 'textOverlayMakeBrush';
         brushBtn.textContent = 'Convert to brush';
-        brushBtn.title = 'Paint with these letters: the text becomes a brush shape and your brush tip right away, with clean edges. ' +
-            'It keeps the font, weight, case and spacing; the background box, shadow and rotation are left out. ' +
-            'The text itself stays where it is. Find the shape again under Tip in the Brush section.';
+        brushBtn.title = 'Text becomes a brush shape in your brush tip library';
         brushBtn.style.cssText = 'width:100%;cursor:pointer;margin-bottom:10px;';
         var brushBtnTimer = null;
         brushBtn.addEventListener('click', function () {
@@ -7107,7 +7235,7 @@
                 '<select id="audioReactSource" class="audio-mini-src">' +
                     '<option value="mic">Mic</option><option value="system">System</option><option value="file">File</option>' +
                 '</select>' +
-                '<button type="button" id="audioChooseTrack" class="audio-choose-track" title="Load an audio track — every audio feature follows this one file">🎵 Track…</button>' +
+                '<button type="button" id="audioChooseTrack" class="audio-choose-track" title="Pick an audio track">Audio File</button>' +
             '</div>' +
             // Transport (2026-08-16): a loaded file plays out loud, so it gets
             // real controls \u2014 play/pause, restart, loop, a draggable playhead
@@ -7121,7 +7249,7 @@
                     '<button id="audioLoopBtn" class="audio-play-btn active" title="Loop the track">\ud83d\udd01</button>' +
                     '<span id="audioClock" class="audio-clock">0:00 / 0:00</span>' +
                 '</div>' +
-                '<input type="range" id="audioSeek" class="audio-seek" min="0" max="1000" step="1" value="0" title="Playhead \u2014 drag to scrub" data-no-scale="1">' +
+                '<input type="range" id="audioSeek" class="audio-seek" min="0" max="1000" step="1" value="0" title="Draggable playhead for scrubbing" data-no-scale="1">' +
                 '<div class="audio-mini-row">' +
                     '<button id="audioMuteBtn" class="audio-play-btn" title="Mute playback (visuals keep reacting)">\ud83d\udd0a</button>' +
                     '<input type="range" id="audioVolume" class="audio-vol" min="0" max="1" step="0.01" value="0.85" title="Playback volume" data-no-scale="1">' +
@@ -7155,7 +7283,7 @@
         timingLbl.setAttribute('for', 'audioTimingToggle');
         timingLbl.style.cssText = 'margin:0;font-size:10px';
         timingLbl.textContent = 'Visualize Audio Timing';
-        timingLbl.title = 'Chart the loaded track as descending bars, so you can see the hits coming and move on them';
+        timingLbl.title = 'Visualize the track as descending bars for easy timing to paint along with.';
         timingRow.appendChild(timingCb);
         timingRow.appendChild(timingLbl);
         body.appendChild(timingRow);
@@ -7723,7 +7851,7 @@
             b.type = 'button';
             b.className = 'ar-pattern-btn' + (p[0] === 'center' ? ' active' : '');
             b.dataset.gen = p[0];
-            b.title = p[2] + ' — bass auto-splat pattern';
+            b.title = '';
             b.innerHTML = '<span class="ar-pat-glyph">' + p[1] + '</span><span class="ar-pat-label">' + p[2] + '</span>';
             b.addEventListener('click', function () {
                 Object.keys(patBtns).forEach(function (k) { patBtns[k].classList.remove('active'); });
@@ -7897,7 +8025,7 @@
         projGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
         var saveProjBtn = document.createElement('button');
         saveProjBtn.textContent = 'Save Project';
-        saveProjBtn.title = 'Download the whole project (layers, masks, bindings, brush presets, colors…) as a .fluid file';
+        saveProjBtn.title = 'Download the current project (layers, masks, bindings, brush presets, colors) as a .fluid file';
         saveProjBtn.style.cssText = 'cursor:pointer;';
         saveProjBtn.addEventListener('click', function () {
             var nm = window.prompt ? window.prompt('Project name', 'fluid-project') : 'fluid-project';
@@ -7953,7 +8081,7 @@
         var videoBtn = document.createElement('button');
         videoBtn.id = 'exportVideoBtn';
         videoBtn.textContent = 'Video';
-        videoBtn.title = 'Save a clip of the canvas as it moves. MP4 where the browser can, WebM otherwise; the background goes under the paint.';
+        videoBtn.title = 'Export as MP4 (WebM fallback for browser)';
         videoBtn.style.cssText = 'cursor:pointer;';
         // While its export captures, the button reads "■ Stop and save"
         // (24 sets the words) and a click keeps what was captured so far;
@@ -7983,7 +8111,7 @@
         var stillBtn = document.createElement('button');
         stillBtn.id = 'exportStillBtn';
         stillBtn.textContent = 'Save picture';
-        stillBtn.title = 'Save a PNG of what you see — background, layers and text included. Background, below, switches between As seen and Transparent.';
+        stillBtn.title = 'Export as PNG';
         stillBtn.style.cssText = 'cursor:pointer;';
         stillBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.still();
@@ -8014,7 +8142,7 @@
         groundRow.appendChild(groundLabel);
         var groundSel = document.createElement('select');
         groundSel.id = 'exportGround';
-        groundSel.title = 'As seen: the background colour goes under the paint, so the file matches the screen. Transparent: a PNG keeps the paint alone with its alpha. GIF, JPG and video always get a background, since they cannot hold transparency: the Background Color, or black when Display → Transparent Background is on.';
+        groundSel.title = 'As seen: the background color goes under the paint, so the file matches the screen. Transparent: a PNG keeps the paint alone with its alpha. (GIF and video always get a background)';
         [['seen', 'As seen'], ['transparent', 'Transparent (PNG)']].forEach(function (o) {
             var opt = document.createElement('option');
             opt.value = o[0]; opt.textContent = o[1];
@@ -8465,104 +8593,23 @@
 
     // ─── ARM COLORS DROPDOWN ────────────────────────────────────
 
+    // triggerEl: the arm-count value cell of the Multi-Brush channel.
+    // host: the Multi-Brush section body the rows are built into.
     function buildArmColorsDropdown(triggerEl, host) {
-        // Use an existing element (e.g. the multiplier value) as the toggle, or
-        // fall back to a standalone gold icon button.
-        var toggle;
-        if (triggerEl && host) {
-            // In the Multi-Brush section the value is just the arm count.
-            toggle = triggerEl;
-        } else if (triggerEl) {
-            toggle = triggerEl;
-            toggle.classList.add('arm-colors-trigger');
-            toggle.title = 'Per-arm brush colors \u2014 click to configure';
-        } else {
-            toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.className = 'arm-colors-toggle';
-            toggle.textContent = '\u2726';
-            toggle.title = 'Per-arm color settings';
-        }
-
         var panel = document.createElement('div');
         // arm-colors-rows marks THE arm-colors popup: the brush drawer and the
         // presets popup share the .arm-colors-panel skin, so 05g needs a class
         // that only this one carries to decide whether a rebuild is visible.
         panel.className = 'arm-colors-panel arm-colors-rows';
-        // Popovers are portaled to <body>, so they carry the paint surface's tint
-        // with them rather than inheriting the app-root system fallback.
+        // The paint surface's tint, not the app-root system fallback.
         panel.dataset.group = 'core';
-        if (host) host.appendChild(panel);
-        else {
-            panel.style.display = 'none';
-            panel.style.position = 'fixed';
-            document.body.appendChild(panel);
-        }
-        // Showing = its section open (in the left sidebar), or the popup up.
+        host.appendChild(panel);
+        // Showing = its section open (in the left sidebar).
         function isShown() {
-            if (!host) return panel.style.display !== 'none';
             var sec = panel.closest ? panel.closest('.sidebar-section') : null;
             return !!sec && !sec.classList.contains('collapsed');
         }
 
-        // Once the user has dragged the panel somewhere, it stays there for the
-        // rest of that opening — re-anchoring under the trigger would undo the
-        // move on the next resize. Reset on close, so each fresh open starts
-        // predictably under the trigger.
-        var userMoved = false;
-
-        function positionPanel() {
-            if (userMoved) return;
-            // Panel is zoomed via --ui-scale; fixed left/top are interpreted in the
-            // zoomed coordinate space, so compute in screen px then divide by zoom.
-            var z = window.UIScale ? window.UIScale.get() : 1;
-            var rect = toggle.getBoundingClientRect();
-            var panelW = 220;
-            var left = rect.left + rect.width / 2 - (panelW * z) / 2;
-            // Clamp to viewport (screen px)
-            left = Math.max(4, Math.min(left, window.innerWidth - panelW * z - 4));
-            panel.style.left = (left / z) + 'px';
-            panel.style.top = ((rect.bottom + 4) / z) + 'px';
-            panel.style.width = panelW + 'px';
-            // 8 arms + the arm-count fader outgrows a short viewport: cap to the
-            // space under the trigger and scroll the overflow (same guard the
-            // brush drawer needs).
-            panel.style.maxHeight = Math.max(180, (window.innerHeight - rect.bottom - 16) / z) + 'px';
-            panel.style.overflowY = 'auto';
-        }
-
-        // A silent drag strip where the "Brush Colors" title bar used to be
-        // (2026-08-16): the title only restated the control you just clicked,
-        // and the ✕ was a fourth way to close a panel the trigger, the gear and
-        // any click outside the canvas already close. The strip itself stays —
-        // something has to be grabbable (see the drag note below).
-        var header = document.createElement('div');
-        header.className = 'arm-colors-header arm-colors-grip';
-        header.title = 'Drag to move';
-        if (!host) panel.appendChild(header);   // a section doesn't float
-
-        // Drag by the header so the panel can be moved off whatever you are
-        // trying to look at — the whole point being to pick a colour against
-        // the art underneath it. Draggable handles pointer capture, viewport
-        // clamping and the --ui-scale zoom conversion this panel needs.
-        try {
-            if (!host && typeof Draggable !== 'undefined') {
-                new Draggable(panel, {
-                    handle: header,
-                    constrainToViewport: true,
-                    onDragStart: function () { userMoved = true; }
-                });
-            }
-        } catch (_) {}
-
-        // Arm count leads the panel: this IS the Multi-Brush panel, so the
-        // number of arms belongs next to the symmetry and per-arm colors it
-        // governs — reaching back out to the strip fader to change it, then
-        // back in here, was the whole complaint. A duplicate slider, NOT a
-        // moved one: #multiplier stays in the strip and stays the single source
-        // of truth. This proxy writes it and dispatches 'input', so every
-        // existing listener (05e's animationMultiplier, the strip's value cell,
-        // the arm rows below) runs exactly as it does for a direct drag.
         // Query through the channel, not the document: faderChannel has already
         // re-parented #multiplier into the Multi-Brush channel and that channel
         // is still DETACHED at this point, so document.getElementById returns
@@ -8570,48 +8617,9 @@
         // "rebuild when multiplier changes" listener at the foot of this
         // function had been silently dead on that null since the strip was
         // built; it shares this handle now.)
-        var multHost = toggle.closest ? toggle.closest('.mixer-channel') : null;
+        var multHost = triggerEl && triggerEl.closest ? triggerEl.closest('.mixer-channel') : null;
         var mainMult = (multHost && multHost.querySelector('#multiplier'))
             || document.getElementById('multiplier');
-        var multGroup = document.createElement('div');
-        multGroup.className = 'control-group';
-        var multLbl = document.createElement('label');
-        multLbl.setAttribute('for', 'multiplierPanel');
-        multLbl.innerHTML = 'Multi-Brush <span class="value-display" id="multiplierPanelValue">1x</span>';
-        var multVal = multLbl.querySelector('.value-display');
-        var multSlider = document.createElement('input');
-        multSlider.type = 'range';
-        multSlider.id = 'multiplierPanel';
-        multSlider.min = '1';
-        multSlider.max = '8';
-        multSlider.step = '1';
-        multSlider.value = mainMult ? mainMult.value : '1';
-        multGroup.appendChild(multLbl);
-        multGroup.appendChild(multSlider);
-        if (!host) panel.appendChild(multGroup);
-
-        // panel → strip. Setting .value never fires an event on its own, so the
-        // dispatch is what keeps the two honest; the strip's 'input' handler
-        // (registered further down) calls pullMultiplier right back, which is a
-        // no-op when the values already match — no ping-pong.
-        multSlider.addEventListener('input', function () {
-            if (!mainMult) return;
-            mainMult.value = multSlider.value;
-            try { mainMult.style.setProperty('--val', multSlider.value); } catch (_) {}
-            mainMult.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-        // strip → panel (also the open-time refresh, for the writers that set
-        // the slider by property without an event: hotkeys 1-8, kaleido, presets)
-        function pullMultiplier() {
-            if (!mainMult) return;
-            if (multSlider.value !== mainMult.value) {
-                multSlider.value = mainMult.value;
-                try { multSlider.style.setProperty('--val', mainMult.value); } catch (_) {}
-            }
-            multVal.textContent = (parseInt(mainMult.value, 10) || 1) + 'x';
-        }
-        pullMultiplier();
-
         // Symmetry follows: the mode decides what the arms listed below
         // actually are. The element is authored in index.html and MOVED here,
         // not cloned — a clone would leave the persisted #symmetryMode id
@@ -8670,9 +8678,7 @@
             }
             // The dab count, not the arm count, is what costs: Quad at 8 arms
             // is 32 splats per stroke sample, and nothing else on screen says so.
-            symNote.textContent = n + (n === 1 ? ' arm → ' : ' arms → ') +
-                dabs + (dabs === 1 ? ' dab' : ' dabs') + ' per stroke sample' +
-                (mir ? ', the mirror included' : '');
+            symNote.textContent = '';
         }
 
         function updateMirrorNote() {
@@ -8809,20 +8815,6 @@
             if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI({ skipPanel: true });
         })();
 
-        // Two-way sync, panel → main picker: arm 0 IS the brush, so giving it
-        // a fixed color should be the same act as picking a color in the
-        // sidebar picker (dispatching 'input' also unchecks random/step and
-        // applies pointer.color via 05g's listener). The reverse direction
-        // (picker → arm 0) lives in 05g's colorPicker input handler.
-        function syncMainPickerFromArm0() {
-            // Superseded by the 05g controller: reflect arm0.mode into the
-            // top-nav colour channel (picker + Rnd/Step/Rainbow chips + hidden
-            // checkboxes) by PROPERTY only. The old version dispatched a picker
-            // 'input', which fed back into the colour handlers — removed. Kept as
-            // a thin alias for any remaining callers.
-            if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI({ skipPanel: true });
-        }
-
         function rebuildRows() {
             // An open tip menu writes to the row's config, which a rebuild
             // may have swapped out (a preset): close it with the rows.
@@ -8866,17 +8858,16 @@
                     var picker = document.createElement('input');
                     picker.type = 'color';
                     picker.className = 'arm-picker';
-                    picker.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' colour');
-                    picker.title = 'Arm ' + (idx + 1) + ' colour. The colour this arm paints next; '
-                        + 'click to pick one of its own (that makes it Custom).';
+                    picker.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' color');
+                    picker.title = 'Arm ' + (idx + 1) + ' color. Click to make it custom';
                     var modes = [
-                        { key: 'main',    text: 'Main',    title: 'Main: this arm paints the brush colour, whatever it is set to' },
-                        { key: 'fixed',   text: 'Custom',  title: 'Custom: this arm keeps a colour of its own. Click to pick it.' },
+                        { key: 'main',    text: 'Main',    title: 'Set to follow default color picker, whatever it is set to' },
+                        { key: 'fixed',   text: 'Custom',  title: 'Custom: this brush keeps a color of its own. Click to select.' },
                         // 'rainbow' removed 2026-08-15 (photosensitivity)
-                        { key: 'random',  text: 'Random',  title: 'Random: a new colour each stroke' },
+                        { key: 'random',  text: 'Random',  title: 'Random: new color each stroke' },
                         // The next palette colour each stroke, in step with
                         // every other Palette arm.
-                        { key: 'step',    text: 'Palette', title: 'Palette: the next palette colour each stroke, in step with every other Palette arm' }
+                        { key: 'step',    text: 'Palette', title: 'Palette: set to follow palette, in line with every other Palette arm' }
                     ];
 
                     // The Paint Into radio track (01-buttons.css
@@ -8884,7 +8875,7 @@
                     var modeWrap = document.createElement('div');
                     modeWrap.className = 'brush-radio-row arm-mode-wrap';
                     modeWrap.setAttribute('role', 'radiogroup');
-                    modeWrap.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' colour');
+                    modeWrap.setAttribute('aria-label', 'Arm ' + (idx + 1) + ' color');
                     var btns = [];
 
                     // ── The arm's tip (2026-10-09) ───────────────────────────
@@ -8930,7 +8921,7 @@
                     // (css/01-buttons.css) and "selected" is its shared .active
                     // plate — their layout lives in 20-mixer-strip.css.
                     function paintRow() {
-                        // Read live: Tab flips the brush to Pressure under a
+                        // Read live: ~ flips the brush to Pressure under a
                         // row that is not rebuilt.
                         var brushPush = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
                         btns.forEach(function(b) {
@@ -8944,14 +8935,9 @@
                         pushBtn.setAttribute('aria-checked', push ? 'true' : 'false');
                         pushBtn.style.opacity = brushPush ? '0.45' : '';
                         pushBtn.title = brushPush
-                            ? 'Pressure arm — the whole brush is already in Pressure mode, '
-                              + 'so every arm pushes. Switch the brush back to Fluid to mix '
-                              + 'pushing and painting arms.'
-                            : (push ? 'Pressure arm: this arm pushes the paint already on the canvas '
-                                      + 'and lays none of its own. Click to make it paint again.'
-                                    : 'Make this a Pressure arm — it pushes paint instead of '
-                                      + 'laying it down, using the mode and Strength set in the '
-                                      + 'brush drawer. The other arms keep painting.');
+                            ? 'Pressure arm - the whole brush is already in Pressure mode, so every arm pushes. Switch the brush back to Fluid to mix pushing and painting arms.'
+                            : (push ? 'Pressure brush: this brush pushes the paint already on the canvas and lays none of its own. Click to make it paint again.'
+                                    : 'Convert to Pressure arm that pushes paint. Uses the mode and Strength set in the brush drawer.');
 
                         paintArmTipButton(tipBtn, tipIcon, idx, cfg, push || brushPush);
 
@@ -9120,7 +9106,6 @@
         // torn out from under an open colour dialog.
         function refreshPanel() {
             if (!isShown()) return;
-            pullMultiplier();
             if (rowsStale()) { rebuildRows(); return; }
             updateSymNote();
             for (var i = 0; i < rowPaints.length; i++) rowPaints[i]();
@@ -9138,83 +9123,21 @@
             if (!watchRaf && isShown()) watchRaf = requestAnimationFrame(watchTick);
         }
 
-        // The floating window opens, closes and follows its trigger; the
-        // section opens and closes like any section, and rebuilds its rows
-        // when it opens. Either way it then stays live (watchPanel).
-        if (host) {
-            var hostSec = host.closest ? host.closest('.sidebar-section') : null;
-            if (hostSec) {
-                hostSec.__onOpen = function () { pullMultiplier(); rebuildRows(); watchPanel(); };
-                // A section also opens without its header click (the saved
-                // open/closed state, a How-do-I tour), which skips __onOpen.
-                if (typeof MutationObserver === 'function') {
-                    new MutationObserver(watchPanel).observe(hostSec, { attributes: true, attributeFilter: ['class'] });
-                }
+        // The section opens and closes like any section, and rebuilds its
+        // rows when it opens; it then stays live (watchPanel).
+        var hostSec = host.closest ? host.closest('.sidebar-section') : null;
+        if (hostSec) {
+            hostSec.__onOpen = function () { rebuildRows(); watchPanel(); };
+            // A section also opens without its header click (the saved
+            // open/closed state, a How-do-I tour), which skips __onOpen.
+            if (typeof MutationObserver === 'function') {
+                new MutationObserver(watchPanel).observe(hostSec, { attributes: true, attributeFilter: ['class'] });
             }
-        } else {
-            function closePanel() {
-                panel.style.display = 'none';
-                toggle.classList.remove('active');
-                userMoved = false;   // next open re-anchors under the trigger
-            }
-    
-            toggle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                var open = isShown();
-                if (open) {
-                    closePanel();
-                } else {
-                    panel.style.display = 'block';
-                    toggle.classList.add('active');
-                    pullMultiplier();
-                    positionPanel();
-                    rebuildRows();
-                    watchPanel();
-                }
-            });
-    
-            // Close when pressing elsewhere in the UI — but NOT on the artwork. Any
-            // canvas click used to dismiss this, so you could never hold a colour
-            // open while working against the art you were picking for, which is
-            // most of the reason to move the panel at all.
-            //
-            // Two things made this feel broken (2026-08-27). The exemption covered
-            // all of #canvas-area — the entire region the panel floats over, empty
-            // letterbox included — so nearly every click that looked like "outside
-            // the dropdown" was inside the exemption and nothing happened. And it
-            // listened for a BUBBLED click, which half the strip never delivered:
-            // the channel gears (since removed) stopped propagation, so opening
-            // another channel's popup left this one hanging open behind it.
-            //
-            // pointerdown in the CAPTURE phase fixes the second: document capture
-            // runs before any handler in the tree, so nothing can swallow it. The
-            // exemption is now the artboard itself — #canvas and the wrapper that
-            // carries its resize handles — not the room it sits in.
-            document.addEventListener('pointerdown', function(e) {
-                if (!isShown()) return;
-                var t = e.target;
-                if (t && panel.contains(t)) return;
-                // The trigger owns the open/close toggle itself.
-                if (t === toggle || (t && toggle.contains(t))) return;
-                if (t && t.closest && t.closest('#canvas, #canvas-wrapper')) return;
-                closePanel();
-            }, true);
-            // Left in place for the OTHER popups' bubble-phase closers, which is
-            // all it ever guarded: this panel's own closer reads pointerdown and
-            // checks panel.contains() directly.
-            panel.addEventListener('click', function(e) { e.stopPropagation(); });
-    
-            // Reposition or close on resize
-            window.addEventListener('resize', function() {
-                if (isShown()) positionPanel();
-            });
-    
         }
 
         // A drag on the arm count lands in the same frame, not the next one.
         if (mainMult) {
             mainMult.addEventListener('input', function() {
-                pullMultiplier();
                 refreshPanel();
             });
         }
@@ -9236,7 +9159,6 @@
         };
 
         watchPanel();
-        return { toggle: toggle };
     }
 
     function hslToHex(h, s, l) {
@@ -9262,7 +9184,7 @@
     // cluster instead of a 16-section scroll. Shift+click opts out and toggles
     // one section on its own, for the "watch Multiplayer while I read Settings"
     // case. The header tooltip is the only place that override is advertised.
-    const SECTION_HINT = 'Click to open — the other sections close. Shift+click to keep them open.';
+    const SECTION_HINT = 'Click to open, Shift+click to keep multiple sections open.';
 
     function persistSectionState() {
         try {
@@ -9386,6 +9308,35 @@
             '<span class="section-chevron">▾</span>';
         sec.appendChild(header);
 
+        // The keyboard's way to open a section. The title, not the header,
+        // is the button: Layers keeps real buttons in its header, and a
+        // button inside a button is lost to a screen reader. Enter and Space
+        // stop here, so Space opens the section instead of freezing (05n).
+        const titleEl = header.firstChild;
+        titleEl.tabIndex = 0;
+        titleEl.setAttribute('role', 'button');
+        titleEl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        titleEl.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (!e.repeat) toggleSection(sec, e.shiftKey);
+        });
+        // Sections fold from many places (the accordion sweep, restore, 43's
+        // hiding), all by the class, so the class is what aria-expanded reads.
+        // A section folding with focus inside it (the accordion closing it as
+        // another opens, 43 hiding it) would drop focus on the page as its
+        // body goes hidden: the title catches it instead.
+        new MutationObserver(function () {
+            const folded = sec.classList.contains('collapsed');
+            titleEl.setAttribute('aria-expanded', folded ? 'false' : 'true');
+            const a = document.activeElement;
+            if (folded && a && a !== titleEl && body.contains(a) && titleEl.getClientRects().length) {
+                try { titleEl.focus({ preventScroll: true }); } catch (_) {}
+            }
+        }).observe(sec, { attributes: true, attributeFilter: ['class'] });
+
         const body = document.createElement('div');
         body.className = 'section-body';
         sec.appendChild(body);
@@ -9433,7 +9384,7 @@
         const val = parseFloat(slider.value);
         const step = parseFloat(slider.step) || 1;
         if (step < 0.01) return val.toFixed(4);
-        if (step < 0.1) return val.toFixed(1);
+        if (step < 0.1) return val.toFixed(2);
         if (step < 1) return val.toFixed(1);
         return String(val);
     }

@@ -3,7 +3,7 @@
     'use strict';
 
     // Enable drag scrolling for elements with specific selectors
-    const scrollableSelectors = ['.rec-body', '.layers-panel'];
+    const scrollableSelectors = ['.layers-panel'];
     
     function enableDragScroll(element) {
         if (!element || element._dragScrollEnabled) return;

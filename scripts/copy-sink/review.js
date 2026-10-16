@@ -253,7 +253,7 @@
     function answered(i) { var a = answers[i]; return !!(a && (a.choice === 'keep' || (a.choice === 'change' && a.note.trim()) || a.choice === 'later')); }
 
     // ── Card + spotlight ──
-    var card = null, spot = null, follow = null, undo = [];
+    var card = null, spot = null, follow = null, undo = [], keysGuarded = false;
     var CSS = '' +
         '#cs-review{position:fixed;bottom:16px;width:380px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto;z-index:' + Z + ';' +
         'background:#17121c;color:#eee;border:1px solid #ff3bd4;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);' +
@@ -537,11 +537,25 @@
             if (!card) {
                 card = h('div'); card.id = 'cs-review';
                 card.style.right = '16px';
-                // Typing in the card must not reach the app's hotkeys.
-                ['keydown', 'keyup', 'keypress'].forEach(function (t) {
-                    card.addEventListener(t, function (e) { e.stopPropagation(); });
-                });
+                // A stop can open a dialog that holds the keyboard (the mask
+                // editor, js/00b): it pulls focus that lands outside it back
+                // in, so the note box could not be typed in. 00b lets another
+                // aria-modal box keep focus, and the card is one.
+                card.setAttribute('role', 'dialog');
+                card.setAttribute('aria-modal', 'true');
+                card.setAttribute('aria-label', 'Copy review');
                 document.body.appendChild(card);
+            }
+            if (!keysGuarded) {
+                keysGuarded = true;
+                // Typing in the card must not reach the app's hotkeys, nor that
+                // dialog's own Tab and Esc (00b listens on document, capturing),
+                // so the keys stop at window before either sees them.
+                ['keydown', 'keyup', 'keypress'].forEach(function (t) {
+                    window.addEventListener(t, function (e) {
+                        if (card && card.contains(e.target)) e.stopPropagation();
+                    }, true);
+                });
             }
             show(m[1] ? parseInt(m[1], 10) - 1 : idx);
         })();

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05j-update-loop.js — part 10/14 of former 05-fluid-sim.js (lines 3120–3489)
+// js/05j-update-loop.js
 // LOAD ORDER: after 05i-sim-stats.js, before 05k-layers-render.js
 // PROVIDES: update() main loop (physics passes, post-FX, display, stats, governor feed)
 // REQUIRES: everything above; renderLayers NOT needed at load
@@ -379,8 +379,9 @@
             }
         };
         // Freeze (Space): the velocity rate while frozen, per 1/60 s. Motion
-        // eases out over ~0.85 s instead of stopping dead.
-        const FREEZE_VELOCITY_BRAKE = 0.9;
+        // eases out over ~0.5 s instead of stopping dead (0.9 took ~0.8 s
+        // and felt slow, 2026-10-14).
+        const FREEZE_VELOCITY_BRAKE = 0.8;
         // The desktop build holds its window invisible until one frame has
         // actually been drawn — that is the only proof the context, the
         // programs and every framebuffer are real (js/00a-boot.js).
@@ -428,8 +429,6 @@
             } else {
                 lastDrawTimeMs = nowMs;
             }
-            // COS Oscillator: advance all active parameter oscillators
-            if (window.cosOscillator) window.cosOscillator.tick(nowMs / 1000);
             // Physics timestep: Cap at 16ms to prevent instability at low FPS
             // Without this cap, 30 FPS = 33ms timestep = simulation explodes!
             const wallDt = Math.min((nowMs - lastTime) / 1000, 1.0);
@@ -769,7 +768,7 @@
                             // Interval -> rate. The control is an interval so its slider reads
                             // like Spacing (minimum = finest); the clock below wants a rate.
                             const _ivl = (typeof config.BRUSH_DAB_INTERVAL_MS === 'number' && config.BRUSH_DAB_INTERVAL_MS > 0)
-                                ? config.BRUSH_DAB_INTERVAL_MS : 8;
+                                ? config.BRUSH_DAB_INTERVAL_MS : 4;
                             const _rate = 1000 / _ivl;
                             const _rateRef = (typeof config.BRUSH_DAB_RATE_REF === 'number' && config.BRUSH_DAB_RATE_REF > 0)
                                 ? config.BRUSH_DAB_RATE_REF : 62.5;
@@ -1247,7 +1246,7 @@
                 // ── Standard Chorin projection order: forces → project → advect ──
                 // ── Freeze (Space) stands the fluid's OWN forces down ──────
                 // Freeze holds dye dissipation at 1.0 and brakes velocity at
-                // 0.9/frame (the advection passes below), but two passes add velocity
+                // 0.8/frame (the advection passes below), but two passes add velocity
                 // back every step with no hand on the canvas: vorticity
                 // confinement feeds on whatever curl is still braking out,
                 // and the Gravity Direction pad re-injects a push from the
@@ -1333,11 +1332,11 @@
                 const _ambOn = !_frozen && !!config.AMBIENT_FORCE && (_ambX !== 0 || _ambY !== 0);
                 if (_ambOn) {
                     const _ambRef = (typeof config.AMBIENT_FORCE_REF === 'number')
-                        ? config.AMBIENT_FORCE_REF : 0.5;
+                        ? config.AMBIENT_FORCE_REF : 5;
                     const _ambLoad = (typeof config.AMBIENT_FORCE_LOAD === 'number' && config.AMBIENT_FORCE_LOAD > 0)
                         ? config.AMBIENT_FORCE_LOAD : 2.4;
                     const _ambFloor = (typeof config.AMBIENT_FORCE_FLOOR === 'number')
-                        ? Math.max(0, Math.min(1, config.AMBIENT_FORCE_FLOOR)) : 0;
+                        ? Math.max(0, Math.min(1, config.AMBIENT_FORCE_FLOOR)) : 0.5;
                     // First the weight's mean along every row and column of the
                     // sim grid, so the force pass can pull each texel by how much
                     // heavier it is than the fluid beside it (balanced pull, see
@@ -1412,7 +1411,7 @@
                 // holds its speed longer (measured at 520×742, brush sizes 11
                 // and 4 at 1: 85-86% of Viscosity 0's speed 2.5 s on; the
                 // height gave 68-75%).
-                const _visc = (typeof config.VISCOSITY === 'number') ? Math.max(0, Math.min(1, config.VISCOSITY)) : 0;
+                const _visc = (typeof config.VISCOSITY === 'number') ? Math.max(0, Math.min(1, config.VISCOSITY)) : 0.3;
                 if (_visc > 0) {
                     const _vReach = (typeof config.VISCOSITY_REACH === 'number' && config.VISCOSITY_REACH > 0)
                         ? config.VISCOSITY_REACH : 0.07;
@@ -1665,7 +1664,7 @@
                     lastVelDiss = _velRate;
                     velDecayAccum = 0;
                 }
-                // Freeze's brake (0.9 per 1/60 s) runs
+                // Freeze's brake (0.8 per 1/60 s) runs
                 // on the wall clock whenever Time is below 1: on the sim clock
                 // it took 1/timeScale as long to bring the canvas to rest —
                 // ~5 s at Time 0.2, ~100 s at the slider's 0.01 floor — so
@@ -1745,7 +1744,7 @@
                 // either is on; with Drying at 0 the dye passes still get
                 // wetInfluence 0, so it never touches the motion.
                 if (_wetInfluence > 0 || (config.COLOR_BLEND || 0) > 0 || colorBlendEff > 0) {
-                    const _halfLife = (typeof config.WET_DRYING === 'number' && config.WET_DRYING > 0) ? config.WET_DRYING : 3.0;
+                    const _halfLife = (typeof config.WET_DRYING === 'number' && config.WET_DRYING > 0) ? config.WET_DRYING : 4.5;
                     if (_halfLife !== lastWetDrying) { lastWetDrying = _halfLife; wetDryAccum = 0; }
                     // Frozen, the map still rides the braking flow (so it
                     // stays on the paint) but does not dry, the way the dye
@@ -1979,15 +1978,8 @@
                 // Ignite rides on top of the user's rate and ceiling
                 // without ever writing them (see window.DyeNudge in 05h).
                 // Idle returns the base values unchanged — exact no-op.
-                // Breathing (45) runs the dye at a rate of its own while it is
-                // on: its Fades box on is a fade paced to the breath, off is a
-                // floor of 1.0 (never fades). The slider and config are
-                // untouched; Ignite still rides on top. Freeze holds the dye
-                // at 1.0 the same way, ahead of both.
-                const _dyeBase = window.__fluidFrozen ? 1.0
-                    : (typeof window.__dyeSustainOverride === 'number')
-                    ? window.__dyeSustainOverride
-                    : config.DENSITY_DISSIPATION;
+                // Freeze holds the dye at 1.0 the same way, ahead of it.
+                const _dyeBase = window.__fluidFrozen ? 1.0 : config.DENSITY_DISSIPATION;
                 const _dyeDiss = window.DyeNudge
                     ? window.DyeNudge.dissipation(_dyeBase)
                     : _dyeBase;
@@ -2490,8 +2482,8 @@
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
             gl.uniform1f(displayProg.uniforms.shadeInvert, window.displayShadingInvert || 0.0);
             gl.uniform1f(displayProg.uniforms.shadeRaised, config.SHADE_RAISED === false ? 0.0 : 1.0);
-            gl.uniform1f(displayProg.uniforms.shadeRelief, (typeof config.SHADE_RELIEF === 'number') ? config.SHADE_RELIEF : 1.0);
-            gl.uniform1f(displayProg.uniforms.shadeGloss, (typeof config.SHADE_GLOSS === 'number') ? config.SHADE_GLOSS : 0.35);
+            gl.uniform1f(displayProg.uniforms.shadeRelief, (typeof config.SHADE_RELIEF === 'number') ? config.SHADE_RELIEF : 0.1);
+            gl.uniform1f(displayProg.uniforms.shadeGloss, (typeof config.SHADE_GLOSS === 'number') ? config.SHADE_GLOSS : 0.05);
             // Light Source: one lamp for relief, gloss and the pool (05a).
             // Explicit number checks, not `|| default`: the pad's left and top
             // edges are 0, and `x || 0.5` threw the lamp back to the centre

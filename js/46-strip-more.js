@@ -12,11 +12,11 @@
 // in reverse when there is room again. Isolation, Viscosity and Time go
 // first, in that order (Gabriel, 2026-09-11: "the other stuff is more
 // important"), then the rest from the RIGHT, so Brush Size and Fluid are
-// the last out and the first back. Color, Transport, Presets and Help never move: those are the cells
+// the last out and the first back. Color, Transport and Presets never move: those are the cells
 // you must be able to hit without a second click.
 //
 // Parking MOVES the live nodes — no clones, no rebuild — so every id, every
-// binding, the perceptual proxies (Density/Time), COS, recording, the
+// binding, the perceptual proxies (Density/Time), recording, the
 // multiplayer mirror and presets keep working untouched. Same reason 20
 // re-parents instead of rebuilding.
 //
@@ -48,7 +48,7 @@
     // right of the bar. Keyed by the cell's data-ui-key (43's label).
     var PARK_FIRST = ['Isolation', 'Viscosity', 'Time'];
     var parkOrder = [];         // candidates sorted by that priority
-    var built = false, enabled = true, isOpen = false, raf = 0, lastStripW = -1;
+    var built = false, enabled = true, isOpen = false, raf = 0, lastStripW = -1, panelFocus = null;
     var PANEL_W = 248;
     // Popovers a parked cell can open (brush drawer, tip menu, arm colours)
     // are body-mounted with this skin; a press inside one is still "inside".
@@ -209,6 +209,13 @@
         panel.style.display = 'block';
         moreBtn.classList.add('active');
         moreBtn.setAttribute('aria-expanded', 'true');
+        // From the keyboard, focus goes to the first parked fader; Tab out
+        // closes it; closed with focus inside, back to More (00b popup).
+        // The faders' own popovers count as inside.
+        panelFocus = window.DialogFocus.popup(panel, moreBtn, {
+            close: close,
+            keep: function (el) { return !!(el.closest && el.closest(INSIDE)); }
+        });
     }
     function close() {
         if (!isOpen) return;
@@ -220,6 +227,7 @@
         panel.style.display = 'none';
         moreBtn.classList.remove('active');
         moreBtn.setAttribute('aria-expanded', 'false');
+        if (panelFocus) { var pf = panelFocus; panelFocus = null; pf.release(); }
     }
 
     // ── Build ──────────────────────────────────────────────────────────
@@ -296,9 +304,8 @@
         }, true);
         document.addEventListener('keydown', function (e) {
             if (!isOpen || e.key !== 'Escape' || e.defaultPrevented) return;
-            var inside = panel.contains(document.activeElement);
-            close();
-            if (inside) { try { moreBtn.focus(); } catch (_) {} }
+            e.preventDefault();   // used: 66 must not also take focus off More
+            close();   // focus back to More (00b popup)
         });
 
         // ── Re-measure triggers ──

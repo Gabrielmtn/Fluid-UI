@@ -357,6 +357,29 @@ button.btn--record:active,
 .btn--record:active {
     background: oklch(38% 0.130 25);
 }
+/* The slowdown button under the canvas (js/08a), Gabriel 2026-10-15:
+   yellow while painting runs over 10% under the fps between strokes, red
+   past 25% (and for the old "running very slowly" test). A warning the
+   painter should catch from the corner of the eye, so like the pair above
+   it sets its own colour. Red is the destructive red. */
+button.btn--slow-yellow {
+    background: oklch(31% 0.070 85);
+    border-color: oklch(52% 0.115 85);
+    color: oklch(93% 0.130 92);
+}
+button.btn--slow-yellow:hover {
+    background: oklch(36% 0.080 85);
+    border-color: oklch(60% 0.125 85);
+}
+button.btn--slow-red {
+    background: oklch(29% 0.110 25);
+    border-color: oklch(45% 0.150 25);
+    color: oklch(89% 0.200 25);
+}
+button.btn--slow-red:hover {
+    background: oklch(34% 0.125 25);
+    border-color: oklch(54% 0.170 25);
+}
 /* Recording IN PROGRESS is the one state that must read across the
    room. It is the pressed state of a reserved button, not a new
    colour. */

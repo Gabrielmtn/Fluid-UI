@@ -372,7 +372,7 @@
             var reader = new FileReader();
             var fail = function (err) {
                 var name = (file && file.name) ? ' "' + file.name + '"' : '';
-                audioNotice('Could not read that audio file' + name + ' — try MP3, WAV, OGG or M4A', 'error');
+                audioNotice('Could not read that audio file' + name + ' - try MP3, WAV, OGG or M4A', 'error');
                 reject(err || new Error('audio decode failed'));
             };
             // Without this the promise never settles when the file can't be
@@ -1239,7 +1239,7 @@
             ctx.fillStyle = 'rgba(255,255,255,0.32)';
             ctx.font = Math.round(Math.max(10, h * 0.07)) + 'px sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('♪ listening…', cx, cy);
+            ctx.fillText('listening…', cx, cy);
         }
 
         // Feature meters (bottom strip): band energies + Feature-Bus sources

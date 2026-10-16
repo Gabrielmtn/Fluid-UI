@@ -1,13 +1,14 @@
-// js/59-brush-type-key.js — Tab steps the brush through the drawer's Paint
-// Into row: Fluid → Pressure → Collider → Fluid, and Shift+Tab goes back.
-// The switch is the drawer's own (20-mixer-layout.js, window.BrushType: the
-// function its three buttons call), so a press and a click can never differ.
-// This file owns the key, and the pill that says where it landed.
+// js/59-brush-type-key.js — the ~ key steps the brush through the drawer's
+// Paint Into row: Fluid → Pressure → Collider → Fluid. The switch is the
+// drawer's own (20-mixer-layout.js, window.BrushType: the function its three
+// buttons call), so a press and a click can never differ. This file owns the
+// key, and the pill that says where it landed.
 //
-// Tab gives up walking focus between controls to do this. It still walks
-// them in a text field or a dropdown (typing targets keep every key), in a
-// confirm dialog, and in the editors that cover the canvas; the other
-// dialogs trap Tab in capture handlers of their own before it reaches here.
+// It was Tab until 2026-10-15; Tab went back to moving keyboard focus (the
+// skip menu, js/66). The key is matched by its place on the keyboard
+// (e.code Backquote), so ~ and ` both step, Shift or not, and a layout that
+// prints something else there (² on AZERTY, ^ on QWERTZ) still has it. Three
+// kinds means going back is two presses, so there is no back key.
 (function () {
     'use strict';
 
@@ -65,7 +66,7 @@
             pill.setAttribute('role', 'status');
             var cap = document.createElement('span');
             cap.className = 'hk-cap';
-            cap.textContent = 'Tab';
+            cap.textContent = '~';
             pill.appendChild(cap);
             ORDER.forEach(function (k) {
                 var s = document.createElement('span');
@@ -89,17 +90,21 @@
         hideTimer = setTimeout(function () { pill.hidden = true; }, SHOW_MS);
     }
 
-    // ─── TAB ────────────────────────────────────────────────────
+    // ─── THE KEY ────────────────────────────────────────────────
+    function isBrushKey(e) {
+        return e.code === 'Backquote' || e.key === '~' || e.key === '`';
+    }
+
     function typing(t) {
         if (window.__isTypingTarget) return window.__isTypingTarget(t);
         var tag = t && t.tagName ? t.tagName.toLowerCase() : '';
         return tag === 'input' || tag === 'textarea' || tag === 'select' || !!(t && t.isContentEditable);
     }
 
-    // Somewhere Tab should keep walking the buttons, or a brush switch would
-    // land under an editor that has its own brush.
+    // A dialog or an editor that has its own brush has the keyboard.
     function keyboardElsewhere() {
-        if (document.querySelector('.delete-modal.show')) return true;
+        if (window.SkipMenu && window.SkipMenu.isOpen()) return true;
+        if (window.DialogFocus.hasKeyboard()) return true;
         if (window.HotkeyBinds && window.HotkeyBinds.isActive()) return true;
         if (window.LayerTransform && window.LayerTransform.isOpen()) return true;
         var me = document.getElementById('maskEditorOverlay');
@@ -109,12 +114,12 @@
     // Document, bubble, like the app's other keys (05n, 58): a listening hotkey
     // picker (window capture, js/48) has already had the press.
     document.addEventListener('keydown', function (e) {
-        if (e.key !== 'Tab' || e.defaultPrevented) return;
-        if (e.ctrlKey || e.metaKey || e.altKey) return;   // the browser's and the system's
-        if (!window.BrushType) return;                    // drawer not built yet: plain Tab
+        if (!isBrushKey(e) || e.defaultPrevented) return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;   // AltGr arrives as Ctrl+Alt: a character, not this
+        if (!window.BrushType) return;                    // drawer not built yet
         if (typing(e.target) || keyboardElsewhere()) return;
         e.preventDefault();
-        if (e.repeat) return;                             // a held Tab must not strobe the brush
-        step(e.shiftKey ? -1 : 1);
+        if (e.repeat) return;                             // a held key must not strobe the brush
+        step(1);
     });
 })();

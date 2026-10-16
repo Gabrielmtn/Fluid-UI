@@ -143,7 +143,7 @@
         var msg = !AR() || !AR().getFileBuffer || !AR().getFileBuffer() ? 'Load a track to see its cues'
                 : e && e.analysing() ? 'Reading the track… ' + Math.round(e.progress() * 100) + '%'
                 : !n ? 'Draw a band in Audio to make a lane'
-                : !ch ? 'Getting the cues ready…' : '';
+                : !ch ? 'Preparing the cues…' : '';
         paintButtons(!!(ch && d));
         if (msg) {
             g.fillStyle = 'rgba(255,255,255,0.45)';
@@ -598,7 +598,7 @@
         if (!box) return;
         var dur = box.t1 - box.t0;
         matchInfo.textContent = 'Shape ' + dur.toFixed(2) + ' s · ' + hzText(box.u0) + '–' + hzText(box.u1) + ' Hz · '
-            + (!match || match.busy ? 'finding its repeats…' : match.peaks.length + (match.peaks.length === 1 ? ' match' : ' matches'));
+            + (!match || match.busy ? 'finding repeats…' : match.peaks.length + (match.peaks.length === 1 ? ' match' : ' matches'));
         var mode = (match && match.mode) || 'texture';
         modeBtns.attack.classList.toggle('active', mode === 'attack');
         modeBtns.texture.classList.toggle('active', mode === 'texture');
@@ -679,7 +679,7 @@
         btn.zoomIn = mkBtn('+', 'Show less of the track, in more detail (Ctrl + wheel)', function () { zoom(1 / 1.5); });
         btn.fit = mkBtn('Fit', 'Show the whole track', function () { view.t0 = 0; view.span = duration() || 20; clampView(); });
         btn.follow = mkBtn('Follow', 'Keep the playhead in view while the track plays', function () { follow = !follow; lastTouchMs = 0; });
-        btn.redetect = mkBtn('Re-detect', 'Give the selected cues\' lanes back to the detector: your edits on them go', function () {
+        btn.redetect = mkBtn('Re-detect', '', function () {
             var e = AT(), lanes = selectedLanes().filter(function (i) { return e.gates()[i] && e.gates()[i].edited && e.gates()[i].method !== 'pattern'; });
             if (!lanes.length) return;
             var before = snapshot(lanes);
@@ -707,7 +707,7 @@
         matchInfo = document.createElement('span');
         matchInfo.className = 'ace-match-info';
         matchEl.appendChild(matchInfo);
-        modeBtns.attack = mkBtn('Attacks', 'Match the shape\'s hits: how it rises, not how loud it sits (drums, plucks)', function () { if (match) match.mode = 'attack'; else match = { mode: 'attack' }; runMatch(); });
+        modeBtns.attack = mkBtn('Attacks', '', function () { if (match) match.mode = 'attack'; else match = { mode: 'attack' }; runMatch(); });
         modeBtns.texture = mkBtn('Texture', 'Match the shape as it sounds, loudness and all (pads, vocals, risers)', function () { if (match) match.mode = 'texture'; else match = { mode: 'texture' }; runMatch(); });
         matchEl.appendChild(modeBtns.texture);
         matchEl.appendChild(modeBtns.attack);
@@ -729,7 +729,7 @@
         simLbl.appendChild(simInput);
         simLbl.appendChild(simOut);
         matchEl.appendChild(simLbl);
-        makeBtn = mkBtn('Make a lane', 'Turn every match into a cue on a new lane, set to Burst; pick what it does in its row', makeLane);
+        makeBtn = mkBtn('Make a lane', '', makeLane);
         makeBtn.classList.add('btn--emphasis');
         matchEl.appendChild(makeBtn);
         matchEl.appendChild(mkBtn('Cancel', 'Drop the box (Escape)', function () { box = null; match = null; paintMatch(); }));
@@ -742,7 +742,7 @@
         // 1-8 (01a's typing rule), so they never reach the app's hotkeys:
         // Delete there clears a recording take.
         cv.setAttribute('data-owns-keys', '');
-        cv.setAttribute('aria-label', 'Cue editor: the track, its spectrogram and each lane\'s cues');
+        cv.setAttribute('aria-label', '');
         cv.addEventListener('pointerdown', onDown);
         cv.addEventListener('pointermove', onMove);
         cv.addEventListener('pointerup', onUp);
@@ -755,7 +755,7 @@
 
         hint = document.createElement('div');
         hint.className = 'ace-hint';
-        hint.textContent = 'Click a cue to select it, drag to move it (it lands on the nearest hit; Alt places it freely), Delete removes it, double-click a row to add one. While it plays, keys 1-8 tap cues onto lanes 1-8. Click the spectrogram to jump there; drag across it to box a shape and find every repeat.';
+        hint.textContent = '';
         wrap.appendChild(hint);
         host.appendChild(wrap);
         if (raf === null) raf = requestAnimationFrame(draw);

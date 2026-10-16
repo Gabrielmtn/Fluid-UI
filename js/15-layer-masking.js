@@ -91,90 +91,6 @@
         hardness: 0.6
     };
 
-    // Initialize mask properties on layers
-    function initLayerMasks() {
-        if (!window.recLayers) return;
-        window.recLayers.forEach(layer => {
-            if (!layer.mask) {
-                layer.mask = {
-                    enabled: false,
-                    mode: 'show', // 'show' or 'hide'
-                    shapes: []
-                };
-            }
-        });
-    }
-
-    // Enter mask editing mode for a layer
-    window.enterMaskMode = function(layerId) {
-        const layer = window.recLayers?.find(l => l.id === layerId);
-        if (!layer) return;
-
-        // Save current layer states
-        maskState.activeMaskLayerId = layerId;
-        maskState.maskMode = layer.mask?.mode || 'show';
-        maskState.shapes = layer.mask?.shapes ? cloneMaskShapes(layer.mask.shapes) : [];
-        maskState.selectedShapeIndex = null;
-
-        // Solo this layer (hide others temporarily)
-        window.recLayers.forEach(l => {
-            l._maskTempVisible = l.visible;
-            l.visible = (l.id === layerId);
-        });
-
-        // Show mask editor overlay
-        showMaskEditor();
-        wizardBegin();
-        updateMaskEditorTitle();
-        renderMaskEditor();
-
-        // If there are no existing shapes, build a default pixel mask from the
-        // current canvas content (treat any non-black pixels as masked).
-        if (!layer.mask?.shapes || layer.mask.shapes.length === 0) {
-            buildDefaultMaskFromCanvas();
-        }
-    };
-
-    // Exit mask editing mode
-    window.exitMaskMode = function(save = true) {
-        if (maskState.activeMaskLayerId === null) return;
-
-        const layer = window.recLayers?.find(l => l.id === maskState.activeMaskLayerId);
-        
-        if (save && layer) {
-            // Save mask data to layer (preserving SAM pixel masks)
-            layer.mask = {
-                enabled: maskState.shapes.length > 0,
-                mode: maskState.maskMode,
-                shapes: cloneMaskShapes(maskState.shapes)
-            };
-        }
-
-        // Restore layer visibility
-        window.recLayers?.forEach(l => {
-            if (l._maskTempVisible !== undefined) {
-                l.visible = l._maskTempVisible;
-                delete l._maskTempVisible;
-            }
-        });
-
-        // Hide mask editor overlay
-        hideMaskEditor();
-
-        // Reset mask state
-        maskState.activeMaskLayerId = null;
-        maskState.shapes = [];
-        maskState.selectedShapeIndex = null;
-        // maskState persists across editor sessions — leftover Instant Roto
-        // points from this one must not wedge a later session's Apply button.
-        resetSamSessionState();
-
-        // Refresh UI
-        if (typeof window.recRenderUI === 'function') {
-            window.recRenderUI();
-        }
-    };
-
     // Show mask editor overlay
     function showMaskEditor() {
         let overlay = document.getElementById('maskEditorOverlay');
@@ -187,102 +103,42 @@
         // The overlay persists across editor sessions — reset the Apply
         // button from whatever busy state the last session left it in.
         samSyncApplyBusy();
+        // It holds the keyboard while it is up (00b): Tab stays in the panel,
+        // app hotkeys don't reach the canvas under it, Esc is the ✕ (close
+        // without applying), and focus goes back to what opened it. Focus
+        // starts on the first wizard step, not on ✕, so a stray Enter
+        // doesn't throw the mask away.
+        if (!maskHold) {
+            const firstStep = overlay.querySelector('.mask-wizard-step');
+            maskHold = window.DialogFocus.hold(overlay, {
+                initial: firstStep && firstStep.getClientRects().length ? firstStep : null,
+                onEscape: function () { window.exitMaskMode(false); }
+            });
+        }
     }
 
     // Hide mask editor overlay
+    let maskHold = null;
+    // The hold above stops the app's hotkeys under the editor, Ctrl+Z with
+    // them, but the editor's own undo is that same Ctrl+Z (the ↶ button's
+    // tooltip says so). So undo and redo go on working here, by the same
+    // calls 05n makes, plus the collider film refresh the ↶ / ↷ buttons do.
+    document.addEventListener('keydown', function (e) {
+        if (!maskHold || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+        const k = (e.key || '').toLowerCase();
+        if (k !== 'z' && k !== 'y') return;
+        if (window.__isTypingTarget && window.__isTypingTarget(e.target)) return;
+        if (!window.UndoManager) return;
+        e.preventDefault();
+        if (k === 'y' || e.shiftKey) window.UndoManager.redo(); else window.UndoManager.undo();
+        if (colliderModeActive()) scheduleColliderFilm();
+    });
     function hideMaskEditor() {
         const overlay = document.getElementById('maskEditorOverlay');
         if (overlay) {
             overlay.style.display = 'none';
         }
-    }
-
-    // Build a default pixel mask from the current canvas content. This is
-    // primarily for fluid / glow layers where non-black pixels should be
-    // considered part of the mask area.
-    function buildDefaultMaskFromCanvas() {
-        const canvas = document.getElementById('canvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const width = canvas.width;
-        const height = canvas.height;
-        if (!width || !height) return;
-
-        const img = ctx.getImageData(0, 0, width, height).data;
-        const size = width * height;
-        const maskData = new Uint8Array(size);
-
-        let minX = width, minY = height, maxX = -1, maxY = -1;
-        let hasPixels = false;
-
-        // Treat any pixel with brightness above a small epsilon as part of the mask.
-        for (let i = 0, j = 0; i < size; i++, j += 4) {
-            const r = img[j];
-            const g = img[j + 1];
-            const b = img[j + 2];
-            const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-            if (brightness > 0.02) {
-                maskData[i] = 1;
-                hasPixels = true;
-                const x = i % width;
-                const y = (i - x) / width;
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-            }
-        }
-
-        if (!hasPixels) return;
-
-        const bboxWidth = maxX - minX + 1;
-        const bboxHeight = maxY - minY + 1;
-        const croppedMask = new Uint8Array(bboxWidth * bboxHeight);
-
-        for (let y = 0; y < bboxHeight; y++) {
-            for (let x = 0; x < bboxWidth; x++) {
-                const srcX = minX + x;
-                const srcY = minY + y;
-                const srcIdx = srcY * width + srcX;
-                const dstIdx = y * bboxWidth + x;
-                croppedMask[dstIdx] = maskData[srcIdx];
-            }
-        }
-
-        const shape = {
-            type: 'sam-mask',
-            x: minX,
-            y: minY,
-            width: bboxWidth,
-            height: bboxHeight,
-            rotation: 0,
-            samMask: croppedMask,
-            samMaskWidth: bboxWidth,
-            samMaskHeight: bboxHeight
-        };
-
-        maskState.shapes = [shape];
-        maskState.selectedShapeIndex = 0;
-        updateMaskEditorTitle();
-        updateRotationControl();
-        renderMaskEditor();
-    }
-
-    // Update mask editor title with layer info
-    function updateMaskEditorTitle() {
-        const overlay = document.getElementById('maskEditorOverlay');
-        if (!overlay) return;
-
-        const layer = window.recLayers?.find(l => l.id === maskState.activeMaskLayerId);
-        if (!layer) return;
-
-        const header = overlay.querySelector('.mask-editor-header h3');
-        if (header) {
-            const shapeCount = maskState.shapes.length;
-            header.innerHTML = `✂️ Mask Editor - ${window.escHtml(layer.name)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
-        }
+        if (maskHold) { const mh = maskHold; maskHold = null; mh.release(); }
     }
 
     // Create mask editor overlay UI
@@ -294,13 +150,13 @@
             <div class="mask-editor-panel">
                 <div class="mask-editor-header">
                     <h3>✂️ Mask Editor</h3>
-                    <button class="mask-close-btn" onclick="window.exitMaskMode(false)">✕</button>
+                    <button type="button" class="mask-close-btn" aria-label="Close" onclick="window.exitMaskMode(false)">✕</button>
                 </div>
                 <!-- Wizard rail: the three steps of making a mask. Clickable,
                      so it doubles as navigation for anyone who already knows
                      the flow. Hidden in collider paint mode. -->
                 <div class="mask-wizard-rail" id="maskWizardRail">
-                    <button type="button" class="mask-wizard-step" data-step="1" title="Pick what to mask — Instant Roto or stamped shapes">
+                    <button type="button" class="mask-wizard-step" data-step="1" title="Pick what to mask - Instant Roto or stamped shapes">
                         <span class="mask-wizard-num">1</span> Select
                     </button>
                     <span class="mask-wizard-sep">›</span>
@@ -308,7 +164,7 @@
                         <span class="mask-wizard-num">2</span> Touch up
                     </button>
                     <span class="mask-wizard-sep">›</span>
-                    <button type="button" class="mask-wizard-step" data-step="3" title="Soften the edge, then apply — no need to feather the layer afterwards">
+                    <button type="button" class="mask-wizard-step" data-step="3" title="Soften the edge, then apply - no need to feather the layer afterwards">
                         <span class="mask-wizard-num">3</span> Soften &amp; finish
                     </button>
                 </div>
@@ -329,8 +185,8 @@
                          walls can be tweaked where you can see them. -->
                     <div id="colliderTools" class="mask-collider-tools" style="display:none;">
                         <div class="mask-collider-row">
-                            <button id="colliderDrawBtn" class="mask-mode-btn collider-tool-btn active" title="Add collider area — paint walls the fluid flows around">Draw</button>
-                            <button id="colliderEraseBtn" class="mask-mode-btn collider-tool-btn" title="Remove collider area — erase walls back out">Erase</button>
+                            <button id="colliderDrawBtn" class="mask-mode-btn collider-tool-btn active" title="Add collider area - paint walls the fluid flows around">Draw</button>
+                            <button id="colliderEraseBtn" class="mask-mode-btn collider-tool-btn" title="Remove collider area - erase walls back out">Erase</button>
                             <!-- Same units as the Brush Size fader (1-30 → SPLAT_RADIUS/1000) -->
                             <label class="collider-size-label">Size
                                 <input type="range" id="colliderSize" min="1" max="30" step="0.5" value="11" data-no-scale="1">
@@ -338,11 +194,11 @@
                             </label>
                             <button id="colliderUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last collider stroke (Ctrl+Z)">↶</button>
                             <button id="colliderRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo (Ctrl+Shift+Z)">↷</button>
-                            <label class="collider-size-label" title="Show the artwork as it looks right now behind the collider — a snapshot taken when ticked, for placing walls against the picture">
+                            <label class="collider-size-label" title="Show the artwork as it looks right now behind the collider - a snapshot taken when ticked, for placing walls against the picture">
                                 <input type="checkbox" id="colliderViewArt"> View on canvas
                             </label>
                         </div>
-                        <div class="mask-collider-hint">Paint directly on the artwork — the collider and its thumbnail update as you go. Shift+drag pans, scroll zooms.</div>
+                        <div class="mask-collider-hint">Paint directly on the artwork - the collider and its thumbnail update as you go. Shift+drag pans, scroll zooms.</div>
                     </div>
                     <!-- Step 1's three ways to make a selection, as tabs over
                          one panel. #smartSelectBtn / #stampMenuBtn keep their
@@ -351,19 +207,19 @@
                          first and is the tab the editor opens on (user test
                          3; wizardBegin). -->
                     <div class="mask-tools-row mask-tool-tabs" role="tablist">
-                        <button id="filterToolBtn" class="mask-tool-tab" data-tool="filter" onclick="window.setMaskTool('filter')" title="Key out a solid background&#10;Pick the background colour, drag the cut up — the shape falls out of it">
+                        <button id="filterToolBtn" class="mask-tool-tab" data-tool="filter" onclick="window.setMaskTool('filter')" title="Key out a solid background&#10;Pick the background color, drag the cut up - the shape falls out of it">
                             <span class="mask-tool-tab-icon">🎚️</span> Filter
                         </button>
-                        <button id="smartSelectBtn" class="mask-tool-tab" data-tool="magic" onclick="window.setMaskTool('magic')" title="AI-powered object masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
+                        <button id="smartSelectBtn" class="mask-tool-tab" data-tool="magic" onclick="window.setMaskTool('magic')" title="ML-powered rotoscope masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
                             <span class="mask-tool-tab-icon">🪄</span> Instant Roto
                         </button>
-                        <button id="stampMenuBtn" class="mask-tool-tab" data-tool="stamps" onclick="window.setMaskTool('stamps')" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more — drag to place, resize with the handle">
+                        <button id="stampMenuBtn" class="mask-tool-tab" data-tool="stamps" onclick="window.setMaskTool('stamps')" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more - drag to place, resize with the handle">
                             <span class="mask-tool-tab-icon">▦</span> Stamps
                         </button>
                         <span id="samLoadingStatus" style="font-size: 12px; color: #8b949e; align-self: center;"></span>
                     </div>
                     <div id="stampMenu" class="mask-stamp-menu mask-tool-panel" style="display: none;">
-                        <div class="mask-stamp-hint">Click a shape to stamp it onto the mask — drag to move it, grab the handle to resize.</div>
+                        <div class="mask-stamp-hint">Click a shape to stamp it onto the mask - drag to move it, grab the handle to resize.</div>
                         <div id="manualShapeTools" class="mask-shape-tools">
                             <button class="mask-tool-btn" data-shape="rect" title="Stamp a Rectangle">▭</button>
                             <button class="mask-tool-btn" data-shape="roundrect" title="Stamp a Rounded Rectangle">▢</button>
@@ -380,11 +236,11 @@
                          (that slider keys against BLACK — real photos aren't). -->
                     <div id="filterPanel" class="mask-filter-panel mask-tool-panel" style="display: none;">
                         <div class="mask-filter-hint">
-                            For a subject on a flat background: set the background colour, then raise the cut until only the shape is left.
+                            Set the background color, then use the slider to raise filter value to cut everything out from that background color. For instant roto, left click to select the object you want it to mask (mixed results, but works for some objects)
                         </div>
                         <div class="mask-filter-row">
                             <span class="mask-filter-label">Background</span>
-                            <input type="color" id="filterBgColor" value="#000000" title="The colour being cut away">
+                            <input type="color" id="filterBgColor" value="#000000" title="The color being cut away">
                             <button type="button" id="filterPickBtn" class="mask-action-btn" title="Then click the background on the image">Pick</button>
                             <button type="button" id="filterAutoBtn" class="mask-action-btn" title="Guess it from the edges of the image">Auto</button>
                             <label class="mask-filter-check" title="Keep the background and drop the subject instead">
@@ -404,9 +260,9 @@
                             🪄 Click the objects you want masked:
                         </div>
                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px;">
-                            • <strong style="color: #3fb950;">Left-click</strong>: Include point (green)<br>
-                            • <strong style="color: #f85149;">Right-click</strong>: Exclude point (red)<br>
-                            • Shift+Click: Pan view
+                            • <strong style="color: #3fb950;">Left-click</strong><br>
+                            • <strong style="color: #f85149;">Right-click</strong><br>
+                            
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button id="samSegmentBtn" class="mask-action-btn" onclick="window.runSAMSegmentation()" style="flex: 0 0 auto; background: linear-gradient(180deg, #238636, #1a7f37);" disabled>
@@ -416,7 +272,7 @@
                                 🗑️ Clear Points
                             </button>
                         </div>
-                        <div id="samCandidateControls" style="display: none; gap: 6px; margin-top: 8px; align-items: center;" title="The AI proposes a few cutouts — hover to preview, click to choose"></div>
+                        <div id="samCandidateControls" style="display: none; gap: 6px; margin-top: 8px; align-items: center;" title="The AI proposes a few cutouts - hover to preview, click to choose"></div>
                         <div id="samLoadingIndicator" style="display: none; margin-top: 8px; padding: 8px; background: rgba(88, 166, 255, 0.15); border-radius: 4px; font-size: 12px; color: #58a6ff; text-align: center;">
                             <span class="sam-spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(88, 166, 255, 0.3); border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px;"></span>
                             Instant Roto is cutting out your object...
@@ -427,8 +283,8 @@
                          missed the handle". -->
                     <div id="touchUpTools" class="mask-collider-tools" style="display:none;">
                         <div class="mask-collider-row">
-                            <button id="touchUpEraseBtn" class="mask-mode-btn collider-tool-btn active" title="Erase mask — wipe away stray bits the AI included">Erase</button>
-                            <button id="touchUpDrawBtn" class="mask-mode-btn collider-tool-btn" title="Add mask — paint in a piece the AI missed">Add</button>
+                            <button id="touchUpEraseBtn" class="mask-mode-btn collider-tool-btn active" title="Erase mask - wipe away stray bits the AI included">Erase</button>
+                            <button id="touchUpDrawBtn" class="mask-mode-btn collider-tool-btn" title="Add mask - paint in a piece the AI missed">Add</button>
                             <label class="collider-size-label">Size
                                 <input type="range" id="touchUpSize" min="2" max="60" step="1" value="14" data-no-scale="1">
                                 <span id="touchUpSizeVal">14</span>
@@ -448,7 +304,7 @@
                             <span id="maskFeatherValue" class="mask-feather-value">0%</span>
                         </label>
                         <div class="mask-feather-hint" id="maskFeatherHint">
-                            0% is a hard cut-out. Raise it for a soft edge — the same Feather that lives on the layer, set here so you never have to go back for it.
+                            0% is a hard cut-out. Raise it for a soft edge - the same Feather that lives on the layer, set here so you never have to go back for it.
                         </div>
                         <label class="mask-collider-opt" id="maskColliderOpt" style="display:none;">
                             <input type="checkbox" id="maskMakeCollider"> 🧱 Also make this a collision layer the fluid flows around
@@ -599,7 +455,7 @@
                 maskState.filterPicking = !maskState.filterPicking;
                 filterSyncControls();
                 setStepHint(maskState.filterPicking
-                    ? '<strong style="color:#58a6ff;">💧 Click the background</strong> on the image to key that colour out.'
+                    ? '<strong style="color:#58a6ff;">💧 Click the background</strong> on the image to key that color out.'
                     : STEP_HINTS[1]);
             });
         }
@@ -612,7 +468,7 @@
                     filterSyncControls();
                     scheduleMaskRender();
                 } else {
-                    setStepHint('<strong style="color:#8b949e;">Could not read the image edges</strong> — pick the colour by hand.', 3000);
+                    setStepHint('<strong style="color:#8b949e;">Could not read the image edges</strong> - pick the color by hand.', 3000);
                 }
             });
         }
@@ -920,9 +776,9 @@
                 maskState.filterBg = picked;
                 maskState.filterBgPicked = true;
                 invalidateFilterPreview();
-                setStepHint('<strong style="color:#3fb950;">Background set</strong> — raise Cut amount to key it out.', 2600);
+                setStepHint('<strong style="color:#3fb950;">Background set</strong> - raise Cut amount to key it out.', 2600);
             } else {
-                setStepHint('<strong style="color:#8b949e;">Could not read that pixel</strong> — set the colour by hand.', 3000);
+                setStepHint('<strong style="color:#8b949e;">Could not read that pixel</strong> - set the color by hand.', 3000);
             }
             filterSyncControls();
             scheduleMaskRender();
@@ -1889,12 +1745,6 @@
         syncMaskToolTabs();
     }
 
-    // Toggle the Stamps submenu (shape tools)
-    window.toggleStampMenu = function() {
-        maskState.stampMenuOpen = !maskState.stampMenuOpen;
-        updateStampMenuDisplay();
-    };
-
     // Toggle Instant Roto mode (AI segmentation)
     window.toggleSmartSelect = async function() {
         maskState.smartSelectMode = !maskState.smartSelectMode;
@@ -2230,26 +2080,6 @@
         }
     }
 
-    // Cycle to previous SAM candidate
-    window.samSelectPrevCandidate = function() {
-        const total = maskState.samCandidates ? maskState.samCandidates.length : 0;
-        if (!total) return;
-        maskState.samSelectedCandidateIndex = (maskState.samSelectedCandidateIndex - 1 + total) % total;
-        maskState.samPreviewMask = maskState.samCandidates[maskState.samSelectedCandidateIndex];
-        samUpdateCandidateControls();
-        renderMaskEditor();
-    };
-
-    // Cycle to next SAM candidate
-    window.samSelectNextCandidate = function() {
-        const total = maskState.samCandidates ? maskState.samCandidates.length : 0;
-        if (!total) return;
-        maskState.samSelectedCandidateIndex = (maskState.samSelectedCandidateIndex + 1) % total;
-        maskState.samPreviewMask = maskState.samCandidates[maskState.samSelectedCandidateIndex];
-        samUpdateCandidateControls();
-        renderMaskEditor();
-    };
-
     // Run SAM segmentation
     window.runSAMSegmentation = async function() {
         if (maskState.samPreviewMask) {
@@ -2301,98 +2131,6 @@
         }
     };
 
-    // Initialize on page load
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initLayerMasks);
-    } else {
-        initLayerMasks();
-    }
-
-    // Check if a point passes through a layer's mask
-    window.checkMaskPoint = function(layerId, x, y) {
-        const layer = window.recLayers?.find(l => l.id === layerId);
-        if (!layer || !layer.mask || !layer.mask.enabled || !layer.mask.shapes || layer.mask.shapes.length === 0) {
-            return true; // No mask, allow all points
-        }
-
-        const canvas = document.getElementById('canvas');
-        if (!canvas) return true;
-
-        // Convert normalized coordinates to canvas coordinates
-        const canvasX = x * canvas.width;
-        const canvasY = y * canvas.height;
-
-        // Check if point is inside any shape
-        let isInside = false;
-        for (const shape of layer.mask.shapes) {
-            if (isPointInShapeMask(shape, canvasX, canvasY)) {
-                isInside = true;
-                break;
-            }
-        }
-
-        // Apply mask mode
-        if (layer.mask.mode === 'show') {
-            return isInside; // Only show if inside a shape
-        } else {
-            return !isInside; // Only show if outside shapes (hide mode)
-        }
-    };
-
-    // Helper to check if point is in shape (using canvas coordinates)
-    function isPointInShapeMask(shape, x, y) {
-        // If shape has depth mask data, check depth value against threshold
-        if (shape.type === 'depth-mask' && shape.depthData && shape.depthWidth && shape.depthHeight) {
-            const relX = (x - shape.x) / shape.width * shape.depthWidth;
-            const relY = (y - shape.y) / shape.height * shape.depthHeight;
-            if (relX < 0 || relY < 0 || relX >= shape.depthWidth || relY >= shape.depthHeight) {
-                return false;
-            }
-            const pixelIndex = Math.floor(relY) * shape.depthWidth + Math.floor(relX);
-            const depthVal = shape.depthData[pixelIndex] || 0;
-            const threshold = shape.threshold || 128;
-            const invert = shape.invert || false;
-            return invert ? (depthVal < threshold) : (depthVal >= threshold);
-        }
-
-        // If shape has SAM pixel mask data, use it for precise checking
-        if (shape.samMask && shape.samMaskWidth && shape.samMaskHeight) {
-            // Convert canvas coordinates to mask-relative coordinates
-            const relX = x - shape.x;
-            const relY = y - shape.y;
-            
-            // Check if point is within mask bounds
-            if (relX < 0 || relY < 0 || relX >= shape.samMaskWidth || relY >= shape.samMaskHeight) {
-                return false;
-            }
-            // Check the actual pixel in the mask. Soft masks (0-255 coverage)
-            // gate at half-coverage so the boolean edge sits mid-ramp —
-            // matching where the visual/collider edge reads ~50%.
-            const pixelIndex = Math.floor(relY) * shape.samMaskWidth + Math.floor(relX);
-            return shape.samSoft ? (shape.samMask[pixelIndex] >= 128) : (shape.samMask[pixelIndex] > 0);
-        }
-        
-        // Fallback to geometric shapes
-        if (shape.type === 'circle') {
-            const cx = shape.x + shape.width / 2;
-            const cy = shape.y + shape.height / 2;
-            const r = shape.width / 2;
-            const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-            return dist <= r;
-        } else if (shape.type === 'ellipse') {
-            const cx = shape.x + shape.width / 2;
-            const cy = shape.y + shape.height / 2;
-            const rx = shape.width / 2;
-            const ry = shape.height / 2;
-            const normalized = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
-            return normalized <= 1;
-        } else {
-            // Rectangle
-            return x >= shape.x && x <= shape.x + shape.width &&
-                   y >= shape.y && y <= shape.y + shape.height;
-        }
-    }
-
     // ══ Mask wizard (2026-08-18) ══════════════════════════════════════════
     // The editor used to be one wall of controls with no order to it, and the
     // two steps that matter most were missing or elsewhere: there was nowhere
@@ -2410,9 +2148,9 @@
     const TOUCHUP_HISTORY = 6; // full-canvas snapshots — deep enough to fix a slip
 
     const STEP_HINTS = {
-        1: '<strong style="color:#58a6ff;">Step 1 — Select:</strong> Filter cuts a plain background away, Instant Roto clicks an object out, Stamps by hand • Scroll to zoom • Middle-click to pan',
-        2: '<strong style="color:#3fb950;">Step 2 — Touch up:</strong> Erase the strays, add anything missed • Right-drag = the other tool • Shift+drag pans',
-        3: '<strong style="color:#d2a8ff;">Step 3 — Soften &amp; finish:</strong> Blue shows what the mask covers • Set the edge softness, then Apply'
+        1: '<strong style="color:#58a6ff;">Step 1 - Select:</strong> Filter cuts a plain background away, Instant Roto clicks an object out, Stamps by hand • Scroll to zoom • Middle-click to pan',
+        2: '<strong style="color:#3fb950;">Step 2 - Touch up:</strong> Erase the strays, add anything missed • Right-drag = the other tool • Shift+drag pans',
+        3: '<strong style="color:#d2a8ff;">Step 3 - Soften &amp; finish:</strong> Blue shows what the mask covers • Set the edge softness, then Apply'
     };
 
     function wizardKind() {
@@ -2421,14 +2159,12 @@
         if (id === 'adhoc') return 'adhoc';
         if (String(id).indexOf('collider-') === 0) return 'collider';
         if (String(id).indexOf('image-') === 0) return 'image';
-        return 'recording';
+        return 'none';
     }
 
     // Feather is stored per consumer: image layers keep it LIVE on
     // layer.threshold (the panel slider, applyLayerMask and the collider bake
     // all already read it), adhoc brush shapes bake it into the stamp.
-    // Recorded-layer masks are hard-tested per point (checkMaskPoint), so a
-    // soft edge there would be a promise the renderer doesn't keep.
     function wizardSupportsFeather() {
         const k = wizardKind();
         return k === 'image' || k === 'adhoc';
@@ -2939,7 +2675,7 @@
             areas.push(area);
         }
         if (areas.length <= 1) {
-            setStepHint('<strong style="color:#8b949e;">Nothing to remove</strong> — the mask is already a single piece.', 2600);
+            setStepHint('<strong style="color:#8b949e;">Nothing to remove</strong> - the mask is already a single piece.', 2600);
             return;
         }
         let max = 0;
@@ -2948,7 +2684,7 @@
         let removed = 0;
         for (let i = 0; i < areas.length; i++) if (areas[i] < cut) removed++;
         if (!removed) {
-            setStepHint('<strong style="color:#8b949e;">Nothing to remove</strong> — every piece is big enough to look deliberate. Erase by hand if you want one gone.', 3200);
+            setStepHint('<strong style="color:#8b949e;">Nothing to remove</strong> - every piece is big enough to look deliberate. Erase by hand if you want one gone.', 3200);
             return;
         }
         touchUpPushUndo(tu);
@@ -2963,7 +2699,7 @@
         tu.tint = null;
         renderMaskEditor();
         setStepHint('<strong style="color:#3fb950;">Removed ' + removed + ' stray ' +
-            (removed === 1 ? 'speck' : 'specks') + '</strong> — ↶ puts them back.', 3200);
+            (removed === 1 ? 'speck' : 'specks') + '</strong> - ↶ puts them back.', 3200);
     }
 
     // Fold the brushed coverage back into maskState.shapes (one soft
@@ -3133,7 +2869,7 @@
         if (from === 1) {
             // A cutout still in flight would be dropped on the floor
             if (samCutoutPending()) {
-                setStepHint('<strong style="color:#58a6ff;">⏳ Instant Roto is still cutting out your object</strong> — one moment.', 2600);
+                setStepHint('<strong style="color:#58a6ff;">⏳ Instant Roto is still cutting out your object</strong> - one moment.', 2600);
                 return;
             }
             // Bake the live filter into a shape before anything downstream
@@ -3200,7 +2936,7 @@
         const fHint = overlay.querySelector('#maskFeatherHint');
         if (fHint) {
             fHint.textContent = canFeather
-                ? '0% is a hard cut-out. Raise it for a soft edge — this is the same Feather that lives on the layer, set here so you never have to go back for it.'
+                ? '0% is a hard cut-out. Raise it for a soft edge - this is the same Feather that lives on the layer, set here so you never have to go back for it.'
                 : 'This mask is tested per point, so it has no soft edge to set. Check the shape below, then apply.';
         }
 
@@ -3514,7 +3250,7 @@
         setTimeout(function () {
             setColliderChromeVisible(true);
             var hdr = document.querySelector('.mask-editor-header h3');
-            if (hdr) hdr.textContent = 'Edit Collider — ' + (layer.title || 'Collision');
+            if (hdr) hdr.textContent = 'Edit Collider - ' + (layer.title || 'Collision');
             var hint = document.getElementById('maskHint');
             if (hint) {
                 hint.innerHTML = '<strong style="color:#ff7b72;">🧱 Collider:</strong> '
@@ -3852,7 +3588,7 @@
         // whole-image fallback stamp — the full-file-rect "giant square".
         // Hold the editor open instead; Cancel is always available.
         if (save && samCutoutPending()) {
-            alert('Instant Roto is still cutting out your object — wait for the green preview, or Cancel.');
+            alert('Instant Roto is still cutting out your object - wait for the green preview, or Cancel.');
             return;
         }
         // Same Apply nicety as image layers: a pending SAM preview with no
@@ -3882,7 +3618,7 @@
         // Same in-flight guard as the adhoc editor: applying before the
         // cutout lands would save an empty/incomplete mask.
         if (save && samCutoutPending()) {
-            alert('Instant Roto is still cutting out your object — wait for the green preview, or Cancel.');
+            alert('Instant Roto is still cutting out your object - wait for the green preview, or Cancel.');
             return;
         }
 
@@ -3925,7 +3661,7 @@
         maskState.activeMaskLayerId = null;
         maskState.shapes = [];
         maskState.selectedShapeIndex = null;
-        // Same anti-leak reset as the adhoc/recording exits: stale points
+        // Same anti-leak reset as the adhoc exit: stale points
         // from a cancelled session would disable Apply on the next open.
         resetSamSessionState();
 
@@ -3966,8 +3702,7 @@
         }
     }
 
-    // Override exitMaskMode to handle every target type
-    const originalExitMaskMode = window.exitMaskMode;
+    // Close the editor for whichever target it has open
     window.exitMaskMode = function(save = true) {
         // The touch-up brush owns the coverage while step 2 is open — fold it
         // back into maskState.shapes before any save path reads them.
@@ -3980,8 +3715,6 @@
             exitAdhocMaskMode(save);
         } else if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
             exitImageLayerMaskMode(save);
-        } else {
-            originalExitMaskMode(save);
         }
         // Only tear the wizard down if the editor actually closed — the in-
         // flight-cutout guards above hold it open and return without saving.
@@ -3989,9 +3722,8 @@
         if (!ov || ov.style.display === 'none') wizardEnd();
     };
 
-    // Update title function to handle every target type
-    const originalUpdateMaskEditorTitle = updateMaskEditorTitle;
-    updateMaskEditorTitle = function() {
+    // Editor title: the brush shape's or the image layer's name
+    function updateMaskEditorTitle() {
         if (maskState.activeMaskLayerId === 'adhoc') {
             const overlay = document.getElementById('maskEditorOverlay');
             const header = overlay && overlay.querySelector('.mask-editor-header h3');
@@ -4008,11 +3740,6 @@
             if (layer) {
                 updateMaskEditorTitleForImageLayer(layer);
             }
-        } else {
-            originalUpdateMaskEditorTitle();
         }
-    };
-
-    // Expose functions
-    window.initLayerMasks = initLayerMasks;
+    }
 })();

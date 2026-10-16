@@ -103,9 +103,7 @@ function fatalError(kind, err) {
         ? 'Swirl Together is missing some of its files.'
         : 'Swirl Together hit an unexpected error and has to close.';
     const guidance = damaged
-        ? 'This usually means the install is incomplete or damaged — an interrupted download, or an antivirus that quarantined a file.\n\n' +
-          'On Steam: right-click Swirl Together → Properties → Installed Files → Verify integrity of game files.\n' +
-          'Elsewhere: reinstalling fixes it.'
+        ? 'This usually means the install is incomplete or damaged - an interrupted download, or an antivirus that quarantined a file.\n\nOn Steam: right-click Swirl Together → Properties → Installed Files → Verify integrity of game files.\nElsewhere: reinstalling fixes it.'
         : 'Your presets, brushes and settings are stored separately and are safe.\n\n' +
           'If this keeps happening, updating your graphics drivers is the usual fix.';
     const first = String((err && err.stack) || err || '').split('\n').slice(0, 3).join('\n');
@@ -293,8 +291,6 @@ app.commandLine.appendSwitch('enable-gpu-memory-buffer-compositor-resources'); /
 // known-bad drivers lose their only fallback path), and VaapiVideoDecoder
 // (Linux-only, a no-op on Windows).
 
-// ⚡ NUCLEAR: Force disable ALL frame limiting
-app.commandLine.appendSwitch('max-gum-fps', '1000'); // Remove media FPS cap
 app.commandLine.appendSwitch('disable-renderer-backgrounding'); // Keep rendering at full speed
 // REMOVED 2026-09-15: disable-backgrounding-occluded-windows. It came in with
 // the "disable ALL frame limiting" sweep above, and what it actually bought
@@ -321,9 +317,7 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding'); // Keep renderin
 // NOTE: Do NOT use --use-angle=gl on Windows — OpenGL backend locks vsync to 60Hz.
 // Default D3D11 backend handles high-refresh monitors correctly.
 
-// ⚡ Memory and Performance Flags
-app.commandLine.appendSwitch('max-old-space-size', '4096'); // 4GB heap
-app.commandLine.appendSwitch('js-flags', '--expose-gc --max-semi-space-size=128'); // Manual GC + larger young gen
+app.commandLine.appendSwitch('js-flags', '--max-semi-space-size=128'); // Larger young gen
 
 // On dual-GPU machines Chromium can land on the integrated GPU (observed:
 // UHD 770 pegged at 100% while the GeForce idles). Ask for the discrete
@@ -810,7 +804,6 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,  // Enable for window controls
             contextIsolation: false, // Disable for window controls
-            enableRemoteModule: true, // Enable remote module for window controls
             offscreen: false, // Use hardware rendering
             webgl: true,
             experimentalFeatures: true,
@@ -845,7 +838,8 @@ function createWindow() {
     mainWindow.maximize();
     
     // NOTE: setFrameRate() only works with offscreen rendering (offscreen: true).
-    // High refresh rate is handled by --disable-gpu-vsync + --disable-frame-rate-limit flags.
+    // rAF follows the display's own refresh rate (see the REMOVED note at the
+    // command-line switches).
     
     // NOTE: Cache and localStorage are preserved across restarts.
     // Use Ctrl+Shift+D in the app to force-clear everything for debugging.
@@ -903,7 +897,7 @@ function createWindow() {
             });
             const num = (k) => (k in f && isFinite(parseInt(f[k], 10))) ? parseInt(f[k], 10) : undefined;
             const opts = {
-                title: 'Swirl Together — Pen input',
+                title: 'Swirl Together - Pen input',
                 frame: true,
                 autoHideMenuBar: true,
                 backgroundColor: '#000000',
@@ -950,7 +944,7 @@ function createWindow() {
     // reports as a failure and is completely normal.
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
         if (!isMainFrame || errorCode === -3) return;
-        const err = new Error('Could not load ' + validatedURL + ' — ' + errorDescription + ' (' + errorCode + ')');
+        const err = new Error('Could not load ' + validatedURL + ' - ' + errorDescription + ' (' + errorCode + ')');
         err.code = 'ENOENT';   // routes to the "verify your files" copy
         fatalError('did-fail-load', err);
     });

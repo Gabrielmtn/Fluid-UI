@@ -284,7 +284,7 @@
             b2.id = 'phonePadRoomBtn';
             b2.type = 'button';
             b2.setAttribute('data-pop-close', '');
-            b2.title = 'Show a code your phone can scan: it becomes this canvas’s mouse, or an artist in this room.';
+            b2.title = 'Show a code your phone can scan. You can make your phone into your canvas’s mouse, or an artist in this room.';
             b2.addEventListener('click', function () { open(); });
             pop.appendChild(b2);
         }
@@ -312,7 +312,7 @@
 
     // ── The dialog ──────────────────────────────────────────────────
     var WAY_KEY = 'fluidui.phoneWay';
-    var modal = null, els = null, keyHandler = null, renderTimer = 0;
+    var modal = null, els = null, keyHandler = null, renderTimer = 0, hold = null;
     var revealed = false, qrKey = '', way = 'mouse';
 
     function savedWay() {
@@ -420,7 +420,7 @@
         // moved from the couch — where an artist phone is another person in
         // the room, with a cursor and a name of its own.
         els.msg.textContent = asMouse
-            ? 'Scan this with your phone’s camera. The phone becomes this computer’s mouse: it moves the brush here, with every setting you’ve made. Nothing to install.' +
+            ? 'Scan this with your phone’s camera. You can use this phone as a brush: ' +
               (roomCode() ? ' In this room it paints as you, not as another artist.' : '')
             : 'Scan this with a phone’s camera to paint in this room as an artist of its own, beside you. Every phone that scans it joins. Nothing to install.';
 
@@ -442,7 +442,7 @@
             var svg = (url && !hidden && window.QRCode) ? window.QRCode.svg(url, { margin: 2 }) : '';
             els.qr.innerHTML = svg || '';
             els.qr.setAttribute('aria-label', !svg ? 'QR code hidden'
-                : asMouse ? 'QR code: opens the phone as this computer’s mouse' : 'QR code: opens the phone brush for this room');
+                : asMouse ? 'QR code: opens the phone as this computer’s brush' : 'QR code: opens the phone brush for this room');
         }
         els.body.hidden = stranger;
         els.qr.classList.toggle('is-hidden', hidden || !url);
@@ -517,6 +517,7 @@
         // them (the same guard as 51's question).
         if (!keyHandler) {
             keyHandler = function (e) {
+                if (window.DialogFocus.top() !== modal) return;   // a dialog over this one has the keys
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
                 if (e.key !== 'Tab') e.stopPropagation();
             };
@@ -525,7 +526,7 @@
         setWay(which === 'artist' || which === 'mouse' ? which : savedWay());
         clearInterval(renderTimer);
         renderTimer = setInterval(renderModal, 500);
-        try { els.done.focus({ preventScroll: true }); } catch (_) {}
+        hold = window.DialogFocus.hold(modal, { initial: els.done });   // Tab kept inside, focus back after (00b)
         syncButtons();
         return true;
     }
@@ -535,6 +536,7 @@
         renderTimer = 0;
         if (keyHandler) { document.removeEventListener('keydown', keyHandler, true); keyHandler = null; }
         if (modal) modal.classList.remove('show');
+        if (hold) { hold.release(); hold = null; }
         // A link no phone ever used does not stay open for nothing.
         var pm = mouse();
         if (pm) pm.idleStop();

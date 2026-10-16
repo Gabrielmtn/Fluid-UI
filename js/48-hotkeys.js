@@ -26,8 +26,8 @@
  * it belongs to — a deleted line, a preset load, Clear All.
  *
  * THE APP'S OWN KEYS ALWAYS WIN. RESERVED mirrors the guard of every
- * built-in handler (05n, 05e, 21, 35, 44, 32, comfyui-bridge,
- * electron-performance, the dev keys in electron-main) — a new built-in
+ * built-in handler (05n, 05e, 21, 35, 44, 32, comfyui-bridge, the dev
+ * keys in electron-main) — a new built-in
  * shortcut gets a rule there too. The picker will not record a press the
  * app already answers, and the dispatcher skips one too, in case a later
  * build claims a key an older binding already had.
@@ -224,20 +224,24 @@
     var RESERVED = [
         // Everywhere — the picker's own keys, a focused button's, the browser's
         { says: 'already stops recording and playback', test: function (k) { return k.key === 'Escape'; } },
-        { says: 'already switches the brush: Fluid, Pressure, Collider', test: function (k) { return k.key === 'Tab' && noCA(k); } },
+        // Tab and Shift+Tab walk focus; with nothing focused they open the
+        // skip menu, and Ctrl+Shift+Tab opens it from anywhere (js/66). Only
+        // a real press walks focus, so these count as native.
+        { says: 'already moves keyboard focus', native: true, test: function (k) { return k.key === 'Tab' && noCA(k); } },
+        { says: 'already moves keyboard focus', native: true, test: function (k) { return k.key === 'Tab' && k.ctrl && k.shift && !k.alt; } },
         { says: 'already belongs to the browser', native: true, test: function (k) { return k.key === 'Tab'; } },
+        // 59 matches the key by its place, so ~ and ` both, Shift or not
+        { says: 'already switches the brush: Fluid, Pressure, Collider', test: function (k) { return noCA(k) && (k.code === 'Backquote' || k.key === '~' || k.key === '`'); } },
         { says: 'already presses the focused button', native: true, test: function (k) { return k.key === 'Enter' && k0(k); } },
         { says: 'already freezes and pauses the fluid', test: function (k) { return k.key === ' '; } },
         { says: 'already opens the hotkey list', test: function (k) { return k.key === 'F1' || (k.shift && (k.key === '?' || k.key === '/')); } },
         { says: 'already switches fullscreen', test: function (k) { return k.key === 'F11'; } },
         { says: 'already starts recording', test: function (k) { return k.key === 'F9'; } },
-        { says: 'already plays and pauses the recorded parts', test: function (k) { return k.key === 'F8'; } },
+        { says: 'already plays and pauses the recorded animations', test: function (k) { return k.key === 'F8' && !k.shift; } },
         { says: 'already reloads the app', native: true, test: function (k) { return k.key === 'F5' || (k.ctrl && k.lower === 'r'); } },
         { says: 'already opens developer tools', native: true, test: function (k) { return k.key === 'F12' || (k.ctrl && k.shift && (k.lower === 'i' || k.lower === 'j')); } },
         { says: 'already resets all local data', native: true, test: function (k) { return k.ctrl && k.shift && k.lower === 'd'; } },
         { says: 'already binds a hotkey to a control', test: function (k) { return k.ctrl && k.shift && k.lower === 'h'; } },
-        { says: 'already adds a part to the animation', test: function (k) { return k.ctrl && k.shift && k.lower === 'n'; } },
-        { says: 'already frees memory (developer)', test: function (k) { return k.ctrl && k.shift && k.lower === 'g'; } },
         { says: 'already undoes', test: function (k) { return k.ctrl && k.lower === 'z' && !k.shift; } },
         { says: 'already redoes', test: function (k) { return k.ctrl && (k.lower === 'y' || k.lower === 'z'); } },
         { says: 'already selects all', native: true, test: function (k) { return k.ctrl && !k.alt && k.lower === 'a'; } },
@@ -250,32 +254,29 @@
         // 05n — canvas, recording, colour
         { says: 'already captures a layer', test: function (k) { return k.key === 'Enter' && k.shift && noCA(k); } },
         { says: 'already sends the canvas to ComfyUI', test: function (k) { return k.key === 'Enter' && k.ctrl && !k.shift && !k.alt; } },
-        { says: 'already clears the animation part', test: function (k) { return k.key === 'Delete' && k0(k); } },
         { says: 'already toggles the cursor', test: function (k) { return k0(k) && k.lower === 'c'; } },
         { says: 'already toggles the border and handles', test: function (k) { return k0(k) && k.lower === 'h'; } },
         { says: 'already locks the borders', test: function (k) { return k0(k) && k.lower === 'l'; } },
         { says: 'already toggles random colors', test: function (k) { return k0(k) && k.lower === 'r'; } },
-        { says: 'already toggles palette mode', test: function (k) { return k0(k) && k.lower === 'a'; } },
+        { says: 'already toggles palette mode', test: function (k) { return k0(k) && k.lower === 'p'; } },
         // K (kaleidoscope on/off, 05n) is left out ON PURPOSE: it is a soft
         // key that yields to any binding on K, because presets shipped text
         // lines on it before it existed.
         { says: 'already opens the radial menu', test: function (k) { return k0(k) && k.lower === 'e'; } },
         { says: 'already mutates the settings', test: function (k) { return k0(k) && k.lower === 'm'; } },
-        { says: 'already changes the brush size', test: function (k) { return noCA(k) && (k.key === '[' || k.key === ']' || k.key === '{' || k.key === '}'); } },
-        { says: 'already steps through the palette colours', test: function (k) { return noCA(k) && k.lower === 'n'; } },
-        { says: 'already adds the brush colour to the palette', test: function (k) { return noCA(k) && k.shift && k.lower === 's'; } },
-        { says: 'already takes the brush colour out of the palette', test: function (k) { return noCA(k) && k.shift && k.lower === 'x'; } },
-        { says: 'already steps through the animation parts', test: function (k) { return k0(k) && (k.key === 'ArrowUp' || k.key === 'ArrowDown'); } },
+        { says: 'already changes the brush size', test: function (k) { return noCA(k) && (k.key === '[' || k.key === ']'); } },
+        { says: 'already steps through the palette colors', test: function (k) { return noCA(k) && k.lower === 'n'; } },
+        { says: 'already adds the brush color to the palette', test: function (k) { return noCA(k) && k.shift && k.lower === 's'; } },
+        { says: 'already takes the brush color out of the palette', test: function (k) { return noCA(k) && k.shift && k.lower === 'x'; } },
         { says: 'already changes the palette', test: function (k) { return k.ctrl && k.shift && (k.key === 'ArrowLeft' || k.key === 'ArrowRight'); } },
-        { says: 'already steps through the palette colours', test: function (k) { return k.ctrl && !k.shift && (k.key === 'ArrowLeft' || k.key === 'ArrowRight'); } },
+        { says: 'already steps through the palette colors', test: function (k) { return k.ctrl && !k.shift && (k.key === 'ArrowLeft' || k.key === 'ArrowRight'); } },
         { says: 'already changes the resolution', test: function (k) { return k.alt && !k.ctrl && (k.key === 'ArrowUp' || k.key === 'ArrowDown'); } },
         // 05e — reads e.code, so Ctrl and Alt still reach it; Shift is left free
         { says: 'already sets the multiplier', test: function (k) { return !k.shift && /^(Digit|Numpad)[1-8]$/.test(k.code); } },
-        // 21, 35, 44
+        // 21, 35 ('/' was 44's "How do I…" until it was parked 2026-10-14)
         { says: 'already toggles focus mode', test: function (k) { return k0(k) && k.lower === 'f'; } },
         { says: 'already toggles zoom mode', test: function (k) { return k0(k) && k.lower === 'z'; } },
-        { says: 'already resets the zoom', test: function (k) { return noCA(k) && k.key === '0'; } },
-        { says: 'already opens “How do I…”', test: function (k) { return k0(k) && k.key === '/'; } }
+        { says: 'already resets the zoom', test: function (k) { return noCA(k) && k.key === '0'; } }
     ];
 
     function facts(e) {
@@ -436,8 +437,8 @@
         var a = document.activeElement;
         if (a && a.tagName === 'INPUT' && a.type === 'range' && SLIDER_KEYS[e.key]
             && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) return true;
-        // A dialog is up: its buttons have the keyboard.
-        if (document.querySelector('.delete-modal.show')) return true;
+        // A dialog is up (the hotkey sheet too): its buttons have the keyboard.
+        if (window.DialogFocus.hasKeyboard()) return true;
         return false;
     }
 
@@ -636,10 +637,10 @@
                 keyBtn.title = 'Press the key or combo you want. Esc cancels.';
             } else if (value) {
                 keyBtn.textContent = format(value);
-                keyBtn.title = format(value) + ' — click to change it.' + (opts.hint ? ' ' + opts.hint : '');
+                keyBtn.title = format(value) + ' - click to change it.' + (opts.hint ? ' ' + opts.hint : '');
             } else {
                 keyBtn.textContent = opts.emptyLabel || 'Set key';
-                keyBtn.title = (opts.hint ? opts.hint + ' ' : '') + 'Click, then press a key or combo.';
+                keyBtn.title = (opts.hint ? opts.hint + ' ' : '') + ' Click, then press a key or combo';
             }
             clearBtn.hidden = on || !value || opts.clearable === false;
         }
@@ -685,8 +686,8 @@
             // through to whatever it was meant for.
             if (!el.isConnected) { session.cancel(); return; }
             if (isModifier(e)) { session.onMods(e); return; }
-            // Focus still moves on, but the app's own Tab (the brush switch,
-            // js/59) must not also hear the press that cancelled.
+            // Focus still moves on, but the app's own Tab (the skip menu,
+            // js/66) must not also hear the press that cancelled.
             if (e.key === 'Tab') { session.cancel(); e.stopPropagation(); return; }
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -707,7 +708,7 @@
             if (says) {
                 pending = '';
                 paint();
-                say(format(combo) + ' ' + says + ' — try another key.', 'warn');
+                say(format(combo) + ' ' + says + ' - try another key.', 'warn');
                 return;
             }
             if (combo === value) { stop(); sayIdle(); return; }
@@ -715,7 +716,7 @@
             if (others.length && pending !== combo) {
                 pending = combo;
                 paint();
-                say(format(combo) + ' is on ' + names(others) + ' — press it again to move it here.', 'warn');
+                say(format(combo) + ' is on ' + names(others) + ' - press it again to move it here.', 'warn');
                 return;
             }
             commit(combo, others);

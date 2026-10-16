@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/04a-canvas-gl-config.js — part 1/7 of former 04-ui-interactions.js (lines 1–270)
+// js/04a-canvas-gl-config.js
 // LOAD ORDER: after 03-recording.js, before 04b-presets.js
-// PROVIDES: saved colors UI, mouse tracking/replay, const gl (WebGL2 context), let config, baselineConfig, mobile defaults
+// PROVIDES: saved colors UI, const gl (WebGL2 context), let config, mobile defaults
 // REQUIRES: canvas (01/03), ParamRegistry (01a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -34,113 +34,6 @@
         function renderSavedColors() {
 
             if (typeof renderPalettePreview === 'function') renderPalettePreview();
-
-        }
-
-
-
-        function trackMouseMovement(e) {
-
-            if (!pointer.down || isReplayActive) return;
-
-            
-
-            const position = {
-
-                x: pointer.x,
-
-                y: pointer.y,
-
-                dx: pointer.dx,
-
-                dy: pointer.dy,
-
-                timestamp: Date.now(),
-
-                color: [...pointer.color],
-
-                velocity: { dx: pointer.dx, dy: pointer.dy },
-
-                // recorded so the hold-to-replay trail reproduces the stroke
-                // faithfully (same fix as processReplay, 2026-07-13)
-
-                radius: config.SPLAT_RADIUS,
-
-                mult: (typeof animationMultiplier === 'number') ? animationMultiplier : 1
-
-            };
-
-            
-
-            mousePositions.push(position);
-
-            const cutoff = position.timestamp - FADE_END;
-
-            mousePositions = mousePositions.filter(pos => pos.timestamp >= cutoff);
-
-        }
-
-        
-
-        function replayMovements() {
-
-            if (!isRightMouseDown || !isReplayActive) {
-
-                customCursor.style.display = 'none';
-
-                return;
-
-            }
-
-            
-
-            customCursor.style.opacity = showCursor ? '1' : '0';
-
-            const now = Date.now();
-
-            const replayProgress = (now % 500) / 500;
-
-            
-
-            mousePositions.forEach((pos, index) => {
-
-                const progress = index / (mousePositions.length - 1);
-
-                if (progress <= replayProgress) {
-
-                    // Faithful trail: recorded radius + arm count (2026-07-13)
-
-                    if (typeof window.applyMultiSplatWith === 'function') {
-
-                        window.applyMultiSplatWith(pos.x, pos.y, pos.velocity.dx, pos.velocity.dy,
-                            pos.color, pos.mult || 1,
-                            (typeof pos.radius === 'number') ? pos.radius : config.SPLAT_RADIUS);
-
-                    } else {
-
-                        splat(pos.x, pos.y, pos.velocity.dx, pos.velocity.dy, pos.color);
-
-                    }
-
-                    
-
-                    if (Math.abs(progress - replayProgress) < 0.1) {
-
-                        customCursor.style.display = 'block';
-
-                        customCursor.style.left = (pos.x - 13) + 'px';
-
-                        customCursor.style.top = (pos.y - 13) + 'px';
-
-                    }
-
-                }
-
-            });
-
-            
-
-            requestAnimationFrame(replayMovements);
 
         }
 
@@ -194,7 +87,7 @@
 
                 _noGl.innerHTML = '<div style="font-size:40px;margin-bottom:12px">🎨</div>' +
                     '<div style="font-size:20px;font-weight:600;margin-bottom:10px">This GPU can&#39;t run Swirl Together</div>' +
-                    '<div style="max-width:520px;opacity:.8">WebGL2 is unavailable &mdash; usually an outdated or broken ' +
+                    '<div style="max-width:520px;opacity:.8">WebGL2 is unavailable - usually an outdated or broken ' +
                     'graphics driver, or a virtual machine without GPU acceleration.<br><br>' +
                     'Try updating your GPU drivers, then relaunch.</div>';
 
@@ -260,8 +153,7 @@
                             'max-width:560px;background:#2b2311;color:#f0d47a;border:1px solid #b8860b88;border-radius:8px;' +
                             'padding:10px 14px;font:12px/1.5 "Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
                         var _txt = document.createElement('div');
-                        _txt.textContent = 'Running on the integrated GPU (' + _renderer + ') — painting will feel slow. ' +
-                            'Fix: Windows Settings → System → Display → Graphics → add ' + _appName + ' → High performance, then relaunch.';
+                        _txt.textContent = 'Running on the integrated GPU (' + _renderer + ') - painting will feel slow. You can try this fix: Windows Settings → System → Display → Graphics → add ' + _appName + ' → High performance, then relaunch.';
                         var _dis = document.createElement('button');
                         _dis.textContent = 'Got it';
                         _dis.style.cssText = 'margin-top:8px;background:#3a3016;color:#f0d47a;border:1px solid #b8860b66;' +
@@ -305,12 +197,13 @@
             PRESSURE_DISSIPATION: 0.95, // was 0.944 — retuned with the multigrid solve
                                         // (low values were stabilizing unconverged Jacobi)
 
-            PRESSURE_ITERATIONS: 47,  // 2026-09-24 default look (was 17, the first-touch feel; 32 solved
-                                      // "cleaner" but read stiff before the user touches anything
+            PRESSURE_ITERATIONS: 25,  // 2026-10-13 (was 47 from the 2026-09-24 default look, 17 before;
+                                      // 32 solved "cleaner" but read stiff before the user touches anything.
+                                      // With Multigrid on, anything >= 24 runs the same full V-cycle (05j)
 
             CURL: 0,                  // Vorticity confinement off in the default look (2026-09-24; was 25)
 
-            SPLAT_RADIUS: 0.0013,     // Brush Size 1.3: a fine line (2026-09-24; was 0.011)
+            SPLAT_RADIUS: 0.001,      // Brush Size 1.00: a fine line (2026-10-13; 1.3 from 2026-09-24, 11 before)
 
             SPLAT_SCISSOR: true,      // Clip each splat pass to the dab's bounding box (bit-identical
                                       // to fullscreen — see 05i splatScissorRect); false = old fullscreen passes
@@ -445,7 +338,8 @@
                                       // Cinematic 4K stays a dropdown choice for capture work (a live
                                       // realloc to 4096 can spike VRAM enough to lose the GL context).
 
-            SIM_RESOLUTION: 512,      // Ultra physics by default on desktop (mobile overrides below)
+            SIM_RESOLUTION: 2048,     // Ultra-fine motion by default on desktop (2026-10-13; was 512).
+                                      // Mobile overrides below; Reset app puts it back (60).
 
             VELOCITY_INFLUENCE: 2,    // Motion isolation (1.0 = full motion, 5.0 = maximum isolation). 2 since usertest 2026-10-03 (5, the max, from 2026-09-24; 2.5 before).
 
@@ -620,7 +514,7 @@
                                       // the same wall time at every Time setting (05j,
                                       // the velocity advection's decay); false = the
                                       // brake runs on the sim clock and takes 1/Time as
-                                      // long (~5 s at 0.2x). Inert at Time >= 1.
+                                      // long (~2.5 s at 0.2x). Inert at Time >= 1.
                                       // Console kill switch, not persisted.
 
             FREEZE_RESUME_STILL: true, // true = resuming a pause (Shift+Space) with Freeze
@@ -662,11 +556,11 @@
 
             VELOCITY_REFERENCE_RESOLUTION: 512,
 
-            VELOCITY_CAP: 30,         // "Max Speed" ceiling in canvas-widths/s (soft knee from
-                                      // 70%). fp16 safety AND an aesthetic knob: growth presets
-                                      // (velocity dissipation > 1) settle at this ceiling inside
-                                      // closed mask pockets — lower = calmer bounded swirls,
-                                      // higher = wilder motion before the sim reins it in.
+            VELOCITY_CAP: 30,         // Speed ceiling in canvas-widths/s (sources taper from
+                                      // 45%, soft knee from 70%). A fixed safety limit, no
+                                      // longer a slider (Max Speed, removed 2026-10-14): the
+                                      // fastest field measured, a size-100 brush stirring hard
+                                      // at Curl 60, peaked near 6, so 5-60 never did anything.
 
             HF_FLOOR: 0.85,           // M2 spectral floor (2026-07-17): fraction of the
                                       // velocity field's Nyquist (Laplacian) component
@@ -1400,7 +1294,7 @@
                                       // 512 grid leaves (2026-09-25). Console-tunable;
                                       // false renders exactly as before.
 
-            KALEIDO_ISOTROPIC: true,  // Kaleido Wedge (and Mandala Studio) folds in
+            KALEIDO_ISOTROPIC: true,  // Kaleido Wedge (and Mandala Overlay) folds in
                                       // SCREEN proportions, so every facet is the same
                                       // shape (05a kaleidoWedge). false = the historic
                                       // fold in per-axis UV, where on a non-square
@@ -1504,18 +1398,6 @@
         // default for them.
         window.__CONFIG_DEFAULTS = Object.freeze(JSON.parse(JSON.stringify(config)));
 
-        // Snapshot baseline for potential adaptive logic
-
-        window.baselineConfig = {
-
-            DYE_RESOLUTION: config.DYE_RESOLUTION,
-
-            SIM_RESOLUTION: config.SIM_RESOLUTION,
-
-            PRESSURE_ITERATIONS: config.PRESSURE_ITERATIONS
-
-        };
-
         
 
         // Mobile defaults: reduce load for iOS/Android WebKit and smaller GPUs
@@ -1549,6 +1431,11 @@
             } catch(_) {}
 
         })();
+
+        // This platform's Motion Detail before any saved choice lands (12):
+        // what Reset app puts back (60). __CONFIG_DEFAULTS is frozen above,
+        // before the mobile override, so it would hand a tablet 2048.
+        window.__SIM_RESOLUTION_DEFAULT = config.SIM_RESOLUTION;
 
         
 

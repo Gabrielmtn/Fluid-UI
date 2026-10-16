@@ -855,7 +855,7 @@
             if (streamPath) {
                 if (streamWriteError) {
                     throw new Error('could not finish writing the video (' +
-                        streamWriteError.message + ') — the file at ' + streamPath + ' is incomplete');
+                        streamWriteError.message + ') - the file at ' + streamPath + ' is incomplete');
                 }
                 updateUI('rendering', 95, 'Video: saving');
                 await plainMp4OnDisk(streamPath);
@@ -1090,7 +1090,7 @@
             try { await fh.close(); } catch (_) {}
             if (writeError) {
                 throw new Error('could not finish writing the video (' + writeError.message +
-                    ') — the file at ' + filePath + ' is incomplete');
+                    ') - the file at ' + filePath + ' is incomplete');
             }
         }
         toast('Video saved (' + sizeNote + ')', 'success');
@@ -1778,7 +1778,7 @@
                 toast('Sequence saved: ' + frameCount + ' frames → ' + seqDir, 'success');
             } else {
                 // Phase 2: build ZIP (70 → 95%)
-                toast('Sequence: saving the ZIP', 'info');
+                toast('Sequence: saving as ZIP', 'info');
                 updateUI('rendering', 75, 'Sequence: saving');
                 await sleep(0); // yield to UI
 

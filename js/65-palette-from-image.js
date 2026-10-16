@@ -457,11 +457,11 @@
         stage.appendChild(markers);
 
         var swatches = el('div', 'pfi-swatches');
-        var hint = el('div', 'pfi-hint', 'Drag a circle to pick a different colour.');
+        var hint = el('div', 'pfi-hint', 'Drag a circle to pick a different color.');
 
         var controls = el('div', 'pfi-controls');
         var method = el('select', 'pfi-method');
-        method.title = 'Which colours to look for';
+        method.title = 'Which colors to look for';
         method.setAttribute('aria-label', 'Method');
         METHOD_LIST.forEach(function (m) {
             var o = el('option', null, m[1]);
@@ -472,23 +472,23 @@
         method.addEventListener('change', function () { S.method = method.value; run(); });
 
         var stepper = el('div', 'pfi-count');
-        stepper.title = 'How many colours';
+        stepper.title = 'How many colors';
         var minus = el('button', 'pfi-step btn--ghost btn--icon', '−');
         minus.type = 'button';
-        minus.setAttribute('aria-label', 'Fewer colours');
+        minus.setAttribute('aria-label', 'Fewer colors');
         var val = el('span', 'pfi-count-val', String(S.count));
         val.setAttribute('aria-live', 'polite');
         var plus = el('button', 'pfi-step btn--ghost btn--icon', '+');
         plus.type = 'button';
-        plus.setAttribute('aria-label', 'More colours');
+        plus.setAttribute('aria-label', 'More colors');
         minus.addEventListener('click', function () { setCount(S.count - 1); });
         plus.addEventListener('click', function () { setCount(S.count + 1); });
         stepper.appendChild(minus); stepper.appendChild(val); stepper.appendChild(plus);
 
         var regen = el('button', 'pfi-regen btn--icon', '↻');
         regen.type = 'button';
-        regen.title = 'Try other colours';
-        regen.setAttribute('aria-label', 'Try other colours');
+        regen.title = 'Try other colors';
+        regen.setAttribute('aria-label', 'Try other colors');
         regen.addEventListener('click', regenerate);
 
         controls.appendChild(method); controls.appendChild(stepper); controls.appendChild(regen);
@@ -609,7 +609,7 @@
         E.method.value = S.method;
         S.items.forEach(function (it, i) {
             var m = el('div', 'pfi-marker');
-            m.title = 'Drag to pick a different colour';
+            m.title = 'Drag to pick a different color';
             var sw = el('div', 'pfi-swatch');
             it.marker = m; it.swatch = sw;
             paint(it);

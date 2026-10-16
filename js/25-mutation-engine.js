@@ -594,7 +594,7 @@
     // layer painted or a canvas resized after Mutate was pressed.
     var LOOK_SECTIONS = ['version', 'timestamp', 'sliders', 'checkboxes', 'selects', 'colors',
         'kaleido', 'paletteIndex', 'paletteName', 'savedColors', 'armColors', 'lightPos',
-        'lightShiftPath', 'brushState', 'material', 'brushTip', 'ssOrigin', 'cosOscillator'];
+        'lightShiftPath', 'brushState', 'material', 'brushTip', 'ssOrigin'];
 
     function lookOf(snapshot) {
         if (!snapshot) return null;

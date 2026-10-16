@@ -130,10 +130,10 @@ comments that nothing had ever checked:
 - **`freeze-halts-the-sim`** — answered 2026-09-12: Freeze IS meant to
   hold the picture still, brake included. Space runs `toggleFreeze`
   (04b), which raises `window.__fluidFrozen`; while it is up the sim
-  step (05j) holds the dye at rate 1.0 and brakes velocity at 0.9 per
-  1/60 s (since 2026-09-29 without writing either into config) — dye
-  stops fading and the stroke's own momentum runs out over about a
-  second — and it skips the two forces the fluid applies to itself while
+  step (05j) holds the dye at rate 1.0 and brakes velocity at 0.8 per
+  1/60 s (0.9 until 2026-10-14; since 2026-09-29 without writing either
+  into config) — dye stops fading and the stroke's own momentum runs
+  out in about half a second — and it skips the two forces the fluid applies to itself while
   `window.__fluidFrozen` is up: vorticity confinement (with its curl
   pass) and the Gravity Direction pad's ambient force. The invariant
   compares `braked` → `held`, a 30-frame window that opens 92 frames
@@ -193,9 +193,9 @@ and would distort the sweep driver's timing.
   bug). Kernel-scale dependent; with the Colour Gate on it is larger
   and non-monotonic, returning bit-exactly to baseline at RIDGES ≥ 2.4.
   **Unexplained — top candidate for the first real investigation.**
-- **Shift+[ / Shift+] coarse brush is unreachable** — the handler
-  matches `e.key === '['` exactly; with Shift held the key is `{`
-  (05n:412). The F1 sheet advertises it.
+- **Shift+[ / Shift+] coarse brush** — was unreachable (Shift turns
+  `[` into `{`); fixed 2026-10-07, then removed 2026-10-14. `[ ]` step
+  the size; `{ }` are free for the hotkey maker.
 - The params inventory carries per-entry `gatedBy` prerequisites and 16
   documented hazards (density-wipe threshold, kaleido first-enable
   multiplier bootstrap, curl-slider material hijack, trusted-event snap

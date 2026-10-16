@@ -70,7 +70,7 @@
 
     var SECTIONS = ['sliders', 'checkboxes', 'selects', 'colors', 'kaleido', 'paletteIndex',
         'paletteName', 'savedColors', 'armColors', 'lightPos', 'lightShiftPath', 'brushState',
-        'material', 'brushTip', 'ssOrigin', 'cosOscillator', 'gravity'];
+        'material', 'brushTip', 'ssOrigin', 'gravity'];
     // Never in a link: 12's machine/workflow keys (BASELINE_SKIP) and the
     // recipient's workspace, device and privacy settings.
     var SKIP = {
@@ -867,7 +867,7 @@
                         : 'a link to your current settings: all ' + st.settings + ' of them, in ' + u.length + ' characters';
                     var thin = (st.pathKept < st.pathPoints) ? ' The light-shift path was smoothed to fit one chat message.' : '';
                     toast(room
-                        ? 'Copied the room link with your current settings: all ' + st.settings + ' of them, in ' + u.length + ' characters. It joins this room, and if the room has closed by then, the settings still open.' + thin
+                        ? 'Copied the room link with your current settings'
                         : 'Copied ' + what + '. It opens Swirl Together with them, in the browser or the desktop app.' + thin, 7000);
                 } else if (typeof window.appConfirm === 'function') {
                     window.appConfirm({ title: 'Copy this link', message: u, confirmLabel: 'Done', cancelLabel: null, danger: false });
@@ -940,7 +940,7 @@
         var msg = name ? 'Opened "' + name + '", shared settings. Paint with them.' : 'Opened shared settings. Paint with them.';
         if (room) msg = (name ? '"' + name + '" is on. ' : 'Shared settings on. ') + 'Joining the room…';
         if (typeof version === 'number' && version > SNAPSHOT_VERSION) msg += ' (Made with a newer version; a few settings may not carry over.)';
-        if (!room) msg += ' To keep them: Presets → + New Preset.';
+        if (!room) msg += ' To save them: Presets → + New Preset.';
         var show = function () { toast(msg, 7000); };
         // The startup fork owns the screen until it is answered; say it after.
         var uv = window.UIVisibility;
@@ -1103,7 +1103,7 @@
         b.type = 'button';
         b.className = 'look-link-copy btn--sm';
         b.textContent = 'Link to current settings';
-        b.title = 'Copies a link to your current settings: colours, brush, fluid, symmetry, light, gravity and finish. It opens Swirl Together with them, in the browser or the desktop app. It shares your settings, not your painting.';
+        b.title = 'Copies a link to open Swirl Together in the browser with your settings.';
         b.addEventListener('click', function (e) { e.stopPropagation(); copyCurrent(); });
         foot.appendChild(b);
         panel.appendChild(foot);

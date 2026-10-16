@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/05d-input-replay.js — part 4/14 of former 05-fluid-sim.js (lines 1192–1740)
+// js/05d-input-replay.js
 // LOAD ORDER: after 05c-programs-framebuffers.js, before 05e-effect-controls.js
 // PROVIDES: pointer, stroke replay system, splatWithRadius, multiSplatWithRadius, initFpsCapControl (+load-time call), scheduleStrokeReplay, mouse/touch listeners
 // REQUIRES: canvas, config (04); multiSplat (05g, runtime only)
@@ -368,6 +368,17 @@
                 radius: effR,
                 tip: config.BRUSH_TIP | 0,
                 shape: config.BRUSH_SHAPE_ID || null,
+                // The brush's Angle (04a BRUSH_ANGLE): 05i turns the stamp by
+                // it on every dab, read straight off config like the tip, so
+                // it is part of the footprint and is recorded with the dab.
+                // Until 2026-10-16 it was not: a replay turned the tip the way
+                // the slider pointed NOW, and a peer's replay the way THEIR
+                // slider pointed (the live wire has carried `angle` per dab
+                // since the footprint fix, and the Animations recorder stores
+                // `ang`; only this path dropped it). Omitted at 0, so the
+                // common event stays byte-identical; absence reads as 0
+                // everywhere it lands.
+                ang: config.BRUSH_ANGLE ? +config.BRUSH_ANGLE : undefined,
                 // Push (velocity-only) dabs deposit no dye, so a replay that
                 // did not know about the flag would repaint them as ordinary
                 // strokes — pigment appearing where the painter laid none.
@@ -416,7 +427,7 @@
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
                      ap: ev.ap, atip: ev.atip ? Object.assign({}, ev.atip) : undefined,
-                     mir: ev.mir, gf: ev.gf, rnd: ev.rnd, fm: ev.fm, ra: ev.ra };
+                     mir: ev.mir, gf: ev.gf, rnd: ev.rnd, fm: ev.fm, ra: ev.ra, ang: ev.ang };
         }
         // Preserve Randomness: an event whose colour was rolled by random mode
         // carries rnd:1 (+ fm, the flow factor baked into its recorded colour).
@@ -604,6 +615,10 @@
                         tip: ev.tip,
                         shape: ev.shape || null
                     };
+                    // ...and the Angle the tip was turned by (pushStrokeEvent
+                    // `ang`). Sent only when set; an older peer ignores it and
+                    // prints the tip unturned, as it always did.
+                    if (ev.ang) o.ang = ev.ang;
                     // Push (velocity-only) dabs deposit no dye. 06 quantizes
                     // `push` and `ap` onto the wire and scheduleStrokeReplay
                     // maps them back, but neither ever got here, so a Pressure
@@ -702,8 +717,8 @@
             for (const r of sr.rates) {
                 if (r >= hz - 1e-6) continue;   // that one is Native
                 let label = fpsRateText(r) + ' fps';
-                if (Math.abs(r - sr.std) < 1e-6) label += ' — Standard';
-                else if (Math.abs(r - sr.save) < 1e-6) label += ' — Battery Saver';
+                if (Math.abs(r - sr.std) < 1e-6) label += ' - Standard';
+                else if (Math.abs(r - sr.save) < 1e-6) label += ' - Battery Saver';
                 rows.push([fpsRateText(r), label]);
             }
             rows.push(['native', 'Native (' + fpsRateText(hz) + ' Hz)']);
@@ -811,6 +826,7 @@
                 && window.BrushShapes.has(evShape));
             var savedTip = config.BRUSH_TIP;
             var savedShape = config.BRUSH_SHAPE_ID;
+            var savedAng = config.BRUSH_ANGLE;
             // Push rides the same pin-then-restore as the footprint: a dab is
             // replayed as velocity-only if it WAS one, whatever the brush is set
             // to now. Pinned unconditionally (not only when ev.push is set), or
@@ -857,6 +873,14 @@
             }
             if (typeof ev.tip === 'number') config.BRUSH_TIP = ev.tip;
             config.BRUSH_SHAPE_ID = haveStamp ? evShape : null;
+            // The Angle rides the same pin, and unconditionally, like push and
+            // the arm pins: no `ang` means the dab was laid with the tip
+            // unturned, never "turn it the way the slider points now" (the old
+            // behaviour here, and on a peer "the way THEIR slider points").
+            // Wrapped into 0..360 the way 41-button-modes keeps the slider: a
+            // peer's replay arrives here as raw wire JSON.
+            var _ang = (typeof ev.ang === 'number' && isFinite(ev.ang)) ? ev.ang : 0;
+            config.BRUSH_ANGLE = ((_ang % 360) + 360) % 360;
             window.__remoteStroke = !haveStamp;
             // Replay is faithful: the colour that was painted. (The "use
             // current colour" opt-in was removed 2026-08-16 — arm modes resolve
@@ -925,6 +949,7 @@
                 window.__splatFlow = 1;   // applyPaintFlow may have set it
                 config.BRUSH_TIP = savedTip;
                 config.BRUSH_SHAPE_ID = savedShape;
+                config.BRUSH_ANGLE = savedAng;
                 config.BRUSH_VELOCITY_ONLY = savedVelOnly;
                 config.BRUSH_VEL_MODE = savedVelMode;
                 config.BRUSH_VEL_STRENGTH = savedVelStr;
@@ -1136,6 +1161,10 @@
                 // arrive rather than borrowing this client's shape.
                 tip: (typeof ev.tip === 'number') ? (ev.tip | 0) : undefined,
                 shape: (typeof ev.shape === 'string' && ev.shape) ? ev.shape : null,
+                // The Angle the sender's tip was turned by. Shape-checked
+                // only, like `mir`: emitReplayDab wraps the value, and does
+                // it for local events too.
+                ang: (typeof ev.ang === 'number' && isFinite(ev.ang)) ? ev.ang : undefined,
                 // Stroke boundary (see deepCopyEvent). Absent from older peers,
                 // where the pause/distance guards do the same job less exactly.
                 head: !!ev.head,
@@ -1604,7 +1633,7 @@
                 customCursor.style.opacity = '0';
                 // "Fast brush" easter egg: if the tip was held during the right-click pause,
                 // fire a short burst of splats along the accumulated velocity vector.
-                // Uses the last snapshotted pointer state from trackMouseMovement.
+                // Uses the pointer state snapshotted when the pause began (_pausedPointerState).
                 if (pointer.down) {
                     var ps = window._pausedPointerState;
                     var bx  = ps ? ps.x  : pointer.x;
@@ -1934,14 +1963,14 @@
                     // there size0 × ratio could never pinch back out.
                     const grid = parseFloat(s.step) || 0.0001;
                     v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max),
-                        +(Math.round(+v.toPrecision(3) / grid) * grid).toFixed(4)));
+                        +(Math.round(+v.toPrecision(3) / grid) * grid).toFixed(5)));
                     s.value = v;
                     s.style.setProperty('--val', v);
                     // Drive it like a user drag (matches the brush-preset apply
                     // idiom): 05h's input binding sets SPLAT_RADIUS and the strip
                     // label updates instantly instead of on its 2s fallback poll.
                     s.dispatchEvent(new Event('input', { bubbles: true }));
-                    toast('🖌 Brush ' + (v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : v.toFixed(1)));
+                    toast('Brush ' + (v < 0.001 ? v.toFixed(5) : v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : v.toFixed(1)));
                 } else {
                     let v = Math.round(period0 + (cy0 - m.cy) / 25); // drag up = longer
                     v = Math.max(1, Math.min(60, v));

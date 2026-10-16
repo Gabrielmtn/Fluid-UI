@@ -326,7 +326,7 @@
         var stamp = processStamp(stampCanvas);
         if (!stamp) {
             say('Nothing to stamp',
-                'That shape came out empty — mask an area (or use an image with transparency) and Apply again.');
+                'That shape came out empty - mask an area (or use an image with transparency) and Apply again.');
             return null;
         }
         // The same art twice is one shape: pick the one already there rather
@@ -399,7 +399,7 @@
         var entry = findEntry(id);
         if (!entry) return;
         if (typeof window.enterAdhocMaskMode !== 'function') {
-            say('One moment', 'The mask editor is still loading — try again in a moment.');
+            say('One moment', 'The mask editor is still loading - try again in a moment.');
             return;
         }
         // seed: the stamp IS a mask, so the editor opens with it already
@@ -414,7 +414,7 @@
 
     function beginImportDataUrl(dataURL, name) {
         if (typeof window.enterAdhocMaskMode !== 'function') {
-            say('One moment', 'The mask editor is still loading — try again in a moment.');
+            say('One moment', 'The mask editor is still loading - try again in a moment.');
             return;
         }
         window.enterAdhocMaskMode(dataURL, name || 'Brush Shape', function (resultCanvas, nm) {

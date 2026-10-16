@@ -283,9 +283,7 @@ const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL
         await a.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
         await a.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
         check(await until(a, "document.getElementById('mpInvitePop').getClientRects().length === 0", 2000), 'and so does Esc');
-        // The guide (44) can point inside it: a tour step opens it first.
-        const tour = await a.eval("(async function(){ if (!window.Recipes || !window.Recipes._reveal) return 'no reveal hook'; var r = await window.Recipes._reveal({ overlay: 'mp', popup: 'invite', sel: '#copyRoomBtn' }); var ok = !!(r && r.el && r.el.id === 'copyRoomBtn') && document.getElementById('mpInvitePop').getClientRects().length > 0; document.getElementById('mpInviteBtn').click(); return ok; })()").catch((e) => String(e));
-        check(tour === true, 'a guide step aimed at Copy link opens the popover first', tour);
+        // (The How-do-I guide's Copy link step went with js/44, parked 2026-10-14.)
         await sleep(200);
 
         // ── 5. The ⋯ menu, host and guest ─────────────────────────────

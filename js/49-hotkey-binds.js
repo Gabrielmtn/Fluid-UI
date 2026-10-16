@@ -306,7 +306,7 @@
         // A wordless colour chip is its colour — a dropdown or a field with a
         // painted ground is not.
         var chipLike = el.tagName !== 'SELECT' && el.tagName !== 'INPUT';
-        var bg = (chipLike && !raw && el.style && el.style.backgroundColor) ? 'Colour ' + hexOf(el.style.backgroundColor) : '';
+        var bg = (chipLike && !raw && el.style && el.style.backgroundColor) ? 'Color ' + hexOf(el.style.backgroundColor) : '';
         return clip(words || norm(el.getAttribute('aria-label')) || norm(el.getAttribute('title')) || bg || raw || el.id || el.tagName.toLowerCase(), 40);
     }
 
@@ -616,7 +616,7 @@
     // .qub-dd-chev, .preset-group-chev …), or by name for the few that
     // carry neither.
     var OPENERS = '#mixerPresetsTrigger, .preset-more, .qub-dd-btn, ' +
-                  '.layer-btn[data-action="collapse"], .brush-trigger, .arm-colors-trigger';
+                  '.layer-btn[data-action="collapse"], .brush-trigger';
 
     function isOpener(el) {
         if (el.hasAttribute('aria-expanded') || el.hasAttribute('aria-haspopup')) return true;
@@ -882,10 +882,10 @@
         ui.pair.textContent = '';
         if (n === 1 && offer) {
             var col = isColour(offer);
-            ui.say.textContent = col ? 'Pick the colour — take as many tries as you like' : 'Is this the one you want?';
+            ui.say.textContent = col ? 'Pick the color - take as many tries as you like' : 'Is this the one you want?';
             ui.pair.appendChild(offerButton(offer));
             lines(ui.sub, col
-                ? ['The button follows your colour. Press it when it’s right.',
+                ? ['The button follows your color. Press it when it’s right.',
                    'Or click any other control to ' + (dest ? 'take' : 'bind') + ' that instead. Esc cancels.']
                 : ['Press it to put ' + describe(offerDraft(offer)) + ' on ' + (dest ? dest.what : 'a key') + '.',
                    'Or keep going: click another control to ' + (dest ? 'take' : 'bind') + ' that instead. Esc cancels.']);
@@ -1318,7 +1318,7 @@
         // What a click on it will do — and an opener says it will only open.
         var verb = b.opener ? 'Opens'
             : b.kind === 'click' ? 'Click'
-            : isColour(b) ? 'Pick a colour'
+            : isColour(b) ? 'Pick a color'
             : b.el.tagName === 'SELECT' ? 'Choose'
             : b.el.type === 'number' ? 'Type'
             : 'Set it, let go';
@@ -1347,7 +1347,7 @@
         var ctrl = e.ctrlKey || e.metaKey;
         if (ctrl && e.shiftKey && !e.altKey && (e.code === 'KeyH' || (e.key || '').toLowerCase() === 'h')) {
             if (H.isListening()) return;     // a picker has the keyboard, and says the key is taken
-            if (document.querySelector('.delete-modal.show')) return;
+            if (window.DialogFocus.hasKeyboard()) return;
             e.preventDefault();
             e.stopImmediatePropagation();
             if (e.repeat) return;
@@ -1401,7 +1401,7 @@
         trigger.type = 'button';
         trigger.className = 'hk-list-trigger btn--block';
         trigger.setAttribute('aria-expanded', 'false');
-        trigger.title = 'Every hotkey you have made — give one a new key, or delete it';
+        trigger.title = 'Every custom hotkey you have made';
         var tl = document.createElement('span');
         tl.className = 'hk-list-trigger-label';
         tl.textContent = 'Your hotkeys';
@@ -1467,7 +1467,7 @@
             var empty = document.createElement('div');
             empty.className = 'hk-empty';
             empty.textContent = 'No hotkeys yet. Press ' + H.format('Ctrl+Shift+KeyH') +
-                ', then click a button or set a slider — or give a line in Text its own key.';
+                ', then click a button or set a slider - or give a line in Text its own key.';
             listEl.appendChild(empty);
             return;
         }
@@ -1493,7 +1493,7 @@
                     combo: t.combo, selfId: t.id,
                     name: t.label, sub: 'Text · ' + t.does,
                     onKey: function (combo) { if (t.set) t.set(combo); },
-                    delTitle: 'Take the key off this line — the text stays',
+                    delTitle: 'Take the key off this line - the text stays',
                     onDelete: function () { if (t.clear) t.clear(); }
                 }));
             });
