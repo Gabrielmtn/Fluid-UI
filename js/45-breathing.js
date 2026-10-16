@@ -313,6 +313,15 @@
             str.addEventListener('input', show);
             show();
         }
+        // The Color dropdown's tooltip is the picked option's own title, so it
+        // never says "stays the same" while "each breath" is picked. A look
+        // or preset can set the value without an event: hovering re-reads it.
+        const cm = $('breathColorMode');
+        if (cm) {
+            const tip = () => { const o = cm.options[cm.selectedIndex]; if (o && o.title) cm.title = o.title; };
+            ['change', 'input', 'pointerenter', 'focus'].forEach((t) => cm.addEventListener(t, tip));
+            tip();
+        }
         // Pattern change restarts the cycle so the cue matches the first phase.
         const pat = $('breathPattern');
         if (pat) pat.addEventListener('change', () => { if (on) { t0 = performance.now(); lastPhase = ''; lastR = null; } });

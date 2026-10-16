@@ -427,7 +427,7 @@
         // moved from the couch — where an artist phone is another person in
         // the room, with a cursor and a name of its own.
         els.msg.textContent = asMouse
-            ? 'Scan this with your phone’s camera. You can use this phone as a brush: ' +
+            ? 'Scan this with your phone’s camera. You can use this phone as a brush.' +
               (roomCode() ? ' In this room it paints as you, not as another artist.' : '')
             : 'Scan this with a phone’s camera to paint in this room as an artist of its own, beside you. Every phone that scans it joins. Nothing to install.';
 

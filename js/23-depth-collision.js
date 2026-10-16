@@ -206,7 +206,7 @@ class DepthEstimator {
             modal.innerHTML = '<div style="background:linear-gradient(180deg,#1a1f2a,#0f141b);border:1px solid rgba(255,120,80,0.3);border-radius:16px;padding:32px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.8);text-align:center;">' +
                 '<div style="font-size:48px;margin-bottom:16px;">🧱</div>' +
                 '<h2 style="color:#ff8850;margin:0 0 12px 0;font-size:24px;font-weight:600;">Downloading Depth Model</h2>' +
-                '<p id="depthDownloadMessage" style="color:#8b949e;margin:0 0 24px 0;font-size:14px;">First-time setup: Downloading Instant Roto Model Depth Anything V2...</p>' +
+                '<p id="depthDownloadMessage" style="color:#8b949e;margin:0 0 24px 0;font-size:14px;"></p>' +
                 '<div style="background:rgba(0,0,0,0.3);border-radius:8px;height:8px;overflow:hidden;margin-bottom:12px;">' +
                 '<div id="depthDownloadBar" style="background:linear-gradient(90deg,#e85d26,#ff8850);height:100%;width:0%;transition:width 0.3s ease;box-shadow:0 0 12px rgba(255,136,80,0.6);"></div></div>' +
                 '<div id="depthDownloadPercent" style="color:#ff8850;font-size:18px;font-weight:600;font-family:monospace;">0%</div>' +

@@ -252,7 +252,7 @@
             // event, NOT 'change' — 'change' would re-enter setMode.
             try { sel.dispatchEvent(new Event('mm-sync')); } catch (e) { /* noop */ }
         }
-        if (slider) slider.title = 'Wetness';
+        if (slider) slider.title = 'Vorticity';
         refreshSpan();
         sizeSelectToLabel();
         try { localStorage.setItem(LS_MODE, 'fluid'); } catch (e) { /* noop */ }
@@ -311,7 +311,7 @@
         slider = document.getElementById('curl');
         span = document.getElementById('curlValue');
         if (!sel || !slider) return;
-        slider.title = 'Thickness';
+        slider.title = 'Vorticity';
         var savedShape = parseInt(localStorage.getItem(LS_SHAPE), 10);
         if (savedShape >= 0 && savedShape < SHAPES.length) shapeIdx = savedShape;
         sel.addEventListener('change', function () { setMode(sel.value); });

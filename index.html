@@ -899,7 +899,7 @@
              On: every arm prints at the brush's own angle. Moved into the
              Multi-Brush dropdown under Symmetry, like the group above. -->
         <div class="control-group checkbox-group" id="symmetrySameAngleGroup"
-             title="Off: Each brush turns around the center of the canvas symmetrically. On: every arm has the same brush angle from the settings menu.">
+             title="Off: Each brush turns around the center of the canvas symmetrically. On: every arm has the same brush angle from the Brush Section.">
             <input type="checkbox" id="symmetrySameAngle">
             <label for="symmetrySameAngle" style="margin: 0">Same angle on every arm</label>
         </div>
@@ -1051,7 +1051,7 @@
         </div>
         <div class="control-group checkbox-group" style="margin-top: 5px;">
             <input type="checkbox" id="photoSafeToggle" checked>
-            <label for="photoSafeToggle" style="margin: 0" title="Photosensitivity protection: reduces rapid flashes, slow rate of brightness change, kaleidoscope spin is limited (WCAG 2.3.1 thresholds).">Reduce flashing and rapid brightness changes</label>
+            <label for="photoSafeToggle" style="margin: 0" title="Photosensitivity protection: reduces rapid flashes, slow rate of brightness change, kaleidoscope spin is limited (WCAG 2.3.1 thresholds). It lowers the risk, it does not remove it, please do not use if you know you're photosensitive.">Reduce flashing and rapid brightness changes</label>
         </div>
         <div class="control-group">
             <button id="photoWarnShowBtn" type="button" style="width:100%">Show photosensitivity warning</button>
@@ -1169,9 +1169,9 @@
             <div class="control-group">
                 <label for="breathColorMode" title="Select to change the color mode to either stay the same, change per cycle, or change per breath.">Color</label>
                 <select id="breathColorMode" title="Color stays the same">
-                    <option value="same" selected>Stays the same</option>
-                    <option value="cycle">Changes each cycle</option>
-                    <option value="breath">Changes each breath</option>
+                    <option value="same" selected title="Color stays the same">Stays the same</option>
+                    <option value="cycle" title="Color changes each cycle">Changes each cycle</option>
+                    <option value="breath" title="Color changes each breath">Changes each breath</option>
                 </select>
             </div>
             <div class="control-group checkbox-group">

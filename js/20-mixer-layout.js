@@ -337,7 +337,7 @@
         { v: 0, glyph: '◌', name: 'Soft',   title: 'Soft Dab' },
         { v: 1, glyph: '⬤', name: 'Blob',   title: 'Solid Circle' },
         { v: 2, glyph: '■', name: 'Chisel', title: 'Square brush' },
-        { v: 3, glyph: '▬', name: 'Streak', title: 'Chisel brush' },
+        { v: 3, glyph: '▬', name: 'Streak', title: 'Rectangle Brush' },
         { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring brush' }
     ];
 
@@ -1364,7 +1364,7 @@
         igniteBtnColor.type = 'button';
         igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
         igniteBtnColor.textContent = 'Ignite';
-        igniteBtnColor.title = 'If your fluid is a little tired, click to \'ignite\' it. Adds some density and brightness to tired dye.';
+        igniteBtnColor.title = 'If your paint looks a little dull, hold ignite to add density and brightness.';
 
         // Latch cell (Task 7): permanently visible so the second mode is
         // discoverable — a small indicator that is hollow when unlatched and
@@ -4214,7 +4214,7 @@
         // A compass, not raw numbers: nobody aims gravity by reading -0.71.
         function label(x, y) {
             var m = Math.min(1, Math.hypot(x, y));
-            if (m < 0.02) return 'Centered - gravity off';
+            if (m < 0.02) return 'Centered - no gravity';
             var names = ['right', 'down-right', 'down', 'down-left',
                          'left', 'up-left', 'up', 'up-right'];
             var a = Math.atan2(y, x); // pad y is DOWN, so this reads as a screen compass
@@ -4610,7 +4610,7 @@
         var head = document.createElement('label');
         head.className = 'brush-section-label';
         head.textContent = 'Mouse Buttons';
-        head.title = 'Controls for left mouse, right mouse, and mouse 3. The popout display follows the left mouse.';
+        head.title = 'Controls for left mouse, right mouse, and mouse 3. Using a stylus on the popout display follows the left mouse.';
         wrap.appendChild(head);
 
         // No button left painting is a deliberate, useful state (every button
@@ -5769,7 +5769,7 @@
             [{ v: 'smudge', label: 'Smudge', title: 'Drags paint along the direction you move.' },
              { v: 'spread', label: 'Spread', title: 'Pushes paint outward from the cursor.' }],
             [{ v: 'gather', label: 'Gather', title: 'Draw paint inward toward the center of the brush.' },
-             { v: 'swirl',  label: 'Swirl',  title: 'Swirls paint towards the brush like a whirlpool.' }]
+             { v: 'swirl',  label: 'Swirl',  title: 'Swirls paint around the brush.' }]
         ];
         var pModeBtns = {};
         PRESSURE_MODES.forEach(function (pair) {
@@ -5942,7 +5942,7 @@
         function setTipOpen(open, keep) {
             tipFold.classList.toggle('collapsed', !open);
             tipHead.setAttribute('aria-expanded', open ? 'true' : 'false');
-            tipHead.title = open ? 'Click to hide Brush Tips' : 'Show the tip settings';
+            tipHead.title = 'Click to show/hide brushes';
             if (keep) { try { if (window.settingsManager) window.settingsManager.set(TIP_OPEN_KEY, !!open); } catch (_) {} }
         }
         tipFold.__setOpen = function (open) { setTipOpen(!!open, true); };
