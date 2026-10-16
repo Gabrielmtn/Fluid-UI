@@ -18,9 +18,10 @@ const profile = path.join(require('os').tmpdir(), 'fluid-penwin-profile-' + proc
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = { checks: [] };
 function check(name, ok, info) { results.checks.push({ name, ok: !!ok, info }); console.log((ok ? 'PASS ' : 'FAIL ') + name + (info !== undefined ? '  ' + JSON.stringify(info) : '')); }
-// Left-drag from 30% to 70% of a slider's track; chordBase = other buttons held.
-async function dragSlider(main, r, chordBase) {
-    const x0 = r.x - r.w / 2 + r.w * 0.3, x1 = r.x - r.w / 2 + r.w * 0.7, y = r.y;
+// Left-drag from 30% to `to` (default 70%) of a slider's track; chordBase =
+// other buttons held.
+async function dragSlider(main, r, chordBase, to) {
+    const x0 = r.x - r.w / 2 + r.w * 0.3, x1 = r.x - r.w / 2 + r.w * (to || 0.7), y = r.y;
     await main.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0, y, buttons: chordBase, pointerType: 'mouse' });
     await main.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y, button: 'left', buttons: chordBase | 1, clickCount: 1, pointerType: 'mouse' });
     await main.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: (x0 + x1) / 2, y, button: 'left', buttons: chordBase | 1, pointerType: 'mouse' });
@@ -367,16 +368,21 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         const scXs = sc.map((v) => v.x);
         const scRising = scXs.every((v, i) => i === 0 || v >= scXs[i - 1] - 0.02);
         check('pen holds Replay on the popup: Scatter (Brush source) lights from the pen, gliding along the top, not from the replayed stroke', penHold.right && penHold.replay && scLast && Math.abs(scLast.x - 0.8) < 0.12 && Math.abs(scLast.y - 0.88) < 0.12 && scRising && sc.slice(4).every((v) => v.y > 0.6), { samples: sc, penHold });
-        // ...and drags a slider (the top-bar Brush Size fader) while the pen holds Replay.
+        // ...and drags a slider (the Brush Size fader in the left sidebar head)
+        // while the pen holds Replay. The fader on screen is 20's log-curve
+        // proxy #brushSizePerceptual (value = min × (max/min)^p); the real
+        // #brushSize sits hidden behind it and takes the value it writes
+        // through. 5 seats the proxy at ~74%, so the drag runs to the far
+        // right: 70% would land at ~4, BELOW the start.
         await pop.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'right', buttons: 2, clickCount: 1, pointerType: 'pen' });
         await sleep(30);
-        const bs0 = await reveal(main, 'brushSize');
+        const bs0 = await reveal(main, 'brushSizePerceptual');
         await main.eval("document.getElementById('brushSize').value = '5'; document.getElementById('brushSize').dispatchEvent(new Event('input', { bubbles: true })); 1");
-        await dragSlider(main, bs0, 0);
-        const bs1 = await main.eval("({ v: parseFloat(document.getElementById('brushSize').value), right: !!isRightMouseDown })");
+        await dragSlider(main, bs0, 0, 0.97);
+        const bs1 = await main.eval("({ v: parseFloat(document.getElementById('brushSize').value), p: parseFloat(document.getElementById('brushSizePerceptual').value), right: !!isRightMouseDown })");
         await pop.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'right', buttons: 0, clickCount: 1, pointerType: 'pen' });
         await sleep(40);
-        check('pen holds Replay on the popup while the mouse drags the Brush Size fader', bs1.v > 30 && bs1.right, { from: 5, to: bs1.v, right: bs1.right });
+        check('pen holds Replay on the popup while the mouse drags the Brush Size fader', bs1.v > 30 && bs1.right, { from: 5, to: bs1.v, p: bs1.p, hit: bs0.hit, right: bs1.right });
         await main.eval("(function(){ var b=document.getElementById('cursorToggle'); b.checked=" + cb0.checked + "; b.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
 
         // ── The native chord: hold Replay with the right button on the main
@@ -419,12 +425,13 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         const after2 = await main.eval("({ v: document.getElementById('scatterSource').value, src: window.config.SCATTER_SOURCE })");
         check('...and when the picker is refused, the click steps to the next option (and the config follows)', after2.v !== selBefore.v && after2.src === after2.v, { selBefore, after2 });
         await main.eval("HTMLSelectElement.prototype.showPicker = window.__origShowPicker; var s=document.getElementById('scatterSource'); s.value='brush'; s.dispatchEvent(new Event('change',{bubbles:true})); 1");
-        // Native <input type=range> sliders under a chord: the strip fader and a sidebar slider.
+        // Native <input type=range> sliders under a chord: the Brush Size fader
+        // (its on-screen proxy, as above) and a sidebar slider.
         await main.eval("document.getElementById('brushSize').value = '5'; document.getElementById('brushSize').dispatchEvent(new Event('input', { bubbles: true })); 1");
-        const fd0 = await reveal(main, 'brushSize');
-        await dragSlider(main, fd0, 2);
-        const fd1 = await main.eval("({ v: parseFloat(document.getElementById('brushSize').value), right: !!isRightMouseDown, captured: document.getElementById('brushSize').hasPointerCapture(1) })");
-        check('native chord: the Brush Size fader takes a chorded drag while Replay is held', fd1.v > 30 && fd1.right && !fd1.captured, { from: 5, to: fd1.v, right: fd1.right, captured: fd1.captured });
+        const fd0 = await reveal(main, 'brushSizePerceptual');
+        await dragSlider(main, fd0, 2, 0.97);
+        const fd1 = await main.eval("({ v: parseFloat(document.getElementById('brushSize').value), p: parseFloat(document.getElementById('brushSizePerceptual').value), right: !!isRightMouseDown, captured: document.getElementById('brushSizePerceptual').hasPointerCapture(1) })");
+        check('native chord: the Brush Size fader takes a chorded drag while Replay is held', fd1.v > 30 && fd1.right && !fd1.captured, { from: 5, to: fd1.v, p: fd1.p, hit: fd0.hit, right: fd1.right, captured: fd1.captured });
         // A sidebar slider: Canvas Opacity (Display), which 20 places in the section.
         const cs0 = await reveal(main, 'canvasOpacity');
         await main.eval("document.getElementById('canvasOpacity').value = '10'; document.getElementById('canvasOpacity').dispatchEvent(new Event('input', { bubbles: true })); window.__ev = []; ['pointerdown','pointermove','pointerup','input','change','gotpointercapture'].forEach(function(t){ document.getElementById('canvasOpacity').addEventListener(t, function(e){ window.__ev.push(t + ':' + (e.button!=null?e.button:'') + (e.isTrusted?'':'~') + ' tgt=' + (e.target.id||e.target.tagName)); }); }); 1");
