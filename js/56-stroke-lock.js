@@ -179,10 +179,9 @@
     // or null while Keep distance is not steering alone or an end is too
     // near the middle to have a steady bearing: a straight line, as before.
     function path(x0, y0, x1, y1) {
-        if (!anchored('distance') || anchored('angle')) return null;
-        var c = cv(), R = locks.distance.r;
-        if (!c || !(R > 1e-6)) return null;
-        var ox = c.width * 0.5, oy = c.height * 0.5;
+        var g = ring();
+        if (!g) return null;
+        var R = g.r, ox = g.x, oy = g.y;
         var r0 = Math.hypot(x0 - ox, y0 - oy), r1 = Math.hypot(x1 - ox, y1 - oy);
         if (r0 < AREA_INNER * R || r1 < AREA_INNER * R) return null;
         var a0 = Math.atan2(y0 - oy, x0 - ox);
@@ -199,6 +198,16 @@
                 return { x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r };
             }
         };
+    }
+
+    // The circle Keep distance holds the brush to ({ x, y, r }, canvas px)
+    // while it steers alone; null otherwise. Steady's head (05d0) chases
+    // round it by whole turns.
+    function ring() {
+        if (!anchored('distance') || anchored('angle')) return null;
+        var c = cv(), R = locks.distance.r;
+        if (!c || !(R > 1e-6)) return null;
+        return { x: c.width * 0.5, y: c.height * 0.5, r: R };
     }
 
     // Where the anchored locks put the brush when the real hand has moved
@@ -724,9 +733,10 @@
         paintHand: paintHand,
         hand: hand,
         // The way between two brush spots round a held Keep-distance circle
-        // (null: a straight line). 05d0's walker and Steady head and 05j's
-        // hose lay their dabs along it.
+        // (null: a straight line). 05d0's walker and 05j's hose lay their
+        // dabs along it; ring() is the circle itself, for Steady's head.
         path: path,
+        ring: ring,
         onChange: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
         // Once a frame while the hand moves under a held lock.
         onHand: function (fn) { if (typeof fn === 'function') handListeners.push(fn); },

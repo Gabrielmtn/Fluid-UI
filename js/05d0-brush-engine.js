@@ -361,14 +361,82 @@
         return (L && typeof L.path === 'function') ? L.path(x0, y0, x1, y1) : null;
     }
 
-    // A chaser (Steady's head, the stabilizer) moved share f of the way round
-    // path g, but never left more than RING_LAG behind: past half a turn the
-    // short way round is the other way, and a fast spin would turn it back.
+    // The stabilizer's point moved share f of the way round path g, but never
+    // left more than RING_LAG behind: past half a turn the short way round is
+    // the other way, and a fast spin would turn it back.
     var RING_LAG = Math.PI / 2;
     function roundStep(g, f) {
         var a = Math.abs(g.turn);
         if (a * (1 - f) > RING_LAG) f = 1 - RING_LAG / a;
         return g.at(f);
+    }
+
+    // ── Steady round a held Keep distance ───────────────────────────────
+    // The head chases the brush round the circle (js/56), so the circle
+    // holds, and at Steady's own ease and top speed, so the stroke is still
+    // smoothed (2026-10-16: "allow stabilization speed to work, but avoid the
+    // collapsing"). It chases by how far the brush is AHEAD, in turns counted
+    // the way the hand went: a hand spinning faster than the top speed laps
+    // the head, and counting the short way round would then point backwards
+    // and turn the head round. Whole laps past RING_OWED are forgotten (the
+    // head would only paint the same circle again), so a long fast spin
+    // leaves at most a lap and a quarter to finish when the hand stops, and
+    // the head is never so few px behind that the pull drops under the top
+    // speed and it stutters as it is lapped.
+    var RING_OWED = 2.5 * Math.PI;
+    var ringLive = false;   // counting: the head and the brush were both on a held circle
+    var ringLead = 0;       // the brush ahead of the head, radians, signed, whole turns kept
+    var ringAim = 0;        // the brush's bearing at the last step
+    var ringHeadA = 0;      // ...and the head's
+
+    function lockRing() {
+        var L = window.StrokeLock;
+        return (L && typeof L.ring === 'function') ? L.ring() : null;
+    }
+    function wrapPi(a) {
+        a = (a + Math.PI) % (2 * Math.PI);
+        if (a < 0) a += 2 * Math.PI;
+        return a - Math.PI;
+    }
+
+    // The head's chase toward (ax, ay) round the held circle, or null (none
+    // held, or the head or the brush too near the middle to have a steady
+    // bearing): a straight chase then, and the count starts again after.
+    function ringChase(ax, ay) {
+        var g = lockRing();
+        if (!g) { ringLive = false; return null; }
+        var hr = Math.hypot(hx - g.x, hy - g.y), ar = Math.hypot(ax - g.x, ay - g.y);
+        if (hr < 0.5 * g.r || ar < 0.5 * g.r) { ringLive = false; return null; }
+        var ha = Math.atan2(hy - g.y, hx - g.x), aa = Math.atan2(ay - g.y, ax - g.x);
+        // What the brush turned since the last step, less whatever the head
+        // turned that the walk below didn't (cut short at the canvas edge).
+        if (!ringLive) ringLead = wrapPi(aa - ha);
+        else ringLead += wrapPi(aa - ringAim) - wrapPi(ha - ringHeadA);
+        ringLive = true;
+        ringAim = aa;
+        ringHeadA = ha;
+        while (ringLead > RING_OWED) ringLead -= 2 * Math.PI;
+        while (ringLead < -RING_OWED) ringLead += 2 * Math.PI;
+        return { g: g, ha: ha, hr: hr, dr: ar - hr, len: Math.hypot(ringLead * g.r, ar - hr) };
+    }
+
+    // Walk the head share f of chase c, in pieces under an eighth of a turn
+    // so each one's dabs go round the way the chase does. True if it ran
+    // off the canvas (after the lift, box set).
+    function ringWalk(c, f, box) {
+        var turn = ringLead * f, dr = c.dr * f;
+        var k = Math.max(1, Math.ceil(Math.abs(turn) / (Math.PI / 4)));
+        ringLead -= turn;
+        ringHeadA = c.ha + turn;
+        for (var i = 1; i <= k; i++) {
+            var a = c.ha + turn * i / k, r = c.hr + dr * i / k;
+            var x = c.g.x + Math.cos(a) * r, y = c.g.y + Math.sin(a) * r;
+            if (box) { if (releaseStep(x, y, box)) return true; continue; }
+            hx = x;
+            hy = y;
+            emitAlong(hx, hy, 1);
+        }
+        return false;
     }
 
     // One straight piece of emitAlong. `share` is this piece's part of the
@@ -559,6 +627,7 @@
         // Off mid-stroke (the slider pulled to 0): the string goes, and the
         // head joins the hand the way raw samples would.
         if (!(s > 0)) {
+            ringLive = false;
             for (var k = 0; k < count; k++) emitAlong(samples[k].x, samples[k].y, 1);
             var offEdge = false;
             if (releasing) offEdge = releaseStep(tx, ty, canvasBox());
@@ -584,22 +653,26 @@
                 if (j >= 0) { ax = samples[j].x; ay = samples[j].y; }
             } else { ax = tx; ay = ty; }
             // Under a held Keep distance the head chases round the circle,
-            // not across it (see roundPath).
-            var g = roundPath(hx, hy, ax, ay);
-            var d = g ? g.len : Math.hypot(ax - hx, ay - hy);
+            // not across it (see ringChase).
+            var rc = ringChase(ax, ay);
+            var d = rc ? rc.len : Math.hypot(ax - hx, ay - hy);
             var e = d - sh.slack;
             if (!(e > 0)) continue; // slack: the head stays where it is
             var step = Math.min(e * pull, sh.vmax * h);
             // Coasting to a release tail: hold the lift's speed to the end
             // (see the header) rather than easing in to a crawl.
             if (coastV > 0) step = Math.min(e, Math.max(step, coastV * h));
-            var to = g ? roundStep(g, step / d) : { x: hx + (ax - hx) / d * step, y: hy + (ay - hy) / d * step };
-            if (box) {
-                if (releaseStep(to.x, to.y, box)) { ranOff = true; break; }
+            if (rc) {
+                if (ringWalk(rc, step / d, box)) { ranOff = true; break; }
                 continue;
             }
-            hx = to.x;
-            hy = to.y;
+            var toX = hx + (ax - hx) / d * step, toY = hy + (ay - hy) / d * step;
+            if (box) {
+                if (releaseStep(toX, toY, box)) { ranOff = true; break; }
+                continue;
+            }
+            hx = toX;
+            hy = toY;
             emitAlong(hx, hy, 1);
         }
         px0 = tx; py0 = ty;
@@ -634,6 +707,7 @@
             strokeSerial++;
             steadyOn = steadyAmount() > 0;
             hx = tx = px0 = x; hy = ty = py0 = y;
+            ringLive = false;
             handSamples.length = 0;
             releasing = false;
             arriveCb = null;
