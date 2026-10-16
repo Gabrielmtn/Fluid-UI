@@ -807,6 +807,12 @@
                                 // rest is next frame's, whose segment starts at dab n.
                                 const _cover = _interp ? (_n / _credit) : 1;
                                 const segx = (cx - px) * _cover, segy = (cy - py) * _cover;
+                                // Under a held Keep distance (js/56) the segment is the
+                                // circle's arc: a straight one per frame cut inside it,
+                                // so a fast spin on a slow frame painted a polygon and
+                                // the ring shrank.
+                                const _round = (_interp && window.StrokeLock && window.StrokeLock.path)
+                                    ? window.StrokeLock.path(px, py, cx, cy) : null;
                                 // ── Spatial floor (2026-09-10) ──────────────────
                                 // The clock alone has no idea how far the hand moved:
                                 // 250 dabs per SIMULATED second is 175 per wall
@@ -839,7 +845,7 @@
                                 // six fainter ones at 1000px/s). Stationary hose:
                                 // zero-length gap, m = 1, bit-identical to before.
                                 let _m = 1;
-                                const _seglen = Math.hypot(segx, segy);
+                                const _seglen = _round ? _round.len * _cover : Math.hypot(segx, segy);
                                 if (_interp && _seglen > 0) {
                                     const _fl = (typeof config.BRUSH_HOSE_FLOOR === 'number') ? config.BRUSH_HOSE_FLOOR : 0.01;
                                     const _flRef = (typeof config.BRUSH_HOSE_FLOOR_REF_MS === 'number' && config.BRUSH_HOSE_FLOOR_REF_MS > 0)
@@ -871,15 +877,24 @@
                                 // per pixel, however many samples carry it.
                                 const sdx = segx * 10 / _total, sdy = segy * 10 / _total;
                                 const _ks = _k / _m;
+                                let _qx = px, _qy = py;
                                 for (let si = 1; si <= _total; si++) {
                                     const t = _interp ? (si / _total) : 1;
+                                    if (_round) {
+                                        // Round the arc, each sample pushing along its own
+                                        // stretch of it.
+                                        const q = _round.at(t * _cover);
+                                        _dabs.push({ x: q.x, y: q.y, dx: (q.x - _qx) * 10, dy: (q.y - _qy) * 10, p: 1, k: _ks });
+                                        _qx = q.x; _qy = q.y;
+                                        continue;
+                                    }
                                     _dabs.push({
                                         x: px + segx * t,
                                         y: py + segy * t,
                                         dx: sdx, dy: sdy, p: 1, k: _ks
                                     });
                                 }
-                                window.__contFlowLast = { x: px + segx, y: py + segy };
+                                window.__contFlowLast = _round ? _round.at(_cover) : { x: px + segx, y: py + segy };
                                 window.__contFlowCredit = _credit - _n;
                                 // Recording taps raw pointer events, which don't fire
                                 // while stationary — capture the hold here. Frames

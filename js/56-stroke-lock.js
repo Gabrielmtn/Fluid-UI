@@ -8,7 +8,8 @@
 //   replay. Reads canvas / pointer / settingsManager lazily.
 // PROVIDES: window.StrokeLock
 // USED BY: 05d (every painted pointer and touch position goes through
-//   apply()), 31 (the brush cursor sits where the paint will go), 49
+//   apply()), 05d0 + 05j (dabs between two spots go round the circle,
+//   path()), 31 (the brush cursor sits where the paint will go), 49
 //   (Settings → Hotkeys lists the two keys).
 //
 // The ORIGIN is the canvas centre, the point Multi-Brush turns its arms
@@ -54,8 +55,8 @@
     var KINDS = ['distance', 'angle'];
     var NAMES = { distance: 'Keep distance', angle: 'Keep angle' };
     var DOES = {
-        distance: 'hold to paint on a circle round the centre',
-        angle: 'hold to paint straight in and out of the centre'
+        distance: 'hold to paint on a circle round the center',
+        angle: 'hold to paint straight in and out of the center'
     };
     // Closer to the centre than this (canvas px), a spoke has no direction
     // yet: Keep angle waits for the brush to leave the middle.
@@ -160,6 +161,44 @@
         }
         var t = (x - ox) * L.ux + (y - oy) * L.uy;
         return { x: ox + L.ux * t, y: oy + L.uy * t };
+    }
+
+    // The way from (x0, y0) to (x1, y1) ROUND the held circle. Every spot
+    // Keep distance gives the brush is on it, but whatever joins two of them
+    // with a straight line cuts inside: the hose's once-a-frame dabs, the
+    // dab walker, Steady's head chasing the brush. The faster the spin, the
+    // longer the step and the smaller the ring the paint makes (2026-10-16:
+    // "when you spin the mouse while holding the hotkey, the ring shrinks";
+    // at three turns a second Steady 30% drew a 194 px circle at 148 px,
+    // and Steady 100% wound into the middle). Here the bearing and the
+    // distance from the centre each change evenly along the way, so two
+    // spots on the circle are joined by its arc, and a spot still easing on
+    // after the key went down spirals on.
+    // { turn (radians, the short way), len (canvas px, measured at the
+    // circle's radius), pieces (enough arcs that none sags 0.25 px), at(t) },
+    // or null while Keep distance is not steering alone or an end is too
+    // near the middle to have a steady bearing: a straight line, as before.
+    function path(x0, y0, x1, y1) {
+        if (!anchored('distance') || anchored('angle')) return null;
+        var c = cv(), R = locks.distance.r;
+        if (!c || !(R > 1e-6)) return null;
+        var ox = c.width * 0.5, oy = c.height * 0.5;
+        var r0 = Math.hypot(x0 - ox, y0 - oy), r1 = Math.hypot(x1 - ox, y1 - oy);
+        if (r0 < AREA_INNER * R || r1 < AREA_INNER * R) return null;
+        var a0 = Math.atan2(y0 - oy, x0 - ox);
+        var turn = Math.atan2(y1 - oy, x1 - ox) - a0;
+        if (turn > Math.PI) turn -= 2 * Math.PI;
+        else if (turn < -Math.PI) turn += 2 * Math.PI;
+        var arc = Math.min(0.2, Math.sqrt(2 / R));
+        return {
+            turn: turn,
+            len: Math.hypot(turn * R, r1 - r0),
+            pieces: Math.min(64, Math.max(1, Math.ceil(Math.abs(turn) / arc))),
+            at: function (t) {
+                var a = a0 + turn * t, r = r0 + (r1 - r0) * t;
+                return { x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r };
+            }
+        };
     }
 
     // Where the anchored locks put the brush when the real hand has moved
@@ -684,6 +723,10 @@
         guideMarkup: guideMarkup,
         paintHand: paintHand,
         hand: hand,
+        // The way between two brush spots round a held Keep-distance circle
+        // (null: a straight line). 05d0's walker and Steady head and 05j's
+        // hose lay their dabs along it.
+        path: path,
         onChange: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
         // Once a frame while the hand moves under a held lock.
         onHand: function (fn) { if (typeof fn === 'function') handListeners.push(fn); },

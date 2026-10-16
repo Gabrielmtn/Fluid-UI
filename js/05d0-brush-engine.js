@@ -341,7 +341,39 @@
     // of spacingPx, with `residual` carrying the leftover distance between
     // segments so sub-spacing moves accumulate instead of vanishing.
     // Pressure interpolates p0 → p1 across the segment.
+    // Under a held Keep distance (js/56) the segment is the circle's arc,
+    // walked as short straight pieces: one long chord between two spots on
+    // the circle cut inside it, and a fast spin shrank the ring.
     function emitAlong(x, y, p1) {
+        var g = roundPath(lastEmitX, lastEmitY, x, y);
+        if (!g || g.pieces < 2) { walkTo(x, y, p1, 1); return; }
+        var p0 = lastP;
+        for (var i = 1; i < g.pieces; i++) {
+            var q = g.at(i / g.pieces);
+            walkTo(q.x, q.y, p0 + (p1 - p0) * i / g.pieces, 1 / g.pieces);
+        }
+        walkTo(x, y, p1, 1 / g.pieces);
+    }
+
+    // The way round a held Keep-distance circle, or null for a straight line.
+    function roundPath(x0, y0, x1, y1) {
+        var L = window.StrokeLock;
+        return (L && typeof L.path === 'function') ? L.path(x0, y0, x1, y1) : null;
+    }
+
+    // A chaser (Steady's head, the stabilizer) moved share f of the way round
+    // path g, but never left more than RING_LAG behind: past half a turn the
+    // short way round is the other way, and a fast spin would turn it back.
+    var RING_LAG = Math.PI / 2;
+    function roundStep(g, f) {
+        var a = Math.abs(g.turn);
+        if (a * (1 - f) > RING_LAG) f = 1 - RING_LAG / a;
+        return g.at(f);
+    }
+
+    // One straight piece of emitAlong. `share` is this piece's part of the
+    // segment, and of its dab budget.
+    function walkTo(x, y, p1, share) {
         var spacing = spacingPx();
         var dx = x - lastEmitX, dy = y - lastEmitY;
         var dist = Math.hypot(dx, dy);
@@ -363,7 +395,7 @@
         // frame-rate dependent at dense spacing.
         var drainBudget = (typeof window.__dabDrainBudget === 'number' && window.__dabDrainBudget > 0)
             ? window.__dabDrainBudget : 64;
-        var segBudget = Math.max(8, Math.min(drainBudget, MAX_QUEUE - queue.length));
+        var segBudget = Math.max(Math.ceil(8 * share), Math.min(drainBudget * share, MAX_QUEUE - queue.length));
         var expected = (dist + residual) / spacing;
         if (expected > segBudget) spacing = (dist + residual) / segBudget;
         // Normalized AFTER the coalescing bump so a thinned-out fast segment
@@ -551,20 +583,23 @@
                 var j = Math.floor((i + 1) * count / n) - 1;
                 if (j >= 0) { ax = samples[j].x; ay = samples[j].y; }
             } else { ax = tx; ay = ty; }
-            var dx = ax - hx, dy = ay - hy;
-            var d = Math.hypot(dx, dy);
+            // Under a held Keep distance the head chases round the circle,
+            // not across it (see roundPath).
+            var g = roundPath(hx, hy, ax, ay);
+            var d = g ? g.len : Math.hypot(ax - hx, ay - hy);
             var e = d - sh.slack;
             if (!(e > 0)) continue; // slack: the head stays where it is
             var step = Math.min(e * pull, sh.vmax * h);
             // Coasting to a release tail: hold the lift's speed to the end
             // (see the header) rather than easing in to a crawl.
             if (coastV > 0) step = Math.min(e, Math.max(step, coastV * h));
+            var to = g ? roundStep(g, step / d) : { x: hx + (ax - hx) / d * step, y: hy + (ay - hy) / d * step };
             if (box) {
-                if (releaseStep(hx + dx / d * step, hy + dy / d * step, box)) { ranOff = true; break; }
+                if (releaseStep(to.x, to.y, box)) { ranOff = true; break; }
                 continue;
             }
-            hx += dx / d * step;
-            hy += dy / d * step;
+            hx = to.x;
+            hy = to.y;
             emitAlong(hx, hy, 1);
         }
         px0 = tx; py0 = ty;
@@ -638,8 +673,12 @@
             // strength 0 → alpha 1 (raw); strength 1 → alpha 0.08 (heavy lag).
             var stab = Math.min(1, Math.max(0, cfg('BRUSH_STABILIZER', 0)));
             var alpha = 1 - 0.92 * stab;
-            sx += (x - sx) * alpha;
-            sy += (y - sy) * alpha;
+            var g = alpha < 1 ? roundPath(sx, sy, x, y) : null;
+            if (g) { var q = roundStep(g, alpha); sx = q.x; sy = q.y; }
+            else {
+                sx += (x - sx) * alpha;
+                sy += (y - sy) * alpha;
+            }
             emitAlong(sx, sy, p);
         },
 

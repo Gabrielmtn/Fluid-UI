@@ -4667,9 +4667,9 @@
         var note = document.createElement('div');
         var pickers = {};
         [
-            { kind: 'distance', name: 'Keep distance', sub: 'Circles round the centre',
+            { kind: 'distance', name: 'Keep distance', sub: 'Circles round the center',
               hint: 'Holding causes brush to maintain distance from the center, helpful for clean circles.' },
-            { kind: 'angle', name: 'Keep angle', sub: 'To and from the centre',
+            { kind: 'angle', name: 'Keep angle', sub: 'To and from the center',
               hint: 'Holding causes the brush to stay on the line through the center. Helpful for pushing colors together.' }
         ].forEach(function (d) {
             var row = document.createElement('div');
