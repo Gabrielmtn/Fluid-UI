@@ -100,32 +100,65 @@ body.sprinting #sprintBtn { border-color: var(--ok); color: var(--ok); }
 .sprint .clock { font: 600 16px var(--mono); min-width: 64px; font-variant-numeric: tabular-nums; }
 .sprint .clock.up { color: var(--warn); }
 .sprint .done-all { color: var(--ok); font-weight: 600; }
-.entry .sprint-tools { display: none; gap: 6px; flex-wrap: wrap; }
-body.sprinting .entry .sprint-tools { display: flex; }
-.entry.sp-done { opacity: .45; }
-.entry.sp-done .sp-done-btn { border-color: var(--ok); color: var(--ok); }
+.entry .sprint-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Keep, Not player text and Show me where are on every row; Skip orders the sprint's queue */
+body:not(.sprinting) .entry .sp-skip-btn { display: none; }
+.entry[data-state="kept"], .entry[data-state="mine"], .entry[data-state="code"] { opacity: .5; }
+/* a reviewed row is still editable: full strength under the pointer or the caret */
+.entry[data-state="kept"]:hover, .entry[data-state="mine"]:hover, .entry[data-state="code"]:hover,
+.entry[data-state="kept"]:focus-within, .entry[data-state="mine"]:focus-within, .entry[data-state="code"]:focus-within { opacity: 1; }
+/* ↩ Back to list shows on a reviewed row only */
+.entry .sp-back { display: none; }
+.entry[data-state="kept"] .sp-back, .entry[data-state="mine"] .sp-back, .entry[data-state="code"] .sp-back { display: inline-block; }
+.entry[data-state="kept"] .sp-keep { border-color: var(--ok); color: var(--ok); }
+.entry[data-state="code"] .sp-code { border-color: var(--muted); color: var(--fg); }
+.entry .sp-state { color: var(--ok); font-size: 11px; align-self: center; }
+.entry[data-state="code"] .sp-state { color: var(--muted); }
+.edit .ctxline { color: var(--muted); font-size: 12px; white-space: pre-wrap; padding: 2px 8px; border-left: 2px solid var(--line2); }
+.edit .ctxline mark { background: rgba(88,166,255,.2); color: var(--fg); border-radius: 3px; padding: 0 2px; }
+.meta .via { font-family: var(--mono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sprint .keys { color: var(--dim); font-size: 11px; }
+/* a sprint has its own batch: the browsing filters only take room */
+body.sprinting #kinds, body.sprinting #scopes, body.sprinting #filters { display: none; }
+body.sprinting .group h2 { position: static; }
+.role { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid; }
+.role b { font-size: 12px; letter-spacing: .6px; white-space: nowrap; }
+.role span { color: var(--muted); }
+.role-screen { border-color: #d29922; background: rgba(210,153,34,.14); } .role-screen b { color: #e3b341; }
+.role-tooltip { border-color: #388bfd; background: rgba(56,139,253,.12); } .role-tooltip b { color: #79c0ff; }
+.role-reader, .role-placeholder { border-color: var(--line2); background: var(--panel2); } .role-reader b, .role-placeholder b { color: var(--fg); }
+.role-message, .role-guide { border-color: #2ea043; background: rgba(46,160,67,.12); } .role-message b, .role-guide b { color: #7ee787; }
+.role-card { border-color: #8957e5; background: rgba(137,87,229,.14); } .role-card b { color: #d2a8ff; }
+.role-error { border-color: var(--bad); background: rgba(248,81,73,.12); } .role-error b { color: #ffa198; }
+.role-unknown { border-color: var(--line2); border-style: dashed; } .role-unknown b { color: var(--muted); }
+.entry[data-role="screen"] .edit textarea { font-weight: 600; }
+.offline-bar { display: none; position: fixed; left: 0; right: 0; top: 0; z-index: 40; background: #3d1416; border-bottom: 1px solid var(--bad); color: var(--fg); padding: 10px 16px; font-size: 13px; }
+.offline-bar code { font-family: var(--mono); background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 4px; }
+body.offline .offline-bar { display: block; }
+.entry[data-pending] .sp-state::after { content: ' · waiting to save'; color: var(--warn); }
 </style>
 </head>
 <body>
 <header class="topbar">
     <div class="row">
         <h1>Copy sink <small id="stamp"></small></h1>
-        <span class="stat"><b id="nAll">0</b> strings · <b id="nVis">0</b> shown · <b id="nCh" class="ch">0</b> changed · <b id="nRt">0</b> placed</span>
+        <span class="stat"><b id="nTouched">0</b> of <b id="nLines">0</b> lines touched · <b id="nAll">0</b> strings · <b id="nVis">0</b> shown · <b id="nCh" class="ch">0</b> changed · <b id="nRt">0</b> placed</span>
         <span style="flex:1"></span>
         <input class="in search" id="q" type="search" placeholder="Search text, label, id, file…  ( / )" autocomplete="off" spellcheck="false">
-        <button class="btn" id="sprintBtn" title="Work through the help text in pomodoro-sized batches (~300 words, 25 minutes), with Done, Skip and Show me where">Sprint</button>
+        <button class="btn" id="sprintBtn" title="Work through every line of player text in pomodoro-sized batches (~300 words or 40 lines, 25 minutes), with Keep, Not player text, Skip and Show me where">Sprint</button>
         <button class="btn" id="frBtn" title="Find & replace across the shown strings">Find &amp; replace</button>
         <button class="btn" id="harvestBtn" title="Load the app in headless Chrome and attach each string to its labeled control (section, label, control type)">Place strings</button>
         <button class="btn" id="reloadBtn" title="Re-read the source">Reload</button>
     </div>
     <div class="row tight" id="kinds"></div>
     <div class="row tight" id="scopes"></div>
-    <div class="row tight">
-        <label class="toggle"><input type="checkbox" id="fPlayer" checked> player-facing only <span title="Hides what a player never reads as words: unbound read-only rows, the boot cursor CSS and jank monitor, and raw markup blobs (whole panels, templates) unless they carry a real sentence. Untick to see the full catalog.">(?)</span></label>
+    <div class="row tight" id="filters">
+        <label class="toggle"><input type="checkbox" id="fPlayer" checked> player-facing only <span title="Hides what a player never reads as words: runtime-only rows (built from pieces that are listed on their own), the boot cursor CSS, and raw markup blobs that are whole panels. Untick to see the full catalog.">(?)</span></label>
         <label class="toggle"><input type="checkbox" id="fChanged"> changed only</label>
         <label class="toggle"><input type="checkbox" id="fTells"> tells only <span title="em-dash, middle dot, ellipsis, semicolon, 'so you can', 'simply', 'seamlessly', a colon that explains — the fingerprints of generated copy">(—&nbsp;·&nbsp;…&nbsp;;)</span></label>
         <label class="toggle"><input type="checkbox" id="fDyn"> dynamic / partial</label>
         <label class="toggle"><input type="checkbox" id="fUnplaced"> not placed</label>
+        <label class="toggle" title="A line you kept, marked not player text, or wrote leaves the list (a search still finds it). Tick this to see them all again; ↩ Back to list on one puts it back to review."><input type="checkbox" id="fReviewed"> show reviewed</label>
         <span class="sep"></span>
         <label class="toggle">group by <select class="in" id="groupBy"><option value="scope">where it appears</option><option value="file">source file</option><option value="kind">kind</option></select></label>
         <span class="sep"></span>
@@ -143,6 +176,7 @@ body.sprinting .entry .sprint-tools { display: flex; }
         <button class="btn small" id="spStart">Start</button>
         <button class="btn small ghost" id="spReset">Reset clock</button>
         <span class="stat" id="spLeft"></span>
+        <span class="keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> keep &amp; next · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd> not player text · <kbd>Ctrl</kbd>+<kbd>S</kbd> write edits</span>
         <span style="flex:1"></span>
         <button class="btn small" id="spNext" title="Leave what is not done for later and take the next ~300 words">Next sprint →</button>
         <button class="btn small ghost" id="spExit">Exit sprint</button>
@@ -163,6 +197,7 @@ body.sprinting .entry .sprint-tools { display: flex; }
     <button class="btn primary" id="applyBtn" disabled title="Write every changed string back into its source file (Ctrl+S)">Write to source</button>
 </div>
 <div class="toast" id="toast"></div>
+<div class="offline-bar" role="alert">The copy sink isn’t running, so nothing can reach the repo right now. Your edits and Keeps are held in this page and go through the moment it’s back. To start it: run <code>npm run copy-sink</code> in a terminal in the Fluid-UI folder.</div>
 
 <script>
 (function () {
@@ -176,22 +211,11 @@ body.sprinting .entry .sprint-tools { display: flex; }
     try { edits = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (_) { edits = {}; }
     function saveEdits() { try { localStorage.setItem(LS_KEY, JSON.stringify(edits)); } catch (_) {} }
 
-    // Player-facing: what someone reads in the app as words. Not player-facing: rows the sink
-    // cannot write anyway (runtime-only), dev diagnostics, and innerHTML blobs that are really
-    // whole panels or templates. A blob stays only when it carries an actual sentence.
-    var DEV_FILES = /^js\/(00a-boot|08b-jank-monitor|08-stats-panel)\.js$/;
-    var BLOCK_TAG = /<(div|span|button|h3|option|input|label|select)\b/i;
-    function isNoise(e) {
-        if (e.enc === 'runtime-only') return true;
-        if (DEV_FILES.test(e.file || '')) return true;
-        if (/\{\s*cursor:/.test(e.text)) return true;
-        if (e.kind === 'html' && BLOCK_TAG.test(e.text)) {
-            if (/\$\{/.test(e.text) || e.text.length > 1200) return true;
-            var words = e.text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().split(' ').length;
-            if (words < 6) return true;
-        }
-        return false;
-    }
+    // Player-facing: what someone reads in the app as words. The server decides
+    // (copy-sink.js devNoise, the same rule `check` counts by): not the rows the
+    // sink cannot write (runtime-only), the boot cursor CSS, or innerHTML blobs
+    // that are whole panels.
+    function isNoise(e) { return !!e.dev; }
     function playerOnly() { return $('fPlayer').checked; }
     function pool() { return playerOnly() ? cat.entries.filter(function (e) { return !isNoise(e); }) : cat.entries; }
     try { if (localStorage.getItem('copySink.playerOnly') === '0') $('fPlayer').checked = false; } catch (_) {}
@@ -279,8 +303,22 @@ body.sprinting .entry .sprint-tools { display: flex; }
         return (el.tag === 'button' || el.tag === 'a') && !el.caption;
     }
 
+    // Where a player meets the words (copy-sink.js roleOf), in large type on every row.
+    var ROLE = {
+        screen: ['ON SCREEN', 'Printed on the control itself (a button, a label, a heading). Keep it short: this is not the tooltip.'],
+        tooltip: ['TOOLTIP', 'Shows when you hover over the control.'],
+        reader: ['SCREEN READER', 'Not shown: read aloud to players who use a screen reader.'],
+        placeholder: ['PLACEHOLDER', 'Grey hint inside an empty text box.'],
+        message: ['MESSAGE', 'A notice, status line or dialog that pops up.'],
+        guide: ['HOW DO I… GUIDE', 'A line of the How do I… guide.'],
+        card: ['EFFECT CARD', 'The card that pops up over an effect.'],
+        error: ['ERROR MESSAGE', 'Shown when something fails.'],
+        unknown: ['NOT SURE WHERE', 'The catcher could not tell where this shows. Use Show me where before you rewrite it.']
+    };
     var dups = {};
     function buildDups() { dups = {}; cat.entries.forEach(function (e) { (dups[e.text] = dups[e.text] || []).push(e); }); }
+    // "Apply to all" reaches only the places where the same words play the same part
+    function sameRoleDups(e) { return (dups[e.text] || []).filter(function (o) { return o !== e && o.enc !== 'runtime-only' && !o.dev && o.role === e.role; }); }
 
     function rowHtml(e) {
         var t = curText(e); var ro = e.enc === 'runtime-only'; var n = dups[e.text] ? dups[e.text].length : 1;
@@ -291,94 +329,200 @@ body.sprinting .entry .sprint-tools { display: flex; }
         if (ro) flags.push('<span class="flag" style="color:var(--bad)" title="Seen at runtime but no source literal matched — built from pieces">unbound</span>');
         if (hotkeyKeyed(e)) flags.push('<span class="flag" title="A Ctrl+Shift+H hotkey finds this control by this text: it has no id and no words of its own. Rewording it unbinds any key someone set on it. Give the control an id first (see addCollisionLayerBtn in js/20).">⚠ hotkey finds it by this</span>');
         var fileLine = e.file ? '<span class="file" title="' + esc(e.file) + ':' + e.line + '"><b>' + esc(e.file.replace(/^js\//, '')) + '</b>:' + e.line + '</span>' : '<span class="file">runtime only</span>';
-        return '<div class="entry' + (isChanged(e) ? ' changed' : '') + (ro ? ' ro' : '') + '" data-key="' + esc(e.key) + '">' +
+        // A piece of a longer line (a label inside markup) shows the whole line, this piece marked.
+        var sentence = e.ctx && e.ctx.sentence ? '<div class="ctxline" title="The whole line this piece is part of; ⟨…⟩ is filled in by the app">' + esc(e.ctx.sentence).replace(/\u0001/g, '<mark>').replace(/\u0002/g, '</mark>') + '</div>' : '';
+        if (e.enc === 'js-chain') flags.push('<span class="flag" title="The app fills in each ⟨…⟩ (a name, a number). Rewrite the words around them, keeping the ⟨…⟩ in order. Delete a ⟨…⟩ whole to take it out of the line.">⟨…⟩ = filled in by the app</span>');
+        if (e.lookedUp) flags.push('<span class="flag" title="Found by these words at: ' + esc(e.lookedUp.join(', ')) + '. If you rename this label, ask Claude to update those so they still find the control.">⚠ a How-do-I tour finds this by its words</span>');
+        var role = ROLE[e.role] || ROLE.unknown;
+        return '<div class="entry' + (isChanged(e) ? ' changed' : '') + (ro ? ' ro' : '') + '" data-key="' + esc(e.key) + '" data-state="' + esc(e.touched || '') + '" data-role="' + esc(e.role || 'unknown') + '">' +
             mockHtml(e) +
-            '<div class="edit"><textarea spellcheck="true"' + (ro ? ' readonly' : '') + '>' + esc(t) + '</textarea>' +
+            '<div class="edit"><div class="role role-' + esc(e.role || 'unknown') + '"><b>' + role[0] + '</b><span>' + role[1] + '</span></div>' +
+            '<textarea spellcheck="true"' + (ro ? ' readonly' : '') + '>' + esc(t) + '</textarea>' +
+            sentence +
             '<div class="orig">' + esc(e.text) + '</div>' +
             '<div class="tools"><span class="len">' + t.length + '</span>' +
             '<span class="tell" data-tell></span>' +
-            (n > 1 ? '<span class="dup" title="The same text appears in ' + n + ' places — click to copy this edit to all of them">×' + n + ' same · apply to all</span>' : '') +
+            (sameRoleDups(e).length ? '<span class="dup" title="The same words, in the same part, in ' + sameRoleDups(e).length + ' other place' + (sameRoleDups(e).length === 1 ? '' : 's') + ': click to see them and copy this edit there">×' + (sameRoleDups(e).length + 1) + ' same · copy there…</span>' : '') +
             '<span style="flex:1"></span><button class="btn small ghost reset" title="Back to the source text">↺</button></div></div>' +
             '<div class="meta"><span class="kind ' + esc(e.kind) + '">' + esc(e.kind) + '</span>' + fileLine + (flags.length ? '<span>' + flags.join(' ') + '</span>' : '') +
+            (e.ctx && e.ctx.via ? '<span class="via" title="Where the words go: ' + esc(e.ctx.via) + '">' + esc(e.ctx.via) + '</span>' : '') +
             (rt(e) && rt(e).path ? '<span class="path" title="' + esc(rt(e).path) + '">' + esc(rt(e).path) + '</span>' : '') +
             sprintToolsHtml(e) + '</div></div>';
     }
 
-    // ── Sprint mode ──────────────────────────────────────────────────
-    // The help text (player-facing, 6+ words) in batches of ~300 words, one
-    // 25-minute pomodoro each, in the order the app shows them. Done and Skip
-    // are remembered in this browser, by file + kind + text, and a string
-    // rewritten and written to source counts as done.
-    var SP_DONE = 'copySink.sprint.done.v1', SP_SKIP = 'copySink.sprint.skip.v1', SP_BATCH = 'copySink.sprint.batch.v1';
-    var SPRINT_WORDS = 300, SPRINT_MS = 25 * 60 * 1000;
+    // ── Sprint mode: every line, touched once ─────────────────────────
+    // Every line of player text (any length), once per distinct wording, in
+    // the order the app shows it, in batches of ~300 words or 40 lines: one
+    // 25-minute pomodoro each. ✓ Keep = read, the words stay. Not player
+    // text = a code string the catcher let through. A line rewritten and
+    // written to source is yours. All three land in scripts/copy-sink/ledger.json
+    // (written by the local sink process), keyed by the words, so `check` and
+    // any browser agree; only Skip and the current batch live in this browser.
+    var SP_SKIP = 'copySink.sprint.skip.v2', SP_BATCH = 'copySink.sprint.batch.v2', SP_OLD_DONE = 'copySink.sprint.done.v1';
+    var SPRINT_WORDS = 300, SPRINT_LINES = 40, SPRINT_MS = 25 * 60 * 1000;
     function lsGet(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (_) { return d; } }
     function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
-    var spDone = lsGet(SP_DONE, {}), spSkip = lsGet(SP_SKIP, {}), spBatch = lsGet(SP_BATCH, []);
+    var spSkip = lsGet(SP_SKIP, {}), spBatch = lsGet(SP_BATCH, []);   // batch: entry keys
     var sprinting = false;
-    function sid(e) { return (e.file || '') + '|' + e.kind + '|' + e.text; }
-    function sidOf(file, kind, text) { return (file || '') + '|' + kind + '|' + text; }
-    function wordsIn(t) { return (String(t).replace(/<[^>]+>/g, ' ').match(/[A-Za-z\u00C0-\u024F][\w'’-]*/g) || []).length; }
-    function isHelp(e) { return !isNoise(e) && e.enc !== 'runtime-only' && wordsIn(e.text) >= 6; }
-    function inBatch(e) { return spBatch.indexOf(sid(e)) >= 0; }
+    var STATE_LABEL = { kept: '✓ kept', mine: '✓ yours', code: 'not player text' };
+    function normT(t) { return String(t).replace(/\s+/g, ' ').trim(); }
+    function wordsIn(t) { return (String(t).replace(/<[^>]+>/g, ' ').match(/[A-Za-zÀ-ɏ][\w'’-]*/g) || []).length; }
+    function isLine(e) { return !isNoise(e) && e.enc !== 'runtime-only'; }
+    // One row per distinct line: the first place the app shows it.
+    function lines() {
+        var seen = {}, out = [];
+        sortedEntries().forEach(function (e) { if (!isLine(e)) return; var k = normT(e.text); if (seen[k]) return; seen[k] = 1; out.push(e); });
+        return out;
+    }
+    function inBatch(e) { return spBatch.indexOf(e.key) >= 0; }
     function sprintToolsHtml(e) {
-        if (!isHelp(e)) return '';
+        if (!isLine(e)) return '';
         var r = rt(e) || {}, el = r.el || {};
-        var loc = { attr: r.attr || (e.kind === 'placeholder' ? 'placeholder' : 'title'), text: e.text, id: el.id || (e.ctx && e.ctx.id) || '' };
-        var where = (r.path || el.id || (e.ctx && e.ctx.id)) ?
+        var attr = r.attr === 'node' ? 'text' : (r.attr || (e.kind === 'placeholder' ? 'placeholder' : (/^(page text|words|error|css|text|textContent|html)$/.test(e.kind) ? 'text' : 'title')));
+        var loc = { attr: attr, text: r.text || e.text, id: el.id || (e.ctx && e.ctx.id) || '' };
+        var where = (r.path || el.id || (e.ctx && e.ctx.id) || attr === 'text') ?
             '<a class="btn small ghost sp-where" target="swirlApp" href="/#locate=' + esc(encodeURIComponent(JSON.stringify(loc))) + '" title="Open the app at this control (one tab, reused)">Show me where</a>' : '';
-        return '<div class="sprint-tools"><button class="btn small sp-done-btn" title="Read and right: take it off the list">✓ Done</button>' +
-            '<button class="btn small ghost sp-skip-btn" title="Not now: it goes to the back of the queue">Skip</button>' + where + '</div>';
+        return '<div class="sprint-tools"><button class="btn small sp-keep" title="Read it; the words stay as they are (Ctrl+Enter in the box: keep it and go to the next)">✓ Keep</button>' +
+            '<button class="btn small ghost sp-code" title="Not words a player reads: a code string the catcher let through (Ctrl+Shift+Enter)">Not player text</button>' +
+            '<button class="btn small ghost sp-skip-btn" title="Not now: it goes to the back of the queue">Skip</button>' +
+            '<button class="btn small ghost sp-back" title="Not reviewed after all: it goes back into the list (and the sprint queue) to look at again">↩ Back to list</button>' + where +
+            '<span class="sp-state"></span></div>';
     }
     function sprintQueue() {
-        var list = sortedEntries().filter(isHelp).filter(function (e) { return !spDone[sid(e)]; });
-        return list.filter(function (e) { return !spSkip[sid(e)]; }).concat(list.filter(function (e) { return spSkip[sid(e)]; }));
+        var list = lines().filter(function (e) { return !e.touched; });
+        return list.filter(function (e) { return !spSkip[e.key]; }).concat(list.filter(function (e) { return spSkip[e.key]; }));
     }
     function takeBatch() {
         var q = sprintQueue(), out = [], w = 0;
-        for (var i = 0; i < q.length && (w < SPRINT_WORDS || !out.length); i++) { out.push(sid(q[i])); w += wordsIn(curText(q[i])); }
+        for (var i = 0; i < q.length && out.length < SPRINT_LINES && (w < SPRINT_WORDS || !out.length); i++) { out.push(q[i].key); w += wordsIn(curText(q[i])); }
         spBatch = out; lsSet(SP_BATCH, spBatch);
     }
     function sprintStats() {
-        var help = cat.entries.filter(isHelp);
-        var doneW = 0, leftW = 0, leftN = 0, bW = 0, bDoneW = 0;
-        help.forEach(function (e) {
-            var w = wordsIn(curText(e));
-            if (spDone[sid(e)]) doneW += w; else { leftW += w; leftN++; }
-            if (inBatch(e)) { bW += w; if (spDone[sid(e)] || spSkip[sid(e)]) bDoneW += w; }
+        var all = lines(), s = { n: all.length, touched: 0, leftN: 0, leftW: 0, bN: 0, bDone: 0 };
+        all.forEach(function (e) {
+            if (e.touched) s.touched++; else { s.leftN++; s.leftW += wordsIn(e.text); }
+            if (inBatch(e)) { s.bN++; if (e.touched || isChanged(e) || spSkip[e.key]) s.bDone++; }
         });
-        return { doneW: doneW, leftW: leftW, leftN: leftN, bW: bW, bDoneW: bDoneW };
+        return s;
+    }
+    function paintStates() {
+        cat.entries.forEach(function (e) {
+            var row = els.get(e.key); if (!row) return;
+            row.dataset.state = e.touched || '';
+            if (pending[normT(e.text)]) row.dataset.pending = '1'; else delete row.dataset.pending;
+            var st = row.querySelector('.sp-state'); if (st) st.textContent = STATE_LABEL[e.touched] || '';
+        });
     }
     function paintSprint() {
+        paintStates(); counts();
         if (!sprinting) return;
         var s = sprintStats();
-        $('spTitle').textContent = 'Sprint ' + (Math.floor(s.doneW / SPRINT_WORDS) + 1);
-        $('spWords').innerHTML = s.bW ? '<b>' + s.bDoneW + '</b> / ' + s.bW + ' words' : '<span class="done-all">All the help text is done.</span>';
-        $('spFill').style.width = s.bW ? Math.round(100 * s.bDoneW / s.bW) + '%' : '100%';
-        $('spLeft').textContent = s.leftN + ' strings, ' + s.leftW + ' words left · about ' + Math.ceil(s.leftW / SPRINT_WORDS) + ' sprints';
-        $('spNext').classList.toggle('primary', s.bW > 0 && s.bDoneW >= s.bW);
-        cat.entries.forEach(function (e) { var row = els.get(e.key); if (row) row.classList.toggle('sp-done', !!spDone[sid(e)]); });
+        $('spTitle').textContent = 'Sprint ' + (Math.floor(s.touched / SPRINT_LINES) + 1);
+        $('spWords').innerHTML = s.bN ? '<b>' + s.bDone + '</b> / ' + s.bN + ' lines' : '<span class="done-all">Every line is touched.</span>';
+        $('spFill').style.width = s.bN ? Math.round(100 * s.bDone / s.bN) + '%' : '100%';
+        $('spLeft').textContent = s.touched + ' of ' + s.n + ' lines touched · ' + s.leftN + ' left, ' + s.leftW + ' words';
+        $('spNext').classList.toggle('primary', s.bN > 0 && s.bDone >= s.bN);
     }
     function setSprinting(on) {
         sprinting = !!on;
         document.body.classList.toggle('sprinting', sprinting);
-        if (sprinting && !spBatch.some(function (k) { return cat.entries.some(function (e) { return sid(e) === k && !spDone[k]; }); })) takeBatch();
+        if (sprinting && !spBatch.some(function (k) { var e = byKey(k); return e && !e.touched; })) takeBatch();
         applyFilter(); paintSprint();
         requestAnimationFrame(autosizeAll);
     }
+    // Touch a line (s = kept | code) or untouch it (s = ''): every place with
+    // the same words follows. The mark is held in this browser first (pending)
+    // and handed to the sink process, which writes the ledger file; if the
+    // sink is not running it waits here and goes the moment it is back, so a
+    // stopped process never costs a click.
+    var SP_PENDING = 'copySink.ledger.pending.v1';
+    var pending = lsGet(SP_PENDING, {});   // normT(text) → { text, s }
+    var flushing = false;
+    function applyMark(k, s) {
+        cat.entries.forEach(function (o) { if (normT(o.text) === k) { if (s) o.touched = s; else delete o.touched; } });
+    }
+    function setState(e, s) {
+        var k = normT(e.text);
+        applyMark(k, s);
+        pending[k] = { text: e.text, s: s || null }; lsSet(SP_PENDING, pending);
+        paintSprint();
+        flushPending();
+    }
+    function flushPending() {
+        var keys = Object.keys(pending);
+        if (!keys.length || flushing) return;
+        flushing = true;
+        var sent = keys.map(function (k) { return pending[k]; });
+        fetch('/__sink/ledger', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ set: sent }) })
+            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                if (!r.ok) throw new Error(r.error || 'the ledger file could not be written');
+                keys.forEach(function (k, i) { if (pending[k] === sent[i]) delete pending[k]; });   // a newer click on the same line waits for the next round
+                lsSet(SP_PENDING, pending); setOnline(true);
+            }, function () { setOnline(false); })
+            .catch(function (err) { toast('Could not save to the ledger: ' + err.message, true); })
+            .then(function () { flushing = false; paintSprint(); if (online && Object.keys(pending).length) setTimeout(flushPending, 50); });
+    }
+    // Is the sink process up? Checked every few seconds; a banner says so when not.
+    var online = true;
+    function setOnline(on) {
+        if (on === online) return;
+        online = on;
+        document.body.classList.toggle('offline', !on);
+        if (on) { toast('The copy sink is back. Everything held here is being saved.'); flushPending(); }
+    }
+    setInterval(function () {
+        fetch('/__sink/locate.js', { method: 'HEAD', cache: 'no-store' })
+            .then(function (r) { setOnline(r.ok); if (r.ok) flushPending(); }, function () { setOnline(false); });
+    }, 4000);
+    // Ctrl+Enter / Ctrl+Shift+Enter move on to the next row shown. The next
+    // row is found first: outside a sprint, the one just reviewed leaves the
+    // list (unless "show reviewed" is ticked).
+    function rowAfter(row) {
+        var rows = Array.prototype.filter.call(document.querySelectorAll('.entry'), function (r) { return !r.classList.contains('hidden'); });
+        return rows[rows.indexOf(row) + 1] || null;
+    }
+    function focusRow(next) {
+        if (next && !next.classList.contains('hidden')) { next.querySelector('textarea').focus(); next.scrollIntoView({ block: 'nearest' }); }
+        else toast(sprinting ? 'That was the last line of this batch. Next sprint → when you are ready.' : 'That was the last line shown.');
+    }
+    // A line reviewed outside a sprint leaves the list (a sprint keeps its batch in view)
+    function dropReviewed() { if (!sprinting && !$('fReviewed').checked) applyFilter(); }
     $('sprintBtn').addEventListener('click', function () { setSprinting(!sprinting); });
     $('spExit').addEventListener('click', function () { setSprinting(false); });
     $('spNext').addEventListener('click', function () { takeBatch(); applyFilter(); paintSprint(); requestAnimationFrame(autosizeAll); window.scrollTo(0, 0); });
     $('main').addEventListener('click', function (ev) {
         var row = ev.target.closest('.entry'); if (!row) return;
         var e = byKey(row.dataset.key); if (!e) return;
-        if (ev.target.classList.contains('sp-done-btn')) {
-            if (spDone[sid(e)]) delete spDone[sid(e)]; else { spDone[sid(e)] = 1; delete spSkip[sid(e)]; }
-            lsSet(SP_DONE, spDone); lsSet(SP_SKIP, spSkip); paintSprint();
+        if (ev.target.classList.contains('sp-keep')) {
+            if (isChanged(e)) return toast('This one has an edit: Write to source makes it yours. ↺ drops the edit.', true);
+            setState(e, e.touched === 'kept' ? '' : 'kept');
+            if (spSkip[e.key]) { delete spSkip[e.key]; lsSet(SP_SKIP, spSkip); }
+            dropReviewed();
         }
-        if (ev.target.classList.contains('sp-skip-btn')) {
-            spSkip[sid(e)] = 1; lsSet(SP_SKIP, spSkip); paintSprint();
-        }
+        if (ev.target.classList.contains('sp-code')) { setState(e, e.touched === 'code' ? '' : 'code'); dropReviewed(); }
+        if (ev.target.classList.contains('sp-back')) { setState(e, ''); toast('Back in the list.'); }
+        if (ev.target.classList.contains('sp-skip-btn')) { spSkip[e.key] = 1; lsSet(SP_SKIP, spSkip); paintSprint(); }
     });
+    $('main').addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Enter' || !(ev.ctrlKey || ev.metaKey) || ev.target.tagName !== 'TEXTAREA') return;
+        var row = ev.target.closest('.entry'); var e = row && byKey(row.dataset.key); if (!e) return;
+        ev.preventDefault();
+        var next = rowAfter(row);
+        if (ev.shiftKey) setState(e, 'code');
+        else if (!isChanged(e) && !e.touched) setState(e, 'kept');
+        dropReviewed();
+        focusRow(next);
+    });
+    // The old sprint kept Done in this browser only; hand any of it to the ledger once.
+    function migrateOldDone() {
+        var old = lsGet(SP_OLD_DONE, null); if (!old) return;
+        var set = Object.keys(old).map(function (sid) { var p = sid.split('|'); return { text: p.slice(2).join('|'), s: 'kept' }; }).filter(function (x) { return x.text; });
+        if (!set.length) { try { localStorage.removeItem(SP_OLD_DONE); } catch (_) {} return; }
+        fetch('/__sink/ledger', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ set: set }) })
+            .then(function (r) { return r.json(); })
+            .then(function (r) { if (r.ok) { try { localStorage.removeItem(SP_OLD_DONE); } catch (_) {} toast('Moved ' + set.length + ' lines marked Done in the old sprint into the ledger.'); load(); } });
+    }
     // The clock: 25 minutes, Start / Pause, then a nudge to take a break.
     var spLeftMs = SPRINT_MS, spTick = 0, spLast = 0;
     function paintClock() {
@@ -470,6 +614,8 @@ body.sprinting .entry .sprint-tools { display: flex; }
         if ($('fTells').checked && !TELLS.test(curText(e))) return false;
         if ($('fDyn').checked && !(e.partial || e.enc === 'js-template-expr' || e.enc === 'runtime-only')) return false;
         if ($('fUnplaced').checked && rt(e)) return false;
+        // A reviewed line leaves the list, but a search still finds it
+        if (!$('fReviewed').checked && e.touched && !q) return false;
         if (q) {
             var hay = (curText(e) + ' ' + e.text + ' ' + labelOf(e) + ' ' + (e.file || '') + ' ' + (e.ctx.id || '') + ' ' + ((rt(e) || {}).el || {}).id + ' ' + scopeOf(e) + ' ' + e.kind).toLowerCase();
             if (hay.indexOf(q) < 0) return false;
@@ -491,6 +637,7 @@ body.sprinting .entry .sprint-tools { display: flex; }
     function counts() {
         var ch = cat.entries.filter(isChanged).length;
         $('nAll').textContent = pool().length; $('nCh').textContent = ch; $('nCh2').textContent = ch;
+        var ls = lines(); $('nLines').textContent = ls.length; $('nTouched').textContent = ls.filter(function (e) { return e.touched; }).length;
         $('nRt').textContent = cat.entries.filter(function (e) { return rt(e); }).length;
         $('applyBtn').disabled = !ch;
         $('stamp').textContent = (cat.runtimeAt ? 'placed ' + new Date(cat.runtimeAt).toLocaleString() : 'not placed yet — click “Place strings”');
@@ -562,14 +709,17 @@ body.sprinting .entry .sprint-tools { display: flex; }
         var e = byKey(row.dataset.key); if (!e) return;
         if (ev.target.classList.contains('reset')) { setText(e, e.text); }
         if (ev.target.classList.contains('dup')) {
-            var t = curText(e); var n = 0;
-            (dups[e.text] || []).forEach(function (o) { if (o !== e && o.enc !== 'runtime-only') { setText(o, t); n++; } });
-            toast('Copied to ' + n + ' other place' + (n === 1 ? '' : 's') + '.');
+            var t = curText(e), others = sameRoleDups(e);
+            if (!others.length) return;
+            var where = others.map(function (o) { return '• ' + (o.file || '') + ':' + o.line + (o.ctx && o.ctx.via ? '   ' + o.ctx.via : ''); }).join('\n');
+            if (!confirm('Copy this edit to ' + others.length + ' other place' + (others.length === 1 ? '' : 's') + ' with the same words, also ' + (ROLE[e.role] || ROLE.unknown)[0] + ':\n\n' + where + '\n\nNow: "' + t + '"')) return;
+            others.forEach(function (o) { setText(o, t); });
+            toast('Copied to ' + others.length + ' other place' + (others.length === 1 ? '' : 's') + '.');
         }
     });
 
     // ── filters ──
-    ['q', 'fPlayer', 'fChanged', 'fTells', 'fDyn', 'fUnplaced'].forEach(function (id) { $(id).addEventListener('input', applyFilter); $(id).addEventListener('change', applyFilter); });
+    ['q', 'fPlayer', 'fChanged', 'fTells', 'fDyn', 'fUnplaced', 'fReviewed'].forEach(function (id) { $(id).addEventListener('input', applyFilter); $(id).addEventListener('change', applyFilter); });
     $('groupBy').addEventListener('change', render);
     document.addEventListener('keydown', function (ev) {
         if (ev.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { ev.preventDefault(); $('q').focus(); $('q').select(); }
@@ -620,29 +770,46 @@ body.sprinting .entry .sprint-tools { display: flex; }
     });
 
     // ── write to source ──
+    // Before writing: words printed ON a control that grew into a sentence are
+    // almost always a tooltip typed in the wrong box, and a label a tour looks
+    // up by its words stops being found when it changes. Say so, by name.
+    function writeWarnings(list) {
+        var w = function (s) { return (String(s).match(/[A-Za-zÀ-ɏ][\w'’-]*/g) || []).length; };
+        var long = [], tours = [];
+        list.forEach(function (ed) {
+            var e = byKey(ed.key); if (!e) return;
+            if (e.role === 'screen' && (ed.text.length > Math.max(30, ed.orig.length * 2) || (w(ed.text) >= 5 && w(ed.text) > w(ed.orig) + 2))) long.push('• "' + ed.orig + '" → "' + ed.text.slice(0, 80) + (ed.text.length > 80 ? '…' : '') + '"');
+            if (e.lookedUp) tours.push('• "' + ed.orig + '" (found by ' + e.lookedUp.slice(0, 3).join(', ') + ')');
+        });
+        var msg = '';
+        if (long.length) msg += 'These are ON-SCREEN words, printed on the button or label itself, not tooltips:\n\n' + long.join('\n') + '\n\nThe whole sentence will show on the control.\n\n';
+        if (tours.length) msg += 'A How-do-I tour finds these controls by their words; after this it will not find them until Claude updates the tour:\n\n' + tours.join('\n') + '\n\n';
+        return msg ? confirm(msg + 'Write anyway? (Cancel to go back; ↺ on a row undoes its edit.)') : true;
+    }
     $('applyBtn').addEventListener('click', function () {
         var list = editList(); if (!list.length) return;
+        if (!writeWarnings(list)) return;
         $('applyBtn').disabled = true; $('applyBtn').textContent = 'Writing…';
         fetch('/__sink/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits: list.map(function (e) { return { key: e.key, text: e.text, orig: e.orig }; }) }) })
             .then(function (r) { return r.json(); })
             .then(function (rep) {
                 if (rep.error) throw new Error(rep.error);
+                // The sink process marked the new words "mine" in the ledger; the
+                // batch follows each string to its new key so the row stays in view.
                 (rep.applied || []).forEach(function (a) {
-                    var ed = list.filter(function (x) { return x.key === a.key; })[0];
-                    if (ed) {
-                        var was = sidOf(ed.file, ed.kind, ed.orig), now = sidOf(ed.file, ed.kind, ed.text);
-                        spDone[now] = 1;
-                        var bi = spBatch.indexOf(was); if (bi >= 0) spBatch[bi] = now;
-                    }
+                    var bi = spBatch.indexOf(a.key); if (bi >= 0 && a.newKey) spBatch[bi] = a.newKey;
                     delete edits[a.key];
                 });
-                lsSet(SP_DONE, spDone); lsSet(SP_BATCH, spBatch);
+                lsSet(SP_BATCH, spBatch);
                 saveEdits();
                 var sk = (rep.skipped || []).filter(function (s) { return s.reason !== 'unchanged'; });
                 toast('Wrote ' + rep.applied.length + ' string' + (rep.applied.length === 1 ? '' : 's') + ' to source.' + (sk.length ? '\n' + sk.length + ' skipped:\n' + sk.map(function (s) { return '• ' + s.key.split('#')[0] + ' — ' + s.reason; }).join('\n') : ''), !!sk.length);
                 return load();
             })
-            .catch(function (err) { toast('Write failed: ' + err.message, true); })
+            .catch(function (err) {
+                if (/fetch|network/i.test(err.message)) { setOnline(false); toast('Could not reach the copy sink, so nothing was written. Your edits are safe in this page: start it again (npm run copy-sink) and press Write to source.', true); }
+                else toast('Write failed: ' + err.message, true);
+            })
             .then(function () { $('applyBtn').textContent = 'Write to source'; counts(); });
     });
 
@@ -663,9 +830,13 @@ body.sprinting .entry .sprint-tools { display: flex; }
             var live = {}; cat.entries.forEach(function (e) { live[e.key] = 1; });
             Object.keys(edits).forEach(function (k) { if (!live[k]) delete edits[k]; });
             saveEdits();
+            // marks still waiting for the sink win over what the ledger said
+            Object.keys(pending).forEach(function (k) { applyMark(k, pending[k].s); });
+            setOnline(true); flushPending();
             buildDups(); buildChips(); render(); counts();
             cat.entries.forEach(refreshRow);
             paintSprint();
+            migrateOldDone();
         }).catch(function (err) { $('main').innerHTML = '<div class="empty">Could not load the catalog: ' + esc(err.message) + '<br>Run <code>node scripts/copy-sink.js serve</code> and open this page from that server.</div>'; });
     }
     load();

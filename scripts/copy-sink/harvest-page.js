@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // scripts/copy-sink/harvest-page.js — evaluated INSIDE the running app by
-// copy-sink.js harvest. Walks the DOM for every copy-bearing attribute,
-// pops each effect card, reads the recipe registry, and returns one item
+// copy-sink.js harvest. Walks the DOM for every copy-bearing attribute and
+// text node, pops each effect card, reads the recipe registry, and returns one item
 // per string with the context the sink needs to show the string next to
 // the labeled control it belongs to:
 //   { text, attr, el: {tag, type, id, cls, options}, label, control,
@@ -156,6 +156,19 @@
         }
         try { thumb.dispatchEvent(new Event('blur')); } catch (_) {}
     }
+    // 4b. every text node (labels, captions, options, headings): only lends its
+    // place to the catalog entry with the same words (or the fragment inside
+    // it); a runtime-built text never becomes an entry of its own.
+    var tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    var tn;
+    while ((tn = tw.nextNode())) {
+        var pe = tn.parentElement;
+        if (!pe || pe.closest('script, style, noscript, template, .copy-sink')) continue;
+        var tt = (tn.nodeValue || '').replace(/\s+/g, ' ').trim();
+        if (!tt || tt.length > 600 || !/[A-Za-z]{2}/.test(tt)) continue;
+        push(pe, 'node', tt);
+    }
+    if (document.title) push(document.documentElement, 'node', document.title, { scope: 'Window title', label: 'window title', control: 'title bar' });
     // 4. recipes registry
     var R = window.Recipes && (window.Recipes.RECIPES || window.Recipes.registry);
     if (R && R.length) {

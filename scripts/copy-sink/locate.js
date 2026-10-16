@@ -15,6 +15,19 @@
             var byId = document.getElementById(q.id);
             if (byId) return byId;
         }
+        if (q.attr === 'text' && q.text) {
+            // Words on the page (a label, a caption, a piece of a sentence): the
+            // element whose own text is them, else the first that contains them.
+            var want = q.text.replace(/\s+/g, ' ').trim(), part = null;
+            var tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), n;
+            while ((n = tw.nextNode())) {
+                var p = n.parentElement; if (!p || p.closest('script, style')) continue;
+                var t = (n.nodeValue || '').replace(/\s+/g, ' ').trim();
+                if (t === want) return p;
+                if (!part && want.length >= 4 && t.indexOf(want) >= 0) part = p;
+            }
+            return part;
+        }
         if (q.attr && q.text) {
             var all = document.querySelectorAll('[' + q.attr + ']');
             for (var i = 0; i < all.length; i++) if (all[i].getAttribute(q.attr) === q.text) return all[i];
