@@ -98,7 +98,83 @@ function onArtistName(data) {
     renderActivity();
 }
 
-// Update remote cursor display
+// ── Remote cursors ──────────────────────────────────────────────────
+// Each painter in the room shows as a ring at their pen with their name on
+// a tag beside it, the look the trailer's name tags set (the CSS is in
+// 21-sidebar). One element per peer, kept and moved: a peer's
+// cursor messages arrive every 50 ms at most (broadcastCursor), so the tag
+// eases toward each new point on this canvas's own frames instead of
+// jumping there.
+var cursorTags = new Map();     // clientId -> { el, label, col, x, y, tx, ty }
+var CURSOR_EASE = 0.35;         // share of the gap closed per 60 Hz frame
+var cursorGlideRaf = 0;
+var cursorGlideAt = 0;
+
+// The colour each peer last painted with, so their ring is the paint they
+// are laying. Until they have painted, colorForClient stands in.
+var peerPaintColours = new Map();   // clientId -> { css, base }
+
+// Every incoming 'splat' passes through here (06d enqueueRemoteSplat). The
+// unbaked `base` is the colour the painter picked; `color` is baked with the
+// dab's flow on most senders, so it is only read from a peer that has never
+// sent a base (an older build). A push lays no pigment, so it says nothing
+// about the paint.
+function notePeerPaint(data) {
+    var d = data && data.data;
+    var id = data && data.clientId;
+    if (!d || typeof id !== 'string' || !id || typeof d.push === 'string') return;
+    var had = peerPaintColours.get(id);
+    var fromBase = Array.isArray(d.base) && d.base.length >= 3;
+    if (!fromBase && had && had.base) return;
+    var src = fromBase ? d.base : d.color;
+    if (!Array.isArray(src) || src.length < 3) return;
+    var ch = [];
+    for (var i = 0; i < 3; i++) {
+        var v = +src[i];
+        if (!isFinite(v)) return;
+        ch.push(Math.round(Math.max(0, Math.min(1, v)) * 255));
+    }
+    var css = 'rgb(' + ch.join(', ') + ')';
+    if (had && had.css === css && had.base === fromBase) return;
+    peerPaintColours.set(id, { css: css, base: fromBase });
+    var tag = cursorTags.get(id);
+    if (tag) paintCursorTag(tag, css);
+}
+
+function cursorColour(id) {
+    var p = peerPaintColours.get(id);
+    return p ? p.css : colorForClient(id);
+}
+
+function paintCursorTag(tag, col) {
+    if (tag.col === col) return;
+    tag.col = col;
+    tag.el.style.setProperty('--peer', col);
+}
+
+function placeCursorTag(tag) {
+    // x and y are normalized 0-1
+    tag.el.style.left = (tag.x * 100) + '%';
+    tag.el.style.top = (tag.y * 100) + '%';
+}
+
+function makeCursorTag(id, cursor) {
+    var el = document.createElement('div');
+    el.id = 'remote-cursor-' + id;
+    el.className = 'remote-cursor';
+    var ring = document.createElement('span');
+    ring.className = 'remote-cursor-ring';
+    var label = document.createElement('span');
+    label.className = 'remote-cursor-label';
+    el.appendChild(ring);
+    el.appendChild(label);
+    // A new tag starts where the peer is, not gliding in from a corner.
+    var tag = { el: el, label: label, col: '', x: cursor.x, y: cursor.y, tx: cursor.x, ty: cursor.y };
+    placeCursorTag(tag);
+    canvasWrapper.appendChild(el);
+    return tag;
+}
+
 function updateRemoteCursors() {
     // Remove old cursors (older than 5 seconds)
     const now = Date.now();
@@ -110,43 +186,65 @@ function updateRemoteCursors() {
             remoteLastPositions.delete(id);
         }
     }
-
-    // Clear existing remote cursors
-    clearRemoteCursors();
-
-    // Create cursor elements for each remote client (distinct per-user color + label)
-    for (const [id, cursor] of remoteCursors.entries()) {
-        const col = colorForClient(id);
-        let cursorEl = document.getElementById(`remote-cursor-${id}`);
-        if (!cursorEl) {
-            cursorEl = document.createElement('div');
-            cursorEl.id = `remote-cursor-${id}`;
-            cursorEl.className = 'remote-cursor';
-            cursorEl.style.cssText = 'position:absolute;width:12px;height:12px;border-radius:50%;' +
-                // 1002: over the text layer (1001, 23-text-overlays), so words
-                // on the canvas never hide where a painter is.
-                'border:2px solid rgba(255,255,255,0.85);pointer-events:none;z-index:1002;' +
-                'transform:translate(-50%,-50%);transition:left 0.05s, top 0.05s;';
-            cursorEl.style.backgroundColor = col;
-            cursorEl.style.boxShadow = '0 0 8px ' + col;
-            const label = document.createElement('span');
-            label.className = 'remote-cursor-label';
-            // A phone brush paints here without a canvas of its own: mark
-            // it, so whoever holds the phone can find themselves.
-            label.textContent = (window.PhonePads && window.PhonePads.isPad(id) ? '📱 ' : '') + shortName(id);
-            label.style.color = col;
-            cursorEl.appendChild(label);
-            canvasWrapper.appendChild(cursorEl);
+    for (const [id, tag] of cursorTags.entries()) {
+        if (!remoteCursors.has(id)) {
+            tag.el.remove();
+            cursorTags.delete(id);
         }
+    }
 
-        // Update position (x and y are normalized 0-1)
-        cursorEl.style.left = `${cursor.x * 100}%`;
-        cursorEl.style.top = `${cursor.y * 100}%`;
+    for (const [id, cursor] of remoteCursors.entries()) {
+        let tag = cursorTags.get(id);
+        if (!tag) {
+            tag = makeCursorTag(id, cursor);
+            cursorTags.set(id, tag);
+        }
+        tag.tx = cursor.x;
+        tag.ty = cursor.y;
+        // A phone brush paints here without a canvas of its own: mark
+        // it, so whoever holds the phone can find themselves. Rechecked on
+        // every move, since its hello and a Steam name can land after the
+        // first cursor message.
+        const name = (window.PhonePads && window.PhonePads.isPad(id) ? '📱 ' : '') + shortName(id);
+        if (tag.label.textContent !== name) tag.label.textContent = name;
+        paintCursorTag(tag, cursorColour(id));
+    }
+    if (cursorTags.size && !cursorGlideRaf) {
+        cursorGlideAt = 0;
+        cursorGlideRaf = requestAnimationFrame(glideRemoteCursors);
     }
 }
 
-// Clear all remote cursors
+// Runs only while some tag is still short of its point, then stops.
+function glideRemoteCursors(now) {
+    cursorGlideRaf = 0;
+    // Timed, so a 144 Hz screen glides at the same pace as a 60 Hz one.
+    const dt = cursorGlideAt ? Math.min(100, now - cursorGlideAt) : 1000 / 60;
+    cursorGlideAt = now;
+    const k = 1 - Math.pow(1 - CURSOR_EASE, dt * 60 / 1000);
+    let moving = false;
+    for (const tag of cursorTags.values()) {
+        const ex = tag.tx - tag.x, ey = tag.ty - tag.y;
+        if (!ex && !ey) continue;
+        if (Math.abs(ex) < 1e-4 && Math.abs(ey) < 1e-4) {
+            tag.x = tag.tx;
+            tag.y = tag.ty;
+        } else {
+            tag.x += ex * k;
+            tag.y += ey * k;
+            moving = true;
+        }
+        placeCursorTag(tag);
+    }
+    if (moving) cursorGlideRaf = requestAnimationFrame(glideRemoteCursors);
+}
+
+// Clear all remote cursors (leaving the room, or the socket dropping)
 function clearRemoteCursors() {
+    if (cursorGlideRaf) cancelAnimationFrame(cursorGlideRaf);
+    cursorGlideRaf = 0;
+    cursorTags.clear();
+    peerPaintColours.clear();   // connection ids are room-scoped
     const cursors = document.querySelectorAll('.remote-cursor');
     cursors.forEach(cursor => cursor.remove());
 }

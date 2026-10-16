@@ -1511,19 +1511,58 @@ body.compact-ui #sidebar-right > #mixer-strip .mixer-stack .mixer-actions {
     transition: opacity 0.3s;
 }
 
-/* Name label on a remote user's cursor (positioned beside the colored dot) */
+/* A remote painter's cursor (06e): a ring at their pen and their name on a
+   tag below and to the right, both in the colour they paint with (--peer,
+   set per peer). The trailer's name tags set the look, drawn at 44 px text
+   for video; every length here is that design in em, so font-size is the
+   one size for the whole tag. The element itself is a zero-size point at
+   the pen. */
+.remote-cursor {
+    --peer: #fff;
+    position: absolute;
+    width: 0;
+    height: 0;
+    /* 1002: over the text layer (1001, 23-text-overlays), so words on the
+       canvas never hide where a painter is. */
+    z-index: 1002;
+    pointer-events: none;
+    font-family: Bahnschrift, 'DIN Alternate', var(--font-ui);
+    font-size: 15px;
+    font-weight: 600;
+}
+.remote-cursor-ring {
+    position: absolute;
+    left: -0.557em;
+    top: -0.557em;
+    width: 1.114em;
+    height: 1.114em;
+    box-sizing: border-box;
+    /* A border under 2 px rounds down to a hairline on a 1x screen. */
+    border: max(2px, 0.114em) solid var(--peer);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.25);
+}
 .remote-cursor-label {
     position: absolute;
-    left: 13px;
-    top: -3px;
-    white-space: nowrap;
-    font-family: 'Courier New', monospace;
-    font-size: 9px;
-    font-weight: 700;
+    left: 0.636em;
+    top: 0.409em;
+    height: 1.364em;
+    line-height: 1.364em;
+    padding: 0 0.318em 0 0.455em;
+    border-radius: 0.273em;
     background: rgba(0, 0, 0, 0.55);
-    padding: 1px 5px;
-    border-radius: 3px;
-    pointer-events: none;
+    color: #fff;
+    white-space: nowrap;
+}
+/* The colour bar on the tag's left edge, square over its rounded corners. */
+.remote-cursor-label::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0.2em;
+    background: var(--peer);
 }
 
 /* Settings buttons row */

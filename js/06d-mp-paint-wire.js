@@ -1164,6 +1164,7 @@ function dabTime(d) {
 }
 
 function enqueueRemoteSplat(data) {
+    notePeerPaint(data);   // their cursor ring takes this colour (06e)
     if (window.config && window.config.MP_INBOUND_QUEUE === false) { handleRemoteSplat(data); return; }
     var n = inboundDabCount(data);
     var dabs = data && data.data && data.data.dabs;

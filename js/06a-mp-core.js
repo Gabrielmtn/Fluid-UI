@@ -636,6 +636,7 @@ function onMultiplayerMessage(event) {
                 if (typeof data.id === 'string' && data.id && data.id !== clientId) {
                     dropPeerAssetsOf(data.id);
                     peerArtistNames.delete(data.id);
+                    peerPaintColours.delete(data.id);
                     if (window.PhonePads) window.PhonePads.onLeft(data.id);
                 }
                 break;
