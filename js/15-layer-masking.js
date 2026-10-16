@@ -1796,13 +1796,18 @@
 
                 if (maskState.activeMaskLayerId === 'adhoc' && maskState.adhocSource) {
                     // Ad-hoc image (brush-shape import)
-                    imageToLoad = maskState.adhocSource.dataURL;
+                    imageToLoad = adhocSamCanvas();
                 } else if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
                     // Image layer - use stored image data
                     const layerIndex = parseInt(maskState.activeMaskLayerId.replace('image-', ''));
                     const layer = window.layers?.find(l => l.index === layerIndex);
                     if (layer && layer.data) {
                         imageToLoad = layer.data;
+                        const dc = document.getElementById('canvas');
+                        if (dc && dc.width && dc.height) {
+                            try { imageToLoad = await layerSamCanvas(layer.data, dc.width, dc.height); }
+                            catch (_) { /* won't decode here: hand SAM the file, as before */ }
+                        }
                     }
                 } else {
                     // Recording layer - capture current canvas
@@ -1956,6 +1961,26 @@
         }
     }
 
+    // Image layers get what brush shapes get from adhocSamCanvas: the picture
+    // STRETCHED to the display canvas, which is the stored space the editor
+    // maps clicks into (and the mapping applyLayerMask bakes with), so Instant
+    // Roto's masks come back at the size they are used instead of at the
+    // photo's. One per editor session: re-opening the tool hands loadImage
+    // the same canvas, so it keeps the embeddings.
+    let _layerSam = null; // {src, w, h, canvas}
+    async function layerSamCanvas(src, w, h) {
+        const c0 = _layerSam;
+        if (c0 && c0.src === src && c0.w === w && c0.h === h) return c0.canvas;
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d', { willReadFrequently: true }).drawImage(img, 0, 0, w, h);
+        _layerSam = { src: src, w: w, h: h, canvas: c };
+        return c;
+    }
+
     // Fully stand down this session's Instant Roto state — points, preview,
     // candidates, pending debounce — and resync the Apply button. Every
     // editor exit path must call this: maskState and the overlay both
@@ -1963,6 +1988,7 @@
     // points would otherwise hold a LATER session's Apply button in its
     // busy state (samCutoutPending's points-without-preview clause).
     function resetSamSessionState() {
+        _layerSam = null;
         maskState.smartSelectPoints = [];
         maskState.samPreviewMask = null;
         maskState.samCandidates = [];
@@ -3419,6 +3445,23 @@
         return c;
     }
 
+    // Instant Roto segments the picture at the editor's working size, not the
+    // file's own. Fed the original, it scaled every click's three proposals
+    // up to the photo's resolution and back down to this size: on a 24 MP
+    // photo that was ~2 s per click with Next locked on "Cutting out".
+    // Drawn from the PADDED bitmap in a padded session, so clicks
+    // (mapped through width/height) land on the artwork. Built once a session.
+    function adhocSamCanvas() {
+        const src = maskState.adhocSource;
+        if (!src.samCanvas) {
+            const c = document.createElement('canvas');
+            c.width = src.width; c.height = src.height;
+            c.getContext('2d', { willReadFrequently: true }).drawImage(src.image, 0, 0, src.width, src.height);
+            src.samCanvas = c;
+        }
+        return src.samCanvas;
+    }
+
     // ── Ad-hoc mask mode (2026-08-09): run the full editor (stamps +
     // Instant Roto) against an arbitrary image, no layer involved. Used by
     // custom brush shapes (33-brush-shapes). The editor canvas is sized to
@@ -3449,10 +3492,6 @@
             const h = Math.max(1, Math.round(sh * scale));
             maskState.adhocSource = {
                 image: source,
-                // Instant Roto keys off this URL and maps clicks through
-                // width/height, so a padded session must hand it the PADDED
-                // bitmap or its coordinates land offset from the artwork.
-                dataURL: padded ? padded.toDataURL('image/png') : imageDataURL,
                 name: name || 'Brush Shape',
                 onApply: onApply,
                 seeded: false,

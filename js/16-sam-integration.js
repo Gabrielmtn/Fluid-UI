@@ -18,6 +18,7 @@ class SAMSegmenter {
         this.transformers = null;
         this.displayWidth = null;
         this.displayHeight = null;
+        this.sourceKey = null; // what loadImage last embedded, see there
         this.device = null;   // 'webgpu' | 'wasm' — chosen at initialize()
         this.dtype = null;    // 'fp16' (webgpu) | 'q8' (wasm)
         this.modelId = null;
@@ -414,9 +415,20 @@ class SAMSegmenter {
                 return false;
             }
 
-            // Load image using RawImage
-            const { RawImage } = this.transformers;
-            this.currentImage = await RawImage.fromURL(imageUrl);
+            // Re-opening Instant Roto on the picture it already holds (Touch
+            // up, Back, Instant Roto again) keeps the embeddings instead of
+            // extracting them all over: that is seconds, more on a big photo.
+            const same = imageUrl === this.sourceKey && this.currentImage && this.imageEmbeddings;
+            if (!same) {
+                this.sourceKey = null;
+                // A canvas is a picture the caller already decoded at the size
+                // it wants segmented (the brush editor's working size), so the
+                // masks come back at that size and need no second rescale.
+                const { RawImage } = this.transformers;
+                this.currentImage = (typeof imageUrl === 'string')
+                    ? await RawImage.fromURL(imageUrl)
+                    : RawImage.fromCanvas(imageUrl);
+            }
 
             // Track the display space where clicks are coming from
             this.displayWidth = (typeof displayWidth === 'number' && displayWidth > 0)
@@ -425,6 +437,7 @@ class SAMSegmenter {
             this.displayHeight = (typeof displayHeight === 'number' && displayHeight > 0)
                 ? displayHeight
                 : this.currentImage.height;
+            if (same) return true;
 
             // Reset cached inputs/embeddings for this image
             this.imageInputs = null;
@@ -449,6 +462,7 @@ class SAMSegmenter {
                 // Prepare base image inputs and image embeddings once (no points yet)
                 this.imageInputs = await this._processImage(this.currentImage);
                 this.imageEmbeddings = await this.model.get_image_embeddings(this.imageInputs);
+                this.sourceKey = imageUrl;
                 console.log('✅ Image inputs and embeddings prepared for segmentation', {
                     original_sizes: this.imageInputs.original_sizes?.data || this.imageInputs.original_sizes,
                     reshaped_input_sizes: this.imageInputs.reshaped_input_sizes?.data || this.imageInputs.reshaped_input_sizes,
