@@ -201,7 +201,7 @@ const SAMPLE_STOP = "(function(){ var s = window.__samp; window.__samp = null; c
         const st = await Promise.all([a.eval("document.getElementById('multiplayerStatus').textContent"), b.eval("document.getElementById('multiplayerStatus').textContent")]);
         check(st[0] === 'Sharing settings · 2 here' && st[1] === 'Sharing settings · 2 here', 'status: "Sharing settings · 2 here" on both', st);
         const tip = await b.eval("document.getElementById('multiplayerStatus').title");
-        check(/changes for everyone/.test(tip) && /own brush/.test(tip), 'the status tooltip says what sharing means', tip);
+        check(/one set of settings/.test(tip) && /own brush/.test(tip), 'the status tooltip says what sharing means', tip);
         const hostName = await a.eval('shortName(clientId)');
         const welcomeLine = await b.eval("document.getElementById('mpActivity').textContent");
         check(welcomeLine === 'Now on ' + hostName + '’s settings', 'B\'s panel says "' + welcomeLine + '"');
