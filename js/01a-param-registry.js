@@ -250,7 +250,7 @@
     };
     var SELECTS = {
         visualResolution: {options: ["4096", "2048", "1536", "1024", "512", "256"], def: "2048", mut: null},
-        physicsResolution: {options: ["2048", "1536", "1024", "512", "384", "256", "192", "128", "64", "32"], def: "2048", mut: null},
+        physicsResolution: {options: ["2048", "1536", "1024", "512", "384", "256", "192", "128", "64", "32"], def: "1024", mut: null},
         // Shading Detail (SHADE_FORM_RESOLUTION). A LOOK param, not a machine
         // one: unlike the two resolutions above it stays out of 12's
         // BASELINE_SKIP and 50's link SKIP, so look links carry it and a

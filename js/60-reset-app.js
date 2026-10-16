@@ -22,8 +22,9 @@
 // brush drawer's engine settings, which the registry keeps no default for
 // (Spacing, Interval, Texture, Flow... from 04a's literal); Replay Speed;
 // running again (unfrozen, unpaused); the view (zoom back to 1:1, Zoom
-// Mode off); Motion Detail (2026-10-13: Gabriel wants 2048 after a reset,
-// not whatever was left); and a clean canvas, pressure included. What it
+// Mode off); Motion Detail (2026-10-13: Gabriel wants the shipped default
+// after a reset, not whatever was left); and a clean canvas, pressure
+// included. What it
 // keeps: presets, palettes, hotkeys, mouse-button roles, the layout,
 // PhotoSafe, image resolution, the fps cap and animations — the machine
 // and the player's libraries.

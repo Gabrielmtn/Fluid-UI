@@ -1892,8 +1892,9 @@
         // the slider apply converts both alike.
         7: { sliders: { vibrance: 1 } },
         // 2026-10-13: Pressure Iteration starts at 25, Brush Size at 1.00.
-        // (Motion Detail went 512 -> 2048 the same day; it is a machine
-        // setting, BASELINE_SKIP, which Reset app now puts back itself.)
+        // (Motion Detail went 512 -> 2048 the same day, 1024 on 2026-10-16;
+        // it is a machine setting, BASELINE_SKIP, which Reset app now puts
+        // back itself.)
         8: { sliders: { pressureIteration: 47, brushSize: 1.3 } }
     };
     // Per generation, the sliders whose SCALE it changed, not just their

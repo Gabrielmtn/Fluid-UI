@@ -133,8 +133,13 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail }); con
         await sleep(400);
         govLog();
         s = await state();
-        check('D5 click lowers Motion Detail one step and hides it',
-            s.shown === 'none' && !s.visible && s.sim < before.sim && s.dye === before.dye && +s.motionSel === s.sim,
+        // The higher of the two goes down (Motion on a tie), so which one
+        // depends on the shipped defaults.
+        const motionFirst = before.sim >= before.dye;
+        check('D5 click lowers the higher of Motion Detail / Image Sharpness one step and hides it',
+            s.shown === 'none' && !s.visible && (motionFirst
+                ? s.sim < before.sim && s.dye === before.dye && +s.motionSel === s.sim
+                : s.dye < before.dye && s.sim === before.sim && +s.imageSel === s.dye),
             { before: [before.dye, before.sim], after: [s.dye, s.sim, s.imageSel, s.motionSel] });
 
         // ── Dismiss: yellow stays quiet, red still asks ──

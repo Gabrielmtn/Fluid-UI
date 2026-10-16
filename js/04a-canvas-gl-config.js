@@ -338,7 +338,9 @@
                                       // Cinematic 4K stays a dropdown choice for capture work (a live
                                       // realloc to 4096 can spike VRAM enough to lose the GL context).
 
-            SIM_RESOLUTION: 2048,     // Ultra-fine motion by default on desktop (2026-10-13; was 512).
+            SIM_RESOLUTION: 1024,     // Fine motion by default on desktop (2026-10-16; 2048 from
+                                      // 2026-10-13, 512 before). 2048 made fast scribbling trip
+                                      // PhotoSafe (scripts/test/photosafe "hard scribbling").
                                       // Mobile overrides below; Reset app puts it back (60).
 
             VELOCITY_INFLUENCE: 2,    // Motion isolation (1.0 = full motion, 5.0 = maximum isolation). 2 since usertest 2026-10-03 (5, the max, from 2026-09-24; 2.5 before).

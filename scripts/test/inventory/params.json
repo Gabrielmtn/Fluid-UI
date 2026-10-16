@@ -1706,7 +1706,7 @@
       "min": null,
       "max": null,
       "step": null,
-      "def": "2048",
+      "def": "1024",
       "options": [
         "2048",
         "1536",

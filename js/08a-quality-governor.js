@@ -42,7 +42,7 @@
     var level = 0;
 
     // ── Boot quality ascent ──────────────────────────────────────────
-    // Desktop boots with config at Ultra (2048 dye / 512 sim), but rendering
+    // Desktop boots with config at Ultra (2048 dye / 1024 sim), but rendering
     // that cold makes load janky on rigs that can't do it — and the ladder
     // only sheds quality slowly, through visible jank. So invert it: the sim
     // STARTS at a light effective resolution (the old balanced-boot workload)
@@ -53,7 +53,7 @@
     // rescue) wins exactly: the boot factor snaps to 1 the moment config
     // diverges from the boot values.
     var BOOT_STAGES = [
-        { dye: 0.5, sim: 0.5 },   // ≈1024/256 at the 2048/512 default — snappy load
+        { dye: 0.5, sim: 0.5 },   // ≈1024/512 at the 2048/1024 default — snappy load
         { dye: 1.0, sim: 1.0 }    // full Ultra
     ];
     var bootStage = 0;
