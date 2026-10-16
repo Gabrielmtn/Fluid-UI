@@ -442,6 +442,19 @@
 
             MACCORMACK: true,         // Crisp advection: MacCormack error-corrected dye transport
                                       // (2 extra dye-res passes; governor sheds it with post-FX)
+            CRISP_FINE_FLOOR: 0.2,    // Crisp's own grain floor (advectionFrag hfFloorFineCrisp, the
+                                      // Laminar fine floor's bi-Laplacian): MacCormack never smooths
+                                      // grain a texel wide, so with Grain Cleanup at 0 paint left to
+                                      // drift grew feathery colour-fringed streaks (2026-10-16; grain
+                                      // 2.05 -> 0.8 at 150 s, veins and fold sharpness kept). Full with
+                                      // Grain Cleanup at 0, gone at CRISP_FINE_HANDOFF and up (the stock
+                                      // 0.75 never runs it), steps aside under Laminar / Blend. Above
+                                      // 0.2 the per-step cap makes 60 Hz weaker than 144 Hz. 0 = off
+            CRISP_FINE_HANDOFF: 0.25, // Grain Cleanup at which Crisp's floor is gone
+            CRISP_FINE_ROUND: true,   // While Crisp's floor runs, the corrected field and the dye store
+                                      // round to the nearest half float (as under Laminar): on a
+                                      // truncating GPU Density 1 paint otherwise drained to black in
+                                      // ~2 minutes. false = truncate
 
             MULTIGRID: true,          // Multigrid pressure V-cycle — converges like hundreds of
                                       // Jacobi iterations at ~1/3 the fill cost of the 32 default

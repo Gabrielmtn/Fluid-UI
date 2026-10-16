@@ -771,6 +771,18 @@
                 // untouched. Shared here so all three dye passes displace alike.
                 disp *= dyeMobility(vUv);
         `;
+        // Round to the nearest half float, so a store that TRUNCATES (the
+        // 4090 under ANGLE/D3D11) has nothing left to cut. advectionFrag's
+        // dye store and macCorrectFrag's corrected field both use it.
+        const halfRoundGLSL = `
+            vec3 roundToHalf(vec3 c) {
+                vec3 a = max(abs(c), vec3(6.103515625e-5));
+                vec3 e = floor(log2(a));
+                e += step(exp2(e + 1.0), a) - (1.0 - step(exp2(e), a)); // log2 can miss by one at a power of two
+                vec3 ulp = exp2(e - 10.0);
+                return round(c / ulp) * ulp;
+            }
+        `;
         const advectionFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
@@ -790,6 +802,8 @@
                                           // edge; above hfFloorDye only under Laminar (05j)
             uniform float hfFloorFine;    // Laminar's own floor: removes only texel-scale grain
                                           // (bi-Laplacian), 0 = off (05j, LAMINAR_FINE_FLOOR)
+            uniform float hfFloorFineCrisp; // the same floor under Crisp Advection while Grain Cleanup
+                                            // is low, open at any transport, 0 = off (05j, CRISP_FINE_FLOOR)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float dyeRoundNearest; // 1 = round the dye to the nearest half float before the store (Color Blend on)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
@@ -820,6 +834,7 @@
                                  // and apply only the decay/drain logic below.
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
+            ${halfRoundGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec2 coord = (macMode == 1) ? vUv : clamp(vUv - disp, 0.0, 1.0);
@@ -998,9 +1013,24 @@
                     // and a 6-texel one at 1/220, where the plain floor takes 1/4
                     // and 1/15. Same motion gate, so still dye and frozen artwork
                     // are untouched. 13 taps of the source round coord.
-                    if (hfFloorFine > 0.0 && frozen < 0.5) {
-                        float mGateF = smoothstep(0.03, 0.3, length(disp / srcTexelSize));
-                        if (mGateF > 0.0) {
+                    //   Crisp Advection runs it too (hfFloorFineCrisp, 2026-10-16).
+                    // MacCormack never smooths grain a texel wide, and every half
+                    // float store rounds each channel of moving paint a little,
+                    // so with Grain Cleanup at 0 nothing took it out: paint left
+                    // to drift grew feathery, colour-fringed streaks along its
+                    // travel (interior grain 2.05 and rising after 150 s; 0.8
+                    // with this at 0.2, Crisp off 0.10). Paint
+                    // that has slowed to a crawl drifts below the gate above
+                    // (0.03 texels a frame, read per frame, so 0.07 at 60 Hz terms
+                    // on a 144 Hz screen) while it is still resampled, so this
+                    // one opens wherever the dye moves at all: from the settle
+                    // ease-out's zero up, in 60 Hz texels like the ease-out.
+                    if ((hfFloorFine > 0.0 || hfFloorFineCrisp > 0.0) && frozen < 0.5) {
+                        float tTexF = length(disp / srcTexelSize);
+                        float mGateF = smoothstep(0.03, 0.3, tTexF);
+                        float mGateC = smoothstep(0.002, 0.03, tTexF * (0.0166667 / max(dt, 1e-4)));
+                        float kGateF = max(hfFloorFine * mGateF, hfFloorFineCrisp * mGateC);
+                        if (kGateF > 0.0) {
                             vec2 ex = vec2(srcTexelSize.x, 0.0), ey = vec2(0.0, srcTexelSize.y);
                             vec3 c0 = texture(uSource, coord).rgb;
                             vec3 n1 = texture(uSource, clamp(coord + ex, 0.0, 1.0)).rgb + texture(uSource, clamp(coord - ex, 0.0, 1.0)).rgb
@@ -1013,7 +1043,7 @@
                             vec3 biLap = 1.25 * c0 - 0.5 * n1 + 0.125 * dg + 0.0625 * n2;
                             // Capped at 0.2 a step: the checkerboard's weight is 4, so
                             // up to 0.25 it decays without flipping sign.
-                            float kF = min(hfFloorFine * mGateF * (dt * 60.0), 0.2);
+                            float kF = min(kGateF * (dt * 60.0), 0.2);
                             color.rgb -= effectiveDecay * biLap * kF;
                             color.rgb = max(color.rgb, 0.0);
                         }
@@ -1205,11 +1235,7 @@
                 // 0.030% a step to this store against 0.008% at 0, and went dark
                 // and brown within seconds. Off, the store is as it always was.
                 if (isDensity == 1 && dyeRoundNearest > 0.0) {
-                    vec3 a = max(abs(color.rgb), vec3(6.103515625e-5));
-                    vec3 e = floor(log2(a));
-                    e += step(exp2(e + 1.0), a) - (1.0 - step(exp2(e), a)); // log2 can miss by one at a power of two
-                    vec3 ulp = exp2(e - 10.0);
-                    color.rgb = round(color.rgb / ulp) * ulp;
+                    color.rgb = roundToHalf(color.rgb);
                 }
                 fragColor = color;
             }
@@ -1264,8 +1290,11 @@
             uniform float deband;        // 0 = off (bit-exact); >0 softens fast-moving dye cliffs
             uniform float uLaminar;      // Laminar (COLOR_BLEND below 0), 0-1: how much of the
                                          // fast-flow back-off below is withdrawn; 0 = bit-exact
+            uniform float uRoundNearest; // 1 = round the corrected field to the nearest half
+                                         // float before its store (05j, with the dye store's)
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
+            ${halfRoundGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec4 fwd = texture(uForward, vUv);
@@ -1338,7 +1367,13 @@
                     float db = smoothstep(0.15, 0.5, dyeContrast) * fastMove * deband;
                     corrected = mix(corrected, fwd, db);
                 }
-                fragColor = mix(corrected, fwd, revert);
+                vec4 outC = mix(corrected, fwd, revert);
+                // The correction is arithmetic, so it is rarely a half float
+                // already, and the main pass self-fetches it: a truncating
+                // store cut half a step here every frame however the final
+                // store rounded (Crisp's floor, 2026-10-16).
+                if (uRoundNearest > 0.0) outC.rgb = roundToHalf(outC.rgb);
+                fragColor = outC;
             }
         `;
         // ─── Wetness field: advect + dry (P15-1) ────────────────────────

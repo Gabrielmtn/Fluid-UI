@@ -1875,6 +1875,21 @@
                 const _cbCrispFrom = (typeof config.COLOR_BLEND_CRISP_FROM === 'number') ? config.COLOR_BLEND_CRISP_FROM : 0.25;
                 const _laminar = Math.max(0, Math.min(1, Math.max(-colorBlendEff,
                     (_cbCrispFrom > 0 && colorBlendEff > 0) ? colorBlendEff / _cbCrispFrom : 0)));
+                // Crisp Advection's fine floor (advectionFrag hfFloorFineCrisp,
+                // CRISP_FINE_FLOOR): full with Grain Cleanup at 0, gone at
+                // CRISP_FINE_HANDOFF and up, where Grain Cleanup's own floor
+                // takes the grain, so the stock 0.75 never runs it. It steps
+                // aside for Laminar / Blend, which run their own fine floor
+                // (hfFloorFine) whatever Grain Cleanup says. While it runs, the
+                // corrected field and the dye store both round to the nearest
+                // half float (CRISP_FINE_ROUND): on a truncating GPU each cut
+                // half a step a frame off paint the floor had smoothed, and
+                // Density 1 paint drained to black within 2 minutes.
+                const _crispFineMax = (typeof config.CRISP_FINE_FLOOR === 'number') ? Math.max(0, config.CRISP_FINE_FLOOR) : 0.2;
+                const _crispHandoff = (typeof config.CRISP_FINE_HANDOFF === 'number' && config.CRISP_FINE_HANDOFF > 0) ? config.CRISP_FINE_HANDOFF : 0.25;
+                const _crispFine = macActive
+                    ? _crispFineMax * (1 - _laminar) * Math.max(0, 1 - (config.HF_FLOOR_DYE || 0.0) / _crispHandoff) : 0;
+                const _crispRound = _crispFine > 0 && config.CRISP_FINE_ROUND !== false;
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 // P15-1: bind the (freshly advected) wetness field to unit 4 for
                 // all three dye passes. Bound unconditionally — dyeMobility()
@@ -1933,6 +1948,8 @@
                     // De-band taper (organic no-curl fix — see macCorrectFrag)
                     gl.uniform1f(macCorrectProg.uniforms.deband, config.DEBAND || 0.0);
                     gl.uniform1f(macCorrectProg.uniforms.uLaminar, _laminar);
+                    gl.uniform1f(macCorrectProg.uniforms.uRoundNearest,
+                        (_crispRound && config.COLOR_BLEND_HOLD_PAINT !== false) ? 1 : 0);
                     gl.activeTexture(gl.TEXTURE2);
                     gl.bindTexture(gl.TEXTURE_2D, sharpened.texture);
                     // Unconditional for the same reason as the forward pass above.
@@ -2013,7 +2030,7 @@
                 const _fineFloorOn = _laminar > 0 && colorBlendEff < 0 &&
                     ((typeof config.LAMINAR_FINE_FLOOR === 'number') ? config.LAMINAR_FINE_FLOOR : 0.1) > 0;
                 gl.uniform1f(advectionProg.uniforms.dyeRoundNearest,
-                    ((colorBlendEff > 0 || _fineFloorOn) && config.COLOR_BLEND_HOLD_PAINT !== false) ? 1 : 0);
+                    ((colorBlendEff > 0 || _fineFloorOn || _crispRound) && config.COLOR_BLEND_HOLD_PAINT !== false) ? 1 : 0);
                 // Pigment memory + Ignite restore (see advectionFrag). memDiss
                 // 1.0 would make memory immortal; the default half-life lets
                 // work you deliberately let go stay gone.
@@ -2036,6 +2053,7 @@
                 // _laminar as the plain floor falls; 0 at Laminar / Blend 0.
                 gl.uniform1f(advectionProg.uniforms.hfFloorFine,
                     Math.max(0, (typeof config.LAMINAR_FINE_FLOOR === 'number') ? config.LAMINAR_FINE_FLOOR : 0.1) * _laminar);
+                gl.uniform1f(advectionProg.uniforms.hfFloorFineCrisp, _crispFine);
                 // Wall-drain flow gate: spare dye that is still moving past a
                 // collider (see the drain in advectionFrag). 0 = legacy drain.
                 gl.uniform1f(advectionProg.uniforms.obsFlowKeep,
