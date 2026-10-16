@@ -318,8 +318,45 @@ const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL
         const actC = await until(c, "(function(){var s=" + PANEL + "; return s.activity && s.activity.indexOf('changed') !== -1 ? s.activity : null;})()", 4000);
         check(actA === bName + ' changed ' + sharpName && actC === actA, 'B moves ' + sharpName + ': A and C read "' + actA + '"', [actA, actC]);
         check(!!await until(a, "Math.abs(config.SHARPNESS - 1.7) < 1e-6", 3000), 'and the setting itself arrives (once its glide lands)');
-        check(await a.eval("getComputedStyle(document.querySelector('#mpActivity .mp-activity-who')).color") === await a.eval("(function(){ var d=document.createElement('div'); d.style.color=colorForClient(" + JSON.stringify(await b.eval('clientId')) + "); document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c; })()"), 'the name is in B\'s cursor colour');
+        const bId = JSON.stringify(await b.eval('clientId'));
+        // A colour as the browser computes it, to compare against.
+        const css = (expr) => "(function(){ var d=document.createElement('div'); d.style.color=" + expr + "; document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c; })()";
+        const WHO = "getComputedStyle(document.querySelector('#mpActivity .mp-activity-who')).color";
+        check(await a.eval(WHO) === await a.eval(css('colorForClient(' + bId + ')')), 'the name is in B\'s cursor colour (B has not painted: the hash colour)');
         await shot(A, '08-activity.png');
+
+        // B's tag turns B's paint colour once B paints (06e cursorColour),
+        // and the name follows: the line already up repaints in place, and
+        // the next change and the glow on its control are in it too.
+        const PINK = 'rgb(255, 47, 122)';
+        await b.eval("(function(){ ['randomColor','stepPalette'].forEach(function(id){ var e=document.getElementById(id); if(e && e.checked){ e.checked=false; e.dispatchEvent(new Event('change',{bubbles:true})); } }); var cp=document.getElementById('colorPicker'); cp.value='#ff2f7a'; cp.dispatchEvent(new Event('input',{bubbles:true})); cp.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        // Sharpness again, so the line is fresh (it holds 5 s) while B paints.
+        await b.eval("(function(){ var e=document.getElementById('sharpness'); e.value='1.5'; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        await until(a, "Math.abs(config.SHARPNESS - 1.5) < 1e-6", 3000);
+        await a.eval("window.__whoEl = document.querySelector('#mpActivity .mp-activity-who'); 1");
+        const R = await b.eval("(function(){ var r=canvas.getBoundingClientRect(); return { x:r.left, y:r.top, w:r.width, h:r.height }; })()");
+        const at = (u, v) => ({ x: R.x + u * R.w, y: R.y + v * R.h });
+        let p = at(0.35, 0.55);
+        await b.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, buttons: 0 });
+        await b.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', buttons: 1, clickCount: 1 });
+        for (let i = 0; i <= 40; i++) {
+            p = at(0.35 + i * 0.008, 0.55 + Math.sin(i / 6) * 0.08);
+            await b.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'left', buttons: 1 });
+            await sleep(16);
+        }
+        await b.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', buttons: 0, clickCount: 1 });
+        const tagCol = await until(a, "(function(){ var e=document.getElementById('remote-cursor-'+" + bId + "); var v=e && getComputedStyle(e).getPropertyValue('--peer').trim(); return v && v.indexOf('rgb(')===0 ? v : null; })()", 4000);
+        check(tagCol === PINK, 'B paints #ff2f7a: B\'s tag on A takes it', tagCol);
+        const whoCol = await until(a, "(function(){ var c=" + WHO + "; return c === " + JSON.stringify(PINK) + " ? c : null; })()", 2000) || await a.eval(WHO);
+        check(whoCol === PINK && await a.eval("document.querySelector('#mpActivity .mp-activity-who') === window.__whoEl"),
+            'and the name on the line already up follows, repainted in place', whoCol);
+        await b.eval("(function(){ var e=document.getElementById('vibrance'); e.value='0.8'; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        const vibName = await a.eval("HotkeyBinds.nameOf(document.getElementById('vibrance'))");
+        await until(a, "(function(){var s=" + PANEL + "; return s.activity && s.activity.indexOf(" + JSON.stringify(vibName) + ") !== -1;})()", 4000);
+        const next = await a.eval("({ who: " + WHO + ", rebuilt: document.querySelector('#mpActivity .mp-activity-who') !== window.__whoEl, glow: controlFace('vibrance').style.getPropertyValue('--mp-peer') })");
+        check(next.who === PINK && next.rebuilt, 'B\'s next change (' + vibName + ') draws the name in it too', next);
+        check(await a.eval(css(JSON.stringify(next.glow))) === PINK, 'and so is the glow on the control B moved', next.glow);
+        await shot(A, '08b-activity-painted.png');
 
         // ── 11. A stranger pair (B and C) ─────────────────────────────
         await click(b, '#disconnectBtn');

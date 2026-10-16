@@ -137,13 +137,32 @@ function notePeerPaint(data) {
     var css = 'rgb(' + ch.join(', ') + ')';
     if (had && had.css === css && had.base === fromBase) return;
     peerPaintColours.set(id, { css: css, base: fromBase });
-    var tag = cursorTags.get(id);
-    if (tag) paintCursorTag(tag, css);
+    repaintPeer(id, css);
 }
 
+// A peer's colour everywhere it shows: their tag, the activity line's name,
+// the glow on a control they moved, and the dot on their lines in the Text
+// panel (20).
 function cursorColour(id) {
     var p = peerPaintColours.get(id);
     return p ? p.css : colorForClient(id);
+}
+
+// What is already on screen in a peer's colour follows when it changes: the
+// tag, the activity line's name while the line is about them (it holds for
+// 5 s), and the owner dots (class mp-owner-dot, data-peer). A control's glow
+// takes the new colour from their next change, and fades 1.4 s after it.
+function repaintPeer(id, col) {
+    var tag = cursorTags.get(id);
+    if (tag) paintCursorTag(tag, col);
+    if (_activity && _activity.who === id) {
+        var who = document.querySelector('#mpActivity .mp-activity-who');
+        if (who) who.style.color = col;
+    }
+    var dots = document.getElementsByClassName('mp-owner-dot');
+    for (var i = 0; i < dots.length; i++) {
+        if (dots[i].dataset.peer === id) dots[i].style.background = col;
+    }
 }
 
 function paintCursorTag(tag, col) {
@@ -367,7 +386,7 @@ function flashControl(id, col) {
 function onRoomLookChanged(change, fromId, welcome) {
     var names = [];
     var add = function (n) { if (n && names.indexOf(n) === -1) names.push(n); };
-    var col = colorForClient(fromId);
+    var col = cursorColour(fromId);
     ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
         Object.keys(change[sec] || {}).forEach(function (id) { add(controlName(id)); flashControl(id, col); });
     });
@@ -409,7 +428,7 @@ function renderActivity() {
     }
     var who = document.createElement('span');
     who.className = 'mp-activity-who';
-    who.style.color = colorForClient(a.who);
+    who.style.color = cursorColour(a.who);
     who.textContent = shortName(a.who);
     if (a.welcome) {
         el.appendChild(document.createTextNode('Now on '));

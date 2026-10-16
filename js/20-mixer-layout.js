@@ -6571,8 +6571,12 @@
                     ';background:' + (isSel ? 'rgba(255,130,170,0.12)' : 'transparent') + ';';
                 row.title = who + '’s text';
                 var dot = document.createElement('span');
+                // In their tag's colour: their paint once they have painted.
+                // 06e repaints it (mp-owner-dot, data-peer) when that changes.
+                dot.className = 'mp-owner-dot';
+                dot.dataset.peer = pl.owner;
                 dot.style.cssText = 'flex:none;width:7px;height:7px;border-radius:50%;';
-                dot.style.background = (typeof colorForClient === 'function') ? colorForClient(pl.owner) : '#9aa';
+                dot.style.background = (typeof cursorColour === 'function') ? cursorColour(pl.owner) : '#9aa';
                 row.appendChild(dot);
                 var label = document.createElement('span');
                 label.style.cssText = 'flex:1;min-width:0;font-size:11px;color:rgba(255,255,255,0.8);' +
