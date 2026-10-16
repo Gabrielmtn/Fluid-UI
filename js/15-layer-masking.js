@@ -149,7 +149,7 @@
         overlay.innerHTML = `
             <div class="mask-editor-panel">
                 <div class="mask-editor-header">
-                    <h3>✂️ Mask Editor</h3>
+                    <h3>Mask Editor</h3>
                     <button type="button" class="mask-close-btn" aria-label="Close" onclick="window.exitMaskMode(false)">✕</button>
                 </div>
                 <!-- Wizard rail: the three steps of making a mask. Clickable,
@@ -208,15 +208,15 @@
                          3; wizardBegin). -->
                     <div class="mask-tools-row mask-tool-tabs" role="tablist">
                         <button id="filterToolBtn" class="mask-tool-tab" data-tool="filter" onclick="window.setMaskTool('filter')" title="Key out a solid background&#10;Pick the background color, drag the cut up - the shape falls out of it">
-                            <span class="mask-tool-tab-icon">🎚️</span> Filter
+                            Filter
                         </button>
                         <button id="smartSelectBtn" class="mask-tool-tab" data-tool="magic" onclick="window.setMaskTool('magic')" title="ML-powered rotoscope masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
-                            <span class="mask-tool-tab-icon">🪄</span> Instant Roto
+                            Instant Roto
                         </button>
                         <button id="stampMenuBtn" class="mask-tool-tab" data-tool="stamps" onclick="window.setMaskTool('stamps')" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more - drag to place, resize with the handle">
-                            <span class="mask-tool-tab-icon">▦</span> Stamps
+                            Stamps
                         </button>
-                        <span id="samLoadingStatus" style="font-size: 12px; color: #8b949e; align-self: center;"></span>
+                        <span id="samLoadingStatus" class="mask-roto-status"></span>
                     </div>
                     <div id="stampMenu" class="mask-stamp-menu mask-tool-panel" style="display: none;">
                         <div class="mask-stamp-hint">Click a shape to stamp it onto the mask - drag to move it, grab the handle to resize.</div>
@@ -236,7 +236,7 @@
                          (that slider keys against BLACK — real photos aren't). -->
                     <div id="filterPanel" class="mask-filter-panel mask-tool-panel" style="display: none;">
                         <div class="mask-filter-hint">
-                            Set the background color, then use the slider to raise filter value to cut everything out from that background color. For instant roto, left click to select the object you want it to mask (mixed results, but works for some objects)
+                            Set the background color, then use the slider to raise filter value to cut everything out from that background color.
                         </div>
                         <div class="mask-filter-row">
                             <span class="mask-filter-label">Background</span>
@@ -255,26 +255,27 @@
                             <span id="filterThresholdValue" class="mask-filter-value">0%</span>
                         </label>
                     </div>
-                    <div id="smartSelectControls" class="mask-tool-panel" style="display: none; background: rgba(63, 185, 80, 0.08); padding: 12px; margin-bottom: 8px; border: 1px solid rgba(63, 185, 80, 0.2);">
-                        <div style="font-size: 13px; color: #3fb950; margin-bottom: 8px; font-weight: 600;">
-                            🪄 Click the objects you want masked:
+                    <!-- The dots are the point markers drawn on the image
+                         (renderMaskEditor), so the legend is their key. -->
+                    <div id="smartSelectControls" class="mask-roto-panel mask-tool-panel" style="display: none;">
+                        <div class="mask-roto-title">
+                            Click the objects you want masked:
                         </div>
-                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px;">
-                            • <strong style="color: #3fb950;">Left-click</strong><br>
-                            • <strong style="color: #f85149;">Right-click</strong><br>
-                            
+                        <div class="mask-roto-legend">
+                            <span><i class="mask-roto-dot is-include"></i>Left-click</span>
+                            <span><i class="mask-roto-dot is-exclude"></i>Right-click</span>
                         </div>
-                        <div style="display: flex; gap: 8px;">
-                            <button id="samSegmentBtn" class="mask-action-btn" onclick="window.runSAMSegmentation()" style="flex: 0 0 auto; background: linear-gradient(180deg, #238636, #1a7f37);" disabled>
-                                ✨ Instant Roto It
+                        <div class="mask-roto-actions">
+                            <button id="samSegmentBtn" class="mask-action-btn btn--emphasis" onclick="window.runSAMSegmentation()" disabled>
+                                Instant Roto It
                             </button>
                             <button class="mask-action-btn" onclick="window.clearSAMPoints()">
-                                🗑️ Clear Points
+                                Clear Points
                             </button>
                         </div>
-                        <div id="samCandidateControls" style="display: none; gap: 6px; margin-top: 8px; align-items: center;" title="The AI proposes a few cutouts - hover to preview, click to choose"></div>
-                        <div id="samLoadingIndicator" style="display: none; margin-top: 8px; padding: 8px; background: rgba(88, 166, 255, 0.15); border-radius: 4px; font-size: 12px; color: #58a6ff; text-align: center;">
-                            <span class="sam-spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(88, 166, 255, 0.3); border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px;"></span>
+                        <div id="samCandidateControls" class="mask-roto-candidates" style="display: none;" title="The AI proposes a few cutouts - hover to preview, click to choose"></div>
+                        <div id="samLoadingIndicator" class="mask-roto-busy" style="display: none;">
+                            <span class="sam-spinner"></span>
                             Instant Roto is cutting out your object...
                         </div>
                     </div>
@@ -307,7 +308,7 @@
                             0% is a hard cut-out. Raise it for a soft edge - the same Feather that lives on the layer, set here so you never have to go back for it.
                         </div>
                         <label class="mask-collider-opt" id="maskColliderOpt" style="display:none;">
-                            <input type="checkbox" id="maskMakeCollider"> 🧱 Also make this a collision layer the fluid flows around
+                            <input type="checkbox" id="maskMakeCollider"> Also make this a collision layer the fluid flows around
                         </label>
                     </div>
                     <div class="mask-rotation-control" id="maskRotationControl" style="display: none; padding: 8px 12px; background: rgba(88, 166, 255, 0.05); border-radius: 6px; margin-top: 8px;">
@@ -318,8 +319,8 @@
                         </label>
                     </div>
                 </div>
-                <div id="maskHint" class="mask-hint" style="padding: clamp(4px, 0.8vh, 8px) clamp(12px, 2vw, 20px); background: rgba(88, 166, 255, 0.1); border-top: 1px solid rgba(88, 166, 255, 0.2); border-bottom: 1px solid rgba(88, 166, 255, 0.2); font-size: clamp(11px, 1.3vh, 13px); color: #8b949e; text-align: center; flex-shrink: 0;">
-                    <strong style="color: #58a6ff;">💡 Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning
+                <div id="maskHint" class="mask-hint">
+                    <strong>Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning
                 </div>
                 <div class="mask-canvas-container">
                     <canvas id="maskEditorCanvas" class="mask-editor-canvas"></canvas>
@@ -455,7 +456,7 @@
                 maskState.filterPicking = !maskState.filterPicking;
                 filterSyncControls();
                 setStepHint(maskState.filterPicking
-                    ? '<strong style="color:#58a6ff;">💧 Click the background</strong> on the image to key that color out.'
+                    ? '<strong style="color:#58a6ff;">Click the background</strong> on the image to key that color out.'
                     : STEP_HINTS[1]);
             });
         }
@@ -1760,7 +1761,7 @@
             smartControls.style.display = 'block';
 
             if (hintDiv) {
-                hintDiv.innerHTML = '<strong style="color: #3fb950;">🪄 Instant Roto:</strong> Left-click objects to include • Right-click to exclude • Shift+Click to pan';
+                hintDiv.innerHTML = '<strong>Instant Roto:</strong> Left-click objects to include • Right-click to exclude • Shift+Click to pan';
             }
 
             // Hardness slider removed; SAM now uses a fixed default hardness
@@ -1770,9 +1771,10 @@
             if (typeof window.initializeSAM === 'function') {
                 const statusEl = document.getElementById('samLoadingStatus');
                 const segmentBtn = document.getElementById('samSegmentBtn');
-                
+
                 if (segmentBtn) segmentBtn.disabled = true;
-                
+                if (statusEl) statusEl.classList.remove('is-error');
+
                 if (statusEl && !window.samSegmenter.isReady) {
                     statusEl.textContent = 'Preparing AI...';
                 }
@@ -1781,7 +1783,7 @@
                 
                 // Check if initialization succeeded
                 if (!window.samSegmenter.isReady) {
-                    if (statusEl) statusEl.textContent = 'Failed to load';
+                    if (statusEl) { statusEl.textContent = 'Failed to load'; statusEl.classList.add('is-error'); }
                     smartSelectBtn.disabled = false; // Re-enable button
                     // Points placed while preparing will never segment now —
                     // drop them so they can't hold Apply in its busy state.
@@ -1852,7 +1854,7 @@
                             autoRunSAMSegmentation();
                         }
                     } else {
-                        if (statusEl) statusEl.textContent = 'Image load failed';
+                        if (statusEl) { statusEl.textContent = 'Image load failed'; statusEl.classList.add('is-error'); }
                         smartSelectBtn.disabled = false;
                         // Nothing will ever segment these points — stand down.
                         maskState.smartSelectPoints = [];
@@ -1885,7 +1887,7 @@
             if (maskState.wizardActive) {
                 wizardHint(); // back to the step's own guidance
             } else if (hintDiv) {
-                hintDiv.innerHTML = '<strong style="color: #58a6ff;">💡 Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning';
+                hintDiv.innerHTML = '<strong>Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning';
             }
 
             renderMaskEditor();
@@ -2072,7 +2074,6 @@
 
         const label = document.createElement('span');
         label.textContent = 'Cutout options:';
-        label.style.cssText = 'font-size: 12px; color: #8b949e; margin-right: 4px;';
         candControls.appendChild(label);
 
         for (let i = 0; i < total; i++) {
@@ -2080,11 +2081,8 @@
             btn.className = 'mask-zoom-btn';
             btn.textContent = String(i + 1);
             btn.title = `Mask proposal ${i + 1} of ${total}`;
-
-            if (i === idx) {
-                btn.style.background = 'rgba(88,166,255,0.4)';
-                btn.style.color = '#fff';
-            }
+            // The button system's pressed plate (01-buttons), not a colour of its own
+            btn.classList.toggle('active', i === idx);
 
             btn.onmouseenter = () => {
                 // Preview this candidate on hover
@@ -2895,7 +2893,7 @@
         if (from === 1) {
             // A cutout still in flight would be dropped on the floor
             if (samCutoutPending()) {
-                setStepHint('<strong style="color:#58a6ff;">⏳ Instant Roto is still cutting out your object</strong> - one moment.', 2600);
+                setStepHint('<strong style="color:#58a6ff;">Instant Roto is still cutting out your object</strong> - one moment.', 2600);
                 return;
             }
             // Bake the live filter into a shape before anything downstream
@@ -3279,7 +3277,7 @@
             if (hdr) hdr.textContent = 'Edit Collider - ' + (layer.title || 'Collision');
             var hint = document.getElementById('maskHint');
             if (hint) {
-                hint.innerHTML = '<strong style="color:#ff7b72;">🧱 Collider:</strong> '
+                hint.innerHTML = '<strong style="color:#ff7b72;">Collider:</strong> '
                     + 'Draw to add walls • Erase to carve them back • Shift+Drag to pan • Scroll to zoom';
             }
             var cv = document.getElementById('colliderViewArt');
@@ -3737,7 +3735,7 @@
         const header = overlay.querySelector('.mask-editor-header h3');
         if (header) {
             const shapeCount = maskState.shapes.length;
-            header.innerHTML = `✂️ Mask Editor - ${window.escHtml(layer.title)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
+            header.innerHTML = `Mask Editor - ${window.escHtml(layer.title)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
         }
     }
 
@@ -3769,7 +3767,7 @@
             if (header) {
                 const shapeCount = maskState.shapes.length;
                 const nm = (maskState.adhocSource && maskState.adhocSource.name) || 'Brush Shape';
-                header.innerHTML = `🖌️ Brush Shape - ${window.escHtml(nm)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
+                header.innerHTML = `Brush Shape - ${window.escHtml(nm)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
             }
             return;
         }

@@ -556,19 +556,20 @@
     background: rgba(255, 255, 255, 0.04);
 }
 
+/* One surface for the selected tab and its panel, so they read as one piece.
+   No tool gets a hue of its own: the label says which tool it is. */
 .mask-tool-tab.active {
-    color: #fff;
-    background: rgba(88, 166, 255, 0.12);
+    color: #e6edf3;
+    background: rgba(255, 255, 255, 0.04);
     border-color: rgba(255, 255, 255, 0.1);
     border-bottom: 1px solid rgba(26, 31, 42, 0);
 }
 
 .mask-tool-tab:disabled { opacity: 0.5; cursor: default; }
 
-.mask-tool-tab-icon { font-size: 16px; line-height: 1; }
-
 /* The panels the tabs switch between */
 .mask-tool-panel {
+    background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-top: none;
     border-radius: 0 0 8px 8px;
@@ -576,7 +577,6 @@
 
 /* Filter */
 .mask-filter-panel {
-    background: rgba(88, 166, 255, 0.06);
     padding: 12px;
     margin-bottom: 8px;
 }
@@ -648,27 +648,95 @@
     box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.6), 0 0 16px rgba(88, 166, 255, 0.35);
 }
 
-/* Each tool keeps its own accent so the tabs stay recognisable at a glance
-   (Instant Roto has always read green in this editor). */
-.mask-tool-tab[data-tool="magic"] { color: #3fb950; }
-.mask-tool-tab[data-tool="magic"]:hover:not(:disabled) { color: #56d364; background: rgba(63, 185, 80, 0.08); }
-.mask-tool-tab[data-tool="magic"].active {
-    color: #fff;
-    background: rgba(63, 185, 80, 0.16);
-    border-color: rgba(63, 185, 80, 0.5);
+/* Model status at the far end of the tab strip ("Ready to segment") */
+.mask-roto-status {
+    margin-left: auto;
+    align-self: center;
+    font-size: 12px;
+    color: #8b949e;
+}
+.mask-roto-status.is-error { color: #f85149; }
+
+/* Instant Roto */
+.mask-roto-panel {
+    padding: 10px 12px;
+    margin-bottom: 8px;
 }
 
-.mask-tool-tab[data-tool="filter"].active {
-    background: rgba(88, 166, 255, 0.14);
-    border-color: rgba(88, 166, 255, 0.45);
+.mask-roto-title {
+    font-size: 13px;
+    color: #c9d1d9;
+    margin-bottom: 6px;
 }
 
-/* The Instant Roto panel predates the tab strip and carries inline styling;
-   square off its top corners so it reads as the selected tab's panel. */
-#smartSelectControls.mask-tool-panel {
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
+/* Key to the point markers on the image: same two colours, same order */
+.mask-roto-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 10px;
 }
+
+.mask-roto-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mask-roto-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.mask-roto-dot.is-include { background: #3fb950; }
+.mask-roto-dot.is-exclude { background: #f85149; }
+
+.mask-roto-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.mask-roto-candidates {
+    gap: 6px;
+    margin-top: 8px;
+    align-items: center;
+    font-size: 12px;
+    color: #8b949e;
+}
+.mask-roto-candidates > span { margin-right: 4px; }
+
+.mask-roto-busy {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #8b949e;
+}
+
+.mask-roto-busy .sam-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;
+    vertical-align: -2px;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-top-color: #c9d1d9;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Hint line between the tools and the image. Step hints colour their own
+   label inline; anything else (the Instant Roto line, the tip) stays grey. */
+.mask-hint {
+    padding: clamp(4px, 0.8vh, 8px) clamp(12px, 2vw, 20px);
+    background: rgba(255, 255, 255, 0.03);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: clamp(11px, 1.3vh, 13px);
+    color: #8b949e;
+    text-align: center;
+    flex-shrink: 0;
+}
+.mask-hint strong { color: #c9d1d9; }
 
 /* .mask-editor-controls is a gapped flex column, which pushed the panel a
    gap's width away from its own tabs. Cancel exactly that gap so the tab
