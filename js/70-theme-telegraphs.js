@@ -13,7 +13,8 @@
 // The face follows the CANONICAL value. It is redrawn only when a value
 // changes: the canonical input's input/change events, plus a MutationObserver
 // on the proxy's style attribute, which js/20 rewrites (--val) on every
-// reflection, including its 250 ms poll and remote glides. No loop.
+// reflection, including its 250 ms poll and remote glides. No loop of its
+// own: the lever eases to a change on a spring stepped by js/71's frame.
 //
 // Mapping to the app:
 //   Laminar / Blend  canonical -1..1 (Laminar < 0 < Blend). The LAMINAR half
@@ -175,12 +176,32 @@
             };
         }
 
+        // The lever rides a spring on the normalised value, as the study's
+        // stepTeles does (1687-1690): local profile for your changes, remote
+        // for another player's, stepped on js/71's frame. Reduced motion: the
+        // spring lands at once.
+        var lev = { sp: null, last: '' };
+        function nrm(v) { return k === 'laminar' ? (Math.max(-1, Math.min(1, v)) + 1) / 2 : Math.max(0, Math.min(1, (v - 0.01) / 2.99)); }
+        function setLever(n) {
+            var v = k === 'laminar' ? n * 2 - 1 : 0.01 + n * 2.99;
+            var a = 'rotate(' + ang(Math.max(0, Math.min(1, C.toF(v)))).toFixed(2) + ')';
+            if (a !== lev.last) { o.lever.setAttribute('transform', a); lev.last = a; }
+        }
+        function stepLever(dt) { lev.sp.step(dt); setLever(lev.sp.x); return lev.sp.settled(); }
+        function leverTo(v) {
+            var TM = window.ThemeMotion, n = nrm(v);
+            if (!TM) { setLever(n); return; }
+            if (!lev.sp) { lev.sp = new TM.Spring(n, TM.PROF.local); setLever(n); return; }
+            var remote = !!window.__mpApplyingRemote || cell.classList.contains('mp-peer-touch') || !!cell.querySelector('.mp-peer-touch');
+            lev.sp.to(n, remote ? TM.PROF.remote : TM.PROF.local);
+            if (lev.sp.settled()) setLever(n); else TM.run(stepLever);
+        }
+
         function draw() {
             var v = parseFloat(canonical.value);
             if (!isFinite(v) || v === o.last) return;
             o.last = v;
-            var f = Math.max(0, Math.min(1, C.toF(v)));
-            o.lever.setAttribute('transform', 'rotate(' + ang(f).toFixed(2) + ')');
+            leverTo(v);
             if (k === 'laminar') {
                 var lit = [Math.max(0, -v), Math.max(0, v)];
                 o.secs.forEach(function (p, n) {
