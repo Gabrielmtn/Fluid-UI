@@ -89,7 +89,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
             var(--arc, rgb(255 176 110)) 0 calc(var(--t) * 270deg),
             rgba(160, 120, 92, 0.32) calc(var(--t) * 270deg) 270deg,
             transparent 270deg),
-        var(--mesh-dim) center / 6px 10.4px,
+        var(--mesh-dim) center / 3.5px 6.06px,
         linear-gradient(170deg, #1a1210, #070403);
 }
 /* The thumb is the needle's hit point only; the face draws everything. */
@@ -166,7 +166,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="
             var(--arc, rgba(255, 150, 70, 0.62)) var(--lit-from) var(--lit-to),
             rgba(160, 120, 92, 0.3) var(--lit-to) 240deg,
             transparent 240deg),
-        var(--mesh-dim) center / 6px 10.4px,
+        var(--mesh-dim) center / 3.5px 6.06px,
         linear-gradient(170deg, #1a1210, #070403);
 }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Color Blend"] { min-width: 132px; }
@@ -239,9 +239,13 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
     height: 26px;
     border-radius: 6px;
     color: var(--lit);
+    /* The legacy system face, not the bundled one: script sizes this select
+       by measuring its text, and a measurement taken before a web font has
+       loaded gave a different width per boot. */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
     background:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='24' viewBox='0 0 18 24'%3E%3Cpath d='M0.5 4V20' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M6 10L9 13L12 10' fill='none' stroke='%23f2b38a' stroke-width='1.4'/%3E%3C/svg%3E") right -2px center / 18px 24px no-repeat,
-        var(--mesh-dim) center / 7px 12.12px,
+        var(--mesh-dim) center / 3.5px 6.06px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow: 0 0 0 1px var(--cu), 0 0 0 2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 210, 170, 0.14);
 }

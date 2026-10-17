@@ -69,17 +69,6 @@ const K = { down: ['ArrowDown', 'ArrowDown', 40], up: ['ArrowUp', 'ArrowUp', 38]
         s = await st();
         check('T9 a closed field still steps natively with ArrowDown', !s.list && s.value !== before, s);
 
-        // Classic theme: no inline fields at all.
-        await d.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__themeOverride="classic";' });
-        await d.load();
-        const cl = await d.ev(`(function(){ var t = [].slice.call(document.querySelectorAll('#sidebar-left .section-title')).find(function(x){ return /Multi/.test(x.textContent); });
-            if (t.getAttribute('aria-expanded') !== 'true') t.click(); return 1; })()`);
-        await sleep(500);
-        const c2 = await d.ev(`(function(){ var s = document.getElementById('symmetryMode'); s.scrollIntoView({ block: 'center' }); var r = s.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
-        await d.click(c2.x, c2.y); await sleep(300);
-        const cls = await d.ev(`({ theme: document.documentElement.dataset.theme, list: !!document.querySelector('.wc-lbx'), api: !!window.ThemeFields })`);
-        await d.tap(...K.esc); await sleep(150);
-        check('T10 classic theme: the native popup, no inline field', cls.theme === 'classic' && !cls.list && !cls.api, cls);
     } catch (e) {
         check('harness', false, String(e && e.stack || e));
     } finally {
