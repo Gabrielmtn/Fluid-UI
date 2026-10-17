@@ -1,5 +1,6 @@
-// Walnut & Copper inline fields (js/69-theme-fields.js), headless Chrome with
-// trusted mouse and keys against the repo's own files:
+// Walnut & Copper inline fields (js/69-theme-fields.js) and checkbox panes
+// (css/37 §3: the label is the pane, the native input its cathode),
+// headless Chrome with trusted mouse and keys against the repo's own files:
 //   node scripts/test/theme-fields/run.js
 // Reuses the radial menu's driver (own static server, clean profile).
 // Exit code 1 if any check failed. SHOT_DIR=<dir> writes a screenshot.
@@ -68,6 +69,61 @@ const K = { down: ['ArrowDown', 'ArrowDown', 40], up: ['ArrowUp', 'ArrowUp', 38]
         await key('down');
         s = await st();
         check('T9 a closed field still steps natively with ArrowDown', !s.list && s.value !== before, s);
+
+        // ── Checkbox panes (css/37 §3, js/69 + js/71) ──────────────────
+        // Stroke and replay > Preserve randomness: <input> + <label for> in a
+        // .checkbox-group row. The input stays the control; the label is the
+        // pane, the input its square cathode.
+        await d.ev(`(function(){ var t = [].slice.call(document.querySelectorAll('#sidebar-left .section-title')).find(function(x){ return /Stroke/.test(x.textContent); });
+            if (t.getAttribute('aria-expanded') !== 'true') t.click();
+            window.__cbChg = 0; document.getElementById('preserveRandomness').addEventListener('change', function(){ window.__cbChg++; }); return 1; })()`);
+        await sleep(600);
+        const cb = () => d.ev(`(function(){ var i = document.getElementById('preserveRandomness'), l = document.querySelector('label[for="preserveRandomness"]'), row = i.parentElement;
+            var ir = i.getBoundingClientRect(), lr = l.getBoundingClientRect(), z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+            var ls = getComputedStyle(l), is = getComputedStyle(i);
+            return { checked: i.checked, app: window.preserveRandomness, changes: window.__cbChg, focused: document.activeElement === i, fv: i.matches(':focus-visible'),
+              rowCi: +getComputedStyle(row).getPropertyValue('--ci'), inCi: +is.getPropertyValue('--ci'), labCi: +ls.getPropertyValue('--ci'),
+              appearance: is.appearance, inLeft: Math.round((ir.left - lr.left) / z * 10) / 10, inMid: Math.round(((ir.top + ir.height / 2) - (lr.top + lr.height / 2)) / z * 10) / 10,
+              labH: Math.round(lr.height / z), labOutline: ls.outlineStyle + ' ' + ls.outlineWidth, inOutline: is.outlineStyle, pane: row.hasAttribute('data-wc-pane'),
+              inline: row.style.getPropertyValue('--ci') }; })()`);
+        await d.ev(`(function(){ var i = document.getElementById('preserveRandomness'); i.scrollIntoView({ block: 'center' }); if (i.checked) { i.checked = false; i.dispatchEvent(new Event('change', { bubbles: true })); } window.__cbChg = 0; return 1; })()`);
+        await sleep(2600);
+        let k0 = await cb();
+        check('T10 a checkbox row is a pane: 32 px label, the native input drawn as its cathode in the first module', k0.appearance === 'none' && k0.labH >= 32 && Math.abs(k0.inLeft - 9) < 1.5 && Math.abs(k0.inMid) < 1.5 && !k0.checked && k0.rowCi === 0, k0);
+
+        // Keyboard focus: the ring is on the pane, not on the small box.
+        await d.tap('Shift', 'ShiftLeft', 16);
+        await d.ev(`document.getElementById('preserveRandomness').focus()`);
+        await sleep(200);
+        let k1 = await cb();
+        check('T11 keyboard focus shows the focus ring on the pane (2 px), the input keeps the focus', k1.focused && k1.fv && /solid 2px/.test(k1.labOutline) && k1.inOutline === 'none', k1);
+
+        await key('space'); await sleep(600);
+        let k2 = await cb();
+        check('T12 Space toggles the checkbox: one change event, the app reads it, the pane lights', k2.checked && k2.app === true && k2.changes === 1 && k2.focused && k2.rowCi === 1 && k2.inCi === 1 && k2.labCi === 1 && k2.pane, k2);
+
+        await key('space'); await sleep(400);
+        let k3 = await cb();
+        check('T13 Space again unchecks it and the cathode fades (afterglow, not a snap)', !k3.checked && k3.app === false && k3.changes === 2 && k3.rowCi > 0.02 && k3.rowCi < 0.35, k3);
+        await sleep(3000);   // the afterglow settles (~2.1 s) and js/71 drops its inline --ci
+
+        // A change no event announces (a preset, a room) still shows: the
+        // resting state is CSS.
+        await d.ev(`document.getElementById('preserveRandomness').checked = true`);
+        await sleep(120);
+        let k4 = await cb();
+        await d.ev(`document.getElementById('preserveRandomness').checked = false`);
+        await sleep(120);
+        let k5 = await cb();
+        check('T14 the pane follows a programmatic checked change with no event', k4.rowCi === 1 && k4.inCi === 1 && !k4.inline && k5.rowCi === 0 && k5.inCi === 0 && k5.changes === 2, { on: k4, off: k5 });
+
+        // A click on the label (the pane) toggles it, as the label always did.
+        const lc = await d.ev(`(function(){ var r = document.querySelector('label[for="preserveRandomness"]').getBoundingClientRect(); return { x: r.left + r.width * 0.6, y: r.top + r.height / 2 }; })()`);
+        await d.click(lc.x, lc.y); await sleep(600);
+        let k6 = await cb();
+        check('T15 clicking the pane toggles the checkbox', k6.checked && k6.app === true && k6.changes === 3 && k6.rowCi === 1, k6);
+        await d.click(lc.x, lc.y); await sleep(300);
+        await d.shot('theme-checkbox-pane.png');
 
     } catch (e) {
         check('harness', false, String(e && e.stack || e));

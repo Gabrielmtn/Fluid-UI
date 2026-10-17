@@ -113,7 +113,9 @@
                 // At rest css/37 says the same thing: drop the inline values.
                 s.removeProperty('--ci'); s.removeProperty('--open'); r.last = r.lastO = '';
             } else {
-                var ci = (0.5 + 0.5 * r.hi.x).toFixed(3);
+                // Clamped: the spring overshoots, and a colour-mix past 100 %
+                // would void the whole declaration for that frame.
+                var ci = Math.max(0, Math.min(1, 0.5 + 0.5 * r.hi.x)).toFixed(3);
                 if (ci !== r.last) { s.setProperty('--ci', ci); r.last = ci; }
                 var o = Math.max(0, Math.min(1, r.op.x)).toFixed(3);
                 if (o !== r.lastO) { s.setProperty('--open', o); r.lastO = o; }
@@ -149,7 +151,7 @@
     function stepSurges(dt) {
         surging.forEach(function (w) {
             w.sp.step(dt);
-            var v = Math.max(0, w.sp.x).toFixed(3);
+            var v = Math.max(0, Math.min(1, w.sp.x)).toFixed(3);
             if (v !== w.last) { w.el.style.setProperty('--wa', v); w.last = v; }
             if (w.sp.settled() || !w.el.isConnected) surging.delete(w);
         });
