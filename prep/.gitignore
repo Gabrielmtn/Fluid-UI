@@ -1,0 +1,4 @@
+# Scratch output from prep agents and --check re-captures (regenerable)
+work/
+# Raw perf traces (~10 MB each); summary.md and run-*.json carry the numbers
+baseline/perf/trace-*.json.gz

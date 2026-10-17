@@ -1,0 +1,25 @@
+# popup-focus — node scripts/test/popup-focus/run.js
+# started 2026-10-17T13:05:32.653Z, duration 13.0 s, exit code 0
+# PASS 17 / FAIL 0  summary: 17/17 passed
+# HEAD c4796dac21008b26528e57f813425ffb7bd58490, node v25.9.0, Chrome 155.0.8059.80 (from disk)
+# ---- stdout ----
+PASS P1 Presets from the keyboard: opens with focus on a preset, aria-expanded true  {"s":{"shown":true,"inside":true,"active":"BUTTON.mixer-preset-btn","frozen":false},"exp":"true"}
+PASS P2 Esc closes it and focus goes back to the trigger  {"shown":false,"inside":false,"active":"mixerPresetsTrigger","frozen":false}
+PASS P3 Shift+Tab back past its first control steps out and closes Presets (skip menu shut)  {"s":{"shown":false,"inside":false,"active":"SPAN.section-title","frozen":false},"skip":false}
+PASS P3 ...and focus landing outside it closes it too  {"shown":false,"inside":false,"active":"resetAppBtn","frozen":false}
+PASS P4 opened with the mouse: focus not moved in, and Space still freezes  {"s":{"shown":true,"inside":false,"active":"mixerPresetsTrigger","frozen":false},"sp":{"shown":true,"inside":false,"active":"mixerPresetsTrigger","frozen":true}}
+PASS P4 ...a click away closes it
+PASS C1 a colour well from the keyboard: the picker opens with focus inside it  {"okBg":true,"s":{"shown":true,"inside":true,"active":"INPUT.cp-hex","frozen":false}}
+PASS C2 Esc closes it and focus goes back to the well  {"shown":false,"inside":false,"active":"backgroundColorPicker","frozen":false}
+PASS C3 Enter on its × closes it and focus goes back to the well (it used to drop to the page)  {"shown":false,"inside":false,"active":"backgroundColorPicker","frozen":false}
+PASS C4 Shift+Tab back past the picker × steps out and closes it (skip menu shut)  {"s":{"shown":false,"inside":false,"active":"BUTTON.btn--ghost","frozen":false},"skip":false}
+PASS R1 Room options from the keyboard: the menu opens with focus on an item  {"okMenu":true,"s":{"shown":true,"inside":true,"active":"roomReportBtn","frozen":false}}
+PASS R2 Esc closes it and focus goes back to the ⋯ button  {"shown":false,"inside":false,"active":"mpMenuBtn","frozen":false}
+PASS R3 Invite from the keyboard: opens with focus inside  {"shown":true,"inside":true,"active":"shareModeCode","frozen":false}
+PASS R4 focus walking out of Invite closes it  {"shown":false,"inside":false,"active":"mpMenuBtn","frozen":false}
+PASS M1 More from the keyboard: opens with focus on a parked fader  {"shown":true,"inside":true,"active":"viscosity","frozen":false}
+PASS M2 Esc closes it and focus goes back to More  {"shown":false,"inside":false,"active":"mixerMoreBtn","frozen":false}
+PASS X no page exceptions  []
+
+17/17 passed
+

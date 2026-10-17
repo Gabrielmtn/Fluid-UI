@@ -1,0 +1,2766 @@
+{
+ "kind": "capture",
+ "generated": "2026-10-17T08:23:24.988Z",
+ "env": {
+  "A": {
+   "viewport": [
+    1584,
+    805
+   ],
+   "dpr": 1,
+   "uiScale": "1",
+   "displayHz": 120,
+   "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+   "deviceUid": "BASELINEA",
+   "relayHost": "127.0.0.1:8787",
+   "lookBaselineGen": 8,
+   "fpsCapPinned": {
+    "id": "fpsCap",
+    "value": "0",
+    "optionExisted": true
+   },
+   "beforeRoom": {
+    "curl": 0,
+    "glowToggle": false,
+    "breathPattern": "relaxed",
+    "paletteIndex": 1,
+    "brushSize": 1,
+    "multiplier": 1,
+    "randomColor": true,
+    "fpsCap": "0",
+    "gravity": {
+     "on": false,
+     "x": 0,
+     "y": 0
+    },
+    "materialActive": false,
+    "connectedClients": 0,
+    "role": "guest",
+    "socketOpen": false
+   },
+   "afterJoin": {
+    "curl": 0,
+    "glowToggle": false,
+    "breathPattern": "relaxed",
+    "paletteIndex": 1,
+    "brushSize": 1,
+    "multiplier": 1,
+    "randomColor": true,
+    "fpsCap": "0",
+    "gravity": {
+     "on": false,
+     "x": 0,
+     "y": 0
+    },
+    "materialActive": false,
+    "connectedClients": 2,
+    "role": "host",
+    "socketOpen": true
+   }
+  },
+  "B": {
+   "viewport": [
+    1584,
+    805
+   ],
+   "dpr": 1,
+   "uiScale": "1",
+   "displayHz": 120,
+   "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+   "deviceUid": "BASELINEB",
+   "relayHost": "127.0.0.1:8787",
+   "lookBaselineGen": 8,
+   "fpsCapPinned": {
+    "id": "fpsCap",
+    "value": "0",
+    "optionExisted": true
+   },
+   "beforeRoom": {
+    "curl": 0,
+    "glowToggle": false,
+    "breathPattern": "relaxed",
+    "paletteIndex": 1,
+    "brushSize": 1,
+    "multiplier": 1,
+    "randomColor": true,
+    "fpsCap": "0",
+    "gravity": {
+     "on": false,
+     "x": 0,
+     "y": 0
+    },
+    "materialActive": false,
+    "connectedClients": 0,
+    "role": "guest",
+    "socketOpen": false
+   },
+   "afterJoin": {
+    "curl": 0,
+    "glowToggle": false,
+    "breathPattern": "relaxed",
+    "paletteIndex": 1,
+    "brushSize": 1,
+    "multiplier": 1,
+    "randomColor": true,
+    "fpsCap": "0",
+    "gravity": {
+     "on": false,
+     "x": 0,
+     "y": 0
+    },
+    "materialActive": false,
+    "connectedClients": 2,
+    "role": "guest",
+    "socketOpen": true
+   }
+  },
+  "chrome": "Chrome/155.0.8059.80",
+  "jsVersion": "15.5.35.23",
+  "protocol": "1.3",
+  "head": "c4796da",
+  "node": "v25.9.0",
+  "os": "win32 10.0.26200",
+  "stepMs": 250,
+  "settleMs": 3000
+ },
+ "relay": {
+  "kind": "wrangler",
+  "host": "127.0.0.1:8787",
+  "pid": 46216,
+  "readyMs": 1024,
+  "command": "C:\\Program Files\\nodejs\\node.exe Z:\\New folder\\Fluid-UI\\node_modules\\wrangler\\bin\\wrangler.js dev --port 8787 --ip 127.0.0.1 --persist-to C:\\Users\\Gabri\\AppData\\Local\\Temp\\fluid-sync-relay-state-PDIOsf",
+  "tried": [
+   {
+    "kind": "wrangler",
+    "command": "C:\\Program Files\\nodejs\\node.exe Z:\\New folder\\Fluid-UI\\node_modules\\wrangler\\bin\\wrangler.js dev --port 8787 --ip 127.0.0.1 --persist-to C:\\Users\\Gabri\\AppData\\Local\\Temp\\fluid-sync-relay-state-PDIOsf",
+    "ok": true,
+    "note": ""
+   }
+  ],
+  "log": "prep\\baseline\\sync\\relay.log",
+  "persistDir": "(OS temp, removed after the run)"
+ },
+ "processes": {
+  "before": {
+   "chromeAll": 63,
+   "driverChromes": 12,
+   "workerd": 0,
+   "relayNodes": 0,
+   "nodeAll": 8
+  },
+  "after": {
+   "chromeAll": 67,
+   "driverChromes": 0,
+   "driverChromesOthers": 0,
+   "ownChromeLeft": 0,
+   "workerd": 0,
+   "ownWorkerdLeft": 0,
+   "relayNodes": 0,
+   "ownRelayLeft": 0,
+   "nodeAll": 8,
+   "relayKilled": true,
+   "waitedMs": 0,
+   "killedByPid": [],
+   "ownChromePids": [
+    34080,
+    20336
+   ],
+   "ownProfiles": [
+    "fluid-radial-e2e-9751",
+    "fluid-radial-e2e-9461"
+   ],
+   "relayPid": 46216,
+   "relayTree": [
+    46216,
+    38828
+   ]
+  }
+ },
+ "sequence": [
+  {
+   "id": 1,
+   "label": "curl 10 (#curl, shared slider, step 1 of 4)",
+   "shared": true
+  },
+  {
+   "id": 2,
+   "label": "curl 20",
+   "shared": true
+  },
+  {
+   "id": 3,
+   "label": "curl 30",
+   "shared": true
+  },
+  {
+   "id": 4,
+   "label": "curl 40",
+   "shared": true
+  },
+  {
+   "id": 5,
+   "label": "Glow toggle (#glowToggle, shared checkbox)",
+   "shared": true
+  },
+  {
+   "id": 6,
+   "label": "Breathing pattern -> box (#breathPattern, shared select)",
+   "shared": true
+  },
+  {
+   "id": 7,
+   "label": "palette: next in the list (.cp-pal-select in the colour popover)",
+   "shared": true
+  },
+  {
+   "id": 8,
+   "label": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)",
+   "shared": true
+  },
+  {
+   "id": 9,
+   "label": "brush size 7 (#brushSize, PERSONAL: must not arrive)",
+   "shared": false
+  },
+  {
+   "id": 10,
+   "label": "Multi-Brush arms 3 (#multiplier, brush category, PERSONAL)",
+   "shared": false
+  },
+  {
+   "id": 11,
+   "label": "Random colour toggle (#randomColor, Brush section checkbox, PERSONAL)",
+   "shared": false
+  },
+  {
+   "id": 12,
+   "label": "gravity pad write (Constant on + tap at (0, +0.8))",
+   "shared": true
+  },
+  {
+   "id": 13,
+   "label": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")",
+   "shared": true
+  }
+ ],
+ "steps": [
+  {
+   "id": 1,
+   "label": "curl 10 (#curl, shared slider, step 1 of 4)",
+   "shared": true,
+   "result": {
+    "id": "curl",
+    "value": "10"
+   },
+   "error": null
+  },
+  {
+   "id": 2,
+   "label": "curl 20",
+   "shared": true,
+   "result": {
+    "id": "curl",
+    "value": "20"
+   },
+   "error": null
+  },
+  {
+   "id": 3,
+   "label": "curl 30",
+   "shared": true,
+   "result": {
+    "id": "curl",
+    "value": "30"
+   },
+   "error": null
+  },
+  {
+   "id": 4,
+   "label": "curl 40",
+   "shared": true,
+   "result": {
+    "id": "curl",
+    "value": "40"
+   },
+   "error": null
+  },
+  {
+   "id": 5,
+   "label": "Glow toggle (#glowToggle, shared checkbox)",
+   "shared": true,
+   "result": {
+    "id": "glowToggle",
+    "checked": true
+   },
+   "error": null
+  },
+  {
+   "id": 6,
+   "label": "Breathing pattern -> box (#breathPattern, shared select)",
+   "shared": true,
+   "result": {
+    "id": "breathPattern",
+    "value": "box",
+    "optionExisted": true
+   },
+   "error": null
+  },
+  {
+   "id": 7,
+   "label": "palette: next in the list (.cp-pal-select in the colour popover)",
+   "shared": true,
+   "result": {
+    "from": 1,
+    "to": 2,
+    "count": 4,
+    "name": "Ross' Sunset",
+    "popoverClosed": true
+   },
+   "error": null
+  },
+  {
+   "id": 8,
+   "label": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)",
+   "shared": true,
+   "result": {
+    "selector": ".mixer-preset-btn[data-preset=\"opal\"]",
+    "text": "Liquid opal"
+   },
+   "error": null
+  },
+  {
+   "id": 9,
+   "label": "brush size 7 (#brushSize, PERSONAL: must not arrive)",
+   "shared": false,
+   "result": {
+    "id": "brushSize",
+    "value": "7"
+   },
+   "error": null
+  },
+  {
+   "id": 10,
+   "label": "Multi-Brush arms 3 (#multiplier, brush category, PERSONAL)",
+   "shared": false,
+   "result": {
+    "id": "multiplier",
+    "value": "3"
+   },
+   "error": null
+  },
+  {
+   "id": 11,
+   "label": "Random colour toggle (#randomColor, Brush section checkbox, PERSONAL)",
+   "shared": false,
+   "result": {
+    "id": "randomColor",
+    "checked": true
+   },
+   "error": null
+  },
+  {
+   "id": 12,
+   "label": "gravity pad write (Constant on + tap at (0, +0.8))",
+   "shared": true,
+   "result": {
+    "sectionOpened": "false",
+    "wrapVisible": true,
+    "rect": {
+     "w": 250,
+     "h": 250
+    },
+    "after": {
+     "on": true,
+     "x": 0,
+     "y": 0.8
+    },
+    "sectionExpandedAfter": "false"
+   },
+   "error": null
+  },
+  {
+   "id": 13,
+   "label": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")",
+   "shared": true,
+   "result": {
+    "selector": "button[onclick*=\"clearCanvas\"]",
+    "text": "Clear"
+   },
+   "error": null
+  }
+ ],
+ "compared": {
+  "bRecv": [
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "B.recv",
+    "type": "connected",
+    "keys": [
+     "capacity",
+     "locked",
+     "role",
+     "roomKind",
+     "totalClients"
+    ],
+    "payload": {
+     "capacity": 8,
+     "clientId": "<B>",
+     "locked": false,
+     "role": "guest",
+     "roomKind": "private",
+     "timestamp": 0,
+     "totalClients": 2,
+     "type": "connected"
+    }
+   },
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "B.recv",
+    "type": "client-count",
+    "keys": [
+     "count"
+    ],
+    "payload": {
+     "count": 2,
+     "timestamp": 0,
+     "type": "client-count"
+    }
+   },
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=true",
+     "checkboxes.breathCueToggle",
+     "checkboxes.breathingToggle",
+     "checkboxes.colorGate",
+     "checkboxes.displayShadingToggle",
+     "checkboxes.ditherToggle",
+     "checkboxes.enableLightShift",
+     "checkboxes.enableLighting",
+     "checkboxes.glowToggle",
+     "checkboxes.kAnimateRot",
+     "checkboxes.kaleidoToggle",
+     "checkboxes.macCormackToggle",
+     "checkboxes.multigridToggle",
+     "checkboxes.overflowToggle",
+     "checkboxes.scatterBlockToggle",
+     "checkboxes.scatterToggle",
+     "colors",
+     "gravity",
+     "lightPos",
+     "lightShiftPath",
+     "material",
+     "paletteIndex",
+     "paletteName",
+     "resolution",
+     "savedColors",
+     "selects.breathColorMode",
+     "selects.breathPattern",
+     "selects.ditherPattern",
+     "selects.ditherTone",
+     "selects.fpsCap",
+     "selects.kaleidoMode",
+     "selects.lightMode",
+     "selects.lightShiftMode",
+     "selects.physicsResolution",
+     "selects.scatterSource",
+     "selects.shadeFormResolution",
+     "selects.visualResolution",
+     "sliders.breathStrength",
+     "sliders.canvasOpacity",
+     "sliders.captureDimming",
+     "sliders.colorBlend",
+     "sliders.curl",
+     "sliders.densityDissipation",
+     "sliders.ditherLevels",
+     "sliders.ditherSize",
+     "sliders.glowIntensity",
+     "sliders.glowThreshold",
+     "sliders.grainCleanup",
+     "sliders.kAngle",
+     "sliders.kBlend",
+     "sliders.kSpinSpeed",
+     "sliders.kTwist",
+     "sliders.kZoom",
+     "sliders.kaleidoSegments",
+     "sliders.lightAmbient",
+     "sliders.lightIntensity",
+     "sliders.lightShiftIntensity",
+     "sliders.lightShiftSaturation",
+     "sliders.lightShiftSpeed",
+     "sliders.lightShiftThreshold",
+     "sliders.lightSpeed",
+     "sliders.mgCoarse",
+     "sliders.mgCycles",
+     "sliders.mgPost",
+     "sliders.mgPre",
+     "sliders.mgRelax",
+     "sliders.overflowBand",
+     "sliders.pressureDissipation",
+     "sliders.pressureIteration",
+     "sliders.ridges",
+     "sliders.scatterAmount",
+     "sliders.scatterReach",
+     "sliders.shadeGloss",
+     "sliders.shadeRelief",
+     "sliders.shadingIntensity",
+     "sliders.sharpness",
+     "sliders.symmetryHold",
+     "sliders.timeScale",
+     "sliders.velocityDissipation",
+     "sliders.velocityInfluence",
+     "sliders.vibrance",
+     "sliders.viscosity",
+     "sliders.wetDrying",
+     "sliders.wetInfluence",
+     "ssOrigin"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": true,
+     "snapshot": {
+      "baseline": 8,
+      "checkboxes": {
+       "breathCueToggle": true,
+       "breathingToggle": false,
+       "colorGate": true,
+       "displayShadingToggle": false,
+       "ditherToggle": false,
+       "enableLightShift": false,
+       "enableLighting": false,
+       "glowToggle": false,
+       "kAnimateRot": false,
+       "kaleidoToggle": false,
+       "macCormackToggle": true,
+       "multigridToggle": true,
+       "overflowToggle": false,
+       "scatterBlockToggle": true,
+       "scatterToggle": false
+      },
+      "colors": {
+       "background": "#000000"
+      },
+      "gravity": {
+       "on": false,
+       "x": 0,
+       "y": 0
+      },
+      "lightPos": {
+       "enabled": false,
+       "x": 0.5,
+       "y": 0.5
+      },
+      "lightShiftPath": [],
+      "material": {
+       "amount": null,
+       "mode": "fluid",
+       "shape": 0
+      },
+      "paletteIndex": 1,
+      "paletteName": "Forest Serenity",
+      "resolution": {
+       "dye": 2048,
+       "sim": 1024
+      },
+      "savedColors": [
+       "#2C5F2D",
+       "#4A7856",
+       "#8B4513",
+       "#FFD700",
+       "#F0EAD6"
+      ],
+      "selects": {
+       "breathColorMode": "same",
+       "breathPattern": "relaxed",
+       "ditherPattern": "bayer",
+       "ditherTone": "retro",
+       "fpsCap": "0",
+       "kaleidoMode": "1",
+       "lightMode": "manual",
+       "lightShiftMode": "replace",
+       "physicsResolution": "1024",
+       "scatterSource": "light",
+       "shadeFormResolution": "256",
+       "visualResolution": "2048"
+      },
+      "sliders": {
+       "breathStrength": 0.5,
+       "canvasOpacity": 100,
+       "captureDimming": 80,
+       "colorBlend": 0,
+       "curl": 0,
+       "densityDissipation": 0.99,
+       "ditherLevels": 4,
+       "ditherSize": 2,
+       "glowIntensity": 0.8,
+       "glowThreshold": 0.6,
+       "grainCleanup": 0.75,
+       "kAngle": 0,
+       "kBlend": 1,
+       "kSpinSpeed": 30,
+       "kTwist": 0,
+       "kZoom": 1,
+       "kaleidoSegments": 12,
+       "lightAmbient": 0.3,
+       "lightIntensity": 0.5,
+       "lightShiftIntensity": 0.5,
+       "lightShiftSaturation": 1,
+       "lightShiftSpeed": 0.5,
+       "lightShiftThreshold": 0.85,
+       "lightSpeed": 0.5,
+       "mgCoarse": 8,
+       "mgCycles": 2,
+       "mgPost": 2,
+       "mgPre": 2,
+       "mgRelax": 1,
+       "overflowBand": 2.5,
+       "pressureDissipation": 0.95,
+       "pressureIteration": 25,
+       "ridges": 6,
+       "scatterAmount": 0.5,
+       "scatterReach": 1,
+       "shadeGloss": 0.05,
+       "shadeRelief": 0.1,
+       "shadingIntensity": 2,
+       "sharpness": 2,
+       "symmetryHold": 0,
+       "timeScale": 1,
+       "velocityDissipation": 1.0009,
+       "velocityInfluence": 2,
+       "vibrance": 0.5,
+       "viscosity": 0.3,
+       "wetDrying": 4.5,
+       "wetInfluence": 0.14
+      },
+      "ssOrigin": null
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 1,
+    "stepLabel": "curl 10 (#curl, shared slider, step 1 of 4)",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 10
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 2,
+    "stepLabel": "curl 20",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 20
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 3,
+    "stepLabel": "curl 30",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 30
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 4,
+    "stepLabel": "curl 40",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 40
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 5,
+    "stepLabel": "Glow toggle (#glowToggle, shared checkbox)",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "checkboxes.glowToggle"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "checkboxes": {
+       "glowToggle": true
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 6,
+    "stepLabel": "Breathing pattern -> box (#breathPattern, shared select)",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "selects.breathPattern"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "selects": {
+       "breathPattern": "box"
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 7,
+    "stepLabel": "palette: next in the list (.cp-pal-select in the colour popover)",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "paletteIndex",
+     "paletteName",
+     "savedColors"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "paletteIndex": 2,
+      "paletteName": "Ross' Sunset",
+      "savedColors": [
+       "#FF6347",
+       "#FFD700",
+       "#FF8C00",
+       "#8B4789",
+       "#FFF5EE"
+      ]
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 8,
+    "stepLabel": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "checkboxes.displayShadingToggle",
+     "checkboxes.glowToggle",
+     "colors",
+     "paletteIndex",
+     "paletteName",
+     "savedColors",
+     "selects.breathPattern",
+     "sliders.curl",
+     "sliders.densityDissipation",
+     "sliders.grainCleanup",
+     "sliders.pressureDissipation",
+     "sliders.pressureIteration",
+     "sliders.ridges",
+     "sliders.shadeGloss",
+     "sliders.shadeRelief",
+     "sliders.shadingIntensity",
+     "sliders.sharpness",
+     "sliders.velocityDissipation",
+     "sliders.velocityInfluence",
+     "sliders.vibrance",
+     "sliders.viscosity",
+     "sliders.wetDrying",
+     "sliders.wetInfluence"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "checkboxes": {
+       "displayShadingToggle": true,
+       "glowToggle": false
+      },
+      "colors": {
+       "background": "#080c16"
+      },
+      "paletteIndex": 1,
+      "paletteName": "Forest Serenity",
+      "savedColors": [
+       "#2AC9B7",
+       "#E9E3F1",
+       "#8B72D9"
+      ],
+      "selects": {
+       "breathPattern": "relaxed"
+      },
+      "sliders": {
+       "curl": 14,
+       "densityDissipation": 0.9992,
+       "grainCleanup": 0.6,
+       "pressureDissipation": 0.97,
+       "pressureIteration": 35,
+       "ridges": 0,
+       "shadeGloss": 0.5,
+       "shadeRelief": 0.8,
+       "shadingIntensity": 0.9,
+       "sharpness": 0.8,
+       "velocityDissipation": 0.9985,
+       "velocityInfluence": 2.5,
+       "vibrance": 0.075,
+       "viscosity": 0,
+       "wetDrying": 3,
+       "wetInfluence": 0
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 12,
+    "stepLabel": "gravity pad write (Constant on + tap at (0, +0.8))",
+    "dir": "B.recv",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "gravity"
+    ],
+    "payload": {
+     "clientId": "<A>",
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "gravity": {
+       "on": true,
+       "x": 0,
+       "y": 0.8
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 13,
+    "stepLabel": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")",
+    "dir": "B.recv",
+    "type": "clear",
+    "keys": [],
+    "payload": {
+     "clientId": "<A>",
+     "timestamp": 0,
+     "type": "clear"
+    }
+   }
+  ],
+  "aSent": [
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "A.sent",
+    "type": "ping",
+    "keys": [],
+    "payload": {
+     "type": "ping"
+    }
+   },
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=true",
+     "checkboxes.breathCueToggle",
+     "checkboxes.breathingToggle",
+     "checkboxes.colorGate",
+     "checkboxes.displayShadingToggle",
+     "checkboxes.ditherToggle",
+     "checkboxes.enableLightShift",
+     "checkboxes.enableLighting",
+     "checkboxes.glowToggle",
+     "checkboxes.kAnimateRot",
+     "checkboxes.kaleidoToggle",
+     "checkboxes.macCormackToggle",
+     "checkboxes.multigridToggle",
+     "checkboxes.overflowToggle",
+     "checkboxes.scatterBlockToggle",
+     "checkboxes.scatterToggle",
+     "colors",
+     "gravity",
+     "lightPos",
+     "lightShiftPath",
+     "material",
+     "paletteIndex",
+     "paletteName",
+     "resolution",
+     "savedColors",
+     "selects.breathColorMode",
+     "selects.breathPattern",
+     "selects.ditherPattern",
+     "selects.ditherTone",
+     "selects.fpsCap",
+     "selects.kaleidoMode",
+     "selects.lightMode",
+     "selects.lightShiftMode",
+     "selects.physicsResolution",
+     "selects.scatterSource",
+     "selects.shadeFormResolution",
+     "selects.visualResolution",
+     "sliders.breathStrength",
+     "sliders.canvasOpacity",
+     "sliders.captureDimming",
+     "sliders.colorBlend",
+     "sliders.curl",
+     "sliders.densityDissipation",
+     "sliders.ditherLevels",
+     "sliders.ditherSize",
+     "sliders.glowIntensity",
+     "sliders.glowThreshold",
+     "sliders.grainCleanup",
+     "sliders.kAngle",
+     "sliders.kBlend",
+     "sliders.kSpinSpeed",
+     "sliders.kTwist",
+     "sliders.kZoom",
+     "sliders.kaleidoSegments",
+     "sliders.lightAmbient",
+     "sliders.lightIntensity",
+     "sliders.lightShiftIntensity",
+     "sliders.lightShiftSaturation",
+     "sliders.lightShiftSpeed",
+     "sliders.lightShiftThreshold",
+     "sliders.lightSpeed",
+     "sliders.mgCoarse",
+     "sliders.mgCycles",
+     "sliders.mgPost",
+     "sliders.mgPre",
+     "sliders.mgRelax",
+     "sliders.overflowBand",
+     "sliders.pressureDissipation",
+     "sliders.pressureIteration",
+     "sliders.ridges",
+     "sliders.scatterAmount",
+     "sliders.scatterReach",
+     "sliders.shadeGloss",
+     "sliders.shadeRelief",
+     "sliders.shadingIntensity",
+     "sliders.sharpness",
+     "sliders.symmetryHold",
+     "sliders.timeScale",
+     "sliders.velocityDissipation",
+     "sliders.velocityInfluence",
+     "sliders.vibrance",
+     "sliders.viscosity",
+     "sliders.wetDrying",
+     "sliders.wetInfluence",
+     "ssOrigin"
+    ],
+    "payload": {
+     "full": true,
+     "snapshot": {
+      "baseline": 8,
+      "checkboxes": {
+       "breathCueToggle": true,
+       "breathingToggle": false,
+       "colorGate": true,
+       "displayShadingToggle": false,
+       "ditherToggle": false,
+       "enableLightShift": false,
+       "enableLighting": false,
+       "glowToggle": false,
+       "kAnimateRot": false,
+       "kaleidoToggle": false,
+       "macCormackToggle": true,
+       "multigridToggle": true,
+       "overflowToggle": false,
+       "scatterBlockToggle": true,
+       "scatterToggle": false
+      },
+      "colors": {
+       "background": "#000000"
+      },
+      "gravity": {
+       "on": false,
+       "x": 0,
+       "y": 0
+      },
+      "lightPos": {
+       "enabled": false,
+       "x": 0.5,
+       "y": 0.5
+      },
+      "lightShiftPath": [],
+      "material": {
+       "amount": null,
+       "mode": "fluid",
+       "shape": 0
+      },
+      "paletteIndex": 1,
+      "paletteName": "Forest Serenity",
+      "resolution": {
+       "dye": 2048,
+       "sim": 1024
+      },
+      "savedColors": [
+       "#2C5F2D",
+       "#4A7856",
+       "#8B4513",
+       "#FFD700",
+       "#F0EAD6"
+      ],
+      "selects": {
+       "breathColorMode": "same",
+       "breathPattern": "relaxed",
+       "ditherPattern": "bayer",
+       "ditherTone": "retro",
+       "fpsCap": "0",
+       "kaleidoMode": "1",
+       "lightMode": "manual",
+       "lightShiftMode": "replace",
+       "physicsResolution": "1024",
+       "scatterSource": "light",
+       "shadeFormResolution": "256",
+       "visualResolution": "2048"
+      },
+      "sliders": {
+       "breathStrength": 0.5,
+       "canvasOpacity": 100,
+       "captureDimming": 80,
+       "colorBlend": 0,
+       "curl": 0,
+       "densityDissipation": 0.99,
+       "ditherLevels": 4,
+       "ditherSize": 2,
+       "glowIntensity": 0.8,
+       "glowThreshold": 0.6,
+       "grainCleanup": 0.75,
+       "kAngle": 0,
+       "kBlend": 1,
+       "kSpinSpeed": 30,
+       "kTwist": 0,
+       "kZoom": 1,
+       "kaleidoSegments": 12,
+       "lightAmbient": 0.3,
+       "lightIntensity": 0.5,
+       "lightShiftIntensity": 0.5,
+       "lightShiftSaturation": 1,
+       "lightShiftSpeed": 0.5,
+       "lightShiftThreshold": 0.85,
+       "lightSpeed": 0.5,
+       "mgCoarse": 8,
+       "mgCycles": 2,
+       "mgPost": 2,
+       "mgPre": 2,
+       "mgRelax": 1,
+       "overflowBand": 2.5,
+       "pressureDissipation": 0.95,
+       "pressureIteration": 25,
+       "ridges": 6,
+       "scatterAmount": 0.5,
+       "scatterReach": 1,
+       "shadeGloss": 0.05,
+       "shadeRelief": 0.1,
+       "shadingIntensity": 2,
+       "sharpness": 2,
+       "symmetryHold": 0,
+       "timeScale": 1,
+       "velocityDissipation": 1.0009,
+       "velocityInfluence": 2,
+       "vibrance": 0.5,
+       "viscosity": 0.3,
+       "wetDrying": 4.5,
+       "wetInfluence": 0.14
+      },
+      "ssOrigin": null
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 1,
+    "stepLabel": "curl 10 (#curl, shared slider, step 1 of 4)",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 10
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 2,
+    "stepLabel": "curl 20",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 20
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 3,
+    "stepLabel": "curl 30",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 30
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 4,
+    "stepLabel": "curl 40",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "sliders.curl"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "sliders": {
+       "curl": 40
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 5,
+    "stepLabel": "Glow toggle (#glowToggle, shared checkbox)",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "checkboxes.glowToggle"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "checkboxes": {
+       "glowToggle": true
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 6,
+    "stepLabel": "Breathing pattern -> box (#breathPattern, shared select)",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "selects.breathPattern"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "selects": {
+       "breathPattern": "box"
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 7,
+    "stepLabel": "palette: next in the list (.cp-pal-select in the colour popover)",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "paletteIndex",
+     "paletteName",
+     "savedColors"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "paletteIndex": 2,
+      "paletteName": "Ross' Sunset",
+      "savedColors": [
+       "#FF6347",
+       "#FFD700",
+       "#FF8C00",
+       "#8B4789",
+       "#FFF5EE"
+      ]
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 8,
+    "stepLabel": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "checkboxes.displayShadingToggle",
+     "checkboxes.glowToggle",
+     "colors",
+     "paletteIndex",
+     "paletteName",
+     "savedColors",
+     "selects.breathPattern",
+     "sliders.curl",
+     "sliders.densityDissipation",
+     "sliders.grainCleanup",
+     "sliders.pressureDissipation",
+     "sliders.pressureIteration",
+     "sliders.ridges",
+     "sliders.shadeGloss",
+     "sliders.shadeRelief",
+     "sliders.shadingIntensity",
+     "sliders.sharpness",
+     "sliders.velocityDissipation",
+     "sliders.velocityInfluence",
+     "sliders.vibrance",
+     "sliders.viscosity",
+     "sliders.wetDrying",
+     "sliders.wetInfluence"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "checkboxes": {
+       "displayShadingToggle": true,
+       "glowToggle": false
+      },
+      "colors": {
+       "background": "#080c16"
+      },
+      "paletteIndex": 1,
+      "paletteName": "Forest Serenity",
+      "savedColors": [
+       "#2AC9B7",
+       "#E9E3F1",
+       "#8B72D9"
+      ],
+      "selects": {
+       "breathPattern": "relaxed"
+      },
+      "sliders": {
+       "curl": 14,
+       "densityDissipation": 0.9992,
+       "grainCleanup": 0.6,
+       "pressureDissipation": 0.97,
+       "pressureIteration": 35,
+       "ridges": 0,
+       "shadeGloss": 0.5,
+       "shadeRelief": 0.8,
+       "shadingIntensity": 0.9,
+       "sharpness": 0.8,
+       "velocityDissipation": 0.9985,
+       "velocityInfluence": 2.5,
+       "vibrance": 0.075,
+       "viscosity": 0,
+       "wetDrying": 3,
+       "wetInfluence": 0
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 12,
+    "stepLabel": "gravity pad write (Constant on + tap at (0, +0.8))",
+    "dir": "A.sent",
+    "type": "room-look",
+    "keys": [
+     "full=false",
+     "gravity"
+    ],
+    "payload": {
+     "full": false,
+     "snapshot": {
+      "baseline": 8,
+      "gravity": {
+       "on": true,
+       "x": 0,
+       "y": 0.8
+      }
+     },
+     "timestamp": 0,
+     "type": "room-look"
+    }
+   },
+   {
+    "step": 13,
+    "stepLabel": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")",
+    "dir": "A.sent",
+    "type": "clear",
+    "keys": [],
+    "payload": {
+     "timestamp": 0,
+     "type": "clear"
+    }
+   }
+  ],
+  "aRecv": [
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "A.recv",
+    "type": "connected",
+    "keys": [
+     "capacity",
+     "locked",
+     "role",
+     "roomKind",
+     "totalClients"
+    ],
+    "payload": {
+     "capacity": 8,
+     "clientId": "<A>",
+     "locked": false,
+     "role": "host",
+     "roomKind": "private",
+     "timestamp": 0,
+     "totalClients": 1,
+     "type": "connected"
+    }
+   },
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "A.recv",
+    "type": "client-count",
+    "keys": [
+     "count"
+    ],
+    "payload": {
+     "count": 1,
+     "timestamp": 0,
+     "type": "client-count"
+    }
+   },
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "A.recv",
+    "type": "client-count",
+    "keys": [
+     "count"
+    ],
+    "payload": {
+     "count": 2,
+     "timestamp": 0,
+     "type": "client-count"
+    }
+   }
+  ],
+  "bSent": [
+   {
+    "step": 0,
+    "stepLabel": "join",
+    "dir": "B.sent",
+    "type": "ping",
+    "keys": [],
+    "payload": {
+     "type": "ping"
+    }
+   }
+  ],
+  "personalAbsent": {
+   "sliders.brushSize": true,
+   "sliders.multiplier": true,
+   "checkboxes.randomColor": true,
+   "colors.brush": true
+  },
+  "landed": {
+   "A": {
+    "curl": 14,
+    "glowToggle": false,
+    "breathPattern": "relaxed",
+    "paletteIndex": 1,
+    "brushSize": 7,
+    "multiplier": 3,
+    "randomColor": true,
+    "fpsCap": "0",
+    "gravity": {
+     "on": true,
+     "x": 0,
+     "y": 0.8
+    },
+    "materialActive": false,
+    "connectedClients": 2,
+    "role": "host",
+    "socketOpen": true
+   },
+   "B": {
+    "curl": 14,
+    "glowToggle": false,
+    "breathPattern": "relaxed",
+    "paletteIndex": 1,
+    "brushSize": 1,
+    "multiplier": 1,
+    "randomColor": true,
+    "fpsCap": "0",
+    "gravity": {
+     "on": true,
+     "x": 0,
+     "y": 0.8
+    },
+    "materialActive": false,
+    "connectedClients": 2,
+    "role": "guest",
+    "socketOpen": true
+   }
+  },
+  "stepResults": [
+   {
+    "id": 1,
+    "result": {
+     "id": "curl",
+     "value": "10"
+    },
+    "error": null
+   },
+   {
+    "id": 2,
+    "result": {
+     "id": "curl",
+     "value": "20"
+    },
+    "error": null
+   },
+   {
+    "id": 3,
+    "result": {
+     "id": "curl",
+     "value": "30"
+    },
+    "error": null
+   },
+   {
+    "id": 4,
+    "result": {
+     "id": "curl",
+     "value": "40"
+    },
+    "error": null
+   },
+   {
+    "id": 5,
+    "result": {
+     "id": "glowToggle",
+     "checked": true
+    },
+    "error": null
+   },
+   {
+    "id": 6,
+    "result": {
+     "id": "breathPattern",
+     "value": "box",
+     "optionExisted": true
+    },
+    "error": null
+   },
+   {
+    "id": 7,
+    "result": {
+     "from": 1,
+     "to": 2,
+     "count": 4,
+     "name": "Ross' Sunset",
+     "popoverClosed": true
+    },
+    "error": null
+   },
+   {
+    "id": 8,
+    "result": {
+     "selector": ".mixer-preset-btn[data-preset=\"opal\"]",
+     "text": "Liquid opal"
+    },
+    "error": null
+   },
+   {
+    "id": 9,
+    "result": {
+     "id": "brushSize",
+     "value": "7"
+    },
+    "error": null
+   },
+   {
+    "id": 10,
+    "result": {
+     "id": "multiplier",
+     "value": "3"
+    },
+    "error": null
+   },
+   {
+    "id": 11,
+    "result": {
+     "id": "randomColor",
+     "checked": true
+    },
+    "error": null
+   },
+   {
+    "id": 12,
+    "result": {
+     "sectionOpened": "false",
+     "wrapVisible": true,
+     "after": {
+      "on": true,
+      "x": 0,
+      "y": 0.8
+     },
+     "sectionExpandedAfter": "false"
+    },
+    "error": null
+   },
+   {
+    "id": 13,
+    "result": {
+     "selector": "button[onclick*=\"clearCanvas\"]",
+     "text": "Clear"
+    },
+    "error": null
+   }
+  ]
+ },
+ "raw": {
+  "ids": {
+   "A": "MsOR3tfU5oSfglf7g6vc5",
+   "B": "heAKvQcSDXhNFnZYzBk4n"
+  },
+  "room": "PLEFZL",
+  "A": {
+   "t0": 8220.89999999851,
+   "recv": [
+    {
+     "data": {
+      "type": "connected",
+      "clientId": "MsOR3tfU5oSfglf7g6vc5",
+      "timestamp": 1792225415774,
+      "totalClients": 1,
+      "role": "host",
+      "locked": false,
+      "capacity": 8,
+      "roomKind": "private"
+     },
+     "t": 405.8
+    },
+    {
+     "data": {
+      "type": "client-count",
+      "count": 1,
+      "timestamp": 1792225415774
+     },
+     "t": 406.4
+    },
+    {
+     "data": {
+      "type": "client-count",
+      "count": 2,
+      "timestamp": 1792225415862
+     },
+     "t": 490.2
+    }
+   ],
+   "sent": [
+    {
+     "data": {
+      "type": "ping"
+     },
+     "t": 403.1
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": true,
+      "snapshot": {
+       "sliders": {
+        "densityDissipation": 0.99,
+        "velocityDissipation": 1.0009,
+        "pressureDissipation": 0.95,
+        "pressureIteration": 25,
+        "mgCycles": 2,
+        "mgPre": 2,
+        "mgPost": 2,
+        "mgCoarse": 8,
+        "mgRelax": 1,
+        "wetInfluence": 0.14,
+        "wetDrying": 4.5,
+        "ridges": 6,
+        "overflowBand": 2.5,
+        "breathStrength": 0.5,
+        "velocityInfluence": 2,
+        "curl": 0,
+        "grainCleanup": 0.75,
+        "sharpness": 2,
+        "viscosity": 0.3,
+        "symmetryHold": 0,
+        "colorBlend": 0,
+        "timeScale": 1,
+        "canvasOpacity": 100,
+        "captureDimming": 80,
+        "kSpinSpeed": 30,
+        "kTwist": 0,
+        "kZoom": 1,
+        "kBlend": 1,
+        "kAngle": 0,
+        "kaleidoSegments": 12,
+        "lightSpeed": 0.5,
+        "lightIntensity": 0.5,
+        "lightAmbient": 0.3,
+        "lightShiftSpeed": 0.5,
+        "lightShiftThreshold": 0.85,
+        "lightShiftIntensity": 0.5,
+        "lightShiftSaturation": 1,
+        "vibrance": 0.5,
+        "glowIntensity": 0.8,
+        "glowThreshold": 0.6,
+        "scatterAmount": 0.5,
+        "scatterReach": 1,
+        "ditherLevels": 4,
+        "ditherSize": 2,
+        "shadingIntensity": 2,
+        "shadeRelief": 0.1,
+        "shadeGloss": 0.05
+       },
+       "checkboxes": {
+        "colorGate": true,
+        "kaleidoToggle": false,
+        "kAnimateRot": false,
+        "enableLighting": false,
+        "enableLightShift": false,
+        "macCormackToggle": true,
+        "multigridToggle": true,
+        "glowToggle": false,
+        "overflowToggle": false,
+        "breathingToggle": false,
+        "breathCueToggle": true,
+        "scatterToggle": false,
+        "scatterBlockToggle": true,
+        "ditherToggle": false,
+        "displayShadingToggle": false
+       },
+       "selects": {
+        "visualResolution": "2048",
+        "physicsResolution": "1024",
+        "shadeFormResolution": "256",
+        "kaleidoMode": "1",
+        "fpsCap": "0",
+        "lightMode": "manual",
+        "scatterSource": "light",
+        "breathPattern": "relaxed",
+        "breathColorMode": "same",
+        "ditherPattern": "bayer",
+        "ditherTone": "retro",
+        "lightShiftMode": "replace"
+       },
+       "colors": {
+        "background": "#000000"
+       },
+       "savedColors": [
+        "#2C5F2D",
+        "#4A7856",
+        "#8B4513",
+        "#FFD700",
+        "#F0EAD6"
+       ],
+       "paletteIndex": 1,
+       "paletteName": "Forest Serenity",
+       "lightPos": {
+        "x": 0.5,
+        "y": 0.5,
+        "enabled": false
+       },
+       "lightShiftPath": [],
+       "material": {
+        "mode": "fluid",
+        "amount": null,
+        "shape": 0
+       },
+       "ssOrigin": null,
+       "resolution": {
+        "dye": 2048,
+        "sim": 1024
+       },
+       "gravity": {
+        "on": false,
+        "x": 0,
+        "y": 0
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225416365
+     },
+     "t": 990.8
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 10
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225417919
+     },
+     "t": 2544.6
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 20
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418171
+     },
+     "t": 2796.6
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 30
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418423
+     },
+     "t": 3048.4
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 40
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418686
+     },
+     "t": 3311.3
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "checkboxes": {
+        "glowToggle": true
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418949
+     },
+     "t": 3575
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "selects": {
+        "breathPattern": "box"
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225419212
+     },
+     "t": 3837.2
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "savedColors": [
+        "#FF6347",
+        "#FFD700",
+        "#FF8C00",
+        "#8B4789",
+        "#FFF5EE"
+       ],
+       "paletteIndex": 2,
+       "paletteName": "Ross' Sunset",
+       "baseline": 8
+      },
+      "timestamp": 1792225419480
+     },
+     "t": 4105.9
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "densityDissipation": 0.9992,
+        "velocityDissipation": 0.9985,
+        "pressureDissipation": 0.97,
+        "pressureIteration": 35,
+        "wetInfluence": 0,
+        "wetDrying": 3,
+        "ridges": 0,
+        "velocityInfluence": 2.5,
+        "curl": 14,
+        "grainCleanup": 0.6,
+        "sharpness": 0.8,
+        "viscosity": 0,
+        "vibrance": 0.075,
+        "shadingIntensity": 0.9,
+        "shadeRelief": 0.8,
+        "shadeGloss": 0.5
+       },
+       "checkboxes": {
+        "glowToggle": false,
+        "displayShadingToggle": true
+       },
+       "selects": {
+        "breathPattern": "relaxed"
+       },
+       "colors": {
+        "background": "#080c16"
+       },
+       "savedColors": [
+        "#2AC9B7",
+        "#E9E3F1",
+        "#8B72D9"
+       ],
+       "paletteIndex": 1,
+       "paletteName": "Forest Serenity",
+       "baseline": 8
+      },
+      "timestamp": 1792225419783
+     },
+     "t": 4408.2
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "gravity": {
+        "on": true,
+        "x": 0,
+        "y": 0.8
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225420851
+     },
+     "t": 5476.7
+    },
+    {
+     "data": {
+      "type": "clear",
+      "timestamp": 1792225421054
+     },
+     "t": 5679.3
+    }
+   ],
+   "marks": [
+    {
+     "t": 2542.6,
+     "step": 1,
+     "label": "curl 10 (#curl, shared slider, step 1 of 4)"
+    },
+    {
+     "t": 2795,
+     "step": 2,
+     "label": "curl 20"
+    },
+    {
+     "t": 3047.1,
+     "step": 3,
+     "label": "curl 30"
+    },
+    {
+     "t": 3310.1,
+     "step": 4,
+     "label": "curl 40"
+    },
+    {
+     "t": 3573.1,
+     "step": 5,
+     "label": "Glow toggle (#glowToggle, shared checkbox)"
+    },
+    {
+     "t": 3835.8,
+     "step": 6,
+     "label": "Breathing pattern -> box (#breathPattern, shared select)"
+    },
+    {
+     "t": 4095.2,
+     "step": 7,
+     "label": "palette: next in the list (.cp-pal-select in the colour popover)"
+    },
+    {
+     "t": 4371.8,
+     "step": 8,
+     "label": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)"
+    },
+    {
+     "t": 4638.2,
+     "step": 9,
+     "label": "brush size 7 (#brushSize, PERSONAL: must not arrive)"
+    },
+    {
+     "t": 4896,
+     "step": 10,
+     "label": "Multi-Brush arms 3 (#multiplier, brush category, PERSONAL)"
+    },
+    {
+     "t": 5155.7,
+     "step": 11,
+     "label": "Random colour toggle (#randomColor, Brush section checkbox, PERSONAL)"
+    },
+    {
+     "t": 5414.6,
+     "step": 12,
+     "label": "gravity pad write (Constant on + tap at (0, +0.8))"
+    },
+    {
+     "t": 5678.3,
+     "step": 13,
+     "label": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")"
+    }
+   ],
+   "hooks": 1
+  },
+  "B": {
+   "t0": 4069.199999999255,
+   "recv": [
+    {
+     "data": {
+      "type": "connected",
+      "clientId": "heAKvQcSDXhNFnZYzBk4n",
+      "timestamp": 1792225415862,
+      "totalClients": 2,
+      "role": "guest",
+      "locked": false,
+      "capacity": 8,
+      "roomKind": "private"
+     },
+     "t": 491.6
+    },
+    {
+     "data": {
+      "type": "client-count",
+      "count": 2,
+      "timestamp": 1792225415862
+     },
+     "t": 491.6
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": true,
+      "snapshot": {
+       "sliders": {
+        "densityDissipation": 0.99,
+        "velocityDissipation": 1.0009,
+        "pressureDissipation": 0.95,
+        "pressureIteration": 25,
+        "mgCycles": 2,
+        "mgPre": 2,
+        "mgPost": 2,
+        "mgCoarse": 8,
+        "mgRelax": 1,
+        "wetInfluence": 0.14,
+        "wetDrying": 4.5,
+        "ridges": 6,
+        "overflowBand": 2.5,
+        "breathStrength": 0.5,
+        "velocityInfluence": 2,
+        "curl": 0,
+        "grainCleanup": 0.75,
+        "sharpness": 2,
+        "viscosity": 0.3,
+        "symmetryHold": 0,
+        "colorBlend": 0,
+        "timeScale": 1,
+        "canvasOpacity": 100,
+        "captureDimming": 80,
+        "kSpinSpeed": 30,
+        "kTwist": 0,
+        "kZoom": 1,
+        "kBlend": 1,
+        "kAngle": 0,
+        "kaleidoSegments": 12,
+        "lightSpeed": 0.5,
+        "lightIntensity": 0.5,
+        "lightAmbient": 0.3,
+        "lightShiftSpeed": 0.5,
+        "lightShiftThreshold": 0.85,
+        "lightShiftIntensity": 0.5,
+        "lightShiftSaturation": 1,
+        "vibrance": 0.5,
+        "glowIntensity": 0.8,
+        "glowThreshold": 0.6,
+        "scatterAmount": 0.5,
+        "scatterReach": 1,
+        "ditherLevels": 4,
+        "ditherSize": 2,
+        "shadingIntensity": 2,
+        "shadeRelief": 0.1,
+        "shadeGloss": 0.05
+       },
+       "checkboxes": {
+        "colorGate": true,
+        "kaleidoToggle": false,
+        "kAnimateRot": false,
+        "enableLighting": false,
+        "enableLightShift": false,
+        "macCormackToggle": true,
+        "multigridToggle": true,
+        "glowToggle": false,
+        "overflowToggle": false,
+        "breathingToggle": false,
+        "breathCueToggle": true,
+        "scatterToggle": false,
+        "scatterBlockToggle": true,
+        "ditherToggle": false,
+        "displayShadingToggle": false
+       },
+       "selects": {
+        "visualResolution": "2048",
+        "physicsResolution": "1024",
+        "shadeFormResolution": "256",
+        "kaleidoMode": "1",
+        "fpsCap": "0",
+        "lightMode": "manual",
+        "scatterSource": "light",
+        "breathPattern": "relaxed",
+        "breathColorMode": "same",
+        "ditherPattern": "bayer",
+        "ditherTone": "retro",
+        "lightShiftMode": "replace"
+       },
+       "colors": {
+        "background": "#000000"
+       },
+       "savedColors": [
+        "#2C5F2D",
+        "#4A7856",
+        "#8B4513",
+        "#FFD700",
+        "#F0EAD6"
+       ],
+       "paletteIndex": 1,
+       "paletteName": "Forest Serenity",
+       "lightPos": {
+        "x": 0.5,
+        "y": 0.5,
+        "enabled": false
+       },
+       "lightShiftPath": [],
+       "material": {
+        "mode": "fluid",
+        "amount": null,
+        "shape": 0
+       },
+       "ssOrigin": null,
+       "resolution": {
+        "dye": 2048,
+        "sim": 1024
+       },
+       "gravity": {
+        "on": false,
+        "x": 0,
+        "y": 0
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225416365,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 989.3
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 10
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225417919,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 2544
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 20
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418171,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 2794.9
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 30
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418423,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 3046.6
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "curl": 40
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418686,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 3309.2
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "checkboxes": {
+        "glowToggle": true
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225418949,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 3576
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "selects": {
+        "breathPattern": "box"
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225419212,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 3836.9
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "savedColors": [
+        "#FF6347",
+        "#FFD700",
+        "#FF8C00",
+        "#8B4789",
+        "#FFF5EE"
+       ],
+       "paletteIndex": 2,
+       "paletteName": "Ross' Sunset",
+       "baseline": 8
+      },
+      "timestamp": 1792225419480,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 4105.3
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "sliders": {
+        "densityDissipation": 0.9992,
+        "velocityDissipation": 0.9985,
+        "pressureDissipation": 0.97,
+        "pressureIteration": 35,
+        "wetInfluence": 0,
+        "wetDrying": 3,
+        "ridges": 0,
+        "velocityInfluence": 2.5,
+        "curl": 14,
+        "grainCleanup": 0.6,
+        "sharpness": 0.8,
+        "viscosity": 0,
+        "vibrance": 0.075,
+        "shadingIntensity": 0.9,
+        "shadeRelief": 0.8,
+        "shadeGloss": 0.5
+       },
+       "checkboxes": {
+        "glowToggle": false,
+        "displayShadingToggle": true
+       },
+       "selects": {
+        "breathPattern": "relaxed"
+       },
+       "colors": {
+        "background": "#080c16"
+       },
+       "savedColors": [
+        "#2AC9B7",
+        "#E9E3F1",
+        "#8B72D9"
+       ],
+       "paletteIndex": 1,
+       "paletteName": "Forest Serenity",
+       "baseline": 8
+      },
+      "timestamp": 1792225419783,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 4411.5
+    },
+    {
+     "data": {
+      "type": "room-look",
+      "full": false,
+      "snapshot": {
+       "gravity": {
+        "on": true,
+        "x": 0,
+        "y": 0.8
+       },
+       "baseline": 8
+      },
+      "timestamp": 1792225420851,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 5478.3
+    },
+    {
+     "data": {
+      "type": "clear",
+      "timestamp": 1792225421054,
+      "clientId": "MsOR3tfU5oSfglf7g6vc5"
+     },
+     "t": 5676.7
+    }
+   ],
+   "sent": [
+    {
+     "data": {
+      "type": "ping"
+     },
+     "t": 489.4
+    }
+   ],
+   "marks": [
+    {
+     "t": 2538.9,
+     "step": 1,
+     "label": "curl 10 (#curl, shared slider, step 1 of 4)"
+    },
+    {
+     "t": 2791.2,
+     "step": 2,
+     "label": "curl 20"
+    },
+    {
+     "t": 3043.4,
+     "step": 3,
+     "label": "curl 30"
+    },
+    {
+     "t": 3306.4,
+     "step": 4,
+     "label": "curl 40"
+    },
+    {
+     "t": 3569.4,
+     "step": 5,
+     "label": "Glow toggle (#glowToggle, shared checkbox)"
+    },
+    {
+     "t": 3832,
+     "step": 6,
+     "label": "Breathing pattern -> box (#breathPattern, shared select)"
+    },
+    {
+     "t": 4091.5,
+     "step": 7,
+     "label": "palette: next in the list (.cp-pal-select in the colour popover)"
+    },
+    {
+     "t": 4368.1,
+     "step": 8,
+     "label": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)"
+    },
+    {
+     "t": 4634.3,
+     "step": 9,
+     "label": "brush size 7 (#brushSize, PERSONAL: must not arrive)"
+    },
+    {
+     "t": 4892.3,
+     "step": 10,
+     "label": "Multi-Brush arms 3 (#multiplier, brush category, PERSONAL)"
+    },
+    {
+     "t": 5151.9,
+     "step": 11,
+     "label": "Random colour toggle (#randomColor, Brush section checkbox, PERSONAL)"
+    },
+    {
+     "t": 5410.9,
+     "step": 12,
+     "label": "gravity pad write (Constant on + tap at (0, +0.8))"
+    },
+    {
+     "t": 5674.4,
+     "step": 13,
+     "label": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")"
+    }
+   ],
+   "hooks": 1
+  }
+ },
+ "problems": [],
+ "timing": {
+  "bRecv": [
+   {
+    "step": 0,
+    "type": "connected",
+    "t": 491.6
+   },
+   {
+    "step": 0,
+    "type": "client-count",
+    "t": 491.6
+   },
+   {
+    "step": 0,
+    "type": "room-look",
+    "t": 989.3
+   },
+   {
+    "step": 1,
+    "type": "room-look",
+    "t": 2544
+   },
+   {
+    "step": 2,
+    "type": "room-look",
+    "t": 2794.9
+   },
+   {
+    "step": 3,
+    "type": "room-look",
+    "t": 3046.6
+   },
+   {
+    "step": 4,
+    "type": "room-look",
+    "t": 3309.2
+   },
+   {
+    "step": 5,
+    "type": "room-look",
+    "t": 3576
+   },
+   {
+    "step": 6,
+    "type": "room-look",
+    "t": 3836.9
+   },
+   {
+    "step": 7,
+    "type": "room-look",
+    "t": 4105.3
+   },
+   {
+    "step": 8,
+    "type": "room-look",
+    "t": 4411.5
+   },
+   {
+    "step": 12,
+    "type": "room-look",
+    "t": 5478.3
+   },
+   {
+    "step": 13,
+    "type": "clear",
+    "t": 5676.7
+   }
+  ],
+  "aSent": [
+   {
+    "step": 0,
+    "type": "ping",
+    "t": 403.1
+   },
+   {
+    "step": 0,
+    "type": "room-look",
+    "t": 990.8
+   },
+   {
+    "step": 1,
+    "type": "room-look",
+    "t": 2544.6
+   },
+   {
+    "step": 2,
+    "type": "room-look",
+    "t": 2796.6
+   },
+   {
+    "step": 3,
+    "type": "room-look",
+    "t": 3048.4
+   },
+   {
+    "step": 4,
+    "type": "room-look",
+    "t": 3311.3
+   },
+   {
+    "step": 5,
+    "type": "room-look",
+    "t": 3575
+   },
+   {
+    "step": 6,
+    "type": "room-look",
+    "t": 3837.2
+   },
+   {
+    "step": 7,
+    "type": "room-look",
+    "t": 4105.9
+   },
+   {
+    "step": 8,
+    "type": "room-look",
+    "t": 4408.2
+   },
+   {
+    "step": 12,
+    "type": "room-look",
+    "t": 5476.7
+   },
+   {
+    "step": 13,
+    "type": "clear",
+    "t": 5679.3
+   }
+  ],
+  "marksB": [
+   {
+    "t": 2538.9,
+    "step": 1,
+    "label": "curl 10 (#curl, shared slider, step 1 of 4)"
+   },
+   {
+    "t": 2791.2,
+    "step": 2,
+    "label": "curl 20"
+   },
+   {
+    "t": 3043.4,
+    "step": 3,
+    "label": "curl 30"
+   },
+   {
+    "t": 3306.4,
+    "step": 4,
+    "label": "curl 40"
+   },
+   {
+    "t": 3569.4,
+    "step": 5,
+    "label": "Glow toggle (#glowToggle, shared checkbox)"
+   },
+   {
+    "t": 3832,
+    "step": 6,
+    "label": "Breathing pattern -> box (#breathPattern, shared select)"
+   },
+   {
+    "t": 4091.5,
+    "step": 7,
+    "label": "palette: next in the list (.cp-pal-select in the colour popover)"
+   },
+   {
+    "t": 4368.1,
+    "step": 8,
+    "label": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)"
+   },
+   {
+    "t": 4634.3,
+    "step": 9,
+    "label": "brush size 7 (#brushSize, PERSONAL: must not arrive)"
+   },
+   {
+    "t": 4892.3,
+    "step": 10,
+    "label": "Multi-Brush arms 3 (#multiplier, brush category, PERSONAL)"
+   },
+   {
+    "t": 5151.9,
+    "step": 11,
+    "label": "Random colour toggle (#randomColor, Brush section checkbox, PERSONAL)"
+   },
+   {
+    "t": 5410.9,
+    "step": 12,
+    "label": "gravity pad write (Constant on + tap at (0, +0.8))"
+   },
+   {
+    "t": 5674.4,
+    "step": 13,
+    "label": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")"
+   }
+  ],
+  "marksA": [
+   {
+    "t": 2542.6,
+    "step": 1,
+    "label": "curl 10 (#curl, shared slider, step 1 of 4)"
+   },
+   {
+    "t": 2795,
+    "step": 2,
+    "label": "curl 20"
+   },
+   {
+    "t": 3047.1,
+    "step": 3,
+    "label": "curl 30"
+   },
+   {
+    "t": 3310.1,
+    "step": 4,
+    "label": "curl 40"
+   },
+   {
+    "t": 3573.1,
+    "step": 5,
+    "label": "Glow toggle (#glowToggle, shared checkbox)"
+   },
+   {
+    "t": 3835.8,
+    "step": 6,
+    "label": "Breathing pattern -> box (#breathPattern, shared select)"
+   },
+   {
+    "t": 4095.2,
+    "step": 7,
+    "label": "palette: next in the list (.cp-pal-select in the colour popover)"
+   },
+   {
+    "t": 4371.8,
+    "step": 8,
+    "label": "preset apply: Liquid opal (.mixer-preset-btn[data-preset=\"opal\"] click)"
+   },
+   {
+    "t": 4638.2,
+    "step": 9,
+    "label": "brush size 7 (#brushSize, PERSONAL: must not arrive)"
+   },
+   {
+    "t": 4896,
+    "step": 10,
+    "label": "Multi-Brush arms 3 (#multiplier, brush category, PERSONAL)"
+   },
+   {
+    "t": 5155.7,
+    "step": 11,
+    "label": "Random colour toggle (#randomColor, Brush section checkbox, PERSONAL)"
+   },
+   {
+    "t": 5414.6,
+    "step": 12,
+    "label": "gravity pad write (Constant on + tap at (0, +0.8))"
+   },
+   {
+    "t": 5678.3,
+    "step": 13,
+    "label": "Clear (the strip's Clear button, onclick=\"clearCanvas()\")"
+   }
+  ]
+ },
+ "personal": {
+  "sliders.brushSize": {
+   "step": 9,
+   "arrivedIn": []
+  },
+  "sliders.multiplier": {
+   "step": 10,
+   "arrivedIn": []
+  },
+  "checkboxes.randomColor": {
+   "step": 11,
+   "arrivedIn": []
+  },
+  "colors.brush": {
+   "step": 11,
+   "arrivedIn": []
+  }
+ },
+ "counts": {
+  "bRecv": 13,
+  "aSent": 12,
+  "aRecv": 3,
+  "bSent": 1,
+  "bRecvByType": {
+   "connected": 1,
+   "client-count": 1,
+   "room-look": 10,
+   "clear": 1
+  },
+  "aSentByType": {
+   "ping": 1,
+   "room-look": 10,
+   "clear": 1
+  },
+  "roomLookToB": 10,
+  "personalLeaked": 0
+ }
+}

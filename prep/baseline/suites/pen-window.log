@@ -1,0 +1,68 @@
+# pen-window — node scripts/test/pen-window/web-headless.js
+# started 2026-10-17T13:06:10.935Z, duration 19.8 s, exit code 0
+# PASS 53 / FAIL 0  summary: {"ok":true,"fails":[]}
+# HEAD c4796dac21008b26528e57f813425ffb7bd58490, node v25.9.0, Chrome 155.0.8059.80 (from disk)
+# note: no run.js in this folder; web-headless.js is the headless entry, needs APP_URL (served by bundle.js) and writes three PNGs to PENWIN_OUT (set to the OS temp dir)
+# ---- stdout ----
+app: {"rect":[272,85,1008,646],"canvas":[1008,646],"btnText":"Pop Out Pen Input","section":"Display","mirrorSel":true,"state":{"open":false,"box":{"x":0,"y":0,"w":1,"h":1},"heldCount":0,"hoverInside":false,"ringOwner":null,"pendingCancels":0,"coalescedOK":true,"childWin":false,"electron":false,"cursorForced":true,"guides":{"on":{"strokeLock":true,"mandala":true,"kaleido":true},"shown":[],"menuOpen":false},"cursorReturn":{"on":false,"available":null,"reason":"","penOwnsCursor":false,"penGone":false,"returns":0,"last":null},"mirror":{"mode":"light","running":false,"activeFps":12,"idleFps":2,"rate":0,"draws":0,"drawMs":0,"backing":null,"kAngle":null}},"paused":false}
+PASS button lives in the Display section  "Display"
+PASS constructed pointer events carry coalesced samples
+after click: {"open":true,"box":{"x":0,"y":12,"w":784,"h":502},"heldCount":0,"hoverInside":false,"ringOwner":null,"pendingCancels":0,"coalescedOK":true,"childWin":false,"electron":false,"cursorForced":true,"guides":{"on":{"strokeLock":true,"mandala":true,"kaleido":true},"shown":[],"menuOpen":false},"cursorReturn":{"on":false,"available":null,"reason":"","penOwnsCursor":false,"penGone":false,"returns":0,"last":null},"mirror":{"mode":"light","running":true,"activeFps":12,"idleFps":2,"rate":2,"draws":2,"drawMs":0.36,"backing":[784,502],"kAngle":0}}
+PASS popup target appeared  {"url":"about:blank","title":"Swirl Together - Pen input"}
+popup: {"title":"Swirl Together - Pen input","inner":[784,526],"box":[0,12,784,502],"mirror":{"w":784,"h":502,"hidden":false,"tag":"CANVAS"},"bar":"","status":"Light: 12 fps while drawing, 2 idle - the paint lands on your main monitor.","hasOpener":true}
+PASS popup titled and same-origin (opener reachable)  "Swirl Together - Pen input"
+PASS mirror is a 2D canvas, sized to the box (≤1280 wide), light mode running  {"mirror":{"w":784,"h":502,"hidden":false,"tag":"CANVAS"},"mst":{"mode":"light","running":true,"activeFps":12,"idleFps":2,"rate":2,"draws":3,"drawMs":0.324,"backing":[784,502],"kAngle":0}}
+PASS sidebar screen picker offers Find Screens in the browser build  {"html":"<button type=\"button\" title=\"Asks the browser for your screens (a one-time permission) so the pen window can be placed on one from here.\" style=\"width: 100%;\">Find Screens</button><div class=\"pen-wind","btn":true,"radios":0}
+PASS popup box keeps the canvas aspect  {"boxAR":1.5617529880478087,"canvasAR":1.5603715170278638}
+PASS main sees the window open + mirroring  {"open":true,"box":{"x":0,"y":12,"w":784,"h":502},"heldCount":0,"hoverInside":false,"ringOwner":null,"pendingCancels":0,"coalescedOK":true,"childWin":false,"electron":false,"cursorForced":true,"guides":{"on":{"strokeLock":true,"mandala":true,"kaleido":true},"shown":[],"menuOpen":false},"cursorReturn":{"on":false,"available":null,"reason":"","penOwnsCursor":false,"penGone":false,"returns":0,"last":null},"mirror":{"mode":"light","running":true,"activeFps":12,"idleFps":2,"rate":2,"draws":3,"drawMs":0.324,"backing":[784,502],"kAngle":0}}
+PASS hover inside the box: main brush cursor shows + popup dot and ghost follow  {"hover":{"mainRing":"block","hoverInside":true},"popRing":{"ghost":"block","tf":"translate(392px, 263px) translate(-50%, -50%) rotate(0deg)","w":43,"opacity":1,"px":[0,0,0,0],"edge":[255,19,19,241],"ring":"block","dot":true}}
+PASS popup ghost turns to the brush angle (rotate(45deg)), outlined in the paint colour with a clear centre  {"ghost":"block","tf":"translate(397px, 266px) translate(-50%, -50%) rotate(45deg)","w":43,"opacity":1,"px":[0,0,0,0],"edge":[0,227,121,234],"ring":"block","dot":true}
+PASS pen still: angle, next colour and size changed in the main window reach the popout ghost within a tick  {"still":{"ghost":"block","tf":"translate(397px, 266px) translate(-50%, -50%) rotate(77deg)","w":242,"opacity":1,"px":[0,0,0,0],"edge":[126,188,236,241],"ring":"block","dot":true},"sizeBefore":43}
+PASS Brush Ghost Opacity on the main window sets the popup ghost opacity  {"ghost":"block","tf":"translate(397px, 266px) translate(-50%, -50%) rotate(0deg)","w":130,"opacity":0.7,"px":[0,0,0,0],"edge":[102,153,191,212],"ring":"block","dot":true}
+PASS Show Cursor off on the main window: pen window still shows its cursor (ghost: angle + colour) with no OS cursor  {"offRing":{"ghost":"block","tf":"translate(388px, 265px) translate(-50%, -50%) rotate(0deg)","w":130,"opacity":1,"px":[0,0,0,0],"edge":[102,153,191,212],"ring":"block","dot":true,"cursor":"none"},"mainOff":{"checked":false,"mainRing":"none"}}
+PASS Show Brush Ghost off, Always show cursor on (default): popup still shows the ghost  {"ghost":"block","tf":"translate(388px, 265px) translate(-50%, -50%) rotate(0deg)","w":130,"opacity":1,"px":[0,0,0,0],"edge":[102,153,191,212],"ring":"block","dot":true}
+PASS ...Always show cursor off: popup shows the dot, no ghost  {"ghost":"none","tf":"translate(388px, 265px) translate(-50%, -50%) rotate(0deg)","w":130,"opacity":1,"px":[0,0,0,0],"edge":[102,153,191,212],"ring":"block","dot":true}
+PASS Multi-Brush 4x: popup shows the 3 other arms’ ghosts at their landing spots, turned with their arms (120/210/300)  {"multi":{"host":"block","hostTf":"translate(0px, 12px)","opacity":1,"main":"block","mainRot":30,"arms":[{"x":492.489,"y":407.661,"rot":120},{"x":235.2,"y":351.4,"rot":210},{"x":291.511,"y":94.3387,"rot":300}]},"want":[{"x":492.4,"y":407.79999999999995,"rot":120},{"x":235.20000000000005,"y":351.4,"rot":210},{"x":291.6,"y":94.20000000000005,"rot":300}]}
+PASS Same angle on every arm: every popup arm ghost keeps the brush angle  {"host":"block","hostTf":"translate(0px, 12px)","opacity":1,"main":"block","mainRot":30,"arms":[{"x":492.489,"y":407.661,"rot":30},{"x":235.2,"y":351.4,"rot":30},{"x":291.511,"y":94.3387,"rot":30}]}
+PASS back to 1x: popup arm ghosts gone  {"host":"none","hostTf":"translate(0px, 12px)","opacity":1,"main":"block","mainRot":0,"arms":[]}
+PASS Stay oriented to the center: pen right of the centre turns the popup ghost to brush angle + 90 (105)  {"host":"none","hostTf":"translate(0px, 12px)","opacity":1,"main":"block","mainRot":105,"arms":[]}
+PASS hover in the letterbox: main ring hides  {"mainRing":"none","hoverInside":false}
+PASS press: main stroke opened with the synthetic pointer id  {"down":true,"pid":5002,"engine":true,"held":1,"x":252,"y":323}
+PASS pen down: the brush outline stays up in the popup and the main window  {"ghost":"block","tf":"translate(196px, 263px) translate(-50%, -50%) rotate(0deg)","w":130,"opacity":1,"px":[0,0,0,0],"edge":[17,186,70,212],"ring":"block","dot":true,"mainGhost":"block"}
+PASS blur during a forwarded stroke is swallowed (stroke survives)  {"down":true,"pid":5002}
+PASS mouse press+release in the main window mid-stroke leaves the pen stroke alone  {"down":true,"pid":5002,"held":1}
+PASS main ring is owned by the pen: a mouse over the main canvas neither moves it nor loses its own cursor  {"ringBefore":{"tf":"translate(525.286px, 409.287px) translate(-50%, -50%)","owner":5002,"cursor":"","shown":"block"},"ringAfter":{"tf":"translate(525.286px, 409.287px) translate(-50%, -50%)","owner":5002,"cursor":"","shown":"block"}}
+PASS a stray mouse click on the popup during a pen stroke is ignored  {"down":true,"pid":5002,"held":1}
+PASS a capture-hiccup pointercancel is held back; the next pressed pen report keeps the stroke  {"pend":1,"afterCancel":{"down":true,"pid":5002,"held":1,"pending":0}}
+PASS moves map to canvas pixels (x within 2px of expected)  {"got":756,"expected":756}
+PASS release: stroke closed cleanly  {"down":false,"pid":null,"held":0}
+PASS paint landed on the main canvas (dye coverage grew)  {"before":0,"after":0.6062160584984756}
+PASS mirror canvas shows the paint  {"lit":1029,"of":2048,"w":784,"h":502}
+PASS mirror ran at the active rate while drawing; one blit costs well under a millisecond of main thread  {"mode":"light","running":true,"activeFps":12,"idleFps":2,"rate":12,"draws":46,"drawMs":0.095,"backing":[784,502],"kAngle":0}
+PASS ...and drops to the idle rate when the pen goes quiet  {"mode":"light","running":true,"activeFps":12,"idleFps":2,"rate":2,"draws":69,"drawMs":0.147,"backing":[784,502],"kAngle":0}
+PASS Screen ▸ button is harmless with one screen  "Screen access declined - drag the window over instead."
+PASS right button latches the replay hold and releases it  {"held":{"right":true,"replay":true},"released":{"right":false,"replay":false}}
+cursorToggle at {"x":19,"y":344.09375,"w":14,"h":14,"hit":"cursorToggle","checked":true,"on":true}
+PASS pen holds Replay on the popup while the mouse clicks a checkbox in the app: click lands, hold survives, then releases  {"cb0":true,"cb1":{"checked":false,"right":true,"replay":true},"cb2":{"right":false,"replay":false}}
+PASS pen holds Replay on the popup: Scatter (Brush source) lights from the pen, gliding along the top, not from the replayed stroke  {"samples":[{"x":0.162,"y":0.63},{"x":0.223,"y":0.786},{"x":0.291,"y":0.854},{"x":0.34,"y":0.869},{"x":0.408,"y":0.876},{"x":0.459,"y":0.878},{"x":0.524,"y":0.879},{"x":0.584,"y":0.88},{"x":0.644,"y":0.88},{"x":0.704,"y":0.88},{"x":0.764,"y":0.88}],"penHold":{"right":true,"replay":true}}
+PASS pen holds Replay on the popup while the mouse drags the Brush Size fader  {"from":5,"to":100,"p":1,"hit":"brushSizePerceptual","right":true}
+PASS native chord: hold Replay (right) on the canvas, left-click a checkbox — the click lands, the hold survives, nothing paints  {"ch0":{"right":true,"replay":true,"captured":false},"ch1":{"checked":false,"right":true,"replay":true,"down":false},"was":true}
+scatterSource at {"x":1442,"y":433,"w":250,"h":28,"hit":"scatterSource"}
+PASS native chord: a left click on the Scatter Source select opens its picker while Replay is held  {"picks":["scatterSource"],"active":"scatterSource","right":true}
+PASS ...and when the picker is refused, the click steps to the next option (and the config follows)  {"selBefore":{"v":"brush","src":"brush"},"after2":{"v":"light","src":"light"}}
+PASS native chord: the Brush Size fader takes a chorded drag while Replay is held  {"from":5,"to":100,"p":1,"hit":"brushSizePerceptual","right":true,"captured":false}
+PASS native chord: a sidebar slider (Canvas Opacity) takes a chorded drag, its readout follows, hold survives  {"from":10,"to":71,"label":"71%","cs0":{"x":1442,"y":610.125,"w":250,"h":32,"hit":"canvasOpacity","checked":false,"on":false},"ev":["pointermove:-1 tgt=canvasOpacity","input:~ tgt=canvasOpacity","pointermove:0 tgt=canvasOpacity","gotpointercapture:-1 tgt=canvasOpacity","input:~ tgt=canvasOpacity","pointermove:-1 tgt=canvasOpacity","input:~ tgt=canvasOpacity","pointermove:-1 tgt=canvasOpacity","input:~ tgt=canvasOpacity","change:~ tgt=canvasOpacity","pointermove:0 tgt=canvasOpacity"],"hitAt30":"canvasOpacity"}
+pressureConstant at {"x":1357,"y":433,"w":14,"h":14,"hit":"pressureConstant","checked":false,"on":false}
+pressurePad at {"fx":0,"fy":0.6,"on":true,"x":1317,"y":308,"w":250,"h":250,"hit":"pressurePad"}
+PASS native chord: the Gravity pad (pointerdown-driven) takes a chorded drag while Replay is held  {"pad":{"fx":0,"fy":0.6,"on":true,"x":1317,"y":308,"w":250,"h":250,"hit":"pressurePad"},"pad2":{"fx":0.7,"fy":-0.5,"right":true,"replay":true}}
+PASS releasing Replay over the UI ends the hold and swallows the context menu it raises (once)  {"ch3":{"right":false,"replay":false,"cm":{"fired":true,"prevented":true}},"armed":{"swallowed":true,"secondAllowed":true}}
+PASS wheel over the popup changes the brush size here  {"size0":11,"size1":11.9}
+PASS ] typed in the popup steps the brush size here  {"size1":11.9,"size2":12}
+PASS mirror Off: blank surface, timer stopped, popup button in sync  {"mirrorHidden":true,"blankShown":true,"sel":"Mirror: Off"}
+PASS mirror Smooth: canvas back, 24/4 rates, setting persisted  {"on":{"hidden":false,"w":784,"sel":"Mirror: Smooth"},"onMain":{"mode":"smooth","running":true,"activeFps":24,"idleFps":4,"rate":24,"draws":139,"drawMs":0.071,"backing":[784,502],"kAngle":0},"saved":"smooth"}
+PASS toolbar Mirror button cycles Smooth → Off, sidebar select follows  {"cyc":"Mirror: Off","cycMain":{"sel":"off","st":{"mode":"off","running":false,"activeFps":0,"idleFps":0,"rate":24,"draws":139,"drawMs":0.071,"backing":[784,502],"kAngle":null}}}
+PASS Fullscreen button enters fullscreen (Fullscreen API)  {"fs":true,"label":"Exit fullscreen"}
+PASS ...and leaves it  {"fs":false,"label":"Fullscreen"}
+PASS close while pressed: stroke released, window gone, button reset, mirror stopped  {"preClose":{"down":true},"post":{"down":false,"pid":null,"state":{"open":false,"box":{"x":0,"y":12,"w":784,"h":502},"heldCount":0,"hoverInside":false,"ringOwner":null,"pendingCancels":0,"coalescedOK":true,"childWin":false,"electron":false,"cursorForced":true,"guides":{"on":{"strokeLock":true,"mandala":true,"kaleido":true},"shown":[],"menuOpen":false},"cursorReturn":{"on":false,"available":null,"reason":"","penOwnsCursor":false,"penGone":false,"returns":0,"last":null},"mirror":{"mode":"light","running":false,"activeFps":12,"idleFps":2,"rate":12,"draws":150,"drawMs":0.157,"backing":null,"kAngle":null}},"btn":"Pop Out Pen Input","ring":"none"},"gone":true}
+{"ok":true,"fails":[]}
+

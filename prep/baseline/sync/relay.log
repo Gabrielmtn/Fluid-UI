@@ -1,0 +1,27 @@
+# 2026-10-17T08:23:25.406Z C:\Program Files\nodejs\node.exe Z:\New folder\Fluid-UI\node_modules\wrangler\bin\wrangler.js dev --port 8787 --ip 127.0.0.1 --persist-to C:\Users\Gabri\AppData\Local\Temp\fluid-sync-relay-state-PDIOsf
+
+ ⛅️ wrangler 4.130.0 (update available 4.151.1)
+───────────────────────────────────────────────
+Your Worker has access to the following bindings:
+Binding                    Resource            Mode
+env.fluid (FluidRoom)      Durable Object      local
+env.lobby (LobbyRoom)      Durable Object      local
+
+⎔ Starting local server...
+Wrangler detected this dev session is running in an AI agent.
+The Local Explorer API is available at http://127.0.0.1:8787/cdn-cgi/local/explorer/api
+Useful routes:
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/workers - local Workers and bindings
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces - KV namespaces
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/d1/database - D1 databases
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/r2/buckets - R2 buckets
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/workers/durable_objects/namespaces - Durable Object namespaces
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/workflows - Workflows
+  POST http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/observability/query - run a read-only SQL query (SELECT/WITH only) over captured request traces and console logs. Tables: spans, logs (read attributes via json(attributes)). Example:
+    curl -X POST http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/observability/query -H 'Content-Type: application/json' -d '{"sql":"SELECT service, name, outcome, duration_ms FROM spans WHERE parent_id IS NULL LIMIT 20"}'
+If the routes above don't cover what you need, fetch the full OpenAPI schema (large - use only as a last resort):
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api - OpenAPI schema
+[wrangler:info] ✨ Parsed 9 valid header rules.
+[wrangler:info] Ready on http://127.0.0.1:8787
+[wrangler:info] GET /parties/fluid/PLEFZL 101 Switching Protocols (37ms)
+[wrangler:info] GET /parties/fluid/PLEFZL 101 Switching Protocols (6ms)

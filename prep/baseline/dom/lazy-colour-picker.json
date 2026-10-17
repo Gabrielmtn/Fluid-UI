@@ -1,0 +1,949 @@
+{
+ "name": "colour-picker",
+ "generated": "2026-10-17T07:41:00.663Z",
+ "env": {
+  "date": "2026-10-17T07:41:00.663Z",
+  "headCommit": "c4796dac21008b26528e57f813425ffb7bd58490",
+  "chrome": "Chrome/155.0.8059.80",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "protocol": "1.3",
+  "node": "v25.9.0",
+  "build": "web build in headless Chrome (driver window 1600x900, scratch profile)",
+  "selector": "button, input, select, textarea, a[href], [role], [tabindex], [contenteditable], summary, label, .section-title, .mixer-channel, .sidebar-section",
+  "innerWidth": 1584,
+  "innerHeight": 805,
+  "dpr": 1,
+  "uiScale": "1",
+  "url": "http://127.0.0.1:58518/index.html",
+  "layoutChoice": null,
+  "uiVisibilityState": null,
+  "hiddenUiKeys": [],
+  "titlebarPresent": true,
+  "titlebarVisible": false,
+  "bodyClasses": "web-mode photosafe-on",
+  "leftFolded": false,
+  "rightFolded": false
+ },
+ "root": ".cp-pop",
+ "how": "trusted click on the top bar colour well #colorPicker",
+ "opened": true,
+ "closed": true,
+ "count": 18,
+ "outsideRoot": 0,
+ "controls": [
+  {
+   "order": 0,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-pop"
+   ],
+   "role": "dialog",
+   "name": "Brush color",
+   "nameSource": "cdp",
+   "roleAttr": "dialog",
+   "aria": {
+    "aria-label": "Brush color"
+   },
+   "dataAttrs": {
+    "group": "core"
+   },
+   "tabIndex": -1,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": null,
+   "text": "Brush color×CopyOKLCHHSLRGBLCHThe screen can’t show this one, so the nearest col…",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1147,
+    "y": 59,
+    "w": 268,
+    "h": 273
+   },
+   "parentChain": [],
+   "axProps": {
+    "modal": false
+   }
+  },
+  {
+   "order": 1,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "button",
+   "type": "button",
+   "id": null,
+   "classes": [
+    "cp-pop-close",
+    "btn--ghost",
+    "btn--icon"
+   ],
+   "role": "button",
+   "name": "Close",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {
+    "aria-label": "Close"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "Close (Esc)",
+   "text": "×",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1389,
+    "y": 63,
+    "w": 22,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-pop-bar",
+    "div.cp-pop"
+   ],
+   "disabled": false,
+   "axProps": {
+    "invalid": "false",
+    "focusable": true
+   }
+  },
+  {
+   "order": 2,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "input",
+   "type": "text",
+   "id": null,
+   "classes": [
+    "cp-hex"
+   ],
+   "role": "textbox",
+   "name": "Hex code",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {
+    "aria-label": "Hex code"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": null,
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1195,
+    "y": 96,
+    "w": 73,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-head",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "value": "#FF0000",
+   "nameAttr": null,
+   "placeholder": null,
+   "disabled": false,
+   "readOnly": false,
+   "axProps": {
+    "invalid": "false",
+    "focusable": true,
+    "editable": "plaintext",
+    "settable": true,
+    "multiline": false,
+    "readonly": false,
+    "required": false
+   }
+  },
+  {
+   "order": 3,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "button",
+   "type": "button",
+   "id": null,
+   "classes": [
+    "cp-copy",
+    "btn--ghost",
+    "btn--sm"
+   ],
+   "role": "button",
+   "name": "Copy",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "Copy the hex code",
+   "text": "Copy",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1273,
+    "y": 97,
+    "w": 36,
+    "h": 21
+   },
+   "parentChain": [
+    "div.cp-head",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "disabled": false,
+   "axProps": {
+    "invalid": "false",
+    "focusable": true
+   }
+  },
+  {
+   "order": 4,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "select",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-space"
+   ],
+   "role": "combobox",
+   "name": "Color space",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {
+    "aria-label": "Color space"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "OKLCH: equal steps look equal. HSL and RGB are here too.",
+   "text": "OKLCHHSLRGB",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1314,
+    "y": 96,
+    "w": 61,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-head",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "value": "oklch",
+   "nameAttr": null,
+   "placeholder": null,
+   "disabled": false,
+   "readOnly": false,
+   "options": 3,
+   "selectedText": "OKLCH",
+   "axProps": {
+    "invalid": "false",
+    "focusable": true,
+    "hasPopup": "menu",
+    "expanded": false
+   }
+  },
+  {
+   "order": 5,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "button",
+   "type": "button",
+   "id": null,
+   "classes": [
+    "cp-drop",
+    "btn--ghost",
+    "btn--icon"
+   ],
+   "role": "button",
+   "name": "Pick a color from the canvas",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {
+    "aria-label": "Pick a color from the canvas"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "Pick a color from the canvas. Alt+click on the canvas does it too.",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1380,
+    "y": 96,
+    "w": 24,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-head",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "disabled": false,
+   "axProps": {
+    "invalid": "false",
+    "focusable": true
+   }
+  },
+  {
+   "order": 6,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-track"
+   ],
+   "role": "slider",
+   "name": "Lightness",
+   "nameSource": "cdp",
+   "roleAttr": "slider",
+   "aria": {
+    "aria-label": "Lightness",
+    "aria-valuemin": "0",
+    "aria-valuemax": "1",
+    "aria-valuenow": "0.628",
+    "aria-valuetext": "L 63"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": null,
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1176,
+    "y": 130,
+    "w": 180,
+    "h": 14
+   },
+   "parentChain": [
+    "div.cp-row",
+    "div.cp-sliders",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true,
+    "settable": true,
+    "orientation": "horizontal",
+    "valuemin": 0,
+    "valuemax": 1,
+    "valuetext": ""
+   }
+  },
+  {
+   "order": 7,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "input",
+   "type": "text",
+   "id": null,
+   "classes": [
+    "cp-num"
+   ],
+   "role": "textbox",
+   "name": "Lightness",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "Lightness",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1362,
+    "y": 126,
+    "w": 42,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-row",
+    "div.cp-sliders",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "value": "63",
+   "nameAttr": null,
+   "placeholder": null,
+   "disabled": false,
+   "readOnly": false,
+   "axProps": {
+    "invalid": "false",
+    "focusable": true,
+    "editable": "plaintext",
+    "settable": true,
+    "multiline": false,
+    "readonly": false,
+    "required": false
+   }
+  },
+  {
+   "order": 8,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-track"
+   ],
+   "role": "slider",
+   "name": "Chroma: how vivid",
+   "nameSource": "cdp",
+   "roleAttr": "slider",
+   "aria": {
+    "aria-label": "Chroma: how vivid",
+    "aria-valuemin": "0",
+    "aria-valuemax": "0.37",
+    "aria-valuenow": "0.2577",
+    "aria-valuetext": "C .258"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": null,
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1176,
+    "y": 160,
+    "w": 180,
+    "h": 14
+   },
+   "parentChain": [
+    "div.cp-row",
+    "div.cp-sliders",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true,
+    "settable": true,
+    "orientation": "horizontal",
+    "valuemin": 0,
+    "valuemax": 0.3700000047683716,
+    "valuetext": ""
+   }
+  },
+  {
+   "order": 9,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "input",
+   "type": "text",
+   "id": null,
+   "classes": [
+    "cp-num"
+   ],
+   "role": "textbox",
+   "name": "Chroma: how vivid",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "Chroma: how vivid",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1362,
+    "y": 156,
+    "w": 42,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-row",
+    "div.cp-sliders",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "value": ".258",
+   "nameAttr": null,
+   "placeholder": null,
+   "disabled": false,
+   "readOnly": false,
+   "axProps": {
+    "invalid": "false",
+    "focusable": true,
+    "editable": "plaintext",
+    "settable": true,
+    "multiline": false,
+    "readonly": false,
+    "required": false
+   }
+  },
+  {
+   "order": 10,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-track"
+   ],
+   "role": "slider",
+   "name": "Hue",
+   "nameSource": "cdp",
+   "roleAttr": "slider",
+   "aria": {
+    "aria-label": "Hue",
+    "aria-valuemin": "0",
+    "aria-valuemax": "360",
+    "aria-valuenow": "29.2339",
+    "aria-valuetext": "H 29"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": null,
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1176,
+    "y": 190,
+    "w": 180,
+    "h": 14
+   },
+   "parentChain": [
+    "div.cp-row",
+    "div.cp-sliders",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true,
+    "settable": true,
+    "orientation": "horizontal",
+    "valuemin": 0,
+    "valuemax": 360,
+    "valuetext": ""
+   }
+  },
+  {
+   "order": 11,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "input",
+   "type": "text",
+   "id": null,
+   "classes": [
+    "cp-num"
+   ],
+   "role": "textbox",
+   "name": "Hue",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "Hue",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1362,
+    "y": 186,
+    "w": 42,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-row",
+    "div.cp-sliders",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "value": "29",
+   "nameAttr": null,
+   "placeholder": null,
+   "disabled": false,
+   "readOnly": false,
+   "axProps": {
+    "invalid": "false",
+    "focusable": true,
+    "editable": "plaintext",
+    "settable": true,
+    "multiline": false,
+    "readonly": false,
+    "required": false
+   }
+  },
+  {
+   "order": 12,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "select",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-pal-select"
+   ],
+   "role": "combobox",
+   "name": "Palette",
+   "nameSource": "cdp",
+   "roleAttr": null,
+   "aria": {
+    "aria-label": "Palette"
+   },
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": null,
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "Choosing a palette turns Palette mode on: a new palette color each stroke.",
+   "text": "Ross' Mountain Forest SerenityRoss' SunsetRoss' Ocean",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1212,
+    "y": 269,
+    "w": 192,
+    "h": 22
+   },
+   "parentChain": [
+    "div.cp-pal-head",
+    "div.cp-pal",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "value": "1",
+   "nameAttr": null,
+   "placeholder": null,
+   "disabled": false,
+   "readOnly": false,
+   "options": 4,
+   "selectedText": "Forest Serenity",
+   "axProps": {
+    "invalid": "false",
+    "focusable": true,
+    "hasPopup": "menu",
+    "expanded": false
+   }
+  },
+  {
+   "order": 13,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-chip"
+   ],
+   "role": "button",
+   "name": "#2C5F2D. Click to paint with it.",
+   "nameSource": "cdp",
+   "roleAttr": "button",
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "#2C5F2D. Click to paint with it.",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1158,
+    "y": 297,
+    "w": 38,
+    "h": 24
+   },
+   "parentChain": [
+    "div.cp-pal-row",
+    "div.cp-pal",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true
+   }
+  },
+  {
+   "order": 14,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-chip"
+   ],
+   "role": "button",
+   "name": "#4A7856. Click to paint with it.",
+   "nameSource": "cdp",
+   "roleAttr": "button",
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "#4A7856. Click to paint with it.",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1199,
+    "y": 297,
+    "w": 38,
+    "h": 24
+   },
+   "parentChain": [
+    "div.cp-pal-row",
+    "div.cp-pal",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true
+   }
+  },
+  {
+   "order": 15,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-chip"
+   ],
+   "role": "button",
+   "name": "#8B4513. Click to paint with it.",
+   "nameSource": "cdp",
+   "roleAttr": "button",
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "#8B4513. Click to paint with it.",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1241,
+    "y": 297,
+    "w": 38,
+    "h": 24
+   },
+   "parentChain": [
+    "div.cp-pal-row",
+    "div.cp-pal",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true
+   }
+  },
+  {
+   "order": 16,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-chip"
+   ],
+   "role": "button",
+   "name": "#FFD700. Click to paint with it.",
+   "nameSource": "cdp",
+   "roleAttr": "button",
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "#FFD700. Click to paint with it.",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1283,
+    "y": 297,
+    "w": 38,
+    "h": 24
+   },
+   "parentChain": [
+    "div.cp-pal-row",
+    "div.cp-pal",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true
+   }
+  },
+  {
+   "order": 17,
+   "surface": "overlay:.cp-pop",
+   "section": null,
+   "tag": "div",
+   "type": null,
+   "id": null,
+   "classes": [
+    "cp-chip"
+   ],
+   "role": "button",
+   "name": "#F0EAD6. Click to paint with it.",
+   "nameSource": "cdp",
+   "roleAttr": "button",
+   "aria": {},
+   "dataAttrs": {},
+   "tabIndex": 0,
+   "tabIndexAttr": "0",
+   "labelFor": null,
+   "labelledBy": null,
+   "wrappingLabel": null,
+   "title": "#F0EAD6. Click to paint with it.",
+   "text": "",
+   "visibleAtBoot": null,
+   "presentAtBoot": false,
+   "visibleNow": true,
+   "hiddenAttr": false,
+   "inAriaHidden": false,
+   "rect": {
+    "x": 1324,
+    "y": 297,
+    "w": 38,
+    "h": 24
+   },
+   "parentChain": [
+    "div.cp-pal-row",
+    "div.cp-pal",
+    "div.cp",
+    "div.cp-pop"
+   ],
+   "axProps": {
+    "focusable": true
+   }
+  }
+ ],
+ "newOutsideRoot": [],
+ "problems": [],
+ "file": "lazy-colour-picker.json",
+ "stats": {
+  "cdp": 18,
+  "ignored": 0,
+  "noAxNode": 0,
+  "fallback": 0
+ },
+ "rootInDomAfterClose": false
+}

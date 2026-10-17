@@ -1,0 +1,25 @@
+Yin yang filigree glyph: credit line
+====================================
+
+Short form (an in-app credits line or an About screen):
+
+  Yin yang artwork adapted from a vector by Muhammad Bilal, via Vecteezy (vecteezy.com).
+
+
+Section ready to paste into THIRD-PARTY-NOTICES.txt (the next number there is 7):
+
+7. Yin yang artwork: Muhammad Bilal, via Vecteezy
+-------------------------------------------------
+The yin yang at the centre of the knob filigree is adapted from a vector
+by Muhammad Bilal, published on Vecteezy (https://www.vecteezy.com, item
+80872383). Only the left line-art figure is used. Its outer rim, middle
+line, dots and two small rings were removed, and it was recoloured.
+
+
+Before shipping, confirm the license:
+- Free license: commercial use is allowed, but Vecteezy asks to be credited
+  with a link to vecteezy.com as well. Keep "via Vecteezy (vecteezy.com)"
+  in both forms above.
+- Pro license: no attribution is required (crediting the artist is still a
+  kind thing to do).
+- Either way, the original EPS isn't redistributed; only this derived glyph ships.

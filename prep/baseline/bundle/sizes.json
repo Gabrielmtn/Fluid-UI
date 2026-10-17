@@ -1,0 +1,1530 @@
+{
+ "env": {
+  "date": "2026-10-17T08:15:32.627Z",
+  "headCommit": "c4796dac21008b26528e57f813425ffb7bd58490",
+  "node": "v25.9.0",
+  "platform": "win32 10.0.26200",
+  "chromeOnDisk": "155.0.8059.80",
+  "chromePath": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+ },
+ "totals": {
+  "cssAll": {
+   "files": 12,
+   "bytes": 362597,
+   "gzip": 94257
+  },
+  "cssLoaded": {
+   "files": 12,
+   "bytes": 362597,
+   "gzip": 94257
+  },
+  "indexHtml": {
+   "files": 1,
+   "bytes": 132727,
+   "gzip": 33030
+  },
+  "jsAll": {
+   "files": 106,
+   "bytes": 5004914,
+   "gzip": 1386454
+  },
+  "jsLoaded": {
+   "files": 105,
+   "bytes": 4896066,
+   "gzip": 1358385
+  },
+  "jsNotLoaded": {
+   "files": 1,
+   "bytes": 108848
+  },
+  "vendor": {
+   "files": 5,
+   "bytes": 12059075,
+   "gzip": 3100767
+  },
+  "assets": {
+   "files": 87,
+   "bytes": 14568414
+  },
+  "fontsShipped": {
+   "files": 0,
+   "bytes": 0
+  },
+  "electronShell": {
+   "files": 2,
+   "bytes": 73205
+  },
+  "rendererLoaded": {
+   "files": 118,
+   "bytes": 5391390,
+   "gzip": 1485672,
+   "note": "index.html + the stylesheets it links + the js/*.js it loads (tags and chain loader); js/vendor/ and assets/ are fetched on demand and listed separately"
+  }
+ },
+ "css": [
+  {
+   "path": "css/00-tokens.css",
+   "bytes": 3582,
+   "gzip": 1449,
+   "loaded": true,
+   "loadOrder": 1
+  },
+  {
+   "path": "css/01-buttons.css",
+   "bytes": 17514,
+   "gzip": 5637,
+   "loaded": true,
+   "loadOrder": 2
+  },
+  {
+   "path": "css/20-mixer-strip.css",
+   "bytes": 51707,
+   "gzip": 14941,
+   "loaded": true,
+   "loadOrder": 7
+  },
+  {
+   "path": "css/21-sidebar.css",
+   "bytes": 84632,
+   "gzip": 22933,
+   "loaded": true,
+   "loadOrder": 8
+  },
+  {
+   "path": "css/22-overlays.css",
+   "bytes": 86115,
+   "gzip": 19194,
+   "loaded": true,
+   "loadOrder": 9
+  },
+  {
+   "path": "css/23-colour-picker.css",
+   "bytes": 15491,
+   "gzip": 3843,
+   "loaded": true,
+   "loadOrder": 10
+  },
+  {
+   "path": "css/24-palette-from-image.css",
+   "bytes": 4143,
+   "gzip": 1509,
+   "loaded": true,
+   "loadOrder": 11
+  },
+  {
+   "path": "css/init-responsive.css",
+   "bytes": 20966,
+   "gzip": 6380,
+   "loaded": true,
+   "loadOrder": 12
+  },
+  {
+   "path": "css/light-source.css",
+   "bytes": 552,
+   "gzip": 336,
+   "loaded": true,
+   "loadOrder": 6
+  },
+  {
+   "path": "css/mask-editor.css",
+   "bytes": 17713,
+   "gzip": 4144,
+   "loaded": true,
+   "loadOrder": 5
+  },
+  {
+   "path": "css/slider-styles.css",
+   "bytes": 8266,
+   "gzip": 2919,
+   "loaded": true,
+   "loadOrder": 4
+  },
+  {
+   "path": "css/styles.css",
+   "bytes": 51916,
+   "gzip": 10972,
+   "loaded": true,
+   "loadOrder": 3
+  }
+ ],
+ "indexHtml": {
+  "path": "index.html",
+  "bytes": 132727,
+  "gzip": 33030,
+  "inlineStyleBlocks": [
+   {
+    "bytes": 2861,
+    "line": 249
+   }
+  ],
+  "inlineStyleBytes": 2861,
+  "stylesheetLinks": 12,
+  "scriptTags": 75,
+  "chainScripts": 30
+ },
+ "js": [
+  {
+   "path": "js/00-window-controls.js",
+   "bytes": 5783,
+   "gzip": 1685,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 4
+  },
+  {
+   "path": "js/00a-boot.js",
+   "bytes": 25445,
+   "gzip": 8987,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 1
+  },
+  {
+   "path": "js/00b-dialog-focus.js",
+   "bytes": 13757,
+   "gzip": 4276,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 3
+  },
+  {
+   "path": "js/01-config.js",
+   "bytes": 82931,
+   "gzip": 20174,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 5
+  },
+  {
+   "path": "js/01a-param-registry.js",
+   "bytes": 40532,
+   "gzip": 11455,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 6
+  },
+  {
+   "path": "js/02-palettes.js",
+   "bytes": 16767,
+   "gzip": 3956,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 7
+  },
+  {
+   "path": "js/02a-layer-xform.js",
+   "bytes": 3696,
+   "gzip": 1449,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 8
+  },
+  {
+   "path": "js/03-recording.js",
+   "bytes": 109931,
+   "gzip": 28405,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 9
+  },
+  {
+   "path": "js/04a-canvas-gl-config.js",
+   "bytes": 113624,
+   "gzip": 32678,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 1
+  },
+  {
+   "path": "js/04b-presets.js",
+   "bytes": 16619,
+   "gzip": 5080,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 2
+  },
+  {
+   "path": "js/04c-anim-burst.js",
+   "bytes": 8793,
+   "gzip": 1996,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 3
+  },
+  {
+   "path": "js/04d-anim-ascend-star.js",
+   "bytes": 15244,
+   "gzip": 3980,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 4
+  },
+  {
+   "path": "js/04e-anim-portal.js",
+   "bytes": 24554,
+   "gzip": 4767,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 5
+  },
+  {
+   "path": "js/04f-canvas-actions.js",
+   "bytes": 31994,
+   "gzip": 8636,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 6
+  },
+  {
+   "path": "js/04g-hover-capture.js",
+   "bytes": 16739,
+   "gzip": 4091,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 7
+  },
+  {
+   "path": "js/05a-shader-core.js",
+   "bytes": 68224,
+   "gzip": 19397,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 8
+  },
+  {
+   "path": "js/05b-shader-sim.js",
+   "bytes": 246713,
+   "gzip": 70486,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 9
+  },
+  {
+   "path": "js/05c-programs-framebuffers.js",
+   "bytes": 71052,
+   "gzip": 18530,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 10
+  },
+  {
+   "path": "js/05d-input-replay.js",
+   "bytes": 135386,
+   "gzip": 37717,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 12
+  },
+  {
+   "path": "js/05d0-brush-engine.js",
+   "bytes": 45908,
+   "gzip": 15093,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 11
+  },
+  {
+   "path": "js/05e-effect-controls.js",
+   "bytes": 27376,
+   "gzip": 6700,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 13
+  },
+  {
+   "path": "js/05f-kaleido-controls.js",
+   "bytes": 15553,
+   "gzip": 3783,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 14
+  },
+  {
+   "path": "js/05g-arm-colors.js",
+   "bytes": 65447,
+   "gzip": 18698,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 15
+  },
+  {
+   "path": "js/05h-slider-bindings.js",
+   "bytes": 46069,
+   "gzip": 10869,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 16
+  },
+  {
+   "path": "js/05i-sim-stats.js",
+   "bytes": 101523,
+   "gzip": 25933,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 17
+  },
+  {
+   "path": "js/05j-update-loop.js",
+   "bytes": 190153,
+   "gzip": 49307,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 18
+  },
+  {
+   "path": "js/05k-layers-render.js",
+   "bytes": 63474,
+   "gzip": 15104,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 19
+  },
+  {
+   "path": "js/05l-layers-transform.js",
+   "bytes": 61848,
+   "gzip": 13899,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 20
+  },
+  {
+   "path": "js/05m-layer-masks.js",
+   "bytes": 39857,
+   "gzip": 10159,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 21
+  },
+  {
+   "path": "js/05n-hotkeys-init.js",
+   "bytes": 44323,
+   "gzip": 12018,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 22
+  },
+  {
+   "path": "js/05o-masks.js",
+   "bytes": 20122,
+   "gzip": 5558,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 23
+  },
+  {
+   "path": "js/06-slider-updater.js",
+   "bytes": 11439,
+   "gzip": 4022,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 24
+  },
+  {
+   "path": "js/06a-mp-core.js",
+   "bytes": 36233,
+   "gzip": 10759,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 25
+  },
+  {
+   "path": "js/06b-mp-look.js",
+   "bytes": 29711,
+   "gzip": 9923,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 26
+  },
+  {
+   "path": "js/06c-mp-glide.js",
+   "bytes": 9817,
+   "gzip": 3819,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 27
+  },
+  {
+   "path": "js/06d-mp-paint-wire.js",
+   "bytes": 111563,
+   "gzip": 33917,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 28
+  },
+  {
+   "path": "js/06e-mp-panel.js",
+   "bytes": 46053,
+   "gzip": 14806,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 29
+  },
+  {
+   "path": "js/08-stats-panel.js",
+   "bytes": 8372,
+   "gzip": 2212,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 14
+  },
+  {
+   "path": "js/08a-quality-governor.js",
+   "bytes": 35938,
+   "gzip": 10739,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 15
+  },
+  {
+   "path": "js/08b-jank-monitor.js",
+   "bytes": 29124,
+   "gzip": 8622,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 16
+  },
+  {
+   "path": "js/09-settings-manager.js",
+   "bytes": 12167,
+   "gzip": 2924,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 11
+  },
+  {
+   "path": "js/10-draggable.js",
+   "bytes": 8976,
+   "gzip": 2103,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 13
+  },
+  {
+   "path": "js/11-settings-interface.js",
+   "bytes": 13585,
+   "gzip": 2594,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 12
+  },
+  {
+   "path": "js/12-save-load.js",
+   "bytes": 145697,
+   "gzip": 36998,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 17
+  },
+  {
+   "path": "js/12b-preset-vault.js",
+   "bytes": 27032,
+   "gzip": 7267,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 18
+  },
+  {
+   "path": "js/13-compact-mode.js",
+   "bytes": 5843,
+   "gzip": 2285,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 24
+  },
+  {
+   "path": "js/13-drag-scroll.js",
+   "bytes": 5026,
+   "gzip": 1338,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 23
+  },
+  {
+   "path": "js/13-light-source.js",
+   "bytes": 13836,
+   "gzip": 2844,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 19
+  },
+  {
+   "path": "js/14-light-shift.js",
+   "bytes": 29304,
+   "gzip": 6923,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 20
+  },
+  {
+   "path": "js/15-layer-masking.js",
+   "bytes": 182489,
+   "gzip": 42805,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 25
+  },
+  {
+   "path": "js/16-sam-integration.js",
+   "bytes": 65419,
+   "gzip": 15435,
+   "loaded": true,
+   "loadedBy": "module tag",
+   "loadOrder": 26
+  },
+  {
+   "path": "js/17-hotkey-reminder.js",
+   "bytes": 11336,
+   "gzip": 4006,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 21
+  },
+  {
+   "path": "js/20-mixer-layout.js",
+   "bytes": 486168,
+   "gzip": 122894,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 43
+  },
+  {
+   "path": "js/21-focus-mode.js",
+   "bytes": 14780,
+   "gzip": 4182,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 28
+  },
+  {
+   "path": "js/22-audio-reactive.js",
+   "bytes": 77891,
+   "gzip": 23086,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 29
+  },
+  {
+   "path": "js/23-depth-collision.js",
+   "bytes": 106997,
+   "gzip": 28986,
+   "loaded": true,
+   "loadedBy": "module tag",
+   "loadOrder": 27
+  },
+  {
+   "path": "js/23-text-overlays.js",
+   "bytes": 136044,
+   "gzip": 38828,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 30
+  },
+  {
+   "path": "js/24-path-layers.js",
+   "bytes": 54735,
+   "gzip": 11638,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 36
+  },
+  {
+   "path": "js/24-video-export.js",
+   "bytes": 98773,
+   "gzip": 26651,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 32
+  },
+  {
+   "path": "js/24a-mp4-writer.js",
+   "bytes": 25376,
+   "gzip": 7921,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 31
+  },
+  {
+   "path": "js/25-mutation-engine.js",
+   "bytes": 40002,
+   "gzip": 11196,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 33
+  },
+  {
+   "path": "js/26-layer-transform.js",
+   "bytes": 23101,
+   "gzip": 6671,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 37
+  },
+  {
+   "path": "js/28-studio-drawer.js",
+   "bytes": 5806,
+   "gzip": 2022,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 10
+  },
+  {
+   "path": "js/29-material-modes.js",
+   "bytes": 16954,
+   "gzip": 5254,
+   "loaded": true,
+   "loadedBy": "chain loader",
+   "loadOrder": 30
+  },
+  {
+   "path": "js/30-audio-scenes.js",
+   "bytes": 53711,
+   "gzip": 15403,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 38
+  },
+  {
+   "path": "js/31-brush-cursor.js",
+   "bytes": 46518,
+   "gzip": 14516,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 44
+  },
+  {
+   "path": "js/32-file-drop.js",
+   "bytes": 26519,
+   "gzip": 8281,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 45
+  },
+  {
+   "path": "js/33-brush-shapes.js",
+   "bytes": 25777,
+   "gzip": 8560,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 46
+  },
+  {
+   "path": "js/34-mandala-mode.js",
+   "bytes": 31187,
+   "gzip": 9911,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 47
+  },
+  {
+   "path": "js/35-zoom-view.js",
+   "bytes": 13923,
+   "gzip": 4758,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 49
+  },
+  {
+   "path": "js/36-display-mode.js",
+   "bytes": 11479,
+   "gzip": 3452,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 50
+  },
+  {
+   "path": "js/37-nav-idle-glow.js",
+   "bytes": 11108,
+   "gzip": 4254,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 52
+  },
+  {
+   "path": "js/38-button-audit.js",
+   "bytes": 6500,
+   "gzip": 2324,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 53
+  },
+  {
+   "path": "js/39-qrcode.js",
+   "bytes": 19038,
+   "gzip": 5784,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 2
+  },
+  {
+   "path": "js/40-audio-timing.js",
+   "bytes": 106885,
+   "gzip": 31063,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 39
+  },
+  {
+   "path": "js/40b-audio-cue-editor.js",
+   "bytes": 39910,
+   "gzip": 11999,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 40
+  },
+  {
+   "path": "js/41-button-modes.js",
+   "bytes": 19305,
+   "gzip": 6342,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 41
+  },
+  {
+   "path": "js/42-perf-tiers.js",
+   "bytes": 17059,
+   "gzip": 5888,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 54
+  },
+  {
+   "path": "js/43-ui-visibility.js",
+   "bytes": 35278,
+   "gzip": 10045,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 55
+  },
+  {
+   "path": "js/44-recipes.js",
+   "bytes": 108848,
+   "gzip": 28069,
+   "loaded": false,
+   "loadedBy": null,
+   "loadOrder": null
+  },
+  {
+   "path": "js/45-breathing.js",
+   "bytes": 19330,
+   "gzip": 6776,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 57
+  },
+  {
+   "path": "js/46-strip-more.js",
+   "bytes": 19834,
+   "gzip": 6654,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 56
+  },
+  {
+   "path": "js/47-pen-window.js",
+   "bytes": 97590,
+   "gzip": 27485,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 51
+  },
+  {
+   "path": "js/48-hotkeys.js",
+   "bytes": 39940,
+   "gzip": 11446,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 22
+  },
+  {
+   "path": "js/49-hotkey-binds.js",
+   "bytes": 73420,
+   "gzip": 21639,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 58
+  },
+  {
+   "path": "js/50-look-links.js",
+   "bytes": 59406,
+   "gzip": 18217,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 63
+  },
+  {
+   "path": "js/51-open-in-desktop.js",
+   "bytes": 18073,
+   "gzip": 5705,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 64
+  },
+  {
+   "path": "js/52-demo-clock.js",
+   "bytes": 23813,
+   "gzip": 7373,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 65
+  },
+  {
+   "path": "js/53-idle-vram.js",
+   "bytes": 12027,
+   "gzip": 4219,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 66
+  },
+  {
+   "path": "js/54-phone-pads.js",
+   "bytes": 31281,
+   "gzip": 9610,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 67
+  },
+  {
+   "path": "js/55-phone-mouse.js",
+   "bytes": 26603,
+   "gzip": 8288,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 68
+  },
+  {
+   "path": "js/56-stroke-lock.js",
+   "bytes": 37135,
+   "gzip": 11490,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 42
+  },
+  {
+   "path": "js/57-mutation-thumbs.js",
+   "bytes": 20241,
+   "gzip": 6661,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 34
+  },
+  {
+   "path": "js/58-radial-menu.js",
+   "bytes": 52626,
+   "gzip": 15720,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 59
+  },
+  {
+   "path": "js/59-brush-type-key.js",
+   "bytes": 5544,
+   "gzip": 2129,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 60
+  },
+  {
+   "path": "js/60-reset-app.js",
+   "bytes": 24040,
+   "gzip": 7295,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 69
+  },
+  {
+   "path": "js/61-room-report.js",
+   "bytes": 9893,
+   "gzip": 3460,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 70
+  },
+  {
+   "path": "js/62-canvas-readout.js",
+   "bytes": 5221,
+   "gzip": 2136,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 71
+  },
+  {
+   "path": "js/63-kaleido-guides.js",
+   "bytes": 19173,
+   "gzip": 6513,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 48
+  },
+  {
+   "path": "js/64-colour-picker.js",
+   "bytes": 51504,
+   "gzip": 13415,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 73
+  },
+  {
+   "path": "js/64a-colour-math.js",
+   "bytes": 7574,
+   "gzip": 2750,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 72
+  },
+  {
+   "path": "js/65-palette-from-image.js",
+   "bytes": 33429,
+   "gzip": 10011,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 74
+  },
+  {
+   "path": "js/66-skip-menu.js",
+   "bytes": 17923,
+   "gzip": 5642,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 61
+  },
+  {
+   "path": "js/67-slider-keys.js",
+   "bytes": 3092,
+   "gzip": 1401,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 62
+  },
+  {
+   "path": "js/68-dither.js",
+   "bytes": 19030,
+   "gzip": 6387,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 75
+  },
+  {
+   "path": "js/comfyui-bridge.js",
+   "bytes": 9103,
+   "gzip": 2847,
+   "loaded": true,
+   "loadedBy": "script tag",
+   "loadOrder": 35
+  }
+ ],
+ "otherScriptSrcs": [],
+ "vendor": [
+  {
+   "path": "js/vendor/transformers/fluid-env.js",
+   "bytes": 4769,
+   "gzip": 2110
+  },
+  {
+   "path": "js/vendor/transformers/LICENSE",
+   "bytes": 11560,
+   "gzip": 3943
+  },
+  {
+   "path": "js/vendor/transformers/ort-wasm-simd-threaded.mjs",
+   "bytes": 21165,
+   "gzip": 8576
+  },
+  {
+   "path": "js/vendor/transformers/ort-wasm-simd-threaded.wasm",
+   "bytes": 11133407,
+   "gzip": 2863736
+  },
+  {
+   "path": "js/vendor/transformers/transformers.min.js",
+   "bytes": 888174,
+   "gzip": 222402
+  }
+ ],
+ "assets": {
+  "byType": {
+   "png": {
+    "count": 77,
+    "bytes": 2981054
+   },
+   "gif": {
+    "count": 9,
+    "bytes": 11568053
+   },
+   "ico": {
+    "count": 1,
+    "bytes": 19307
+   }
+  },
+  "byDir": {
+   "assets": {
+    "count": 4,
+    "bytes": 103949
+   },
+   "assets/boot-swirl": {
+    "count": 48,
+    "bytes": 1327313
+   },
+   "assets/effects": {
+    "count": 18,
+    "bytes": 11630514
+   },
+   "assets/og": {
+    "count": 1,
+    "bytes": 692146
+   },
+   "assets/presets": {
+    "count": 12,
+    "bytes": 102160
+   },
+   "assets/pwa": {
+    "count": 4,
+    "bytes": 712332
+   }
+  },
+  "largest": [
+   {
+    "path": "assets/effects/scatter.gif",
+    "bytes": 2487623
+   },
+   {
+    "path": "assets/effects/glow.gif",
+    "bytes": 2091456
+   },
+   {
+    "path": "assets/effects/breathing.gif",
+    "bytes": 1426366
+   },
+   {
+    "path": "assets/effects/shading.gif",
+    "bytes": 1317958
+   },
+   {
+    "path": "assets/effects/border.gif",
+    "bytes": 1204993
+   },
+   {
+    "path": "assets/effects/light-source.gif",
+    "bytes": 1192189
+   },
+   {
+    "path": "assets/effects/light-shift.gif",
+    "bytes": 714768
+   },
+   {
+    "path": "assets/og/swirl-together-card.png",
+    "bytes": 692146
+   },
+   {
+    "path": "assets/effects/dither.gif",
+    "bytes": 681276
+   },
+   {
+    "path": "assets/effects/gravity.gif",
+    "bytes": 451424
+   },
+   {
+    "path": "assets/pwa/icon-512.png",
+    "bytes": 337545
+   },
+   {
+    "path": "assets/pwa/icon-maskable-512.png",
+    "bytes": 257515
+   },
+   {
+    "path": "assets/pwa/icon-192.png",
+    "bytes": 61798
+   },
+   {
+    "path": "assets/pwa/apple-touch-icon.png",
+    "bytes": 55474
+   },
+   {
+    "path": "assets/apple-touch-icon.png",
+    "bytes": 54753
+   }
+  ],
+  "files": [
+   {
+    "path": "assets/apple-touch-icon.png",
+    "bytes": 54753
+   },
+   {
+    "path": "assets/boot-cursor.png",
+    "bytes": 27016
+   },
+   {
+    "path": "assets/boot-swirl/00.png",
+    "bytes": 27271
+   },
+   {
+    "path": "assets/boot-swirl/01.png",
+    "bytes": 28586
+   },
+   {
+    "path": "assets/boot-swirl/02.png",
+    "bytes": 29463
+   },
+   {
+    "path": "assets/boot-swirl/03.png",
+    "bytes": 29584
+   },
+   {
+    "path": "assets/boot-swirl/04.png",
+    "bytes": 30049
+   },
+   {
+    "path": "assets/boot-swirl/05.png",
+    "bytes": 29974
+   },
+   {
+    "path": "assets/boot-swirl/06.png",
+    "bytes": 29888
+   },
+   {
+    "path": "assets/boot-swirl/07.png",
+    "bytes": 29941
+   },
+   {
+    "path": "assets/boot-swirl/08.png",
+    "bytes": 30065
+   },
+   {
+    "path": "assets/boot-swirl/09.png",
+    "bytes": 29890
+   },
+   {
+    "path": "assets/boot-swirl/10.png",
+    "bytes": 29634
+   },
+   {
+    "path": "assets/boot-swirl/11.png",
+    "bytes": 29347
+   },
+   {
+    "path": "assets/boot-swirl/12.png",
+    "bytes": 26662
+   },
+   {
+    "path": "assets/boot-swirl/13.png",
+    "bytes": 26584
+   },
+   {
+    "path": "assets/boot-swirl/14.png",
+    "bytes": 27265
+   },
+   {
+    "path": "assets/boot-swirl/15.png",
+    "bytes": 27220
+   },
+   {
+    "path": "assets/boot-swirl/16.png",
+    "bytes": 27098
+   },
+   {
+    "path": "assets/boot-swirl/17.png",
+    "bytes": 27058
+   },
+   {
+    "path": "assets/boot-swirl/18.png",
+    "bytes": 26920
+   },
+   {
+    "path": "assets/boot-swirl/19.png",
+    "bytes": 26848
+   },
+   {
+    "path": "assets/boot-swirl/20.png",
+    "bytes": 26817
+   },
+   {
+    "path": "assets/boot-swirl/21.png",
+    "bytes": 26716
+   },
+   {
+    "path": "assets/boot-swirl/22.png",
+    "bytes": 26680
+   },
+   {
+    "path": "assets/boot-swirl/23.png",
+    "bytes": 26627
+   },
+   {
+    "path": "assets/boot-swirl/24.png",
+    "bytes": 27016
+   },
+   {
+    "path": "assets/boot-swirl/25.png",
+    "bytes": 27002
+   },
+   {
+    "path": "assets/boot-swirl/26.png",
+    "bytes": 27257
+   },
+   {
+    "path": "assets/boot-swirl/27.png",
+    "bytes": 27229
+   },
+   {
+    "path": "assets/boot-swirl/28.png",
+    "bytes": 26961
+   },
+   {
+    "path": "assets/boot-swirl/29.png",
+    "bytes": 26907
+   },
+   {
+    "path": "assets/boot-swirl/30.png",
+    "bytes": 26683
+   },
+   {
+    "path": "assets/boot-swirl/31.png",
+    "bytes": 26750
+   },
+   {
+    "path": "assets/boot-swirl/32.png",
+    "bytes": 27121
+   },
+   {
+    "path": "assets/boot-swirl/33.png",
+    "bytes": 27175
+   },
+   {
+    "path": "assets/boot-swirl/34.png",
+    "bytes": 26912
+   },
+   {
+    "path": "assets/boot-swirl/35.png",
+    "bytes": 26924
+   },
+   {
+    "path": "assets/boot-swirl/36.png",
+    "bytes": 26714
+   },
+   {
+    "path": "assets/boot-swirl/37.png",
+    "bytes": 26743
+   },
+   {
+    "path": "assets/boot-swirl/38.png",
+    "bytes": 27095
+   },
+   {
+    "path": "assets/boot-swirl/39.png",
+    "bytes": 27168
+   },
+   {
+    "path": "assets/boot-swirl/40.png",
+    "bytes": 27056
+   },
+   {
+    "path": "assets/boot-swirl/41.png",
+    "bytes": 27113
+   },
+   {
+    "path": "assets/boot-swirl/42.png",
+    "bytes": 27476
+   },
+   {
+    "path": "assets/boot-swirl/43.png",
+    "bytes": 27484
+   },
+   {
+    "path": "assets/boot-swirl/44.png",
+    "bytes": 27715
+   },
+   {
+    "path": "assets/boot-swirl/45.png",
+    "bytes": 27745
+   },
+   {
+    "path": "assets/boot-swirl/46.png",
+    "bytes": 27453
+   },
+   {
+    "path": "assets/boot-swirl/47.png",
+    "bytes": 27427
+   },
+   {
+    "path": "assets/effects/border.gif",
+    "bytes": 1204993
+   },
+   {
+    "path": "assets/effects/border.png",
+    "bytes": 8519
+   },
+   {
+    "path": "assets/effects/breathing.gif",
+    "bytes": 1426366
+   },
+   {
+    "path": "assets/effects/breathing.png",
+    "bytes": 10295
+   },
+   {
+    "path": "assets/effects/dither.gif",
+    "bytes": 681276
+   },
+   {
+    "path": "assets/effects/dither.png",
+    "bytes": 2333
+   },
+   {
+    "path": "assets/effects/glow.gif",
+    "bytes": 2091456
+   },
+   {
+    "path": "assets/effects/glow.png",
+    "bytes": 8257
+   },
+   {
+    "path": "assets/effects/gravity.gif",
+    "bytes": 451424
+   },
+   {
+    "path": "assets/effects/gravity.png",
+    "bytes": 4967
+   },
+   {
+    "path": "assets/effects/light-shift.gif",
+    "bytes": 714768
+   },
+   {
+    "path": "assets/effects/light-shift.png",
+    "bytes": 6647
+   },
+   {
+    "path": "assets/effects/light-source.gif",
+    "bytes": 1192189
+   },
+   {
+    "path": "assets/effects/light-source.png",
+    "bytes": 6503
+   },
+   {
+    "path": "assets/effects/scatter.gif",
+    "bytes": 2487623
+   },
+   {
+    "path": "assets/effects/scatter.png",
+    "bytes": 8825
+   },
+   {
+    "path": "assets/effects/shading.gif",
+    "bytes": 1317958
+   },
+   {
+    "path": "assets/effects/shading.png",
+    "bytes": 6115
+   },
+   {
+    "path": "assets/favicon-32.png",
+    "bytes": 2873
+   },
+   {
+    "path": "assets/favicon.ico",
+    "bytes": 19307
+   },
+   {
+    "path": "assets/og/swirl-together-card.png",
+    "bytes": 692146
+   },
+   {
+    "path": "assets/presets/bloom.png",
+    "bytes": 11152
+   },
+   {
+    "path": "assets/presets/chaotic.png",
+    "bytes": 7770
+   },
+   {
+    "path": "assets/presets/currents.png",
+    "bytes": 9171
+   },
+   {
+    "path": "assets/presets/electric.png",
+    "bytes": 9006
+   },
+   {
+    "path": "assets/presets/ethereal.png",
+    "bytes": 7213
+   },
+   {
+    "path": "assets/presets/gelpen.png",
+    "bytes": 7913
+   },
+   {
+    "path": "assets/presets/marble.png",
+    "bytes": 9003
+   },
+   {
+    "path": "assets/presets/opal.png",
+    "bytes": 8194
+   },
+   {
+    "path": "assets/presets/silky.png",
+    "bytes": 7087
+   },
+   {
+    "path": "assets/presets/thick.png",
+    "bytes": 7431
+   },
+   {
+    "path": "assets/presets/turbulent.png",
+    "bytes": 8979
+   },
+   {
+    "path": "assets/presets/wispy.png",
+    "bytes": 9241
+   },
+   {
+    "path": "assets/pwa/apple-touch-icon.png",
+    "bytes": 55474
+   },
+   {
+    "path": "assets/pwa/icon-192.png",
+    "bytes": 61798
+   },
+   {
+    "path": "assets/pwa/icon-512.png",
+    "bytes": 337545
+   },
+   {
+    "path": "assets/pwa/icon-maskable-512.png",
+    "bytes": 257515
+   }
+  ]
+ },
+ "fonts": {
+  "files": [],
+  "fontFaceDeclarations": [],
+  "googleFontsReferences": [],
+  "familiesDeclared": {
+   "inherit": 8,
+   "'Courier New', monospace": 10,
+   "Bahnschrift, 'DIN Alternate', var(--font-ui)": 1,
+   "monospace": 3,
+   "var(--font-mono)": 1,
+   "ui-monospace, Consolas, monospace": 2,
+   "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif": 2,
+   "var(--font-ui, sans-serif)": 2,
+   "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif": 1,
+   "'Segoe UI', system-ui, sans-serif": 1
+  },
+  "tokens": {
+   "--font-ui": "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif",
+   "--font-mono": "'Courier New', monospace"
+  }
+ },
+ "electronShell": [
+  {
+   "path": "electron-main.js",
+   "bytes": 64250,
+   "gzip": 21833
+  },
+  {
+   "path": "electron-pen-cursor.js",
+   "bytes": 8955,
+   "gzip": 3086
+  }
+ ]
+}

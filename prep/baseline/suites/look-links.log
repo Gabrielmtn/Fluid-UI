@@ -1,0 +1,34 @@
+# look-links — node scripts/test/look-links/run.js
+# started 2026-10-17T13:06:30.703Z, duration 8.0 s, exit code 0
+# PASS 24 / FAIL 0  summary: 7.9s OK  24 passed, 0 failed
+# HEAD c4796dac21008b26528e57f813425ffb7bd58490, node v25.9.0, Chrome 155.0.8059.80 (from disk)
+# note: run without MP_HOST (the live-room section is skipped by design)
+# ---- stdout ----
+   2.0s ready kit ok
+   3.1s PASS defaults + 12 built-in looks: the 2. link lands exactly what the 1. link did  []
+   3.1s PASS and is well under half as long (worst 35%)  ["defaults 305/890","opal 310/910","bloom 336/957","currents 310/904","silky 298/870","thick 297/865","wispy 300/868","chaotic 294/861","ethereal 300/866","turbulent 298/864","marble 298/862","electric 298/870","gelpen 292/873"]
+   3.1s PASS stress look: every slider, switch, swatch (mixed case), colour, gravity and material exact  []
+   3.1s PASS stress look fits one chat message (1846 ≤ 1900 characters)  {"settings":128,"pathPoints":600,"pathKept":486,"chars":1817}
+   3.1s PASS its 600-point light path was thinned to fit and spread back to 600, jumps within one point  {"kept":486,"n":600,"g1":[149,299,449,599],"g2":[150,299,450,599]}
+   3.1s PASS a 300-point light path rides whole, within 0.1 px  {"kept":300,"n":300,"dev":0.09984392900940975}
+   3.4s PASS a link from a newer build: the setting this build does not know is skipped, the rest lands  {"curl":12}
+   3.4s PASS 3000 corrupted links: each refused cleanly or read safely, none slower than 60 ms, nothing reaches Object.prototype  {"ok":229,"refused":2771,"slow":8.100000001490116,"other":[],"polluted":false}
+   3.9s PASS Link to current settings is in the panel out of a room, under Sync phone, the same size, errors below both
+   3.9s PASS it copies a 2. link and flashes "Copied"  {"url":"http://127.0.0.1:64324/?look=2.AZWLu27TUABA7_W91_Z1HCeOH_W1H","flash":"Copied"}
+   3.9s PASS the toast says how many settings and how long  "Copied a link to your current settings: all 127 of them, in 919 characters. It opens Swirl Together with them, in the browser or the desktop app."
+   5.2s PASS opened: the settings apply, the toast says so, the URL is cleaned
+   5.2s PASS every look setting lands: 60 sliders, 23 switches, 12 menus, colours, swatches, arms, ramps, material, tip, gravity  []
+   5.2s PASS and the light path, point for point (240/240)  0.09984392900940975
+   5.2s PASS and the saved session keeps its own values (gravity included)  []
+   5.8s PASS a room's Invite has Room link + current settings, lined up under Copy link | Copy code
+   5.8s PASS it copies the invite with the settings packed in, ending #CODE  {"tail":"BRLXh4e4j_oH8#K7P2QX","toast":"Copied the room link with your current settings"}
+   6.4s PASS opened: the room join waits for the settings  {"room":null,"holds":true}
+   7.1s PASS then the room is joined and the URL keeps only #CODE  {"room":"K7P2QX","hash":"#K7P2QX","search":""}
+   7.1s PASS with every setting on first (gravity included), and the toast says it is joining  {"d2":[],"toast2":"Shared settings on. Joining the room…"}
+   7.1s PASS desktop deep link join/CODE?look=… carries the room and the settings  {"kind":"join","code":"K7P2QX","payload":"2.AZXQuW4TURiG4Tlz"}
+   7.1s PASS a broken look still joins; look/2.… and old look/1.… links parse  {"broken":{"kind":"join","code":"K7P2QX"},"look":{"kind":"look","payload":"2.AZXQuW4TURiG4Tlz"},"old":{"kind":"look","payload":"1.abcdefgh"}}
+   7.1s PASS and the web offer builds the same link  "swirltogether://join/K7P2QX?look=2.AZXQuW4TURiG4Tlz"
+   7.1s skip live room section (set MP_HOST=<local relay>, e.g. npx wrangler dev --port 8787 --ip 127.0.0.1)
+   7.4s PASS the button audit passes both new buttons (they take the panel's colour)  {"found":2,"bad":[]}
+   7.9s OK  24 passed, 0 failed
+

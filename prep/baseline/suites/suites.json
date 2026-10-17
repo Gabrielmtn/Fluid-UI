@@ -1,0 +1,204 @@
+{
+ "env": {
+  "date": "2026-10-17T13:03:03.394Z",
+  "headCommit": "c4796dac21008b26528e57f813425ffb7bd58490",
+  "node": "v25.9.0",
+  "platform": "win32 10.0.26200",
+  "chromeOnDisk": "155.0.8059.80",
+  "chromePath": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+ },
+ "oneChromeAtATime": "suites run sequentially; each boots and closes its own headless Chrome",
+ "timeoutMs": 900000,
+ "retryPolicy": "a suite whose outcome is not the expected one (exit 0 when capturing; the baseline counts when checking) is run a second time and the second run stands; the first attempt is kept as <name>.attempt-1.log and in attempt1",
+ "suites": [
+  {
+   "name": "radial-menu",
+   "script": "scripts/test/radial-menu/run.js",
+   "command": "node scripts/test/radial-menu/run.js",
+   "note": "run.js spawns wheel.js, settings.js, regressions.js in turn (one Chrome each)",
+   "started": "2026-10-17T13:03:03.436Z",
+   "durationMs": 64363,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 107,
+   "fail": 0,
+   "summaryLines": [
+    "53/53 passed",
+    "42/42 passed",
+    "12/12 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/radial-menu.log"
+  },
+  {
+   "name": "focus-keys",
+   "script": "scripts/test/focus-keys/run.js",
+   "command": "node scripts/test/focus-keys/run.js",
+   "note": "",
+   "started": "2026-10-17T13:04:07.800Z",
+   "durationMs": 14707,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 20,
+   "fail": 0,
+   "summaryLines": [
+    "20/20 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/focus-keys.log"
+  },
+  {
+   "name": "skip-menu",
+   "script": "scripts/test/skip-menu/run.js",
+   "command": "node scripts/test/skip-menu/run.js",
+   "note": "",
+   "started": "2026-10-17T13:04:22.508Z",
+   "durationMs": 24415,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 43,
+   "fail": 0,
+   "summaryLines": [
+    "43/43 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/skip-menu.log"
+  },
+  {
+   "name": "bar-keys",
+   "script": "scripts/test/bar-keys/run.js",
+   "command": "node scripts/test/bar-keys/run.js",
+   "note": "",
+   "started": "2026-10-17T13:04:46.924Z",
+   "durationMs": 18209,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 13,
+   "fail": 0,
+   "summaryLines": [
+    "13/13 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/bar-keys.log"
+  },
+  {
+   "name": "dialog-focus",
+   "script": "scripts/test/dialog-focus/run.js",
+   "command": "node scripts/test/dialog-focus/run.js",
+   "note": "",
+   "started": "2026-10-17T13:05:05.133Z",
+   "durationMs": 20475,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 25,
+   "fail": 0,
+   "summaryLines": [
+    "25/25 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/dialog-focus.log"
+  },
+  {
+   "name": "slider-keys",
+   "script": "scripts/test/slider-keys/run.js",
+   "command": "node scripts/test/slider-keys/run.js",
+   "note": "",
+   "started": "2026-10-17T13:05:25.608Z",
+   "durationMs": 7044,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 12,
+   "fail": 0,
+   "summaryLines": [
+    "12/12 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/slider-keys.log"
+  },
+  {
+   "name": "popup-focus",
+   "script": "scripts/test/popup-focus/run.js",
+   "command": "node scripts/test/popup-focus/run.js",
+   "note": "",
+   "started": "2026-10-17T13:05:32.653Z",
+   "durationMs": 13018,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 17,
+   "fail": 0,
+   "summaryLines": [
+    "17/17 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/popup-focus.log"
+  },
+  {
+   "name": "stroke-lock",
+   "script": "scripts/test/stroke-lock/ring.js",
+   "command": "node scripts/test/stroke-lock/ring.js",
+   "note": "no run.js in this folder; ring.js is its one check script (shared driver)",
+   "started": "2026-10-17T13:05:45.672Z",
+   "durationMs": 25253,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 10,
+   "fail": 0,
+   "summaryLines": [
+    "10/10 passed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/stroke-lock.log"
+  },
+  {
+   "name": "pen-window",
+   "script": "scripts/test/pen-window/web-headless.js",
+   "command": "node scripts/test/pen-window/web-headless.js",
+   "note": "no run.js in this folder; web-headless.js is the headless entry, needs APP_URL (served by bundle.js) and writes three PNGs to PENWIN_OUT (set to the OS temp dir)",
+   "started": "2026-10-17T13:06:10.935Z",
+   "durationMs": 19767,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 53,
+   "fail": 0,
+   "summaryLines": [
+    "{\"ok\":true,\"fails\":[]}"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/pen-window.log",
+   "env": {
+    "APP_URL": "(ephemeral port on 127.0.0.1, served by bundle.js)",
+    "PENWIN_OUT": "C:\\Users\\Gabri\\AppData\\Local\\Temp\\fluid-f6-penwin"
+   }
+  },
+  {
+   "name": "look-links",
+   "script": "scripts/test/look-links/run.js",
+   "command": "node scripts/test/look-links/run.js",
+   "note": "run without MP_HOST (the live-room section is skipped by design)",
+   "started": "2026-10-17T13:06:30.703Z",
+   "durationMs": 7976,
+   "exitCode": 0,
+   "signal": null,
+   "timedOut": false,
+   "pass": 24,
+   "fail": 0,
+   "summaryLines": [
+    "7.9s OK  24 passed, 0 failed"
+   ],
+   "failLines": [],
+   "log": "prep/baseline/suites/look-links.log",
+   "env": {
+    "MP_HOST": "(unset)"
+   }
+  }
+ ]
+}

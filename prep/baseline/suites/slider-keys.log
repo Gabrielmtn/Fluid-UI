@@ -1,0 +1,20 @@
+# slider-keys — node scripts/test/slider-keys/run.js
+# started 2026-10-17T13:05:25.608Z, duration 7.0 s, exit code 0
+# PASS 12 / FAIL 0  summary: 12/12 passed
+# HEAD c4796dac21008b26528e57f813425ffb7bd58490, node v25.9.0, Chrome 155.0.8059.80 (from disk)
+# ---- stdout ----
+PASS L0 Brush Size takes focus
+PASS L1 an arrow moves the curved Brush Size fader 1% of its travel, and the readout follows  {"a":{"v":0.653,"active":true},"b":{"v":0.663,"active":true},"r0":"41 px","r1":"44 px"}
+PASS L2 Shift+arrow moves it 10%  {"b":{"v":0.663,"active":true},"c":{"v":0.763,"active":true}}
+PASS L3 and back down the same way  {"a":{"v":0.653,"active":true},"back":{"v":0.653,"active":true}}
+PASS L4 Velocity: two arrows move it 2% (0.08), and the setting follows  {"a":{"v":2,"active":true},"b":{"v":2.08,"active":true},"cfg":2.08}
+PASS L4 ...Shift+Up 10% (0.4)  {"b":{"v":2.08,"active":true},"c2":{"v":2.48,"active":true}}
+PASS L5 Viscosity takes focus
+PASS L5 a slider already at 1% a step keeps the browser step (0.01)  {"a":{"v":0.3,"active":true},"b":{"v":0.31,"active":true}}
+PASS L6 ...and Shift+arrow still moves it 10%  {"b":{"v":0.31,"active":true},"c3":{"v":0.41,"active":true}}
+PASS L7 Home is the browser's: to the minimum  {"v":0,"active":true}
+PASS L8 with a dialog up, the slider behind it does not move  {"a":{"v":0.653,"active":true},"b":{"v":0.653,"active":false}}
+PASS L9 no page exceptions  []
+
+12/12 passed
+

@@ -1,0 +1,21 @@
+# bar-keys — node scripts/test/bar-keys/run.js
+# started 2026-10-17T13:04:46.924Z, duration 18.2 s, exit code 0
+# PASS 13 / FAIL 0  summary: 13/13 passed
+# HEAD c4796dac21008b26528e57f813425ffb7bd58490, node v25.9.0, Chrome 155.0.8059.80 (from disk)
+# ---- stdout ----
+PASS Q1 Bottom nav lands on a dropdown button that says listbox, closed, named by its label and value  {"s":{"active":"qub-dd-btn","role":null,"text":"2048▾Alt+↑↓","selected":null,"open":false,"expanded":"false","listRole":"listbox","value":"2048","btnText":"2048▾Alt+↑↓","cursor":true},"name":"Image Sharpness 2048"}
+PASS Q2 Enter opens the list (role listbox) with focus on the chosen option  {"active":"qub-dd-opt sel","role":"option","text":"2048","selected":"true","open":true,"expanded":"true","listRole":"listbox","value":"2048","btnText":"2048▾Alt+↑↓","cursor":true}
+PASS Q3 a letter in the open list does not fire its hotkey (C left the cursor alone)  {"before":true,"after":true}
+PASS Q4 ArrowDown moves to the next option  {"active":"qub-dd-opt","role":"option","text":"1536","selected":"false","open":true,"expanded":"true","listRole":"listbox","value":"2048","btnText":"2048▾Alt+↑↓","cursor":true}
+PASS Q5 Enter picks it: the select changes, the list closes, focus back on the button  {"s":{"active":"qub-dd-btn","role":null,"text":"1536▾Alt+↑↓","selected":null,"open":false,"expanded":"false","listRole":"listbox","value":"1536","btnText":"1536▾Alt+↑↓","cursor":true},"v0":"2048","t1":"1536"}
+PASS Q6 ArrowUp on the closed button opens the list  {"active":"qub-dd-opt sel","role":"option","text":"1536","selected":"true","open":true,"expanded":"true","listRole":"listbox","value":"1536","btnText":"1536▾Alt+↑↓","cursor":true}
+PASS Q6 ...Home and End go to the first and last options  {"home":"8192","end":"256"}
+PASS Q7 Esc closes it and focus goes back to the button, value unchanged  {"active":"qub-dd-btn","role":null,"text":"1536▾Alt+↑↓","selected":null,"open":false,"expanded":"false","listRole":"listbox","value":"1536","btnText":"1536▾Alt+↑↓","cursor":true}
+PASS Q8 Tab out of an open list closes it and lands on the next dropdown, not its hidden <select>  {"active":"qub-dd-btn","role":null,"text":"1024▾Alt+Shift+↑↓","selected":null,"open":false,"expanded":"false","listRole":"listbox","value":"1024","btnText":"1024▾Alt+Shift+↑↓","cursor":true}
+PASS Q9 the six hidden mirrors are tabIndex -1 and aria-hidden  ["randomColor:-1:true","stepPalette:-1:true","colorGate:-1:true","mutationScope:-1:true","visualResolution:-1:true","physicsResolution:-1:true"]
+PASS Q10 a Tab walk of the top bar never lands on a hidden mirror  {"n":19,"walk":["materialMode","curl","viscosity","velocityInfluence","colorBlendPerceptual","timeScalePerceptual","densityDissipationPerceptual","velocityDissipation","ch-text-toggle","ch-text-toggle active","ch-text-toggle","ch-text-toggle ch-gate-toggle"]}
+PASS Q11 a ring on the bottom-bar button, the Material select and a sidebar select  {"r1":{"fv":true,"outline":"solid 2px"},"r2":{"fv":true,"outline":"solid 2px"},"r3":{"fv":true,"outline":"solid 2px"}}
+PASS Q12 no page exceptions  []
+
+13/13 passed
+
