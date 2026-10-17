@@ -1,0 +1,14 @@
+/* ================================================================
+   css/40-theme-overlays.css - Walnut & Copper: overlays. Modals (the
+   .delete-modal family), popup menus (.brush-shape-menu family, except the
+   Multi-brush .arm-tip-menu), floating panels (.arm-colors-panel family,
+   except the Multi-brush .arm-colors-rows), the More and Presets panels,
+   the skip menu, hotkey modal, F1 sheet, radial menu, colour picker
+   popover, toasts.
+   Owner: the overlays workstream. Loads after css/30-39, inside @layer
+   theme. Theme rules are scoped to html[data-theme="walnut-copper"].
+   Button colour may live here (js/38 sanctions the theme component sheets).
+   ================================================================ */
+@layer theme {
+
+} /* @layer theme */

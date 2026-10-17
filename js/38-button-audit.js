@@ -20,10 +20,11 @@
     // Rules that are ALLOWED to colour a button.
     function isSanctioned(href, selector) {
         if (/01-buttons\.css/.test(href || '')) return true;
-        // The Walnut & Copper theme's component sheets (css/31 and 33-39, one
-        // per component family), scoped to html[data-theme="walnut-copper"].
-        // The generated palette remap (32) is not among them.
-        if (/3[13-9]-theme-[a-z-]+\.css/.test(href || '')) return true;
+        // The Walnut & Copper theme's component sheets (css/31, 33-39 and
+        // 40-49, one per component family), scoped to
+        // html[data-theme="walnut-copper"]. The generated palette remap (32)
+        // is not among them.
+        if (/(3[13-9]|4\d)-theme-[a-z-]+\.css/.test(href || '')) return true;
         // Reserved classes may be declared anywhere, but only these two.
         if (/btn--destructive|btn--record/.test(selector)) return true;
         // The PhotoSafe warning is deliberately exempt: it is the FIRST frame,
