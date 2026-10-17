@@ -33,6 +33,27 @@ Every follow-up agent reads this before changing anything in its area. Newest at
 - **Inline disclosures** (Visible sections, Your hotkeys, Saved animations): take the field look.
 - The study's pane mesh on every button, dialogs included: keep.
 
+## Integrator calls for the second wave (defaults; Gabriel may overrule)
+
+Answers to `prep/gaps/SECOND-WAVE.md`'s questions, by its numbers:
+
+- **Q1 sidebar values:** follow the study's sidebar value style (the study is the reference).
+- **Q2 recording in progress:** the study's danger pane at full brightness, keeping the app's existing pulse as a slow brightness breath.
+- **Q3 labels that fit no tier:** a clean two-line pane as a last resort, never an ellipsis. Re-check after the sidebars widen.
+- **Q5 Save cues / Open cues labels blank since 5db4c76:** a regression; restore them.
+- **Q6 accessibility-only attributes in app JS** (aria-label, aria-pressed, label for, a focusable layer disclosure): yes, no behaviour change.
+- **Q7 key legends:** the study's compact keycap, as W3 built.
+- **Q8 tier map:** 48 px for standalone fields and Stroke / Time, Simple / Everything; 32 px in rows, cards and editors; head tubes 38 px.
+- **Q9 export progress:** a thin bar in tube colours, so the drawer never shifts while exporting.
+- **Q10 number fields:** keep the spin buttons (they work), tinted to the theme.
+- **Q11 Display drawer:** dividers between groups only; no new copy.
+- **Q12 Multi-brush:** answered above (eight tiles, dimmed beyond the count; arrow keys in the stamp grid).
+- **Q13 other players' extras** (gate lids, gravity trail, QUEUED / AFTER YOU): new behaviour, out of scope.
+- **Q14 the right sidebar's resize edge** does nothing (pre-existing): not a theme item; listed for a separate fix.
+- **Q15 desktop-only rows:** Gabriel checks them in his Electron build.
+- **Laminar / Blend 0.00:** keeps the app's meaning (neutral middle, -1 full laminar); behaviour is frozen.
+- **Q4 emoji in labels:** asked (changes visible wording).
+
 ## Open
 
 - Swirl Together: room code in the Invite popover (recommended) or in the drawer; own-change lines on the log (recommended keep); quiet-room text (recommended keep 06e's sentence); "and N more" (recommended keep).
