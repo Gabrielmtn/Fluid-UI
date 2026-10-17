@@ -109,7 +109,14 @@
         if (at.g === 0 && at.w < 1e-3) at.w = 0;
         at.a += at.w * dt;
     }
-    function atomResting(at) { return !at.kick && at.g === 0 && at.w === 0; }
+    // At rest to the eye: all the turning it has left (the speed coasting
+    // out, plus the target still decaying) moves its rim under a third of a
+    // pixel. Then it stops where it is.
+    function atomResting(at, rim) {
+        if (at.kick) return false;
+        if ((at.w * FLY.TW + at.g * (FLY.TG + FLY.TW)) * rim < 0.3) { at.w = at.g = 0; return true; }
+        return false;
+    }
 
     var active = new Set();        // records with something still moving
     function wake(r) { active.add(r); }
@@ -703,9 +710,12 @@
                 done = stepDrawer(r, dt);
             } else if (r.kind === 'atom') {
                 stepAtom(r.at, dt, now / 1000);
-                var rot = (r.at.a * 57.2958 % 360).toFixed(1) + 'deg';
-                if (rot !== r.last) { r.el.style.setProperty('--wc-rot', rot); r.last = rot; }
-                done = atomResting(r.at);
+                // Rewritten only when the rim has moved a tenth of a pixel.
+                if (Math.abs(r.at.a - r.lastA) * r.rim >= 0.1) {
+                    r.lastA = r.at.a;
+                    r.el.style.setProperty('--wc-rot', (r.at.a * 57.2958 % 360).toFixed(2) + 'deg');
+                }
+                done = atomResting(r.at, r.rim);
             } else if (r.kind === 'range') {
                 r.sp.step(dt);
                 if (r.sp.settled()) {
