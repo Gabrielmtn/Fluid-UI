@@ -263,6 +263,7 @@
         // Update active button state
         for (var i = 0; i < formatButtons.length; i++) {
             formatButtons[i].classList.toggle('active', formatButtons[i].dataset.formatId === format.id);
+            formatButtons[i].setAttribute('aria-checked', formatButtons[i].dataset.formatId === format.id ? 'true' : 'false');
         }
 
         // Show info (read back actual canvas size for accuracy)
@@ -285,6 +286,7 @@
         activeFormat = null;
         for (var i = 0; i < formatButtons.length; i++) {
             formatButtons[i].classList.remove('active');
+            formatButtons[i].setAttribute('aria-checked', 'false');
         }
         if (formatInfo) {
             formatInfo.textContent = 'Freeform';

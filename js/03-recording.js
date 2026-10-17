@@ -1106,7 +1106,8 @@
             REC_LENGTHS.forEach(ms => {
                 const chip = document.getElementById('recLen' + (ms / 1000));
                 if (!chip) return;
-                chip.setAttribute('aria-pressed', cap === ms ? 'true' : 'false');
+                // A pick-one bank (role radio in index.html): checked, not pressed.
+                chip.setAttribute('aria-checked', cap === ms ? 'true' : 'false');
                 chip.disabled = isRec;
             });
             [['recSrcMe', 'single'], ['recSrcAll', 'all']].forEach(([id, v]) => {
