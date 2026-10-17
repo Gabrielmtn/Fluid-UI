@@ -82,9 +82,13 @@
     function remoteNow() { return !!window.__mpApplyingRemote; }
 
     // ── Panes: cathode + press surge (study rec / pressable / sidebarFrame) ─
-    var PANE = 'button, .btn, .wc-opt';
+    // [data-wc-pane]: a pane registered through ThemeMotion.pane() (a
+    // checkbox row, a brush tile...).
+    var PANE = 'button, .btn, .wc-opt, [data-wc-pane]';
     function inScope(el) { return !!(el && el.closest && el.closest('#mixer-strip, #sidebar-left, #sidebar-right, .mixer-presets-panel, .cp-pop, .arm-tip-menu')); }
     function isOn(el) {
+        // A pane registered through ThemeMotion.pane() says its own state.
+        if (el._wcIsOn) return !!el._wcIsOn(el);
         // Limit's .active means the limit is OFF; its lit state is aria-pressed.
         if (el.classList.contains('ch-gate-toggle')) return el.getAttribute('aria-pressed') === 'true';
         return el.getAttribute('aria-pressed') === 'true' || el.getAttribute('aria-checked') === 'true' ||
@@ -93,10 +97,13 @@
     function paneRec(el, create) {
         if (el._wc) return el._wc;
         if (!create) return null;
-        var r = { kind: 'pane', el: el, cath: new Cathode(), surge: new Spring(0), last: '' };
+        // transient: --ci is written only while the pane moves and removed
+        // once settled, so CSS's static state rule (e.g. :has(:checked)) is
+        // the truth at rest, even after a programmatic change no event saw.
+        var r = { kind: 'pane', el: el, cath: new Cathode(), surge: new Spring(0), last: '', transient: !!el._wcTransient };
         var on = isOn(el); r.cath.on = on; r.cath.I = on ? 1 : 0;
         el._wc = r;
-        write(r);
+        if (!r.transient) write(r);
         return r;
     }
     function write(r) {
@@ -110,7 +117,13 @@
         if (on !== r.cath.on) { r.cath.set(on, remoteNow()); wake(r); }
     }
     function paneOf(t) { var el = t && t.closest ? t.closest(PANE) : null; return el && inScope(el) ? el : null; }
-    function surge(el, v) { var r = paneRec(el, true); r.surge.to(v, PROF.local); wake(r); }
+    function surge(el, v) {
+        var r = paneRec(el, true);
+        // A transient pane at rest re-seats on its live state first (it may
+        // have changed without an event).
+        if (r.transient && !active.has(r)) { var on = isOn(el); r.cath.on = on; r.cath.I = on ? 1 : 0; }
+        r.surge.to(v, PROF.local); wake(r);
+    }
 
     document.addEventListener('pointerdown', function (e) { var el = paneOf(e.target); if (el) surge(el, 1); }, true);
     ['pointerup', 'pointercancel'].forEach(function (t) {
@@ -186,6 +199,9 @@
     document.addEventListener('change', function (e) {
         var t = e.target;
         if (!t || !inScope(t)) return;
+        // A checkbox / radio inside a registered pane: its state is a
+        // property, not an attribute, so the observer can't see it.
+        var p = paneOf(t); if (p && p._wc) syncPane(p);
         kickSectionOf(t);
     }, true);
     function kickSectionOf(el) {
@@ -310,6 +326,7 @@
             if (r.kind === 'pane') {
                 r.cath.step(dt); r.surge.step(dt); write(r);
                 done = r.cath.settled() && r.surge.settled();
+                if (done && r.transient) { r.el.style.removeProperty('--ci'); r.last = ''; }
             } else if (r.kind === 'drawer') {
                 r.sp.step(dt); stepAtom(r.atom, dt);
                 var d = Math.max(0, r.sp.x).toFixed(3);
@@ -328,6 +345,9 @@
                 }
             } else if (r.kind === 'tint') {
                 done = stepTint(r, dt);
+            } else if (r.kind === 'fn') {
+                // ThemeMotion.run(): the stepper returns true once settled.
+                done = !!r.fn(dt, T);
             }
             if (done) active.delete(r);
         });
@@ -340,5 +360,33 @@
     var tries = 0;
     (function attach() { if (!init() && tries++ < 80) setTimeout(attach, 250); })();
 
-    window.ThemeMotion = { active: function () { return active.size; } };
+    // -- Shared hooks for the other theme scripts (js/69, 70, 72-74) -----
+    // Everything rides this one frame; no script adds a loop of its own.
+    window.ThemeMotion = {
+        active: function () { return active.size; },
+        // Step fn(dt, T) once per drawn frame until it returns true. Call it
+        // again (it re-wakes) whenever something new starts moving.
+        run: function (fn) { var r = fn._wcRun || (fn._wcRun = { kind: 'fn', fn: fn }); wake(r); return r; },
+        // Register el as a cathode pane. isOnFn(el) -> lit; default: the
+        // checked state of the checkbox / radio el is or holds. opts.transient
+        // (default true for input-backed panes): --ci only while moving.
+        pane: function (el, isOnFn, opts) {
+            if (!el) return null;
+            var inputBacked = !isOnFn;
+            el._wcIsOn = isOnFn || function (x) {
+                var i = x.matches('input') ? x : x.querySelector('input[type=checkbox], input[type=radio]');
+                return !!(i && i.checked);
+            };
+            el._wcTransient = opts && 'transient' in opts ? !!opts.transient : inputBacked;
+            el.setAttribute('data-wc-pane', '');
+            return paneRec(el, true);
+        },
+        // Re-read a pane's state after a change no attribute shows.
+        sync: function (el) { if (el && (el._wc || el.matches(PANE))) syncPane(el); },
+        // Spin the rosette of el's drawer, as a settings change does.
+        kick: function (el) { if (el) kickSectionOf(el); },
+        Spring: Spring, Cathode: Cathode, PROF: PROF,
+        reduced: function () { return RM; },
+        now: function () { return T; }
+    };
 })();

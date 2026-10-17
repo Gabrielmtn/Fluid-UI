@@ -1,0 +1,11 @@
+/* ================================================================
+   css/38-theme-brush-screens.css - Walnut & Copper: The Multi-brush 8-tile VFD screen and arm editor, the Brush drawer's
+   stamp screen (.scr / .stamps phosphor).
+   Owner: the brush screens workstream. Loads after css/30-34, inside @layer theme,
+   so a rule here wins a tie with the earlier theme sheets. Theme rules are
+   scoped to html[data-theme="walnut-copper"]. Button colour may live here
+   (js/38 sanctions css/31 and 33-39 theme sheets).
+   ================================================================ */
+@layer theme {
+
+} /* @layer theme */

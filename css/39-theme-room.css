@@ -1,0 +1,11 @@
+/* ================================================================
+   css/39-theme-room.css - Walnut & Copper: Swirl Together drawer: panes that never wrap, nixie room code, pilot
+   lamp, the VFD change log (#mpActivity), name chips.
+   Owner: the room workstream. Loads after css/30-34, inside @layer theme,
+   so a rule here wins a tie with the earlier theme sheets. Theme rules are
+   scoped to html[data-theme="walnut-copper"]. Button colour may live here
+   (js/38 sanctions css/31 and 33-39 theme sheets).
+   ================================================================ */
+@layer theme {
+
+} /* @layer theme */

@@ -1,0 +1,11 @@
+/* ================================================================
+   css/36-theme-tubes.css - Walnut & Copper: Bargraph tubes (every range input): travel inset, empty / low / full
+   states, Laminar from centre, detent ticks, head rows (label left, value right).
+   Owner: the tubes workstream. Loads after css/30-34, inside @layer theme,
+   so a rule here wins a tie with the earlier theme sheets. Theme rules are
+   scoped to html[data-theme="walnut-copper"]. Button colour may live here
+   (js/38 sanctions css/31 and 33-39 theme sheets).
+   ================================================================ */
+@layer theme {
+
+} /* @layer theme */

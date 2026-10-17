@@ -1,0 +1,11 @@
+/* ================================================================
+   css/37-theme-fields.css - Walnut & Copper: Fields (.cp.sel, 48 px), text fields, checkbox panes (.cp.ic), radio
+   banks ("Paint into"), keycaps, inline options.
+   Owner: the fields workstream. Loads after css/30-34, inside @layer theme,
+   so a rule here wins a tie with the earlier theme sheets. Theme rules are
+   scoped to html[data-theme="walnut-copper"]. Button colour may live here
+   (js/38 sanctions css/31 and 33-39 theme sheets).
+   ================================================================ */
+@layer theme {
+
+} /* @layer theme */
