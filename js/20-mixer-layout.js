@@ -699,20 +699,23 @@
         closeArmTipMenu();
         if (a && a.focus) a.focus();
     }
+    // What picking an arm's tip does, from its menu or from the Walnut & Copper
+    // tip screen (js/73, through the square's __wcPickTip below).
+    function pickArmTip(cfg, v, onPick) {
+        cfg.tip = v;
+        // Decode a shape now: a stamp still uploading holds its dabs.
+        if (typeof v === 'string' && window.BrushShapes && window.BrushShapes.warm) {
+            try { window.BrushShapes.warm(v); } catch (_) {}
+        }
+        closeArmTipMenu();
+        onPick();
+    }
     function openArmTipMenu(idx, cfg, anchor, onPick) {
         var again = _armTipMenu && _armTipMenu.__anchor === anchor;
         closeArmTipMenu();
         if (again) return;   // a second click on the square closes it
         var cur = (typeof window.sanitizeArmTip === 'function') ? window.sanitizeArmTip(cfg.tip) : null;
-        function pick(v) {
-            cfg.tip = v;
-            // Decode a shape now: a stamp still uploading holds its dabs.
-            if (typeof v === 'string' && window.BrushShapes && window.BrushShapes.warm) {
-                try { window.BrushShapes.warm(v); } catch (_) {}
-            }
-            closeArmTipMenu();
-            onPick();
-        }
+        function pick(v) { pickArmTip(cfg, v, onPick); }
         var m = document.createElement('div');
         m.className = 'brush-shape-menu arm-tip-menu';
         m.dataset.group = 'core';
@@ -8912,13 +8915,17 @@
                     var tipIcon = document.createElement('span');
                     tipIcon.className = 'arm-tip-icon';
                     tipBtn.appendChild(tipIcon);
+                    function tipPicked() {
+                        persistArmColors();
+                        paintRow();
+                    }
                     tipBtn.addEventListener('click', function (e) {
                         e.stopPropagation();
-                        openArmTipMenu(idx, cfg, tipBtn, function () {
-                            persistArmColors();
-                            paintRow();
-                        });
+                        openArmTipMenu(idx, cfg, tipBtn, tipPicked);
                     });
+                    // Presentation hook (Walnut & Copper, js/73): the tip
+                    // screen picks a tip the way this square's menu entries do.
+                    tipBtn.__wcPickTip = function (v) { pickArmTip(cfg, v, tipPicked); };
 
                     // ── Per-arm Pressure (2026-08-26) ────────────────────────
                     // Marks this arm as a PUSH arm: it moves paint already on
