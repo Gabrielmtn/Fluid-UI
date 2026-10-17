@@ -17,9 +17,12 @@
 // own: the lever eases to a change on a spring stepped by js/71's frame.
 //
 // Mapping to the app:
-//   Laminar / Blend  canonical -1..1 (Laminar < 0 < Blend). The LAMINAR half
-//                    lights with -v, the BLEND half with +v; the nixies show
-//                    |v| (0.00-1.00); the lever sits at the top for 0.
+//   Laminar / Blend  canonical -1..1 (Laminar < 0 < Blend). The halves
+//                    crossfade as the study's do: LAMINAR lights with
+//                    (1 - v) / 2, BLEND with (1 + v) / 2, so both glow half
+//                    at 0 and a label lights while its half is more than half
+//                    lit; the nixies show |v| (0.00-1.00), the app's value;
+//                    the lever sits at the top for 0.
 //   Time             canonical 0.01..3, the study's square-root sweep and six
 //                    orders (STOP .. FLANK); the value under the hub, the
 //                    current order on the brass flag, which drops out and the
@@ -203,7 +206,9 @@
             o.last = v;
             leverTo(v);
             if (k === 'laminar') {
-                var lit = [Math.max(0, -v), Math.max(0, v)];
+                // The study's crossfade (stepTeles): LAMINAR with the lever's
+                // share of the sweep to its left, BLEND to its right.
+                var cv = Math.max(-1, Math.min(1, v)), lit = [(1 - cv) / 2, (1 + cv) / 2];
                 o.secs.forEach(function (p, n) {
                     p.setAttribute('fill', 'rgb(255 ' + Math.round(110 + 30 * lit[n]) + ' 30 / ' + (0.05 + 0.5 * lit[n]).toFixed(3) + ')');
                 });
