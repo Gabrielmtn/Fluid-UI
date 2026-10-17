@@ -455,6 +455,7 @@ html[data-theme="walnut-copper"] #mixer-strip #freezeBtn { width: 72px; }
 html[data-theme="walnut-copper"] #mixer-strip .ch-gate-toggle .gate-state { display: none; }
 /* Ignite fills its row; the lock is the 40 px square pane. */
 html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { flex: 1 1 auto; min-width: 120px; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { --wc-wr: 60px; }   /* its label well (below) only as wide as the word */
 html[data-theme="walnut-copper"] #mixer-strip .ch-ignite-lock { width: 40px; min-width: 40px; padding: 0; }
 html[data-theme="walnut-copper"] #mixer-strip #pauseBtn { width: 40px; min-width: 40px; padding: 0; }   /* study .navbar .cap.sq */
 /* At 1200 px and below js/46 parks the faders, and the colour and scene
@@ -491,6 +492,9 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
        unlit (shader: Gc * ga * (mesh * .2 + halo * .07)); js/71's --tgc has
        already turned --gc toward it. */
     --wc-lv: max(var(--ci, 0), var(--wc-floor, 0), calc(var(--ga, 0) * 0.15));
+    /* The study's unlit label (#a08a76) cannot reach 4.5:1 on this glass;
+       a shade lighter here, the bar's labels only. */
+    --unlit: #ab9480;
     --wc-glow: calc(0.75 * sqrt(var(--wc-lv)));
     /* Gold when fully lit, more orange at lower levels (the study's tone map). */
     --wc-gcol: color-mix(in srgb, rgb(var(--gc, 255 110 30)) calc(100% - var(--wc-lv) * 50%), rgb(240 200 60));
@@ -504,6 +508,13 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
         color-mix(in srgb, var(--wc-gcol) calc(var(--wc-glow) * 40%), transparent) 100%,
         color-mix(in srgb, var(--wc-gcol) calc(var(--wc-glow) * 33%), transparent) 125%,
         color-mix(in srgb, var(--wc-gcol) calc(var(--wc-glow) * 30%), transparent) 160%);
+    /* The label's well: the glass behind the label darkens as the pane
+       lights, so every label keeps 4.5:1 against its own glow at rest, lit,
+       hover and focus (the study's lit label rides a dark halo, 562; this is
+       that halo, broad enough to hold the contrast). Fields, whose text sits
+       left, anchor it there. */
+    --wc-wa: calc(0.42 + var(--wc-lv) * 0.18);
+    --wc-well: radial-gradient(ellipse var(--wc-wr, 52%) 15px at 50% 50%, rgb(8 5 3 / var(--wc-wa)) 0, rgb(8 5 3 / var(--wc-wa)) 62%, transparent 100%);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.5),
         inset 0 0 0 1px rgba(12, 7, 5, 0.9),
@@ -516,17 +527,21 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
 }
 html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-channel[data-ui-key="Color"], .mixer-stack) :is(button, .btn):not([style*="background"]):not(#mixerPresetsTrigger) {
     background-color: #141010;
-    background-image: var(--wc-mesh), var(--wc-glass-glow), var(--wc-glass);
-    background-size: 35px 200.05px, auto, auto;
+    background-image: var(--wc-mesh), var(--wc-well), var(--wc-glass-glow), var(--wc-glass);
+    background-size: 35px 200.05px, auto, auto, auto;
     background-position: center;
-    background-repeat: repeat, no-repeat, no-repeat;
-    background-blend-mode: color-dodge, normal, normal;
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+    background-blend-mode: color-dodge, normal, normal, normal;
 }
 /* Presets is a field: the same glass at 60 % with the copper chevron cell
    (study .msel 506-512). js/71 owns --ci (it writes 0 at rest), so the
    field's resting level is a floor under it, for the glow and the label. */
 html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger {
     --wc-floor: 0.6;
+    /* A field glows lower and redder than a lit pane, as the study's do. */
+    --wc-glow: calc(0.55 * sqrt(var(--wc-lv)));
+    --wc-gcol: color-mix(in srgb, rgb(var(--gc, 255 110 30)) calc(100% - var(--wc-lv) * 25%), rgb(240 200 60));
+    --wc-well: radial-gradient(ellipse 105px 15px at 80px 50%, rgb(8 5 3 / var(--wc-wa)) 0, rgb(8 5 3 / var(--wc-wa)) 62%, transparent 100%);
     color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--wc-lv) * 100%), var(--unlit)));
     text-shadow:
         0 0 calc(1px + var(--wc-lv) * 5px) rgb(var(--gc) / calc(var(--wc-lv) * 0.95)),
@@ -534,13 +549,22 @@ html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger {
     background-color: #141010;
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M15 16.5L19 20.5L23 16.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E"),
-        var(--wc-mesh), var(--wc-glass-glow), var(--wc-glass);
-    background-size: 38px 40px, 35px 200.05px, auto, auto;
-    background-position: right center, center, center, center;
-    background-repeat: no-repeat, repeat, no-repeat, no-repeat;
-    background-blend-mode: normal, color-dodge, normal, normal;
+        var(--wc-mesh), var(--wc-well), var(--wc-glass-glow), var(--wc-glass);
+    background-size: 38px 40px, 35px 200.05px, auto, auto, auto;
+    background-position: right center, center, center, center, center;
+    background-repeat: no-repeat, repeat, no-repeat, no-repeat, no-repeat;
+    background-blend-mode: normal, color-dodge, normal, normal, normal;
 }
 html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger:is(:hover, :focus-visible, .active) { --wc-floor: 1; }
+/* The preset's name whole: css/20 trims its line box to the cap height
+   (text-box) and clips it, which shaved the top off Michroma's capitals. A
+   plain line with room for the glyphs and their glow; still one line with
+   an ellipsis. */
+html[data-theme="walnut-copper"] #mixer-strip .mixer-presets-trigger-label {
+    text-box: normal;
+    line-height: 1;
+    padding-block: 3px;
+}
 /* Clear: the study's danger pane (.cap.danger) is the same glass; only its
    label is tinted, and its glow is red when it lights. */
 html[data-theme="walnut-copper"] #mixer-strip .mixer-actions > button.btn--destructive {
@@ -626,7 +650,8 @@ html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger .mixer-preset
    black fall-off on top (black at alpha a multiplies by 1 - a). Stops are
    the study's profile measured at 1920 (the bare wood, controls hidden), in
    screen px like the study's light (--k undoes the bar's --ui-scale zoom).
-   Under the bar, the study console's drop shadow (.console.full). */
+   No drop shadow under the bar: it sits above both sidebars (z 150 over
+   100) and would darken their tops rather than fall on the canvas. */
 html[data-theme="walnut-copper"] #mixer-strip {
     --k: calc(1px / var(--ui-scale, 1));
     background-image:
@@ -639,7 +664,7 @@ html[data-theme="walnut-copper"] #mixer-strip {
         var(--wood-herringbone);
     background-size: auto, auto, auto, 679px 679px;
     background-position: 0 0, -31.84px 0, 0 0, 0 0;
-    box-shadow: 0 30px 50px -30px rgba(0, 0, 0, 0.9);
+    box-shadow: none;
 }
 /* The study draws no frame or rule between groups; the dividers keep their
    box (js/43 and js/46 show and hide them) but paint nothing. Nor is a
@@ -768,6 +793,7 @@ html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip :
     border-radius: 5px;
     font-size: 9px;
     letter-spacing: 0.12em;
+    --wc-wa: calc(0.66 + var(--wc-lv) * 0.12);   /* 9 px strokes are thinner: a deeper well keeps 4.5:1 */
 }
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip :is(.ch-ignite-lock, #pauseBtn) { padding: 0; }
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip #pauseBtn { font-size: 0; }   /* the icon is drawn (above) */
@@ -780,11 +806,11 @@ html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .
     background-color: #141010 !important;
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M15 16.5L19 20.5L23 16.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E"),
-        var(--wc-mesh), var(--wc-glass-glow), var(--wc-glass) !important;
-    background-size: 38px 40px, 35px 200.05px, auto, auto !important;
-    background-position: right center, center, center, center !important;
-    background-repeat: no-repeat, repeat, no-repeat, no-repeat !important;
-    background-blend-mode: normal, color-dodge, normal, normal !important;
+        var(--wc-mesh), var(--wc-well), var(--wc-glass-glow), var(--wc-glass) !important;
+    background-size: 38px 40px, 35px 200.05px, auto, auto, auto !important;
+    background-position: right center, center, center, center, center !important;
+    background-repeat: no-repeat, repeat, no-repeat, no-repeat, no-repeat !important;
+    background-blend-mode: normal, color-dodge, normal, normal, normal !important;
     color: color-mix(in oklab, var(--lit) calc(var(--wc-lv) * 100%), var(--unlit)) !important;
 }
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip #mixerPresetsTrigger {
@@ -792,8 +818,8 @@ html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip #
     padding: 0 30px 0 9px;
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32' viewBox='0 0 24 32'%3E%3Cpath d='M0.5 5V27' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M8 14.5L12 18.5L16 14.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E"),
-        var(--wc-mesh), var(--wc-glass-glow), var(--wc-glass);
-    background-size: 24px 32px, 35px 200.05px, auto, auto;
+        var(--wc-mesh), var(--wc-well), var(--wc-glass-glow), var(--wc-glass);
+    background-size: 24px 32px, 35px 200.05px, auto, auto, auto;
 }
 
 
@@ -857,6 +883,10 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
        fully. --gc as css/31 gives every pane (js/71's --tgc tint). */
     --wc-floor: 0.6;
     --gc: var(--tgc, 255 110 30);
+    /* A field glows lower and redder than a lit pane, as the study's do. */
+    --wc-glow: calc(0.55 * sqrt(var(--wc-lv)));
+    --wc-gcol: color-mix(in srgb, rgb(var(--gc, 255 110 30)) calc(100% - var(--wc-lv) * 25%), rgb(240 200 60));
+    --wc-well: radial-gradient(ellipse 105px 15px at 80px 50%, rgb(8 5 3 / var(--wc-wa)) 0, rgb(8 5 3 / var(--wc-wa)) 62%, transparent 100%);
     color: color-mix(in oklab, var(--lit) calc(var(--wc-lv) * 100%), var(--unlit));
     text-shadow:
         0 0 calc(1px + var(--wc-lv) * 5px) rgb(255 110 30 / calc(var(--wc-lv) * 0.95)),
@@ -864,11 +894,11 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
     background-color: #141010;
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M15 16.5L19 20.5L23 16.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E"),
-        var(--wc-mesh), var(--wc-glass-glow), var(--wc-glass);
-    background-size: 38px 40px, 35px 200.05px, auto, auto;
-    background-position: right center, center, center, center;
-    background-repeat: no-repeat, repeat, no-repeat, no-repeat;
-    background-blend-mode: normal, color-dodge, normal, normal;
+        var(--wc-mesh), var(--wc-well), var(--wc-glass-glow), var(--wc-glass);
+    background-size: 38px 40px, 35px 200.05px, auto, auto, auto;
+    background-position: right center, center, center, center, center;
+    background-repeat: no-repeat, repeat, no-repeat, no-repeat, no-repeat;
+    background-blend-mode: normal, color-dodge, normal, normal, normal;
 }
 html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select:is(:hover, :focus) {
     --wc-floor: 1;
@@ -934,3 +964,39 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-header .ch-label { text-align: left; }
 
 } /* @layer theme */
+
+/* Forced colours (Windows contrast themes): the bar in system colours. The
+   theme's wood, glass and mesh are images, which forced colours keep, so on
+   a light scheme the labels and the drawn Pause icon (ButtonText) sat on
+   dark glass. Here: no wood, plain panes with a ButtonText edge, pressed or
+   lit panes in Highlight (forced-color-adjust off so their text needs no
+   backplate), the fields keep their chevron. In the overrides layer so it
+   wins over every theme rule, the compact window's included. */
+@layer overrides {
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] #mixer-strip { background-image: none; }
+    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel { border-right-color: Canvas; }
+    html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-channel[data-ui-key="Color"], .mixer-stack) :is(button, .btn) {
+        background-image: none;
+        background-color: ButtonFace;
+        border-color: ButtonText;
+        color: ButtonText;
+    }
+    html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-channel[data-ui-key="Color"], .mixer-stack) :is(button, .btn):is([aria-pressed="true"], .active, .locked, .latched) {
+        forced-color-adjust: none;
+        background-color: Highlight;
+        border-color: Highlight;
+        color: HighlightText;
+    }
+    html[data-theme="walnut-copper"] #mixer-strip :is(#mixerPresetsTrigger, .ch-label select.material-mode-select) {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23808080'/%3E%3Cpath d='M15 16.5L19 20.5L23 16.5' fill='none' stroke='%23808080' stroke-width='1.5'/%3E%3C/svg%3E");
+        background-size: 38px 40px;
+        background-position: right center;
+        background-repeat: no-repeat;
+        background-color: ButtonFace;
+        border-color: ButtonText;
+        color: ButtonText;
+    }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select { border: 1px solid ButtonText; }
+}
+}
