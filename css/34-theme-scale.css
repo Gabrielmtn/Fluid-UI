@@ -85,27 +85,4 @@ html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .value-displ
     color: var(--lit);
 }
 
-/* ── Swirl Together: the study's room drawer proportions ── */
-html[data-theme="walnut-copper"] #multiArtistPanel :is(.mp-status-row, #multiplayerStatus) {
-    font-family: var(--ui-font-display);
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--engrave);
-}
-html[data-theme="walnut-copper"] #roomDisplay {
-    font-size: 24px;
-    letter-spacing: 0.35em;
-    padding: 6px 4px 6px 14px;
-    text-align: center;
-}
-html[data-theme="walnut-copper"] #mpActivity {
-    min-height: 63px;          /* three lines on a 21 px pitch */
-    font-size: 12px;
-    line-height: 21px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 6px 12px;
-}
-
 } /* @layer theme */
