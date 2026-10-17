@@ -27,15 +27,13 @@
    ================================================================ */
 @layer theme {
 
-/* ── Materials: the study's mesh, literally (study-lite 134-138) ─────────
-   The app's --mesh-dim token is a heavier variant (stroke .12 / 1.1); the
-   panes here use the study's own glass so they read like its panes. The
+/* ── Materials ───────────────────────────────────────────────────────────
+   The glass is every pane's: the study's mesh, --mesh-pane and its lit twin
+   --mesh-pane-lit (css/31; the app's --mesh-dim is a heavier variant). The
    field's chevron is a filmstrip of the study's .chev::after at 37 angles
    (prep/work/W3/gen-chevron.js): a <select> has no pseudo-elements, so the
    frame for the current --open is picked with background-position. */
 html[data-theme="walnut-copper"] {
-    --wcf-mesh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.10' stroke-width='.7'/%3E%3C/svg%3E");
-    --wcf-mesh-lit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ff9a4d' stroke-width='.8'/%3E%3C/svg%3E");
     /* mesh-lit through the study's radial mask (.cp::before), as one image
        sized to the box, at a field's resting strength (.5 x .3). */
     --wcf-mesh-lit-field: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='p' width='7' height='12.124' patternUnits='userSpaceOnUse' x='50%25' y='50%25' patternTransform='translate(-3.5 -6.062)'%3E%3Cpath d='M3.5 0L7 2.021V6.062L3.5 8.083L0 6.062V2.021ZM3.5 8.083V12.124' fill='none' stroke='%23ff9a4d' stroke-width='.56'/%3E%3C/pattern%3E%3CradialGradient id='g' cx='.5' cy='.5' r='.7071'%3E%3Cstop offset='.25' stop-color='%23fff'/%3E%3Cstop offset='.8' stop-color='%23000'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='100%25' height='100%25' fill='url(%23g)'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23p)' mask='url(%23m)' opacity='.15'/%3E%3C/svg%3E");
@@ -83,7 +81,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.
         linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
         var(--wcf-mesh-lit-field) center / 100% 100% no-repeat,
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605) !important;
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -120,7 +118,7 @@ html[data-theme="walnut-copper"] #sidebar-right .layer-item select:not(.material
         linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
         var(--wcf-mesh-lit-field) center / 100% 100% no-repeat,
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605) !important;
 }
 /* Selects outside the sidebars (the recorder drawer, dialogs) keep the
@@ -265,7 +263,7 @@ html[data-theme="walnut-copper"] .wc-opt {
         0 0 calc(var(--ce) * 16px) rgb(var(--gc) / calc(var(--ce) * 0.6));
     background:
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ce) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -282,7 +280,7 @@ html[data-theme="walnut-copper"] .wc-opt::before {
     border-radius: 3px;
     z-index: -1;
     pointer-events: none;
-    background: var(--wcf-mesh-lit) center / 7px 12.12px;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
     opacity: calc(var(--ce) * 0.3);
     -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
     mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
@@ -422,7 +420,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
         0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
     background:
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -444,7 +442,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
     border-radius: 3px;
     z-index: -1;
     pointer-events: none;
-    background: var(--wcf-mesh-lit) center / 7px 12.12px;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
     opacity: calc(var(--ci) * 0.3);
     -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
     mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
@@ -715,7 +713,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-vis {
     border-radius: 5px;
     background:
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -795,7 +793,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-r
     background:
         linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -837,7 +835,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-r
     border-radius: 3px;
     z-index: -1;
     pointer-events: none;
-    background: var(--wcf-mesh-lit) center / 7px 12.12px;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
     opacity: calc(var(--ci) * 0.3);
     -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
     mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
@@ -912,7 +910,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-gro
     background:
         linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -931,7 +929,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-gro
     border-radius: 3px;
     z-index: -1;
     pointer-events: none;
-    background: var(--wcf-mesh-lit) center / 7px 12.12px;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
     opacity: calc(var(--ci) * 0.3);
     -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
     mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
@@ -994,7 +992,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
     background:
         linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -1027,7 +1025,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
     border-radius: 3px;
     z-index: -1;
     pointer-events: none;
-    background: var(--wcf-mesh-lit) center / 7px 12.12px;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
     opacity: calc(var(--ci) * 0.3);
     -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
     mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
@@ -1095,7 +1093,7 @@ html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], inpu
     color: var(--unlit) !important;
     caret-color: #ffb070;
     border-color: transparent !important;
-    background: var(--wcf-mesh) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605) !important;
+    background: var(--mesh-pane) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605) !important;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
     transition: color 0.2s, text-shadow 0.2s;
 }
@@ -1193,7 +1191,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-k
         0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
     background:
         radial-gradient(ellipse at center, rgb(var(--gc) / calc(var(--ci) * 0.3)), transparent 72%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -1328,7 +1326,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-gr
         0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
     background:
         radial-gradient(ellipse at center, rgb(var(--gc) / calc(var(--ci) * 0.3)), transparent 72%),
-        var(--wcf-mesh) center / 7px 12.12px,
+        var(--mesh-pane) center / 7px 12.12px,
         linear-gradient(170deg, #1a1210, #090605);
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),

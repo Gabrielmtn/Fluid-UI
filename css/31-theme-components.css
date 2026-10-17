@@ -23,6 +23,13 @@
    another player touched (js/71 tints). The 1 px legacy border stays (no
    box changes size) but goes clear: the bezel is the study's inset copper. */
 html[data-theme="walnut-copper"] { --ga: 0; --pc: #fff; }
+/* The pane's glass, literally the study's (study-lite 136-137): the unlit
+   anode mesh at 7 x 12.12 px and its lit (orange) twin. css/30's
+   --mesh-dim is a heavier variant kept for the other surfaces. */
+html[data-theme="walnut-copper"] {
+    --mesh-pane: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.10' stroke-width='.7'/%3E%3C/svg%3E");
+    --mesh-pane-lit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ff9a4d' stroke-width='.8'/%3E%3C/svg%3E");
+}
 html[data-theme="walnut-copper"] :is(button, .btn) {
     --gc: var(--tgc, 255 110 30);
     border-color: transparent;
@@ -44,10 +51,11 @@ html[data-theme="walnut-copper"] :is(button, .btn) {
    (a colour swatch carries its colour inline). */
 html[data-theme="walnut-copper"] :is(button, .btn):not([style*="background"]) {
     background-image:
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
-        var(--mesh-dim),
+        var(--mesh-pane),
         linear-gradient(170deg, #1a1210, #090605);
-    background-size: auto, 3.5px 6.06px, auto;
+    background-size: auto, auto, 7px 12.12px, auto;
     background-position: center;
 }
 
