@@ -351,6 +351,17 @@ html[data-theme="walnut-copper"] .mp-pop.brush-shape-menu {
     color: var(--ui-text);
 }
 
+/* The room menu's rows (ghost panes) read engraved on the wood, and lit
+   when their switch is on (Lock room); the tick still says which. */
+html[data-theme="walnut-copper"] #mpRoomMenu .mp-menu-item {
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+html[data-theme="walnut-copper"] #mpRoomMenu .mp-menu-item[aria-checked="true"] {
+    color: var(--lit);
+    text-shadow: 0 0 6px rgba(255, 120, 40, 0.6), 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+
 /* ── The Invite popover: the room code as nixie tubes ─────────────────
    Its width fits the longest pane on one line (Room link + current
    settings). The code well, the QR, the hint and the two copies keep their
