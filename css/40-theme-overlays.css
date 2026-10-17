@@ -92,11 +92,13 @@ html[data-theme="walnut-copper"] :is(.delete-modal-content, .hotkey-modal) {
 }
 /* Opening: js/75 writes --ov (0 to 1, the drawer spring) on the scrim
    while it moves and removes it once settled. The panel rides 14 px into
-   place as a tray's contents do (.dtray 458); transform and opacity only,
-   and only while moving. Focus and keys are the dialog's from the start. */
-html[data-theme="walnut-copper"] :is(.delete-modal, #hotkeyOverlay)[style*="--ov"] > :is(.delete-modal-content, .hotkey-modal) {
-    opacity: min(1, var(--ov));
-    transform: translateY(calc((1 - min(1, var(--ov))) * -14px));
+   place as a tray's contents do (.dtray 458); transform and opacity only.
+   At rest --ov is unset and both read 1 (no attribute selector on a
+   parent: that would re-check on every inline style write in the page).
+   Focus and keys are the dialog's from the start. */
+html[data-theme="walnut-copper"] :is(.delete-modal, #hotkeyOverlay) > :is(.delete-modal-content, .hotkey-modal) {
+    opacity: min(1, var(--ov, 1));
+    transform: translateY(calc((1 - min(1, var(--ov, 1))) * -14px));
 }
 html[data-theme="walnut-copper"] .delete-modal-content {
     padding: 22px 22px 20px;
@@ -264,14 +266,14 @@ html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .pale
     scrollbar-color: var(--cu) transparent;
     scrollbar-width: thin;
 }
-html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .palette-list, .collision-source-menu)[style*="--ov"],
-html[data-theme="walnut-copper"] #quality-underbar .qub-dd[style*="--ov"] > .qub-dd-list {
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .palette-list, .collision-source-menu)[style*="--ov"] {
     opacity: min(1, var(--ov));
     translate: 0 calc((1 - min(1, var(--ov))) * -8px);
 }
-/* The upward list opens toward the bar it came from. */
-html[data-theme="walnut-copper"] #quality-underbar .qub-dd[style*="--ov"] > .qub-dd-list {
-    translate: 0 calc((1 - min(1, var(--ov))) * 8px);
+/* The upward list opens toward the bar it came from (--ov on its pill). */
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd > .qub-dd-list {
+    opacity: min(1, var(--ov, 1));
+    translate: 0 calc((1 - min(1, var(--ov, 1))) * 8px);
 }
 /* A menu's head: what it is about, engraved over a bead row. */
 html[data-theme="walnut-copper"] :is(.brush-shape-menu-head, #quality-underbar .qub-dd-hdr, .palette-new-cap) {
@@ -407,12 +409,14 @@ html[data-theme="walnut-copper"] .brush-shape-menu:not(.arm-tip-menu) .brush-sha
    already letters every button in capitals: no small caps on top. And the
    drawer's tray gives each of its rows a transform (css/30, the tray's
    ride), which traps the menu's z-index in its row: the row holding the
-   open menu is lifted over its later siblings. */
+   menu is lifted over its later siblings. (Matched on the class alone: an
+   attribute test inside :has() would re-check on every inline style write
+   in the drawer, and js/71 writes some each frame while it animates.) */
 html[data-theme="walnut-copper"] #sidebar-right .collision-source-menu button {
     font-variant-caps: normal;
     white-space: nowrap !important;   /* css/34's sidebar pane rule wraps labels; a menu row must not */
 }
-html[data-theme="walnut-copper"] .sidebar-section .section-body > :has(.collision-source-menu:not([style*="none"])) {
+html[data-theme="walnut-copper"] .sidebar-section .section-body > :has(.collision-source-menu) {
     position: relative;
     z-index: 3;
 }
@@ -1308,7 +1312,7 @@ html[data-theme="walnut-copper"] .radial-empty {
     text-shadow: var(--ovl-engrave-shadow);
 }
 /* It strikes on (js/75 writes --ov with a cathode's 45 ms rise). */
-html[data-theme="walnut-copper"] #radialMenu[style*="--ov"] .radial-wheel { opacity: min(1, var(--ov)); }
+html[data-theme="walnut-copper"] #radialMenu .radial-wheel { opacity: min(1, var(--ov, 1)); }
 
 /* ── Toasts: VFD screens ─────────────────────────────────────────────
    Every transient word the app puts over the painting reads as the
@@ -1544,9 +1548,9 @@ html[data-theme="walnut-copper"] .mask-editor-panel {
     color: var(--ui-text);
     font-family: var(--ui-font-body);
 }
-html[data-theme="walnut-copper"] .mask-editor-overlay[style*="--ov"] > .mask-editor-panel {
-    opacity: min(1, var(--ov));
-    transform: translateY(calc((1 - min(1, var(--ov))) * -14px));
+html[data-theme="walnut-copper"] .mask-editor-overlay > .mask-editor-panel {
+    opacity: min(1, var(--ov, 1));
+    transform: translateY(calc((1 - min(1, var(--ov, 1))) * -14px));
 }
 html[data-theme="walnut-copper"] :is(.mask-editor-header, .mask-wizard-rail, .mask-editor-controls, .mask-editor-footer) {
     background: transparent;
