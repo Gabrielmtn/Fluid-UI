@@ -29,25 +29,36 @@
 // sidebarFrame), all through js/71's one frame (ThemeMotion.run), no loop of
 // its own, nothing measured in the frame:
 //   • a field's brightness rests at .5, rises to .75 under the pointer and to
-//     1 with focus or open, on the local spring (600 / .70);
+//     1 with focus or open, on the local spring (600 / .70); the inline
+//     disclosures (Visible sections, Your hotkeys, Saved animations) take the
+//     same field look and motion, their level in --fl (js/71 owns a button's
+//     --ci) and their chevron following aria-expanded;
 //   • opening turns the chevron (--open) and grows the list on the drawer
 //     spring (180 / .85); closing runs both back, then the list is removed.
-//     The list's height is known from its option count (32 px rows, 5 px
-//     apart: css/37), so nothing is read from layout;
+//     The list's rows are measured once, when it opens;
 //   • the keyboard's active option surges a little (--wa, .55, local spring).
 // The springs write inline only while they move; at rest css/37's states
-// (:hover, :focus, .wc-open) are the truth.
+// (:hover, :focus, .wc-open, aria-expanded) are the truth.
 //
 // Also, presentation only:
 //   • a sidebar checkbox's or radio's pane is registered with
 //     ThemeMotion.pane() the first time it is touched (pointer, key or
 //     focus), so its cathode strikes and fades on the study's timing (js/71
 //     drives it from the change event); a radio's whole group is registered
-//     and synced, so the choice that goes dark fades too;
+//     and synced, so the choice that goes dark fades too; for a few seconds
+//     after a change the panes are re-read every frame, so a change no event
+//     announces (a preset, a room) lands even while a fade is running;
+//   • app words are never cut: a pane's label, a field's value, a
+//     disclosure's label or an option that would not fit at the study's
+//     .12em takes .06em (data-wc-fit="tight"; css/37), then wraps. Words are
+//     measured on a canvas in the display face against the room the element
+//     has when it first comes on screen (an IntersectionObserver hands over
+//     its width), never in a frame;
 //   • Brush ghost's words are wrapped in a span (.wc-cb-txt), so the pane is
 //     as wide as its words and the value stays outside it, as in the study;
-//   • a bound hotkey's keycap is marked with its length (data-wc-keylen) so
-//     a single key is set large and a combo still fits (css/37).
+//   • a hotkey's keycap is marked with its length (data-wc-keylen) so a
+//     single key is set large and a combo still fits (css/37), including
+//     pickers built after boot.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -59,6 +70,7 @@
     var uid = 0;
 
     function TM() { return window.ThemeMotion || null; }
+    function inBars(el) { return !!(el && el.closest && el.closest('#sidebar-left, #sidebar-right')); }
 
     function eligible(sel) {
         if (!sel || sel.tagName !== 'SELECT') return false;
@@ -67,37 +79,49 @@
         return !!sel.closest('#sidebar-left, #sidebar-right');
     }
     // A field css/37 draws (the material label-select and hidden mirrors are not).
-    function isField(sel) {
-        return !!(sel && sel.tagName === 'SELECT' && !sel.multiple && !sel.classList.contains('material-mode-select') &&
-            sel.getAttribute('aria-hidden') !== 'true' && sel.closest('#sidebar-left, #sidebar-right'));
+    function isSelectField(el) {
+        return !!(el && el.tagName === 'SELECT' && !el.multiple && !el.classList.contains('material-mode-select') &&
+            el.getAttribute('aria-hidden') !== 'true' && inBars(el));
+    }
+    // The inline disclosures that take the field look (css/37 §1).
+    var DISC = '.ui-vis-trigger, .hk-list-trigger, .anim-lib-head';
+    function isDisc(el) { return !!(el && el.matches && el.matches(DISC) && inBars(el)); }
+    function isField(el) { return isSelectField(el) || isDisc(el); }
+    function fieldOf(t) {
+        if (!t || !t.closest) return null;
+        var el = t.closest('select, ' + DISC);
+        return isField(el) ? el : null;
     }
 
-    // ── Field motion: brightness (hi), chevron (open), list height (lb) ──
-    // Rows are 32 px, 5 px apart, 5 + 2 px padding (css/37 .wc-lbx-in); a
-    // long list shows MAXV rows and scrolls inside.
-    var ROW = 32, GAP = 5, PADV = 7, MAXV = 8;
+    // ── Field motion: brightness (hi), chevron (op), list height (lb) ────
+    var MAXV = 8;          // a longer list shows about this many rows and scrolls
     var moving = new Set();
-    function fieldRec(sel) {
-        if (sel._wcf) return sel._wcf;
+    function expanded(r) { return r.disc && r.el.getAttribute('aria-expanded') === 'true'; }
+    function fieldRec(el) {
+        if (el._wcf) return el._wcf;
         var tm = TM();
         if (!tm) return null;
-        var r = { sel: sel, hi: new tm.Spring(0, tm.PROF.local), op: new tm.Spring(0, tm.PROF.drawer),
+        var r = { el: el, disc: isDisc(el), hi: new tm.Spring(0, tm.PROF.local), op: new tm.Spring(0, tm.PROF.drawer),
             lb: new tm.Spring(0, tm.PROF.drawer), list: null, h: 0, hover: false, last: '', lastO: '', lastH: '' };
-        sel._wcf = r;
+        // A disclosure may already be open (its list survives in the page).
+        if (expanded(r)) { r.op.x = r.op.t = 1; }
+        el._wcf = r;
         return r;
     }
     function hiTarget(r) {
-        if (open && open.select === r.sel) return 1;
-        if (document.activeElement === r.sel) return 1;
+        if (open && open.select === r.el) return 1;
+        if (expanded(r)) return 1;
+        if (document.activeElement === r.el) return 1;
         return r.hover ? 0.5 : 0;
     }
-    function retarget(sel) {
-        if (!isField(sel)) return;
-        var r = fieldRec(sel);
+    function retarget(el) {
+        if (!isField(el)) return;
+        var r = fieldRec(el);
         if (!r) return;
         var tm = TM();
         var t = hiTarget(r);
         if (r.hi.t !== t) r.hi.to(t, tm.PROF.local);
+        if (r.disc) { var o = expanded(r) ? 1 : 0; if (r.op.t !== o) r.op.to(o, tm.PROF.drawer); }
         wakeFields(r);
     }
     function wakeFields(r) {
@@ -108,16 +132,16 @@
     function stepFields(dt) {
         moving.forEach(function (r) {
             r.hi.step(dt); r.op.step(dt); r.lb.step(dt);
-            var s = r.sel.style;
+            var s = r.el.style, prop = r.disc ? '--fl' : '--ci';
             var settled = r.hi.settled() && r.op.settled() && r.lb.settled();
             if (settled) {
                 // At rest css/37 says the same thing: drop the inline values.
-                s.removeProperty('--ci'); s.removeProperty('--open'); r.last = r.lastO = '';
+                s.removeProperty(prop); s.removeProperty('--open'); r.last = r.lastO = '';
             } else {
                 // Clamped: the spring overshoots, and a colour-mix past 100 %
                 // would void the whole declaration for that frame.
                 var ci = Math.max(0, Math.min(1, 0.5 + 0.5 * r.hi.x)).toFixed(3);
-                if (ci !== r.last) { s.setProperty('--ci', ci); r.last = ci; }
+                if (ci !== r.last) { s.setProperty(prop, ci); r.last = ci; }
                 var o = Math.max(0, Math.min(1, r.op.x)).toFixed(3);
                 if (o !== r.lastO) { s.setProperty('--open', o); r.lastO = o; }
             }
@@ -156,6 +180,71 @@
             if (v !== w.last) { w.el.style.setProperty('--wa', v); w.last = v; }
             if (w.sp.settled() || !w.el.isConnected) surging.delete(w);
         });
+    }
+
+    // ── Words that fit: the study's tracking, or a tighter one, then wrap ─
+    var ctx = null;
+    function textWidth(text, px) {
+        if (!ctx) ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = '400 ' + px + 'px Michroma, Eurostile, "Arial Black", sans-serif';
+        return ctx.measureText(text).width;
+    }
+    // Wider than the room at .12em (letter-spacing follows every letter)?
+    function tooLong(text, px, room) {
+        var t = String(text || '').replace(/\s+/g, ' ').trim().toUpperCase();
+        if (!t || !(room > 0)) return false;
+        return textWidth(t, px) + t.length * 0.12 * px > room;
+    }
+    function setFit(el, tight) {
+        if (tight) { if (el.getAttribute('data-wc-fit') !== 'tight') el.setAttribute('data-wc-fit', 'tight'); }
+        else if (el.hasAttribute('data-wc-fit')) el.removeAttribute('data-wc-fit');
+    }
+    // el._wcW: the element's width in CSS px when it came on screen.
+    function fitEl(el) {
+        var w = el._wcW;
+        if (!w) return;
+        if (el.tagName === 'SELECT') {
+            if (!isSelectField(el)) return;
+            var sm = !!el.closest('.layer-item');
+            var o = el.options[el.selectedIndex];
+            setFit(el, !!o && tooLong(o.textContent, sm ? 9 : 10.5, w - (sm ? 39 : 66)));
+            return;
+        }
+        if (el.matches(DISC)) {
+            var lab = el.querySelector('.ui-vis-trigger-label, .hk-list-trigger-label, .anim-lib-head-label');
+            var cnt = el.querySelector('.ui-vis-trigger-count, .hk-list-trigger-count');
+            var c = cnt ? cnt.textContent.trim() : '';
+            setFit(el, tooLong(lab ? lab.textContent : el.textContent, 10.5, w - 66 - (c ? c.length * 7 + 10 : 0)));
+            return;
+        }
+        var name = el.matches('.ui-vis-row') ? (el.querySelector('.ui-vis-row-name') || el) : el;
+        setFit(el, tooLong(name.textContent, 9, w - 35));
+    }
+    var FIT = '.checkbox-group > input[type="checkbox"] + label, .brush-ghost-head > .wc-cb-txt, .checkbox-group > label, ' +
+        '.mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, ' +
+        '.brush-radio-row:not(.arm-mode-wrap) > button, .brush-mode-row > button, .stream-format-grid > button, select, ' + DISC;
+    var io = null;
+    function uiScale() { return parseFloat(getComputedStyle(root).getPropertyValue('--ui-scale')) || 1; }
+    function watchFit(scope) {
+        if (!io) return;
+        if (scope.matches && scope.matches(FIT) && inBars(scope)) io.observe(scope);
+        if (scope.querySelectorAll) Array.prototype.forEach.call(scope.querySelectorAll(FIT), function (el) { if (inBars(el)) io.observe(el); });
+    }
+    function startFit() {
+        if (io || typeof IntersectionObserver !== 'function') return;
+        io = new IntersectionObserver(function (entries) {
+            var z = 0;
+            entries.forEach(function (en) {
+                var w = en.boundingClientRect.width;
+                if (!(w > 0)) return;          // not displayed yet (a shut drawer): wait
+                if (!z) z = uiScale();
+                var el = en.target;
+                el._wcW = w / z;
+                io.unobserve(el);
+                fitEl(el);
+            });
+        }, { rootMargin: '4000px 0px' });
+        ['sidebar-left', 'sidebar-right'].forEach(function (id) { var b = document.getElementById(id); if (b) watchFit(b); });
     }
 
     // The row the listbox goes under: the field's control group, else its
@@ -199,11 +288,21 @@
             inner.appendChild(o);
             items.push(o);
         });
-        // Its full height, from the rows (no layout read).
-        var n = Math.max(1, items.length), shown = Math.min(n, MAXV);
-        var h = shown * ROW + (shown - 1) * GAP + PADV;
-        if (n > MAXV) { inner.classList.add('wc-scroll'); inner.style.maxHeight = h + 'px'; }
-        return { list: list, items: items, h: h };
+        if (items.length > MAXV) inner.classList.add('wc-scroll');
+        return { list: list, inner: inner, items: items };
+    }
+    // Once, when the list opens (never in a frame): the options' tracking
+    // against the list's width, then the list's full height from its rows.
+    function measureList(b) {
+        var room = b.list.clientWidth - 35 - (b.items.length > MAXV ? 4 : 0);
+        b.items.forEach(function (o) { setFit(o, tooLong(o.textContent, 9, room)); });
+        var full = b.inner.offsetHeight;
+        if (b.items.length > MAXV) {
+            var cap = MAXV * 37 + 7;
+            b.inner.style.maxHeight = cap + 'px';
+            full = Math.min(full, cap);
+        }
+        return full;
     }
 
     function setActive(k) {
@@ -233,23 +332,25 @@
         sel.setAttribute('aria-expanded', 'true');
         sel.setAttribute('aria-controls', b.list.id);
         sel.classList.add('wc-open');
-        var cur = 0;
-        for (var i = 0; i < b.items.length; i++) if (+b.items[i].dataset.index === sel.selectedIndex) cur = i;
-        setActive(cur);
-        // The list grows on the drawer spring as the chevron turns (study
-        // openSelect: _open and _lbS to 1 on PROF.drawer).
-        var r = isField(sel) ? fieldRec(sel) : null;
+        var r = isSelectField(sel) ? fieldRec(sel) : null;
         if (r) {
             var tm = TM();
             if (r.list && r.list !== b.list) dropList(r);
-            r.list = b.list; r.h = b.h; r.lastH = '';
+            r.list = b.list; r.lastH = '';
+            b.list.style.height = '0px';
+            r.h = measureList(b);
             b.list.style.height = (Math.max(0, r.lb.x) * r.h).toFixed(1) + 'px';
+            // The list grows on the drawer spring as the chevron turns (study
+            // openSelect: _open and _lbS to 1 on PROF.drawer).
             r.op.to(1, tm.PROF.drawer); r.lb.to(1, tm.PROF.drawer);
             r.hi.to(hiTarget(r), tm.PROF.local);
             wakeFields(r);
         } else {
             b.list.style.height = 'auto';
         }
+        var cur = 0;
+        for (var i = 0; i < b.items.length; i++) if (+b.items[i].dataset.index === sel.selectedIndex) cur = i;
+        setActive(cur);
     }
 
     function closeOpen(refocus) {
@@ -337,10 +438,27 @@
             if (el && !el._wc) tm.pane(el);
         });
     }
+    // After a change the panes of that control are re-read every frame for
+    // a few seconds (ThemeMotion.sync acts only when the state differs), so
+    // a programmatic change made while the fade runs is not lost to it.
+    var watched = new Map(), WATCH_MS = 2600;
+    function watchStep() {
+        var tm = TM(), now = performance.now();
+        watched.forEach(function (until, el) {
+            if (!el.isConnected || now > until) { watched.delete(el); return; }
+            tm.sync(el);
+        });
+        return watched.size === 0;
+    }
     document.addEventListener('change', function (e) {
-        var tm = TM();
-        if (!tm || !e.target || e.target.type !== 'radio') return;
-        groupOf(e.target).forEach(function (r) { var el = cbPaneOf(r); if (el && el._wc) tm.sync(el); });
+        var tm = TM(), t = e.target;
+        if (!tm || !t || (t.type !== 'radio' && t.type !== 'checkbox') || !inBars(t)) return;
+        var until = performance.now() + WATCH_MS;
+        (t.type === 'radio' ? groupOf(t) : [t]).forEach(function (r) {
+            var el = cbPaneOf(r);
+            if (el && el._wc) { tm.sync(el); watched.set(el, until); }
+        });
+        if (watched.size) tm.run(watchStep);
     }, true);
 
     // Mouse / pen: take the press before the OS popup opens.
@@ -405,34 +523,61 @@
     document.addEventListener('focusin', function (e) {
         touchPane(e.target);
         if (isField(e.target)) retarget(e.target);
+        if (isSelectField(e.target)) fitEl(e.target);
     }, true);
     document.addEventListener('focusout', function (e) {
         if (isField(e.target)) { var s = e.target; setTimeout(function () { retarget(s); }, 0); }
     }, true);
     document.addEventListener('pointerover', function (e) {
-        var s = e.target && e.target.closest ? e.target.closest('select') : null;
-        if (!isField(s)) return;
+        var s = fieldOf(e.target);
+        if (!s) return;
         var r = fieldRec(s);
         if (r && !r.hover) { r.hover = true; retarget(s); }
     }, true);
     document.addEventListener('pointerout', function (e) {
-        var s = e.target && e.target.closest ? e.target.closest('select') : null;
-        if (!isField(s) || (e.relatedTarget && s.contains(e.relatedTarget))) return;
+        var s = fieldOf(e.target);
+        if (!s || (e.relatedTarget && s.contains(e.relatedTarget))) return;
         var r = s._wcf;
         if (r && r.hover) { r.hover = false; retarget(s); }
     }, true);
+    // A disclosure's own handler flips aria-expanded on click; follow it.
+    document.addEventListener('click', function (e) {
+        var d = fieldOf(e.target);
+        if (d && isDisc(d)) setTimeout(function () { retarget(d); }, 0);
+    }, true);
+    // A field's value changed (a pick, a key, the app): its words re-fit.
+    ['input', 'change'].forEach(function (t) {
+        document.addEventListener(t, function (e) { if (isSelectField(e.target)) fitEl(e.target); }, true);
+    });
 
-    // ── Keycaps: how long the bound key's text is (css/37 sizes it) ──────
+    // ── Keycaps: how long the key's text is (css/37 sizes it) ────────────
     function markKey(btn) {
         var t = (btn.textContent || '').trim();
         var v = t.length <= 2 ? '1' : (t.length > 6 ? 'l' : 'm');
         if (btn.getAttribute('data-wc-keylen') !== v) btn.setAttribute('data-wc-keylen', v);
+    }
+    function markKeysIn(node) {
+        if (node.matches && node.matches('.hk-picker-key')) markKey(node);
+        if (node.querySelectorAll) Array.prototype.forEach.call(node.querySelectorAll('.hk-picker-key'), markKey);
     }
     // js/48 paint() writes aria-pressed on every state change of a picker.
     var keyMo = new MutationObserver(function (list) {
         for (var i = 0; i < list.length; i++) {
             var el = list[i].target;
             if (el.nodeType === 1 && el.classList.contains('hk-picker-key')) markKey(el);
+        }
+    });
+    // Rows built after boot (js/48 pickers paint before they are inserted,
+    // js/49's hotkey rows, a layer's card): keycaps and words that fit.
+    var addMo = new MutationObserver(function (list) {
+        for (var i = 0; i < list.length; i++) {
+            var added = list[i].addedNodes;
+            for (var j = 0; j < added.length; j++) {
+                var n = added[j];
+                if (n.nodeType !== 1 || n.classList.contains('wc-lbx')) continue;
+                markKeysIn(n);
+                watchFit(n);
+            }
         }
     });
 
@@ -463,8 +608,16 @@
             if (tries++ < 80) setTimeout(attach, 250);
             return;
         }
-        document.querySelectorAll('#sidebar-left .hk-picker-key, #sidebar-right .hk-picker-key').forEach(markKey);
+        markKeysIn(document.getElementById('sidebar-left') || document.body);
+        markKeysIn(document.getElementById('sidebar-right'));
         keyMo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] });
+        ['sidebar-left', 'sidebar-right'].forEach(function (id) {
+            var b = document.getElementById(id);
+            if (b) addMo.observe(b, { childList: true, subtree: true });
+        });
+        // Words are measured in the display face, so wait for it.
+        var fonts = document.fonts && document.fonts.ready;
+        if (fonts && fonts.then) fonts.then(startFit, startFit); else startFit();
     })();
 
     window.ThemeFields = { close: function () { closeOpen(false); }, isOpen: function () { return !!open; } };
