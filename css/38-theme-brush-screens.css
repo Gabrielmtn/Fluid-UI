@@ -137,6 +137,20 @@ html[data-theme="walnut-copper"] .wcb-tile > :is(.wcb-n, .wcb-l) {
 html[data-theme="walnut-copper"] .wcb-tile > .wcb-n { left: 5px; }
 html[data-theme="walnut-copper"] .wcb-tile > .wcb-l { right: 5px; }
 
+/* "Left click also mirrors" (js/20 updateMirrorNote): a small engraved card
+   with its way out, on the drawer's one-container rule (study .card 303). */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb > .arm-mirror-note {
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 9px;
+    background: rgba(10, 6, 4, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(214, 140, 92, 0.7), inset 0 0 0 2px rgba(0, 0, 0, 0.3);
+    font: 400 12px/1.3 var(--ui-font-body);
+    color: #c9b39b;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+
 /* ── The arm editor: the chosen arm's own row; the others step aside ──── */
 html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-off { display: none; }
 html[data-theme="walnut-copper"] #sidebar-left .wcb-mb > .arm-colors-rows { gap: 0; }
@@ -588,6 +602,8 @@ html[data-theme="walnut-copper"] .wcb-cap.wcb-scap {
     color: var(--vfd);
     text-shadow: 0 0 6px rgba(114, 242, 212, 0.6);
 }
+/* No shapes yet: no screen and no caption, + and Clipboard start the row. */
+html[data-theme="walnut-copper"] #sidebar-left .brush-shapes-area:has(.brush-shapes-row:empty) .wcb-scap { display: none; }
 
 @media (forced-colors: active) {
     html[data-theme="walnut-copper"] .wcb-scr { border: 1px solid CanvasText; }

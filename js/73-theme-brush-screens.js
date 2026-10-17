@@ -123,6 +123,29 @@
         return t;
     }
 
+    // A tile the count just added powers up on the drawer spring (the
+    // study's --pw: a brush beyond the count is dim), stepped on js/71's
+    // frame and dropped once settled. Reduced motion: it is simply there.
+    var powering = [];
+    function powerUp(t) {
+        var T = TM();
+        if (!T || T.reduced()) return;
+        t._wcbPw = new T.Spring(0, T.PROF.drawer);
+        t._wcbPw.to(1, T.PROF.drawer);
+        t.style.setProperty('--pw', '0');
+        powering.push(t);
+        T.run(stepPower);
+    }
+    function stepPower(dt) {
+        for (var i = powering.length - 1; i >= 0; i--) {
+            var t = powering[i], s = t._wcbPw;
+            s.step(dt);
+            if (!t.isConnected || s.settled()) { t.style.removeProperty('--pw'); powering.splice(i, 1); }
+            else t.style.setProperty('--pw', Math.max(0, Math.min(1, s.x)).toFixed(3));
+        }
+        return !powering.length;
+    }
+
     // Once per row js/20 builds: the head line for the tip screen (the
     // row's own tip square moves onto it as the caption), and the Pressure
     // pane's indicator. Nothing the row's handlers hold is replaced.
@@ -235,8 +258,8 @@
         // syncEditor). One read, on the change only.
         if (MB.shown !== row) {
             MB.shown = row;
-            var c = hit >= 0 ? cells[hit] : null;
-            MB.grid.scrollTop = c ? Math.max(0, c.offsetTop - 6) : 0;
+            var on = hit >= 0 ? cells[hit] : null;
+            MB.grid.scrollTop = on ? Math.max(0, on.offsetTop - 6) : 0;
         }
     }
 
@@ -248,8 +271,12 @@
             MB.scr.hidden = !n;
             if (!n) return;
             if (MB.sel >= n) MB.sel = n - 1;
-            var tiles = MB.tiles;
-            while (tiles.children.length < n) tiles.appendChild(makeTile(tiles.children.length));
+            var tiles = MB.tiles, had = tiles.children.length;
+            while (tiles.children.length < n) {
+                var nt = makeTile(tiles.children.length);
+                tiles.appendChild(nt);
+                if (had) powerUp(nt);       // the count grew; not the first build
+            }
             while (tiles.children.length > n) tiles.removeChild(tiles.lastChild);
             var sel = null;
             rows.forEach(function (row, i) {
@@ -348,7 +375,11 @@
             var had = g.contains(document.activeElement) || focus;
             pickTip(k);
             var c = g.children[k];
-            if (had && c) c.focus({ preventScroll: false });
+            if (!had || !c) return;
+            // The roving stop moves with it now (the repaint that follows the
+            // pick would set the same), so focus lands on a Tab stop.
+            for (var j = 0; j < g.children.length; j++) g.children[j].tabIndex = j === k ? 0 : -1;
+            c.focus({ preventScroll: false });
         }
         g.addEventListener('click', function (e) {
             var c = e.target.closest('.wcb-ms');
