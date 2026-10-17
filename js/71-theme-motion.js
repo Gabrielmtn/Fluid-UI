@@ -2,9 +2,11 @@
 // js/71-theme-motion.js — Walnut & Copper motion, ported from the study.
 //
 // Verbatim from design/study-lite.html (v19): Spring + profiles (1207-1218),
-// Cathode (1219-1233), atom spin (1234-1242), the press surge (pressable,
-// 1864-1871), tints + name chips (2218-2244) and the per-element frame
-// (sidebarFrame, 2872-2898). Only the selectors and one property name change:
+// Cathode (1219-1233), the press surge (pressable, 1864-1871), tints + name
+// chips (2218-2244) and the per-element frame (sidebarFrame, 2872-2898). The
+// atoms (1234-1242) gain momentum and the drawers' height animation
+// (2720-2758) becomes transforms; both are described below. Only the
+// selectors and one property name change:
 // the study's --i is written as --ci here, because the app already uses an
 // inherited --i on every sidebar section (js/20 stampGroupRows, on the
 // selector contract) and a per-element --i would collide with it.
