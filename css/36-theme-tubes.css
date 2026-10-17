@@ -40,6 +40,10 @@
    ================================================================ */
 @layer theme {
 
+/* The tube is drawn through Blink's slider parts; a browser without them
+   (Firefox) keeps the legacy fader rather than half a tube. */
+@supports selector(::-webkit-slider-thumb) {
+
 /* ── 1. Every tube ─────────────────────────────────────────────────────
    (:where() keeps the dial / telegraph exclusion out of the specificity.) */
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)) {
@@ -176,6 +180,8 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
     cursor: default;
 }
 
+} /* @supports */
+
 /* ── 4. Sidebar rows: the study's .head over a .lad.sm ──────────────────
    Head 13.6 px (label 10.5/1.2 Michroma, value 13/1 Share Tech Mono, on
    one baseline, 4 px in), the tube box 38 px overlapping it by 1 px (the
@@ -290,6 +296,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .fader-scale { display: none; }
 /* .mslide is a grid with a 2 px gap: the channel's 4 px gap less 2 */
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-fader { margin-top: -2px; }
+@supports selector(::-webkit-slider-thumb) {
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range] {
     --input-py: 9px;                /* 22 + 2 x 9 = 40 px, .navbar .mslide .track */
     --wc-dy: 15.5px;
@@ -358,6 +365,8 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
         outline-color: Highlight;
     }
 }
+
+} /* @supports */
 
 /* Printed scale under faders (popups that still show it): engraved. */
 html[data-theme="walnut-copper"] .fader-scale {
