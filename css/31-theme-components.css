@@ -189,21 +189,7 @@ html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-channel[data-ui-key="Co
     color: #fff6e6;
     text-shadow: 0 0 1px #000, 0 0 3px rgba(12, 4, 0, 0.95), 0 0 6px rgba(12, 4, 0, 0.8), 0 0 calc(var(--ci) * 12px) rgb(var(--gc) / calc(var(--ci) * 0.4));
 }
-/* Presets: a field (60 % brightness) with the copper chevron cell. */
-html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger {
-    --ci: 0.6;
-    width: 100%;
-    justify-content: flex-start;
-    padding: 0 46px 0 16px;
-    background-image:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M15 16.5L19 20.5L23 16.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E"),
-        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.2)), transparent 75%),
-        var(--mesh-dim),
-        linear-gradient(170deg, #1a1210, #090605);
-    background-size: 38px 40px, auto, 3.5px 6.06px, auto;
-    background-position: right center, center, center, center;
-    background-repeat: no-repeat, no-repeat, repeat, no-repeat;
-}
+/* Presets: the top bar's field, css/37-theme-fields.css. */
 
 
 
@@ -217,13 +203,6 @@ html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-channel[data-ui-key="Co
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.1'/%3E%3C/svg%3E"),
         linear-gradient(175deg, #5a4e48, #3a302b 55%, #2a221f);
     background-size: auto, 3.5px 6.06px, auto;
-}
-html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger {
-    background-image:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M15 16.5L19 20.5L23 16.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E"),
-        radial-gradient(ellipse 85% 100% at 50% 50%, rgb(255 150 64 / 0.16), transparent 80%),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.1'/%3E%3C/svg%3E"),
-        linear-gradient(175deg, #5a4e48, #3a302b 55%, #2a221f);
 }
 
 } /* @layer theme */

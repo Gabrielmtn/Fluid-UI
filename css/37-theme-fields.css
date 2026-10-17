@@ -730,7 +730,12 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-vis >
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-vis:has(> input:focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 3px; }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.layer-vis, .layer-check) > input:focus-visible + .layer-vis-box { outline: none; }
 
-/* 3i. Every other checkbox row keeps the study's 8 px rhythm. */
+/* 3i. In a panel that spaces its rows with a flex gap (Multi-brush, Mutate)
+   the gap is the rhythm; the rows add no margin of their own. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.arm-colors-rows, .mutation-controls) > :is(.checkbox-group:has(> input[type="checkbox"] + label), .control-group:has(> select:not([aria-hidden="true"]))) {
+    margin-bottom: 0;
+}
+/* Every other checkbox row keeps the study's 8 px rhythm. */
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group:has(> label > input[type="checkbox"]) {
     display: flex;
     align-items: center;
@@ -971,7 +976,6 @@ html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], inpu
     outline-offset: 3px;
 }
 html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea)::selection { background: rgba(255, 120, 40, 0.4); }
-html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea)::placeholder { color: rgba(160, 138, 118, 0.7); }
 html[data-theme="walnut-copper"] :is(input, textarea)[aria-invalid="true"] {
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px #ff6a4d, inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
 }
@@ -1203,7 +1207,67 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-gr
 
 
 /* ════════════════════════════════════════════════════════════════════
-   8. FORCED COLOURS and REDUCED MOTION
+   8. TOP-BAR FIELDS: the study's .msel (506-512, 532-535)
+   Material type and Presets are fields at 60 % (study matE / presetE:
+   level .6, 1 with focus): the label in the pane's lit colour at .6 with
+   its glow, 14 px in, a 38 px chevron cell whose divider stops 9 px from
+   top and bottom, the chevron 16 px from the right. The glass is the
+   console stand-in (css/31 cluster glass, css/33 material). The material
+   select keeps its css/33 font and sizing (js/29 measures it); only its
+   insets, chevron and glow are set here. js/71 drives the Presets
+   button's --ci as a pane (0 unless pressed), so the field's level is
+   written out literally rather than through --ci.
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] {
+    /* The study's chevron: a 6 px L of 1.5 px borders rotated 45deg, its
+       box centred 16 + 3 px from the right and 2 px above the middle. */
+    --wcf-msel-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath transform='translate(19 18) rotate(45)' d='M2.25-3V2.25H-3' fill='none' stroke='%23f2b38a' stroke-width='1.5' stroke-linejoin='miter'/%3E%3C/svg%3E");
+    --wcf-console-mesh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.1'/%3E%3C/svg%3E");
+}
+html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0 44px 0 14px;
+    letter-spacing: 0.16em;
+    color: color-mix(in oklab, var(--lit) 60%, var(--unlit));
+    text-shadow: 0 0 4px rgb(255 110 30 / 0.57), 0 0 9.6px rgb(255 110 30 / 0.36);
+    background-image:
+        var(--wcf-msel-chev),
+        radial-gradient(ellipse 85% 100% at 50% 50%, rgb(255 150 64 / 0.372), rgb(255 110 30 / 0.108) 70%, transparent 100%),
+        var(--wcf-console-mesh),
+        linear-gradient(175deg, #5a4e48, #3a302b 55%, #2a221f);
+    background-size: 38px 40px, auto, 3.5px 6.06px, auto;
+    background-position: right center, center, center, center;
+    background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+}
+html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger:is(:focus, [aria-expanded="true"]) {
+    color: var(--lit);
+    text-shadow: 0 0 6px rgb(255 110 30 / 0.95), 0 0 16px rgb(255 110 30 / 0.6);
+}
+html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select {
+    padding: 0 44px 0 14px;
+    text-shadow: 0 0 4px rgb(255 110 30 / 0.57), 0 0 9.6px rgb(255 110 30 / 0.36);
+    background:
+        var(--wcf-msel-chev) right center / 38px 40px no-repeat,
+        radial-gradient(ellipse 85% 100% at 50% 50%, rgb(255 150 64 / 0.372), rgb(255 110 30 / 0.108) 70%, transparent 100%),
+        var(--wcf-console-mesh) center / 3.5px 6.06px,
+        linear-gradient(175deg, #5a4e48, #3a302b 55%, #2a221f);
+}
+/* The study's top-bar fields change level with focus only, not hover. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select:hover:not(:focus) {
+    color: color-mix(in oklab, var(--lit) 60%, var(--unlit));
+}
+html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select:focus {
+    color: var(--lit);
+    text-shadow: 0 0 6px rgb(255 110 30 / 0.95), 0 0 16px rgb(255 110 30 / 0.6);
+}
+@media (max-width: 1700px) {
+    html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger { letter-spacing: 0.12em; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   9. FORCED COLOURS and REDUCED MOTION
    Glass and glow give way to system colours; every pane gets a border and
    a lit one a Highlight outline (study 105-109, 322-326, 399). Native
    checkboxes come back so their state reads in the system's colours.
