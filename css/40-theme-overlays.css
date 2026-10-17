@@ -1400,15 +1400,17 @@ html[data-theme="walnut-copper"] body.zoom-mode #zoomBadge {
    nothing here changes a size: every line height is pinned to legacy's.
    Captions are engraved (.lbl 40-41), values are numbers in Share Tech
    Mono (.val 88), the canvas readout a VFD reading. */
+/* The captions name the pills (aria-labelledby): legacy letters them with
+   text-transform, so their names are already in capitals; they keep that
+   (no name changes here; HANDOFF item 12 is Gabriel's call). */
 html[data-theme="walnut-copper"] #quality-underbar :is(.qub-dd-cap),
 html[data-theme="walnut-copper"] .demo-clock-cap {
     font-family: var(--ui-font-display);
     font-weight: 400;
-    font-size: calc(7.5px / 0.7);
+    font-size: 7.5px;
     line-height: 10px;
-    letter-spacing: calc(0.14em * 0.7);
-    font-variant-caps: all-small-caps;
-    text-transform: none;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.7);
 }
