@@ -419,35 +419,82 @@
         wake(r);
     }
 
-    // ── Atoms: which one a change spins ────────────────────────────────
-    // Group heads and boxes that open with their own bead row; the same list
-    // as css/35. A change spins its group's atom, or the tray's own (its
-    // first group) when it sits before any of them.
-    var NOT_FIRST = ':not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"])))';
-    var GROUP = [
-        '.section-body > .brush-section-label' + NOT_FIRST + ':not(:has(+ select))',
-        '.section-body > div' + NOT_FIRST + ' > .brush-section-label:first-child:not([for]):not(.brush-time-group > *)',
+    // ── Groups inside a tray: stamped here, styled by css/35 ───────────
+    // Every group in a drawer opens with a bead row (study .fil). A group
+    // that opens with its own row is stamped data-wc-group="row"; the group
+    // a tray opens with is stamped "first" (the tray's own row and atom are
+    // its). Group headings are stamped data-wc-sect (the study's .sect). The
+    // stamps go on once at init and again for a tray whose elements change
+    // (a layer list re-rendered, a list rebuilt); text changes are ignored.
+    var GROUP_AT = [
+        '.section-body > .brush-section-label:not(:has(+ select))',
+        '.section-body > div > .brush-section-label:first-child:not([for]):not(.brush-time-group > *)',
         '.brush-settings-panel > .brush-fold', '.brush-settings-panel > .brush-fold ~ .brush-section-label',
         '.layers-subsection', '.layers-options-group', '.mutation-locks', '#layersPanel > .layer-item',
         '.fx-cluster + .fx-group', '.control-group:has(#saveSettingsBtn)', 'div:has(> #sidebarPresetList)'
     ].join(', ');
+    var SECT_AT = [
+        '.section-body > .brush-section-label:not(:has(+ select))',
+        '.section-body > div > .brush-section-label:first-child:not([for]):not(.brush-time-group > *)',
+        '.brush-settings-panel > .brush-section-label',
+        '.layers-subsection-title', '.layers-options-title', '.mutation-locks-label', '.palette-label',
+        '.control-group:has(#saveSettingsBtn) > label', 'div:has(> #sidebarPresetList) > label'
+    ].join(', ');
+    // Nothing rendered before it in its tray: the tray's own row opens it.
+    function isFirst(el, body) {
+        for (var n = el; n && n !== body; n = n.parentElement) {
+            for (var p = n.previousElementSibling; p; p = p.previousElementSibling) {
+                if (p.hidden || (p.type === 'file') || getComputedStyle(p).display === 'none') continue;
+                return false;
+            }
+        }
+        return true;
+    }
+    function stampTray(body) {
+        var groups = new Set(body.querySelectorAll(GROUP_AT)), heads = new Set(body.querySelectorAll(SECT_AT));
+        groups.forEach(function (g) { var v = isFirst(g, body) ? 'first' : 'row'; if (g.getAttribute('data-wc-group') !== v) g.setAttribute('data-wc-group', v); });
+        body.querySelectorAll('[data-wc-group]').forEach(function (g) { if (!groups.has(g)) g.removeAttribute('data-wc-group'); });
+        heads.forEach(function (h) { if (!h.hasAttribute('data-wc-sect')) h.setAttribute('data-wc-sect', ''); });
+        body.querySelectorAll('[data-wc-sect]').forEach(function (h) { if (!heads.has(h)) h.removeAttribute('data-wc-sect'); });
+    }
+    function hasElement(nodes) { for (var i = 0; i < nodes.length; i++) if (nodes[i].nodeType === 1) return true; return false; }
+    var stampMo = new MutationObserver(function (list) {
+        var bodies = new Set();
+        for (var i = 0; i < list.length; i++) {
+            var m = list[i];
+            if (!hasElement(m.addedNodes) && !hasElement(m.removedNodes)) continue;
+            var b = m.target.closest && m.target.closest('.section-body');
+            if (b) bodies.add(b);
+        }
+        bodies.forEach(stampTray);
+    });
+
+    // ── Atoms: which one a change spins ────────────────────────────────
+    // A change spins its group's atom, or the tray's own (its first group)
+    // when it sits before any stamped group.
     var DIAL = '#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range]';
     function groupOf(el) {
         var body = el.closest('.section-body');
         if (!body) return null;
         for (var n = el; n && n !== body; n = n.parentElement) {
-            if (n.matches(GROUP)) return n;
-            for (var p = n.previousElementSibling; p; p = p.previousElementSibling) if (p.matches(GROUP)) return p;
+            var v = n.getAttribute('data-wc-group');
+            if (v) return v === 'row' ? n : body;
+            for (var p = n.previousElementSibling; p; p = p.previousElementSibling) {
+                v = p.getAttribute('data-wc-group');
+                if (v) return v === 'row' ? p : body;
+            }
         }
         return body;
     }
-    function atomRec(el) {
-        return el._wca || (el._wca = { kind: 'atom', el: el, at: newAtom(), last: '' });
+    // rim: the atom's radius in px (a bead-row rosette is 14 px across, a
+    // dial's yin-yang hub 30 px), for the perceptual rest and write steps.
+    function atomRec(el, rim) {
+        return el._wca || (el._wca = { kind: 'atom', el: el, at: newAtom(), lastA: 0, rim: rim || 7 });
     }
-    function spin(el) { var r = atomRec(el); kickAtom(r.at); wake(r); }
+    function spin(el, rim) { var r = atomRec(el, rim); kickAtom(r.at); wake(r); }
     function kickFor(el) {
         if (RM || !el || !el.closest) return;
-        if (el.matches(DIAL)) { spin(el); return; }
+        if (el.matches(DIAL)) { spin(el, 15); return; }
         var sec = el.closest('.sidebar-section');
         if (!sec || sec.classList.contains('collapsed')) return;     // nothing to see spin
         var g = groupOf(el);
@@ -623,7 +670,10 @@
         document.querySelectorAll('#sidebar-left .sidebar-section, #sidebar-right .sidebar-section').forEach(function (s) {
             var c = columnOf(s);
             if (c && c.cache == null) c.cache = c.scroller.scrollTop;
+            var b = s.querySelector(':scope > .section-body');
+            if (b) stampTray(b);
         });
+        document.querySelectorAll('#sidebar-left, #sidebar-right').forEach(function (bar) { stampMo.observe(bar, { childList: true, subtree: true }); });
         mo.observe(document.body, { subtree: true, attributes: true, attributeOldValue: true,
             attributeFilter: ['class', 'aria-pressed', 'aria-checked', 'aria-selected'] });
         return true;

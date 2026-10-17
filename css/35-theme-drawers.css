@@ -12,10 +12,13 @@
 
    State stays the app's: .collapsed on .sidebar-section (js/20
    toggleSection) and aria-expanded on the title. js/71 adds presentation
-   classes only while a drawer moves:
+   hooks:
      .wc-closing  a closing drawer keeps its open layout until it settles
      .wc-mv       the drawer whose tray is sliding (clip + slide below)
      .wc-anim     on the sidebar while any of its drawers moves
+     data-wc-group="row" | "first"  a group inside a tray that opens with
+                  its own bead row, or the tray's first group (its row is
+                  the tray's own); data-wc-sect  a group heading
    and writes --dp (drawer spring), --wc-H (tray height, once per toggle),
    --wl / --wlc (lamp), --wc-rot (atoms) and, while a column glides, each
    section's own `translate`.
@@ -196,15 +199,10 @@ html[data-theme="walnut-copper"] .wc-anim .sidebar-section.collapsed:not(.wc-clo
 /* ── Bead rows and atoms (study .fil 164-169) ─────────────────────────
    "One container per column": a dotted copper bead row opens each group,
    with a small atom resting in a 26 px gap. The tray's own row opens its
-   first group; every later group heading or group box gets its own. An
-   atom spins when something in its group changes (js/71, --wc-rot). */
+   first group; a later group (js/71 stamps it data-wc-group="row") gets
+   its own. An atom spins when something in its group changes (--wc-rot). */
 html[data-theme="walnut-copper"] :is(.sidebar-section:not(.collapsed), .sidebar-section.wc-closing) > .section-body::before,
-html[data-theme="walnut-copper"] .section-body :is(
-    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
-    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
-    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
-    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
-    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::before {
+html[data-theme="walnut-copper"] .section-body [data-wc-group="row"]::before {
     content: "";
     position: absolute;
     left: 10px;
@@ -216,12 +214,7 @@ html[data-theme="walnut-copper"] .section-body :is(
     mask: linear-gradient(90deg, #000 calc(50% - 13px), transparent calc(50% - 13px) calc(50% + 13px), #000 calc(50% + 13px));
 }
 html[data-theme="walnut-copper"] :is(.sidebar-section:not(.collapsed), .sidebar-section.wc-closing) > .section-body::after,
-html[data-theme="walnut-copper"] .section-body :is(
-    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
-    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
-    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
-    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
-    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::after {
+html[data-theme="walnut-copper"] .section-body [data-wc-group="row"]::after {
     --wc-rot: inherit;
     content: "";
     position: absolute;
@@ -239,40 +232,26 @@ html[data-theme="walnut-copper"] .section-body :is(
 /* A group that opens with its own bead row: the study's .fil geometry, the
    row 6 px and the atom 0 px from the group's top, content 22 px down, and
    18 px from the group before it (.fil padding-bottom 8 + gap 10). The row
-   spans the tray less 10 px each side, as the tray's own does. */
-html[data-theme="walnut-copper"] .section-body :is(
-    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
-    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
-    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
-    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
-    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList)) {
+   spans the tray less 10 px each side, as the tray's own does. The
+   !important beats the inline margins and rules a few groups carry. */
+html[data-theme="walnut-copper"] .section-body [data-wc-group="row"] {
     position: relative;
     margin-top: 18px !important;
     padding-top: 22px !important;
     border-top: 0 !important;
 }
-html[data-theme="walnut-copper"] .section-body :is(
-    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
-    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
-    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
-    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
-    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::before {
+html[data-theme="walnut-copper"] .section-body [data-wc-group="row"]::before {
     left: -2px;
     right: -2px;
     top: 6px;
 }
-html[data-theme="walnut-copper"] .section-body :is(
-    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
-    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
-    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
-    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
-    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::after {
+html[data-theme="walnut-copper"] .section-body [data-wc-group="row"]::after {
     top: 0;
 }
 /* Mutate's tray is a flex column with a 10 px gap: 8 more makes the 18. */
-html[data-theme="walnut-copper"] .sidebar-section#mutation-section > .section-body > .mutation-locks { margin-top: 8px !important; }
+html[data-theme="walnut-copper"] #mutation-section > .section-body > [data-wc-group="row"] { margin-top: 8px !important; }
 /* A layer dragged over another: its bead row lights as the drop line. */
-html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel > .layer-item.drag-over::before {
+html[data-theme="walnut-copper"] #layersPanel > .layer-item.drag-over[data-wc-group="row"]::before {
     border-top: 2px solid var(--cu-hi);
     box-shadow: 0 0 8px rgba(255, 110, 30, 0.7);
     -webkit-mask: none;
@@ -280,12 +259,7 @@ html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel > .la
 }
 
 /* ── Group headings: the study's .sect (157) ──────────────────────── */
-html[data-theme="walnut-copper"] .section-body :is(
-    .section-body > .brush-section-label:not(:has(+ select)),
-    .section-body > div > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
-    .brush-settings-panel > .brush-section-label,
-    .layers-subsection-title, .layers-options-title, .mutation-locks-label, .palette-label,
-    .control-group:has(#saveSettingsBtn) > label, div:has(> #sidebarPresetList) > label) {
+html[data-theme="walnut-copper"] .section-body [data-wc-sect] {
     display: block;
     /* The gap above is the bead row's (18 px) or the tray's own. */
     margin-left: 0;
@@ -300,7 +274,7 @@ html[data-theme="walnut-copper"] .section-body :is(
 }
 /* Headings that share a row keep it: Path Layers beside + New Path, Lock:
    before its chips, Palettes beside its key hint. */
-html[data-theme="walnut-copper"] .section-body :is(.layers-subsection-title, .mutation-locks-label, .palette-label) {
+html[data-theme="walnut-copper"] .section-body :is(.layers-subsection-title, .mutation-locks-label, .palette-label)[data-wc-sect] {
     display: inline-flex;
     align-items: center;
     gap: 8px;
