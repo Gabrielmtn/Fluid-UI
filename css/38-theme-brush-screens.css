@@ -5,7 +5,844 @@
    so a rule here wins a tie with the earlier theme sheets. Theme rules are
    scoped to html[data-theme="walnut-copper"]. Button colour may live here
    (js/38 sanctions css/31 and 33-39 theme sheets).
+
+   Values are the study's (design/study-lite.html): the screen 267-271, the
+   stamps 272-280, the brush tiles 281-299, panes 171-197, labels 41 / 157,
+   the colour lamp 309-312. js/73-theme-brush-screens.js builds the screens
+   and the tip head; the arm rows and shape tiles are js/20's.
+
+   Specificity: the sidebar pane rule in css/34 (an id plus nine classes)
+   sizes every sidebar button. The arm editor's buttons here carry a second
+   id-weight term (:not(#wcb)) so their study sizes win without !important.
+   --ci (the cathode brightness js/71 writes) is registered non-inherited:
+   --cv carries it to children and pseudo-elements.
    ================================================================ */
 @layer theme {
+
+/* ── Tokens: the study's meshes (134-138) and the five built-in tips as
+   stamps (js/20 BRUSH_TIPS: Soft, Blob, Chisel, Streak, Ring), white on
+   clear, for the phosphor mask. ─────────────────────────────────────── */
+html[data-theme="walnut-copper"] {
+    --wcb-mesh-dim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.10' stroke-width='.7'/%3E%3C/svg%3E");
+    --wcb-mesh-lit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ff9a4d' stroke-width='.8'/%3E%3C/svg%3E");
+    --wcb-mesh-vfd: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%2372f2d4' stroke-opacity='.13' stroke-width='.7'/%3E%3C/svg%3E");
+    --wcb-tip-0: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='.45' stop-color='%23fff' stop-opacity='.8'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='48' cy='48' r='38' fill='url(%23g)'/%3E%3C/svg%3E");
+    --wcb-tip-1: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='48' cy='48' r='30' fill='%23fff'/%3E%3C/svg%3E");
+    --wcb-tip-2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='22' y='22' width='52' height='52' fill='%23fff'/%3E%3C/svg%3E");
+    --wcb-tip-3: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='10' y='33' width='76' height='30' fill='%23fff'/%3E%3C/svg%3E");
+    --wcb-tip-4: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='48' cy='48' r='29' fill='none' stroke='%23fff' stroke-width='7'/%3E%3C/svg%3E");
+}
+
+/* ── The screen (.scr 267-271): dark teal glass, the VFD mesh, the copper
+   bezel, scanlines and a glass sheen over everything on it. ───────────── */
+html[data-theme="walnut-copper"] .wcb-scr {
+    position: relative;
+    box-sizing: border-box;
+    min-width: 0;
+    border-radius: 10px;
+    padding: 8px;
+    background:
+        radial-gradient(ellipse at center, rgba(40, 160, 130, 0.11), transparent 72%),
+        var(--wcb-mesh-vfd) center / 5px 8.66px,
+        #040b0a;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.15),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] .wcb-scr::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 8px;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px),
+        linear-gradient(160deg, rgba(220, 255, 245, 0.06), transparent 40%);
+}
+html[data-theme="walnut-copper"] .wcb-scr[hidden] { display: none; }
+
+/* ── A stamp on the screen (.st 272-280): its image is the mask of a
+   phosphor fill. Resting .4, hover .72, chosen 1 (here the cathode: js/71
+   strikes it on and fades it off), copper corner brackets on the chosen.
+   The study's drop-shadows run before its mask and never show; left out. */
+html[data-theme="walnut-copper"] .wcb-st {
+    --cv: var(--ci);
+    --lv: calc(0.4 + 0.6 * var(--ci));
+    position: relative;
+    box-sizing: border-box;
+    aspect-ratio: 1;
+    min-width: 0;
+    border-radius: 3px;
+    cursor: pointer;
+    outline-offset: 3px;
+    -webkit-tap-highlight-color: transparent;
+}
+html[data-theme="walnut-copper"] .wcb-st[aria-checked="true"] { --ci: 1; }   /* until js/71 registers it */
+html[data-theme="walnut-copper"] .wcb-st:hover { --lv: max(0.72, calc(0.4 + 0.6 * var(--ci))); }
+html[data-theme="walnut-copper"] .wcb-st > i {
+    position: absolute;
+    inset: 3px;
+    background: #7ff5d9;
+    -webkit-mask: var(--m) center / contain no-repeat;
+    mask: var(--m) center / contain no-repeat;
+    opacity: var(--lv);
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] :is(.wcb-st[aria-checked="true"], .wcb-sscr .brush-shape-btn.active)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 0 / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 0 / 1.5px 6px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 0 / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 0 / 1.5px 6px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 100% / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 100% / 1.5px 6px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 100% / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 100% / 1.5px 6px no-repeat;
+}
+html[data-theme="walnut-copper"] :is(.wcb-st, .wcb-sscr .brush-shape-btn):focus-visible {
+    outline: 2px solid var(--ui-focus);
+}
+
+/* ── Multi-Brush: one tile per arm, four to a row (.btiles / .bt) ─────── */
+/* The panel is a 6 px flex column (it carries .arm-colors-rows too), so
+   2 px more makes the study's 8 px step to the editor. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-tscr { margin: 0 0 2px; }
+/* The count slider, moved right above the screen it drives (study 743-745):
+   a little air from the symmetry settings above it, the study's 8 px below. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb > .mixer-channel.wcb-count {
+    margin: 10px 0 0;
+    padding-bottom: 2px;
+}
+html[data-theme="walnut-copper"] .wcb-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+}
+html[data-theme="walnut-copper"] .wcb-tile { --sc: 127 245 217; --pw: 1; }
+/* Beyond the count: dimmed, shown, not pickable (js/73 eases --pw). */
+html[data-theme="walnut-copper"] .wcb-tile.wcb-off { --pw: 0; cursor: default; }
+html[data-theme="walnut-copper"] .wcb-tile > i {
+    inset: 22% 16% 14%;
+    background: rgb(var(--sc));
+    opacity: calc(var(--lv) * (0.25 + 0.75 * var(--pw)));
+}
+html[data-theme="walnut-copper"] .wcb-tile > :is(.wcb-n, .wcb-l) {
+    position: absolute;
+    top: 4px;
+    font: 400 11px/1 var(--ui-font-mono);
+    letter-spacing: 0;
+    color: var(--vfd);
+    text-shadow: 0 0 5px rgba(114, 242, 212, 0.6);
+    opacity: calc(0.35 + 0.65 * var(--pw));
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] .wcb-tile > .wcb-n { left: 5px; }
+html[data-theme="walnut-copper"] .wcb-tile > .wcb-l { right: 5px; }
+
+/* "Left click also mirrors" (js/20 updateMirrorNote): a small engraved card
+   with its way out, on the drawer's one-container rule (study .card 303). */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb > .arm-mirror-note {
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 9px;
+    background: rgba(10, 6, 4, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(214, 140, 92, 0.7), inset 0 0 0 2px rgba(0, 0, 0, 0.3);
+    font: 400 12px/1.3 var(--ui-font-body);
+    color: #c9b39b;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+
+/* ── The arm editor: the chosen arm's own row; the others step aside ──── */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-off { display: none; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb > .arm-colors-rows { gap: 0; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 76px;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+}
+/* "Brush N" (.lbl 41) */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > .arm-label {
+    grid-column: 1;
+    min-width: 0;
+    padding-left: 0;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > .arm-label::before { content: "Brush "; }
+/* The colour lamp (.sw 309-312): the arm's colour well, glowing its colour. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > input[type="color"].arm-picker {
+    --sc: 127 245 217;
+    grid-column: 2;
+    -webkit-appearance: none;
+    appearance: none;
+    box-sizing: border-box;
+    width: 76px;
+    height: 26px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+    background:
+        radial-gradient(ellipse at center, rgb(var(--sc) / 0.95) 0 30%, rgb(var(--sc) / 0.45) 72%, rgb(var(--sc) / 0.18)),
+        var(--wcb-mesh-dim) center / 5px 8.66px,
+        #0c0807;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        0 0 12px rgb(var(--sc) / 0.35);
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > input.arm-picker::-webkit-color-swatch-wrapper { padding: 0; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > input.arm-picker::-webkit-color-swatch { border: 0; opacity: 0; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > input.arm-picker:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > .arm-row-mid {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
+}
+
+/* ── Compact panes (.cp.sm 171-186): the arm editor's buttons, the Brush
+   drawer's tip row and its + / Clipboard. Glass, the fine hex mesh, the
+   inset copper line; lit by the cathode (--ci, js/71). ────────────────── */
+html[data-theme="walnut-copper"] #sidebar-left :where(
+        .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+        .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+        #brushTipFoldBody > .brush-tip-row > .brush-tip-btn,
+        .brush-shapes-actions > .brush-shape-add,
+        .brush-shapes-actions > .brush-shape-paste):not(#wcb) {
+    --gc: var(--tgc, 255 110 30);
+    --cv: var(--ci);
+    position: relative;
+    isolation: isolate;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    height: 32px;
+    min-height: 32px;
+    min-width: 0;
+    margin: 0;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 5px;
+    font: 400 9px/1 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
+    color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit)));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--wcb-mesh-dim) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+/* The lit mesh behind a lit pane and the glass sheen (.cp::before / ::after). */
+html[data-theme="walnut-copper"] #sidebar-left :where(
+        .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+        .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+        #brushTipFoldBody > .brush-tip-row > .brush-tip-btn,
+        .brush-shapes-actions > .brush-shape-add,
+        .brush-shapes-actions > .brush-shape-paste):not(#wcb)::before {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    border: 0;
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--wcb-mesh-lit) center / 7px 12.12px;
+    box-shadow: none;
+    opacity: calc(var(--cv) * 0.3);
+    -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+    mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+}
+html[data-theme="walnut-copper"] #sidebar-left :where(
+        .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+        .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+        .brush-shapes-actions > .brush-shape-add,
+        .brush-shapes-actions > .brush-shape-paste):not(#wcb)::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 3px;
+    pointer-events: none;
+    background: linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%);
+}
+html[data-theme="walnut-copper"] #sidebar-left :where(
+        .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+        .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+        #brushTipFoldBody > .brush-tip-row > .brush-tip-btn,
+        .brush-shapes-actions > .brush-shape-add,
+        .brush-shapes-actions > .brush-shape-paste):focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+    z-index: 1;
+}
+
+/* Colour source: one joined strip (.joined 199-204), no indicator; the
+   chosen pane lit. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row .arm-mode-wrap.brush-radio-row {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+/* .joined > .cp.sm (144-145, 199-204): the strip's own tighter type. The
+   study's 8.5 px / .06em needs a 74 px pane for RANDOM; the app's column
+   gives each pane 63 px, so the type steps down half a pixel to fit whole. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn:not(#wcb) {
+    flex: 1 1 0;
+    padding: 0 3px;
+    border-radius: 0;
+    font-size: 8px;
+    letter-spacing: 0.04em;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn:first-child:not(#wcb) { border-radius: 5px 0 0 5px; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn:last-child:not(#wcb) { border-radius: 0 5px 5px 0; }
+
+/* Pressure: a wide checkbox pane (.cp.sm.ic.wide, 187-197): the square
+   cathode indicator, its check lit with the pane. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row .arm-row-mid > .arm-push-btn:not(#wcb) {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0 10px 0 25px;
+    align-self: auto;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-push-btn > .wcb-ind {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    border-radius: 2px;
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--cv) * 100%), #6b5546),
+        0 0 calc(var(--cv) * 8px) rgb(var(--gc) / calc(var(--cv) * 0.7));
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-push-btn > .wcb-ind::after {
+    content: "";
+    position: absolute;
+    left: 2.6px;
+    top: 0.2px;
+    width: 2.6px;
+    height: 5px;
+    border: solid rgb(255 196 140 / var(--cv));
+    border-width: 0 1.4px 1.4px 0;
+    transform: rotate(45deg);
+    filter: drop-shadow(0 0 3px rgb(var(--gc) / var(--cv)));
+}
+
+/* The tip screen's head (.head 145): "Tip" engraved left, the tip's name on
+   the right in VFD type (.scr-cap 280). The name is the arm's own tip square
+   (it still opens js/20's tip menu, with its chevron). */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    padding: 0 4px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-lbl {
+    flex: none;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn:not(#wcb) {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: auto;
+    height: 20px;
+    min-height: 0;
+    margin: 0 -4px 0 0;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    box-shadow: none;
+    opacity: 1;
+    cursor: pointer;
+    font: 400 12px/1 var(--ui-font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, calc(0.6 + var(--ci) * 0.4));
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn > .arm-tip-icon { display: none; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn > .wcb-cap {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn::after {
+    content: "";
+    flex: none;
+    width: 5px;
+    height: 5px;
+    margin: -3px 1px 0 0;
+    border: solid var(--cu-hi);
+    border-width: 0 1.4px 1.4px 0;
+    transform: rotate(45deg);
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn:hover,
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn.menu-open {
+    color: #b6fff0;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 1px;
+}
+
+/* A pushing arm: js/20 greys its tip square inline; the study keeps the
+   custom brush lit whatever Pressure says (7 of its 8 brushes push), so the
+   caption stays at full brightness. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn { opacity: 1 !important; }
+
+/* The custom brush stamps: a smaller scrolling screen, six to a row, glowing
+   in the arm's colour (.scr.mini / .mstamps / .ms 288-295). The study's 6 px
+   frame and 2 px list padding become 3 + 5 so a focus ring isn't shaved
+   off. Rows are a fixed 36 px (js/73 MS_PITCH = row + gap) so the chosen
+   stamp's row is found from its index, never measured. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mini { padding: 3px; }
+html[data-theme="walnut-copper"] .wcb-mstamps {
+    position: relative;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-auto-rows: 36px;
+    gap: 3px;
+    max-height: 112px;
+    overflow-y: auto;
+    padding: 5px 7px 5px 5px;
+    overscroll-behavior: contain;
+}
+html[data-theme="walnut-copper"] .wcb-mini { --sc: 127 245 217; }
+html[data-theme="walnut-copper"] .wcb-ms { aspect-ratio: auto; outline-offset: 1px; }
+html[data-theme="walnut-copper"] .wcb-ms > i { inset: 4px; background: rgb(var(--sc)); }
+
+/* Both stamp screens scroll on the slim copper thumb (the webkit rules;
+   the standard scrollbar-width / -color would replace them with Chrome's
+   classic bar and its arrow buttons). */
+html[data-theme="walnut-copper"] :is(.wcb-mstamps, #sidebar-left .wcb-sscr > .brush-shapes-row) {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+}
+html[data-theme="walnut-copper"] :is(.wcb-mstamps, #sidebar-left .wcb-sscr > .brush-shapes-row)::-webkit-scrollbar { width: 6px; height: 6px; }
+html[data-theme="walnut-copper"] :is(.wcb-mstamps, #sidebar-left .wcb-sscr > .brush-shapes-row)::-webkit-scrollbar-track { background: transparent; }
+html[data-theme="walnut-copper"] :is(.wcb-mstamps, #sidebar-left .wcb-sscr > .brush-shapes-row)::-webkit-scrollbar-thumb { background: var(--cu); border-radius: 3px; }
+html[data-theme="walnut-copper"] :is(.wcb-mstamps, #sidebar-left .wcb-sscr > .brush-shapes-row)::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* ── Brush drawer: the shape tiles on the phosphor screen, seven to a row
+   (.scr / .stamps / .st 267-279), the chosen one's name under it (.scr-cap). */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-sscr { padding: 3px; margin: 0 0 8px; container-type: inline-size; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-sscr:has(> .brush-shapes-row:empty) { display: none; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-sscr > .brush-shapes-row {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+    /* Three rows show, as the study's 21 stamps; more scroll. */
+    max-height: calc((100cqw - 10px - 18px) / 7 * 3 + 6px + 10px);
+    margin: 0;
+    padding: 5px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-sscr .brush-shape-btn:not(#wcb) {
+    --cv: var(--ci);
+    --lv: calc(0.4 + 0.6 * var(--ci));
+    position: relative;
+    box-sizing: border-box;
+    flex: none;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    aspect-ratio: 1;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    background-image: none !important;
+    box-shadow: none;
+    text-shadow: none;
+    opacity: 1;
+    outline-offset: 1px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-sscr .brush-shape-btn.active { --ci: 1; }   /* until js/71 registers it */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-sscr .brush-shape-btn:hover:not(#wcb) { --lv: max(0.72, calc(0.4 + 0.6 * var(--ci))); }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-sscr .brush-shape-btn::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: #7ff5d9;
+    -webkit-mask: var(--m) center / contain no-repeat;
+    mask: var(--m) center / contain no-repeat;
+    opacity: var(--lv);
+    pointer-events: none;
+}
+
+/* The five built-in tips above the screen (.tips / .glyph 216-226): 32 px
+   square panes, each glyph drawn in cathode colour and lit with its pane.
+   The button's own text glyph stays its name; it just isn't painted. */
+html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+}
+html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn:not(#wcb) {
+    width: 32px;
+    padding: 0;
+    color: transparent;
+    text-shadow: none;
+}
+html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn:not(#wcb)::after {
+    --gcol: color-mix(in oklab, #ffb070 calc(var(--cv) * 100%), #6b5546);
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--gcol);
+    filter: drop-shadow(0 0 calc(var(--cv) * 5px) rgb(var(--gc) / var(--cv)));
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip="0"]:not(#wcb)::after {
+    width: 6px; height: 6px; background: none; box-shadow: inset 0 0 0 1.4px var(--gcol);
+}
+html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip="2"]:not(#wcb)::after {
+    width: 11px; height: 11px; border-radius: 1px;
+}
+html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip="3"]:not(#wcb)::after {
+    width: 16px; height: 9px; border-radius: 1px;
+}
+html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip="4"]:not(#wcb)::after {
+    width: 15px; height: 15px; background: none; box-shadow: inset 0 0 0 1.6px var(--gcol);
+}
+
+/* Under the screen (.line 145): the chosen stamp's name, then + and
+   Clipboard as compact panes. */
+html[data-theme="walnut-copper"] #sidebar-left .brush-shapes-area > .brush-shapes-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .brush-shapes-actions > .brush-shape-add:not(#wcb) {
+    flex: none;
+    width: 32px;
+    padding: 0;
+}
+html[data-theme="walnut-copper"] #sidebar-left .brush-shapes-actions > .brush-shape-paste:not(#wcb) {
+    flex: none;
+    width: auto;
+    padding: 0 10px;
+}
+
+/* The caption: the chosen stamp's name, left of + and Clipboard. */
+html[data-theme="walnut-copper"] .wcb-cap.wcb-scap {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: auto;
+    align-self: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: 400 12px/1 var(--ui-font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.6);
+}
+/* No shapes yet: no screen and no caption, + and Clipboard start the row. */
+html[data-theme="walnut-copper"] #sidebar-left .brush-shapes-area:has(.brush-shapes-row:empty) .wcb-scap { display: none; }
+
+/* ── The arm tip menu (js/20 openArmTipMenu), opened from the custom brush
+   caption: the theme's inline-options look (js/69 .wc-opt) on a dark glass
+   plate with the copper line; its shapes on a phosphor screen. ───────── */
+html[data-theme="walnut-copper"] .brush-shape-menu.arm-tip-menu {
+    width: 224px;
+    padding: 8px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--wcb-mesh-dim) center / 7px 12.12px, linear-gradient(170deg, #1d140f, #0a0705);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.15),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        0 18px 36px -10px rgba(0, 0, 0, 0.85);
+    color: var(--ui-text);
+    font: 400 12px/1.2 var(--ui-font-body);
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .brush-shape-menu-head {
+    margin: 0 0 8px;
+    padding: 4px 4px 8px;
+    border-bottom: 2px dotted rgba(214, 140, 92, 0.55);
+    font: 400 9.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-grid { gap: 4px; margin: 4px 0 8px; }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt:not(#wcb) {
+    --gc: var(--tgc, 255 110 30);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 28px;
+    min-height: 0;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 5px;
+    font: 400 12px/1 var(--ui-font-body);
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    text-shadow: 0 0 calc(var(--ci) * 6px) rgb(var(--gc) / calc(var(--ci) * 0.9));
+    background: var(--wcb-mesh-dim) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605);
+    box-shadow: inset 0 0 0 1px rgba(196, 122, 75, 0.7), inset 0 0 calc(var(--ci) * 12px) rgb(var(--gc) / calc(var(--ci) * 0.3));
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt.active { --ci: 1; }   /* until js/71 registers it */
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt:hover:not(#wcb) {
+    color: color-mix(in oklab, var(--lit) calc(35% + var(--ci) * 65%), var(--unlit));
+    box-shadow: inset 0 0 0 1px var(--cu-hi), inset 0 0 calc(4px + var(--ci) * 8px) rgb(var(--gc) / calc(0.12 + var(--ci) * 0.18));
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 1px; }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-icon { color: inherit; }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-sub {
+    padding: 8px 4px 6px;
+    border-top: 2px dotted rgba(214, 140, 92, 0.55);
+    font: 400 9px/1.2 var(--ui-font-display);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--engrave);
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-note { padding: 0 4px 4px; font: 400 12px/1.35 var(--ui-font-body); color: #c9b39b; }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 3px;
+    max-height: 120px;
+    margin: 0;
+    padding: 6px;
+    overflow-y: auto;
+    border-radius: 8px;
+    background:
+        radial-gradient(ellipse at center, rgba(40, 160, 130, 0.11), transparent 72%),
+        var(--wcb-mesh-vfd) center / 5px 8.66px,
+        #040b0a;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes::-webkit-scrollbar { width: 6px; }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes::-webkit-scrollbar-thumb { background: var(--cu); border-radius: 3px; }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes .brush-shape-btn:not(#wcb) {
+    --lv: calc(0.4 + 0.6 * var(--ci));
+    position: relative;
+    box-sizing: border-box;
+    flex: none;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 1;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    background-image: none !important;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes .brush-shape-btn.active { --ci: 1; }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes .brush-shape-btn:hover:not(#wcb) { --lv: max(0.72, calc(0.4 + 0.6 * var(--ci))); }
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes .brush-shape-btn::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: #7ff5d9;
+    -webkit-mask: var(--m) center / contain no-repeat;
+    mask: var(--m) center / contain no-repeat;
+    opacity: var(--lv);
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes .brush-shape-btn.active::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 0 / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 0 / 1.5px 6px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 0 / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 0 / 1.5px 6px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 100% / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 0 100% / 1.5px 6px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 100% / 6px 1.5px no-repeat,
+        linear-gradient(var(--cu-hi), var(--cu-hi)) 100% 100% / 1.5px 6px no-repeat;
+}
+
+/* ── Forced colours: every state in system colours. Panes are framed
+   ButtonText on ButtonFace, the chosen one Highlight; screens are Canvas
+   framed CanvasText with stamps in CanvasText (GrayText beyond the count),
+   the chosen stamp framed in Highlight; focus is a CanvasText outline,
+   apart from either. ─────────────────────────────────────────────────── */
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] #sidebar-left :where(
+            .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+            .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+            #brushTipFoldBody > .brush-tip-row > .brush-tip-btn,
+            .brush-shapes-actions > .brush-shape-add,
+            .brush-shapes-actions > .brush-shape-paste):not(#wcb),
+    html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt:not(#wcb) {
+        forced-color-adjust: none;
+        background: ButtonFace;
+        color: ButtonText;
+        border: 1px solid ButtonText;
+        box-shadow: none;
+        text-shadow: none;
+    }
+    html[data-theme="walnut-copper"] #sidebar-left :where(
+            .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn[aria-checked="true"],
+            .wcb-mb .arm-row .arm-row-mid > .arm-push-btn[aria-checked="true"],
+            #brushTipFoldBody > .brush-tip-row > .brush-tip-btn.active):not(#wcb),
+    html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt.active:not(#wcb) {
+        background: Highlight;
+        color: HighlightText;
+        border-color: Highlight;
+    }
+    html[data-theme="walnut-copper"] #sidebar-left :where(
+            .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+            .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+            #brushTipFoldBody > .brush-tip-row > .brush-tip-btn,
+            .brush-shapes-actions > .brush-shape-add,
+            .brush-shapes-actions > .brush-shape-paste):not(#wcb)::before,
+    html[data-theme="walnut-copper"] #sidebar-left :where(
+            .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+            .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+            #brushTipFoldBody > .brush-tip-row > .brush-tip-btn,
+            .brush-shapes-actions > .brush-shape-add,
+            .brush-shapes-actions > .brush-shape-paste):not(#wcb)::after { display: none; }
+    /* The tip row: the buttons' own glyphs (◌ ⬤ ■ ▬ ◯) say it in system
+       colour; the drawn ones step aside. */
+    html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn:not(#wcb) { color: ButtonText; font-size: 14px; }
+    html[data-theme="walnut-copper"] #sidebar-left #brushTipFoldBody > .brush-tip-row > .brush-tip-btn.active:not(#wcb) { color: HighlightText; }
+    /* Pressure: the square frame always, the tick only when checked. */
+    html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-push-btn > .wcb-ind {
+        box-shadow: none;
+        border: 1px solid currentColor;
+        margin-top: -5.5px;
+    }
+    html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-push-btn > .wcb-ind::after { display: none; }
+    html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-push-btn[aria-checked="true"] > .wcb-ind::after {
+        display: block;
+        border-color: currentColor;
+        filter: none;
+    }
+    /* Screens and their stamps. */
+    html[data-theme="walnut-copper"] :is(.wcb-scr, .arm-tip-menu .arm-tip-shapes) {
+        forced-color-adjust: none;
+        background: Canvas;
+        border: 1px solid CanvasText;
+        box-shadow: none;
+    }
+    html[data-theme="walnut-copper"] .wcb-scr::after { display: none; }
+    html[data-theme="walnut-copper"] :is(.wcb-st > i, .wcb-sscr .brush-shape-btn::after, .arm-tip-menu .arm-tip-shapes .brush-shape-btn::after) {
+        background: CanvasText;
+        opacity: 1;
+    }
+    html[data-theme="walnut-copper"] .wcb-tile > :is(.wcb-n, .wcb-l) { color: CanvasText; text-shadow: none; opacity: 1; }
+    html[data-theme="walnut-copper"] .wcb-tile.wcb-off > i { background: GrayText; }
+    html[data-theme="walnut-copper"] .wcb-tile.wcb-off > :is(.wcb-n, .wcb-l) { color: GrayText; }
+    html[data-theme="walnut-copper"] :is(.wcb-st[aria-checked="true"], .wcb-sscr .brush-shape-btn[aria-checked="true"], .arm-tip-menu .arm-tip-shapes .brush-shape-btn.active)::before {
+        background: none;
+        border: 2px solid Highlight;
+        border-radius: 3px;
+    }
+    html[data-theme="walnut-copper"] :is(.wcb-st, .wcb-sscr .brush-shape-btn, .arm-tip-menu .arm-tip-shapes .brush-shape-btn):focus-visible {
+        outline: 2px solid CanvasText;
+        outline-offset: 2px;
+    }
+    html[data-theme="walnut-copper"] #sidebar-left :where(
+            .wcb-mb .arm-row .arm-mode-wrap > .arm-mode-btn,
+            .wcb-mb .arm-row .arm-row-mid > .arm-push-btn,
+            #brushTipFoldBody > .brush-tip-row > .brush-tip-btn,
+            .brush-shapes-actions > .brush-shape-add,
+            .brush-shapes-actions > .brush-shape-paste,
+            .wcb-head > .arm-tip-btn):focus-visible,
+    html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt:focus-visible {
+        outline: 2px solid CanvasText;
+        outline-offset: 2px;
+    }
+    /* The colour lamp keeps the arm's colour (it is the content), framed. */
+    html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > input[type="color"].arm-picker {
+        forced-color-adjust: none;
+        border: 1px solid ButtonText;
+        box-shadow: none;
+    }
+    html[data-theme="walnut-copper"] .brush-shape-menu.arm-tip-menu {
+        forced-color-adjust: none;
+        background: Canvas;
+        color: CanvasText;
+        border: 1px solid CanvasText;
+        box-shadow: none;
+    }
+    html[data-theme="walnut-copper"] .arm-tip-menu :is(.brush-shape-menu-head, .arm-tip-sub, .arm-tip-note) {
+        color: CanvasText;
+        border-color: CanvasText;
+        text-shadow: none;
+    }
+}
 
 } /* @layer theme */
