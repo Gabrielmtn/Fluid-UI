@@ -211,12 +211,12 @@
         if (!n) return;
         k = Math.max(0, Math.min(n - 1, k));
         if (open.active >= 0 && open.items[open.active] && open.active !== k) {
-            open.items[open.active].classList.remove('active');
+            open.items[open.active].classList.remove('wc-act');
             surgeTo(open.items[open.active], 0);
         }
         open.active = k;
         var it = open.items[k];
-        it.classList.add('active');
+        it.classList.add('wc-act');   // not .active: js/71 lights a pane that has .active
         surgeTo(it, 0.55);
         open.select.setAttribute('aria-activedescendant', it.id);
         try { it.scrollIntoView({ block: 'nearest' }); } catch (_) {}

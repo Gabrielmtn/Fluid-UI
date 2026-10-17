@@ -296,7 +296,7 @@ html[data-theme="walnut-copper"] .wc-opt::after {
     background: linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%);
 }
 html[data-theme="walnut-copper"] .wc-opt[aria-selected="true"] { --ci: 1; }
-html[data-theme="walnut-copper"] .wc-opt.active { outline: 2px solid var(--ui-focus); outline-offset: -1px; }
+html[data-theme="walnut-copper"] .wc-opt.wc-act { outline: 2px solid var(--ui-focus); outline-offset: -1px; }
 html[data-theme="walnut-copper"] .wc-opt[aria-disabled="true"] { opacity: 0.42; cursor: default; }
 /* The round cathode (study .cp.sm .ind + .cp.ir .ind::after, one element). */
 html[data-theme="walnut-copper"] .wc-opt > .wc-ind {
