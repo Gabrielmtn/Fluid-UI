@@ -134,6 +134,16 @@
         raf = requestAnimationFrame(frame);
     }
 
+    // A styling hook only: [data-idle-glow] on the nav while the glow is up,
+    // so a theme whose resting labels are not the gradient (Walnut & Copper
+    // engraves them) can fade the gradient in and back out. One attribute
+    // write per idle transition; nothing per frame.
+    function markIdle(on) {
+        if (!nav) return;
+        if (on) nav.setAttribute('data-idle-glow', '');
+        else nav.removeAttribute('data-idle-glow');
+    }
+
     function start() {
         // The single gate every path funnels through - idle timer, wake, and the
         // debug hooks alike. Under prefers-reduced-motion the loop is not slowed
@@ -156,14 +166,14 @@
         var due = IDLE_MS - (performance.now() - lastInput);
         idleTimer = setTimeout(function () {
             if (reduce.matches) { armIdleCheck(); return; }
-            if (performance.now() - lastInput >= IDLE_MS - 4) { idle = true; start(); }
+            if (performance.now() - lastInput >= IDLE_MS - 4) { idle = true; markIdle(true); start(); }
             else armIdleCheck();
         }, Math.max(due, 50));
     }
 
     function onInput() {
         lastInput = performance.now();
-        if (idle) { idle = false; armIdleCheck(); start(); }
+        if (idle) { idle = false; markIdle(false); armIdleCheck(); start(); }
     }
 
     function init() {
@@ -194,6 +204,7 @@
         var onReduceChange = function () {
             if (!reduce.matches) return;
             idle = false;
+            markIdle(false);
             stop();
             rest();
         };
@@ -212,7 +223,7 @@
             // Test/tuning surface. wake() and sleep() drive the same transitions
             // the timer does, so the eased paths are the real ones.
             wake:  function () { onInput(); },
-            sleep: function () { lastInput = performance.now() - IDLE_MS; idle = true; start(); },
+            sleep: function () { lastInput = performance.now() - IDLE_MS; idle = true; markIdle(true); start(); },
             state: function () { return { idle: idle, amp: amp, phase: phase, running: !!raf, reduced: !!(reduce && reduce.matches) }; }
         };
         return true;

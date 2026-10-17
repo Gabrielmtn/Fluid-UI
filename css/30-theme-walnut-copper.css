@@ -265,4 +265,54 @@ html[data-theme="walnut-copper"] #quality-underbar .qub-dd-cap {
     color: var(--ui-text-muted);
 }
 
+/* ── Panels painted by inline style="" in index.html ─────────────────
+   An inline style beats every layer; an author !important beats an inline
+   normal declaration, so these few take !important. Paint only. */
+html[data-theme="walnut-copper"] :is(#lightSourceControls, #lightShiftControls) {
+    background: linear-gradient(rgba(8, 4, 2, 0.35), rgba(8, 4, 2, 0.15)) !important;
+    border-left-color: var(--cu) !important;
+}
+html[data-theme="walnut-copper"] :is(#lightMode, #lightShiftMode, #userPresetNameInput) {
+    background: #110b08 !important;
+    border-color: var(--cu) !important;
+    color: var(--lit) !important;
+}
+html[data-theme="walnut-copper"] #lightGridContainer {
+    background: var(--mesh-dim) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605) !important;
+    border-color: var(--cu) !important;
+}
+html[data-theme="walnut-copper"] #lightGridContainer .grid-line {
+    background: rgba(214, 140, 92, 0.25) !important;
+}
+html[data-theme="walnut-copper"] #lightShiftWheel {
+    border-color: var(--cu) !important;
+}
+html[data-theme="walnut-copper"] .anim-toggle-row {
+    background: rgba(255, 150, 70, 0.08) !important;
+}
+
+/* ── Idle easter egg ───────────────────────────────────────────────────
+   At rest the drawer names are engraved. While js/37's idle glow is up it
+   marks the nav [data-idle-glow] and paints the old nav gradient onto each
+   title; here the engraved fill fades away so that gradient glows through,
+   and fades back on the first input. Reduced motion: the glow never starts. */
+html[data-theme="walnut-copper"] #sidebar-right { --row-h: 52px; --row-pad: 16px; }
+html[data-theme="walnut-copper"] .sidebar-section .section-title {
+    transition: -webkit-text-fill-color 0.9s ease, color 0.9s ease;
+}
+@supports (background-image: linear-gradient(in oklch, red, blue)) {
+    html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section[data-group] .section-title {
+        background-image: var(--g);
+        background-size: 100% calc(var(--rows) * var(--row-h));
+        background-position: 0 calc(var(--i) * var(--row-h) * -1 - var(--row-pad));
+        background-repeat: no-repeat;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        text-shadow: none;
+        filter: drop-shadow(0 0 5px rgba(140, 200, 255, 0.35));
+    }
+}
+
 } /* @layer theme */
