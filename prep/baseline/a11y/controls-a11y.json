@@ -1,8 +1,8 @@
 {
- "generated": "2026-10-17T19:13:31.919Z",
+ "generated": "2026-10-17T20:04:20.669Z",
  "env": {
-  "date": "2026-10-17T19:13:31.919Z",
-  "headCommit": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
+  "date": "2026-10-17T20:04:20.669Z",
+  "headCommit": "6c02d302a8e1c75a63bd98e0539200aa4450bd1f",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -13,7 +13,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:58598/index.html",
+  "url": "http://127.0.0.1:59785/index.html",
   "bodyClasses": "web-mode photosafe-on",
   "leftFolded": false,
   "rightFolded": false,
@@ -22,8 +22,8 @@
  },
  "source": {
   "controls": "prep\\baseline\\dom\\controls.json",
-  "controlsGenerated": "2026-10-17T19:13:12.625Z",
-  "controlsHead": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
+  "controlsGenerated": "2026-10-17T20:04:03.528Z",
+  "controlsHead": "6c02d302a8e1c75a63bd98e0539200aa4450bd1f",
   "controlsCount": 847
  },
  "crossCheck": {
@@ -357,7 +357,7 @@
    ],
    "role": "combobox",
    "roleAttr": null,
-   "name": "Material - Changes settings to give a few different feels",
+   "name": "Material type",
    "nameSource": "cdp",
    "state": {
     "focusable": true
@@ -17262,7 +17262,7 @@
      ],
      "role": "menuitem",
      "roleAttr": "menuitem",
-     "name": "Brush Size 31 px",
+     "name": "Brush Size 29 px",
      "nameSource": "cdp",
      "state": {
       "focusable": false

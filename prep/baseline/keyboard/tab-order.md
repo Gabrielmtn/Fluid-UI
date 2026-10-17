@@ -1,13 +1,13 @@
 # Keyboard focus order — Tab and Shift+Tab through the whole UI
 
-Generated 2026-10-17T19:13:54.745Z by `prep/baseline/scripts/tab-order.js` (F4). Machine copy: `tab-order.json`. Notes, caveats and the `--check` result: `NOTES.md`.
+Generated 2026-10-17T20:04:40.347Z by `prep/baseline/scripts/tab-order.js` (F4). Machine copy: `tab-order.json`. Notes, caveats and the `--check` result: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T19:13:54.745Z |
-| headCommit | fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3 |
+| date | 2026-10-17T20:04:40.347Z |
+| headCommit | 6c02d302a8e1c75a63bd98e0539200aa4450bd1f |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -19,7 +19,7 @@ Generated 2026-10-17T19:13:54.745Z by `prep/baseline/scripts/tab-order.js` (F4).
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:57719/index.html |
+| url | http://127.0.0.1:61614/index.html |
 | titlebarVisible | false |
 | leftFolded | false |
 | rightFolded | false |
@@ -107,7 +107,7 @@ Generated 2026-10-17T19:13:54.745Z by `prep/baseline/scripts/tab-order.js` (F4).
 | Region | Arrow | Focused option | Focus landed on | Role | Name | Surface | Menu after | .skip-landed ring |
 |---|---|---|---|---|---|---|---|---|
 | left | ArrowLeft | left | #brushSizePerceptual | slider | Brush Size | sidebar-left | closed | yes |
-| top | ArrowUp | top | #materialMode | combobox | Material - Changes settings to give a few differe… | mixer-strip | closed | yes |
+| top | ArrowUp | top | #materialMode | combobox | Material type | mixer-strip | closed | yes |
 | right | ArrowRight | right | #sidebar-right > div.sidebar-section:nth-of-type(2) > div.section-header:nth-of-type(1) > span.section-title:nth-of-type(1) | button | SWIRL TOGETHER | sidebar-right | closed | yes |
 | bottom | ArrowDown | bottom | #quality-underbar > div.qub-dd:nth-of-type(1) > button.qub-dd-btn | button | IMAGE SHARPNESS 2048 | overlay:quality-underbar | closed | yes |
 
@@ -138,7 +138,7 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 1 | overlay:skipMenu |  |  | button | #skipMenu > div.skip-menu-map:nth-of-type(2) > button.skip-menu-optio… | button | Top nav (c) | 1 | Y |
 | 2 | overlay:skipMenu |  |  | button | #skipMenu > div.skip-menu-map:nth-of-type(2) > button.skip-menu-optio… | button | Right sidebar (c) | 2 | Y |
 | 3 | overlay:skipMenu |  |  | button | #skipMenu > div.skip-menu-map:nth-of-type(2) > button.skip-menu-optio… | button | Bottom nav (c) | 3 | Y |
-| 4 | mixer-strip | Material Type | top | select | #materialMode | combobox | Material - Changes settings to give a few diffe… (c) | 15 | Y |
+| 4 | mixer-strip | Material Type | top | select | #materialMode | combobox | Material type (c) | 15 | Y |
 | 5 | mixer-strip | Material Type | top | input[range] | #curl | slider | Fluid (c) | 16 | Y |
 | 6 | mixer-strip | Viscosity | top | input[range] | #viscosity | slider | Viscosity (c) | 18 | Y |
 | 7 | mixer-strip | Isolation | top | input[range] | #velocityInfluence | slider | Isolation (c) | 20 | Y |
@@ -585,7 +585,7 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 217 | mixer-strip | Isolation | input[range] | #velocityInfluence | slider | Isolation |
 | 218 | mixer-strip | Viscosity | input[range] | #viscosity | slider | Viscosity |
 | 219 | mixer-strip | Material Type | input[range] | #curl | slider | Fluid |
-| 220 | mixer-strip | Material Type | select | #materialMode | combobox | Material - Changes settings to give a few diffe… |
+| 220 | mixer-strip | Material Type | select | #materialMode | combobox | Material type |
 | 221 | overlay:skipMenu |  | button | #skipMenu > div.skip-menu-map:nth-of-type(2) > button.skip-menu-optio… | button | Bottom nav |
 | 222 | overlay:skipMenu |  | button | #skipMenu > div.skip-menu-map:nth-of-type(2) > button.skip-menu-optio… | button | Right sidebar |
 | 223 | overlay:skipMenu |  | button | #skipMenu > div.skip-menu-map:nth-of-type(2) > button.skip-menu-optio… | button | Top nav |

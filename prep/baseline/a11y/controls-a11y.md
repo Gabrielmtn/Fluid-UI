@@ -1,13 +1,13 @@
 # Controls — role, name, state and keyboard pattern of every control
 
-Generated 2026-10-17T19:13:31.919Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `controls-a11y.json` (what `--check` diffs). Derived from `prep/baseline/dom/controls.json` (F0: 2026-10-17T19:13:12.625Z, 847 controls) and its `lazy-*.json`; selectors come from the live boot of this run, which was cross-checked against the F0 record (900 compared, 0 differences). Role and name are the CDP accessibility tree's (`nameSource` c) or the page-side fallback for nodes the tree ignores or does not build (f: `display:none` content, labels folded into their control, containers). The keyboard pattern is a hand-written table keyed on element / role / class with the handler's file:line; it says what the code does today, not what it should do. Notes: `NOTES.md`.
+Generated 2026-10-17T20:04:20.669Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `controls-a11y.json` (what `--check` diffs). Derived from `prep/baseline/dom/controls.json` (F0: 2026-10-17T20:04:03.528Z, 847 controls) and its `lazy-*.json`; selectors come from the live boot of this run, which was cross-checked against the F0 record (900 compared, 0 differences). Role and name are the CDP accessibility tree's (`nameSource` c) or the page-side fallback for nodes the tree ignores or does not build (f: `display:none` content, labels folded into their control, containers). The keyboard pattern is a hand-written table keyed on element / role / class with the handler's file:line; it says what the code does today, not what it should do. Notes: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T19:13:31.919Z |
-| headCommit | fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3 |
+| date | 2026-10-17T20:04:20.669Z |
+| headCommit | 6c02d302a8e1c75a63bd98e0539200aa4450bd1f |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -18,7 +18,7 @@ Generated 2026-10-17T19:13:31.919Z by `prep/baseline/scripts/a11y.js` (F3). Mach
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:58598/index.html |
+| url | http://127.0.0.1:59785/index.html |
 | bodyClasses | web-mode photosafe-on |
 | leftFolded | false |
 | rightFolded | false |
@@ -183,7 +183,7 @@ Columns: order (F0 index); surface; section; selector (live, state classes dropp
 | 12 | titlebar |  | #max-button | button | Maximize (f) |  [focusable] | K10 | N |
 | 13 | titlebar |  | #close-button | button | Close (f) |  [focusable] | K10 | N |
 | 14 | mixer-strip | Material Type | div.ch-material | generic |  (c) |  | K01 | Y |
-| 15 | mixer-strip | Material Type | #materialMode | combobox | Material - Changes settings to give a few diffe… (c) |  [focusable] | K28 | Y |
+| 15 | mixer-strip | Material Type | #materialMode | combobox | Material type (c) |  [focusable] | K28 | Y |
 | 16 | mixer-strip | Material Type | #curl | slider | Fluid (c) |  [focusable] | K20 | Y |
 | 17 | mixer-strip | Viscosity | #mixer-strip > div.mixer-channel:nth-of-type(2) | generic |  (c) |  | K01 | Y |
 | 18 | mixer-strip | Viscosity | #viscosity | slider | Viscosity (c) |  [focusable] | K20 | Y |
@@ -1023,7 +1023,7 @@ Columns: order (F0 index); surface; section; selector (live, state classes dropp
 | # | Surface | Section | Selector | Role | Name | State | Keys | R |
 |---|---|---|---|---|---|---|---|---|
 | 0 | overlay:radialMenu |  | #radialMenu | menu [r] | Radial menu (c) |  | K50 | Y |
-| 1 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(2) | menuitem [r] | Brush Size 31 px (c) |  | K51 | Y |
+| 1 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(2) | menuitem [r] | Brush Size 29 px (c) |  | K51 | Y |
 | 2 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(3) | menuitem [r] | Material Type - Fluid 0 (c) |  | K51 | Y |
 | 3 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(4) | menuitem [r] | Viscosity 0.30 (c) |  | K51 | Y |
 | 4 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(5) | menuitem [r] | Isolation 2.000 (c) |  | K51 | Y |

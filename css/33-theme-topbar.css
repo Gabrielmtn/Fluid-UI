@@ -458,4 +458,108 @@ html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger .mixer-preset
    (the old UI already parked cells at 1366; now every control stays on the bar down to 1201). */
 
 
+/* == Item 4: hierarchy (study .lbl 40-41, .knob-val 84, .msel 506-512,
+   .mslide 495-497, material group 581-591) ==================================== */
+/* The bar breathes: labels never touch its top edge. */
+html[data-theme="walnut-copper"] #mixer-strip { padding-top: 10px; padding-bottom: 6px; }
+/* Engraved labels, the study's .lbl: Michroma 10.5 / 0.18 em, engraved shadow,
+   centred over their control. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-label {
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:not([data-ui-key="Fluid"]) .ch-header { justify-content: center; text-align: center; }
+/* Values under the dials and telegraphs: the study's .knob-val. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-value {
+    font: 400 14px/1 var(--ui-font-mono);
+    letter-spacing: 0.06em;
+    color: var(--lit);
+    text-shadow: 0 0 6px rgba(255, 120, 40, 0.8), 0 0 14px rgba(255, 70, 10, 0.5);
+    font-variant-numeric: tabular-nums;
+}
+
+/* -- Material type: label, field, then the slider's head row (label left,
+   value right) over its tube. -- */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] {
+    position: relative;
+    align-items: stretch;
+    min-width: 200px;
+    max-width: 230px;
+    padding: 0 12px;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-header {
+    display: block;
+    width: 100%;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-label {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-label::before {
+    content: "Material type";
+}
+/* The field: a cathode pane at 60 % (study .cap.msel) with the copper
+   chevron cell; full width of the group (script's measured width is for the
+   old label-select and is overridden here). */
+html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select {
+    width: 100% !important;
+    height: 40px;
+    padding: 0 46px 0 16px;
+    border-radius: 7px;
+    font: 400 10.5px/1 var(--ui-font-display);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--lit) 60%, var(--unlit));
+    text-shadow: 0 0 4px rgb(255 110 30 / 0.5);
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='40' viewBox='0 0 38 40'%3E%3Cpath d='M0.5 9V31' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M15 16.5L19 20.5L23 16.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E") right center / 38px 40px no-repeat,
+        radial-gradient(ellipse 85% 100% at 50% 50%, rgb(255 150 64 / 0.16), transparent 80%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.1'/%3E%3C/svg%3E") center / 3.5px 6.06px,
+        linear-gradient(175deg, #5a4e48, #3a302b 55%, #2a221f);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18), inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
+}
+html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select:is(:hover, :focus) {
+    color: var(--lit);
+}
+html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option {
+    color: #1a120c; background: #f2e6d8; text-transform: none; letter-spacing: 0;
+}
+/* Head row: the slider's label (the scale row's text) left, its value right. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-fader { margin-top: 6px; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .fader-scale {
+    padding: 0 4px;
+    margin: 0 0 2px;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-value {
+    position: absolute;
+    right: 16px;
+    top: 77px;   /* the head row (measured: the scale row sits at 77 px in the cell) */
+    font-size: 12.5px;
+}
+
+/* Labels whole and on one line across the bar: no ellipsis (the cell's
+   value now sits under the control, so the label has the cell's width and
+   may overhang its padding), every group's label at the top. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-header .ch-label {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    text-align: center;
+    flex: 0 0 auto;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel { justify-content: flex-start; }
+/* The scene stack's rows line up with the action group's (study: Presets
+   beside One / Random / Palette, Clear / Pause / Stop beside Ignite). */
+html[data-theme="walnut-copper"] #mixer-strip .mixer-stack { justify-content: flex-start; padding-top: 7px; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-header .ch-label { text-align: left; }
+
 } /* @layer theme */

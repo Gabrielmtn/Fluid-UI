@@ -1,13 +1,13 @@
 # DOM dump — every interactive element of the shipping UI
 
-Generated 2026-10-17T19:13:12.625Z by `prep/scripts/dom-dump.js` (F0). Machine copy: `controls.json`; lazily built UI in `lazy-*.json`. Notes and caveats: `NOTES.md`.
+Generated 2026-10-17T20:04:03.528Z by `prep/scripts/dom-dump.js` (F0). Machine copy: `controls.json`; lazily built UI in `lazy-*.json`. Notes and caveats: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T19:13:12.625Z |
-| headCommit | fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3 |
+| date | 2026-10-17T20:04:03.528Z |
+| headCommit | 6c02d302a8e1c75a63bd98e0539200aa4450bd1f |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -18,7 +18,7 @@ Generated 2026-10-17T19:13:12.625Z by `prep/scripts/dom-dump.js` (F0). Machine c
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:56816/index.html |
+| url | http://127.0.0.1:57332/index.html |
 | layoutChoice | null |
 | uiVisibilityState | null |
 | hiddenUiKeys | [] |
@@ -225,7 +225,7 @@ Columns: order; surface; section; element (tag[type]); id; classes (first three)
 | 12 | titlebar |  | button | #max-button | titlebar-button | button | Maximize (f) |  |  |  | N |
 | 13 | titlebar |  | button | #close-button | titlebar-button close | button | Close (f) |  |  |  | N |
 | 14 | mixer-strip | Material Type | div |  | mixer-channel ch-material | generic |  (c) |  |  |  | Y |
-| 15 | mixer-strip | Material Type | select | #materialMode | material-mode-select | combobox | Material - Changes settings to give a f… (c) |  | fluid |  | Y |
+| 15 | mixer-strip | Material Type | select | #materialMode | material-mode-select | combobox | Material type (c) | label=Material type | fluid |  | Y |
 | 16 | mixer-strip | Material Type | input[range] | #curl |  | slider | Fluid (c) | label=Fluid valuetext=0 | 0 |  | Y |
 | 17 | mixer-strip | Viscosity | div |  | mixer-channel | generic |  (c) |  |  |  | Y |
 | 18 | mixer-strip | Viscosity | input[range] | #viscosity |  | slider | Viscosity (c) | label=Viscosity valuetext=0.30 | 0.3 |  | Y |
@@ -262,7 +262,7 @@ Columns: order; surface; section; element (tag[type]); id; classes (first three)
 | 49 | sidebar-left |  | div | #sidebar-left |  | region | Brush (c) | label=Brush |  |  | Y |
 | 50 | sidebar-left | Brush Size | div |  | mixer-channel | generic |  (c) |  |  |  | Y |
 | 51 | sidebar-left | Brush Size | input[range] | #brushSize |  | slider | Brush Size (f) |  | 1 |  | N |
-| 52 | sidebar-left | Brush Size | input[range] | #brushSizePerceptual | ch-perceptual | slider | Brush Size (c) | label=Brush Size valuetext=31 px | 0.653 |  | Y |
+| 52 | sidebar-left | Brush Size | input[range] | #brushSizePerceptual | ch-perceptual | slider | Brush Size (c) | label=Brush Size valuetext=29 px | 0.653 |  | Y |
 | 53 | sidebar-left |  | label |  |  | LabelText |  (c) |  |  |  | Y |
 | 54 | sidebar-left |  | input[range] | #brushSteady |  | slider | STABILIZATION 0% (c) |  | 0 |  | Y |
 | 55 | sidebar-left |  | input[checkbox] | #brushSteadyHideGuide |  | checkbox | Hide guide (f) |  | unchecked |  | N |

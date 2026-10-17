@@ -1,8 +1,8 @@
 {
- "generated": "2026-10-17T19:13:31.919Z",
+ "generated": "2026-10-17T20:04:20.669Z",
  "env": {
-  "date": "2026-10-17T19:13:31.919Z",
-  "headCommit": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
+  "date": "2026-10-17T20:04:20.669Z",
+  "headCommit": "6c02d302a8e1c75a63bd98e0539200aa4450bd1f",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -13,7 +13,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:58598/index.html",
+  "url": "http://127.0.0.1:59785/index.html",
   "bodyClasses": "web-mode photosafe-on",
   "leftFolded": false,
   "rightFolded": false,
@@ -203,7 +203,7 @@
    "closed": null,
    "note": null,
    "result": {
-    "ms": 509,
+    "ms": 239,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -218,8 +218,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T19:13:46.676Z",
-    "url": "http://127.0.0.1:58598/index.html",
+    "timestamp": "2026-10-17T20:04:33.773Z",
+    "url": "http://127.0.0.1:59785/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -280,17 +280,6 @@
       "help": "Form elements should have a visible label",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-title-only?application=axeAPI",
       "nodes": [
-       {
-        "target": [
-         "#materialMode"
-        ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
-        "impact": "serious",
-        "failureSummary": "Fix all of the following:\n  Only title used to generate label for form element",
-        "checks": [
-         "title-only: Only title used to generate label for form element"
-        ]
-       },
        {
         "target": [
          "#colorPicker"
@@ -677,7 +666,7 @@
         "target": [
          "#canvas-size-display"
         ],
-        "html": "<div id=\"canvas-size-display\">928 × 581 · 1.60:1</div>",
+        "html": "<div id=\"canvas-size-display\">928 × 461 · 2:1</div>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -688,7 +677,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"461\" style=\"width: 928px; height: 461px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -944,7 +933,7 @@
         "target": [
          "#materialMode"
         ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
+        "html": "<select id=\"materialMode\" class=\"material-mode-select\" aria-label=\"Material type\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 159px;\">",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1186,7 +1175,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1197,7 +1186,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1208,7 +1197,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1219,7 +1208,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000;\">Limit<span class=\"gat",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1252,7 +1241,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1263,7 +1252,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1285,7 +1274,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">29 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1923,7 +1912,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 399,
+    "ms": 199,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -1938,8 +1927,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T19:13:47.531Z",
-    "url": "http://127.0.0.1:58598/index.html",
+    "timestamp": "2026-10-17T20:04:34.410Z",
+    "url": "http://127.0.0.1:59785/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -2000,17 +1989,6 @@
       "help": "Form elements should have a visible label",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-title-only?application=axeAPI",
       "nodes": [
-       {
-        "target": [
-         "#materialMode"
-        ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
-        "impact": "serious",
-        "failureSummary": "Fix all of the following:\n  Only title used to generate label for form element",
-        "checks": [
-         "title-only: Only title used to generate label for form element"
-        ]
-       },
        {
         "target": [
          "#colorPicker"
@@ -2349,7 +2327,7 @@
         "target": [
          "#canvas-size-display"
         ],
-        "html": "<div id=\"canvas-size-display\">928 × 581 · 1.60:1</div>",
+        "html": "<div id=\"canvas-size-display\">928 × 461 · 2:1</div>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -2360,7 +2338,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"461\" style=\"width: 928px; height: 461px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -2581,7 +2559,7 @@
         "target": [
          "#materialMode"
         ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
+        "html": "<select id=\"materialMode\" class=\"material-mode-select\" aria-label=\"Material type\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 159px;\">",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2823,7 +2801,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2834,7 +2812,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2845,7 +2823,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2856,7 +2834,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000;\">Limit<span class=\"gat",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2889,7 +2867,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2900,7 +2878,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2922,7 +2900,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">29 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -4446,7 +4424,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 347,
+    "ms": 177,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -4461,8 +4439,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T19:13:48.982Z",
-    "url": "http://127.0.0.1:58598/index.html",
+    "timestamp": "2026-10-17T20:04:35.612Z",
+    "url": "http://127.0.0.1:59785/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -4523,17 +4501,6 @@
       "help": "Form elements should have a visible label",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-title-only?application=axeAPI",
       "nodes": [
-       {
-        "target": [
-         "#materialMode"
-        ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
-        "impact": "serious",
-        "failureSummary": "Fix all of the following:\n  Only title used to generate label for form element",
-        "checks": [
-         "title-only: Only title used to generate label for form element"
-        ]
-       },
        {
         "target": [
          "#colorPicker"
@@ -4920,7 +4887,7 @@
         "target": [
          "#canvas-size-display"
         ],
-        "html": "<div id=\"canvas-size-display\">928 × 581 · 1.60:1</div>",
+        "html": "<div id=\"canvas-size-display\">928 × 461 · 2:1</div>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -4931,7 +4898,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"461\" style=\"width: 928px; height: 461px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -5198,7 +5165,7 @@
         "target": [
          "#materialMode"
         ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
+        "html": "<select id=\"materialMode\" class=\"material-mode-select\" aria-label=\"Material type\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 159px;\">",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5440,7 +5407,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5451,7 +5418,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5462,7 +5429,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5473,7 +5440,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000;\">Limit<span class=\"gat",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5506,7 +5473,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5517,7 +5484,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5539,7 +5506,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">29 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -6056,7 +6023,7 @@
         "target": [
          ".radial-label.is-slider[role=\"menuitem\"]:nth-child(3) > .radial-label-val"
         ],
-        "html": "<span class=\"radial-label-val\">31 px</span>",
+        "html": "<span class=\"radial-label-val\">29 px</span>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
         "checks": [
@@ -6388,7 +6355,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 360,
+    "ms": 174,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -6403,8 +6370,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T19:13:50.516Z",
-    "url": "http://127.0.0.1:58598/index.html",
+    "timestamp": "2026-10-17T20:04:36.885Z",
+    "url": "http://127.0.0.1:59785/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -6465,17 +6432,6 @@
       "help": "Form elements should have a visible label",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-title-only?application=axeAPI",
       "nodes": [
-       {
-        "target": [
-         "#materialMode"
-        ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
-        "impact": "serious",
-        "failureSummary": "Fix all of the following:\n  Only title used to generate label for form element",
-        "checks": [
-         "title-only: Only title used to generate label for form element"
-        ]
-       },
        {
         "target": [
          "#colorPicker"
@@ -6847,7 +6803,7 @@
         "target": [
          "#canvas-size-display"
         ],
-        "html": "<div id=\"canvas-size-display\">928 × 581 · 1.60:1</div>",
+        "html": "<div id=\"canvas-size-display\">928 × 461 · 2:1</div>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -6858,7 +6814,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"461\" style=\"width: 928px; height: 461px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -7114,7 +7070,7 @@
         "target": [
          "#materialMode"
         ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
+        "html": "<select id=\"materialMode\" class=\"material-mode-select\" aria-label=\"Material type\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 159px;\">",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7356,7 +7312,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7367,7 +7323,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7378,7 +7334,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7389,7 +7345,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000;\">Limit<span class=\"gat",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7422,7 +7378,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7433,7 +7389,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7455,7 +7411,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">29 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -8157,7 +8113,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 361,
+    "ms": 163,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -8172,8 +8128,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T19:13:52.040Z",
-    "url": "http://127.0.0.1:58598/index.html",
+    "timestamp": "2026-10-17T20:04:38.124Z",
+    "url": "http://127.0.0.1:59785/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -8234,17 +8190,6 @@
       "help": "Form elements should have a visible label",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-title-only?application=axeAPI",
       "nodes": [
-       {
-        "target": [
-         "#materialMode"
-        ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
-        "impact": "serious",
-        "failureSummary": "Fix all of the following:\n  Only title used to generate label for form element",
-        "checks": [
-         "title-only: Only title used to generate label for form element"
-        ]
-       },
        {
         "target": [
          "#colorPicker"
@@ -8631,7 +8576,7 @@
         "target": [
          "#canvas-size-display"
         ],
-        "html": "<div id=\"canvas-size-display\">928 × 581 · 1.60:1</div>",
+        "html": "<div id=\"canvas-size-display\">928 × 461 · 2:1</div>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -8642,7 +8587,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"461\" style=\"width: 928px; height: 461px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -8920,7 +8865,7 @@
         "target": [
          "#materialMode"
         ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
+        "html": "<select id=\"materialMode\" class=\"material-mode-select\" aria-label=\"Material type\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 159px;\">",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9162,7 +9107,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9173,7 +9118,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9184,7 +9129,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9195,7 +9140,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000;\">Limit<span class=\"gat",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9228,7 +9173,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9239,7 +9184,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9261,7 +9206,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">29 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9721,17 +9666,6 @@
        },
        {
         "target": [
-         ".arm-colors-header"
-        ],
-        "html": "<div class=\"arm-colors-header\">Presets</div>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element",
-        "checks": [
-         "color-contrast: Element's background color could not be determined because it's partially obscured by another element"
-        ]
-       },
-       {
-        "target": [
          ".preset-group-chev"
         ],
         "html": "<span class=\"preset-group-chev\">▾</span>",
@@ -10111,7 +10045,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 343,
+    "ms": 165,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -10126,8 +10060,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T19:13:53.546Z",
-    "url": "http://127.0.0.1:58598/index.html",
+    "timestamp": "2026-10-17T20:04:39.343Z",
+    "url": "http://127.0.0.1:59785/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -10157,7 +10091,7 @@
         "target": [
          ".arm-tip-menu"
         ],
-        "html": "<div class=\"brush-shape-menu arm-tip-menu\" data-group=\"core\" role=\"menu\" style=\"left: 43px; top: 536px;\">",
+        "html": "<div class=\"brush-shape-menu arm-tip-menu\" data-group=\"core\" role=\"menu\" style=\"left: 43px; top: 546.594px;\">",
         "impact": "critical",
         "failureSummary": "Fix any of the following:\n  Element has children which are not allowed: button",
         "checks": [
@@ -10217,17 +10151,6 @@
       "help": "Form elements should have a visible label",
       "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-title-only?application=axeAPI",
       "nodes": [
-       {
-        "target": [
-         "#materialMode"
-        ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
-        "impact": "serious",
-        "failureSummary": "Fix all of the following:\n  Only title used to generate label for form element",
-        "checks": [
-         "title-only: Only title used to generate label for form element"
-        ]
-       },
        {
         "target": [
          "#colorPicker"
@@ -10614,7 +10537,7 @@
         "target": [
          "#canvas-size-display"
         ],
-        "html": "<div id=\"canvas-size-display\">928 × 581 · 1.60:1</div>",
+        "html": "<div id=\"canvas-size-display\">928 × 461 · 2:1</div>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -10625,7 +10548,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"461\" style=\"width: 928px; height: 461px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -10914,7 +10837,7 @@
         "target": [
          "#materialMode"
         ],
-        "html": "<select id=\"materialMode\" class=\"material-mode-select\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 149px;\">",
+        "html": "<select id=\"materialMode\" class=\"material-mode-select\" aria-label=\"Material type\" title=\"Material - Changes settings to give a few different feels\" style=\"width: 159px;\">",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11156,7 +11079,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11167,7 +11090,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11178,7 +11101,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11189,7 +11112,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000;\">Limit<span class=\"gat",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11222,7 +11145,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11233,7 +11156,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11255,7 +11178,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">29 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11498,17 +11421,6 @@
          "label[for=\"buttonMode_right\"]"
         ],
         "html": "<label class=\"brush-section-label\" for=\"buttonMode_right\" title=\"Trigger replay with settings from the Replay Mode section \">Right Click</label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#buttonMode_right"
-        ],
-        "html": "<select id=\"buttonMode_right\" title=\"Trigger replay with settings from the Replay Mode section \" style=\"width: 100%; padding: 4px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 200, 100, 0.3); color: white; border-radius: 4px;",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
