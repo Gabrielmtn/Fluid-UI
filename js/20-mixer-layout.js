@@ -2384,6 +2384,9 @@
     function buildLeftSidebar(strip) {
         var bar = document.createElement('div');
         bar.id = 'sidebar-left';
+        // A named region landmark (the study's cabinet), so the brush bar's
+        // controls sit inside a landmark for screen-reader navigation.
+        bar.setAttribute('role', 'region');
         bar.setAttribute('aria-label', 'Brush');
 
         var head = document.createElement('div');
@@ -2611,6 +2614,9 @@
     function buildSidebar(controls) {
         const sidebar = document.createElement('div');
         sidebar.id = 'sidebar-right';
+        // A named region landmark (the study's cabinet, "Sections").
+        sidebar.setAttribute('role', 'region');
+        sidebar.setAttribute('aria-label', 'Sections');
 
         // Clustered into three colour groups (Gabriel, 2026-08-22). The nav had
         // 16 flat sections in 7 accent colours, which read as 16 unrelated

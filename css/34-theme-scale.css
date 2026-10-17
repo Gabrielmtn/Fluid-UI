@@ -1,0 +1,97 @@
+/* ================================================================
+   34 — WALNUT & COPPER sizing (toward the study's proportions)
+   Gabriel 2026-10-17: "move closer to the original aesthetic". The study's
+   cabinets are wider, its panes 40-48 px with engraved Michroma labels,
+   and each tray opens with a bead-row divider. @layer theme. This sheet
+   changes sizes inside the sidebars; order, controls and behaviour stay.
+   ================================================================ */
+
+@layer theme {
+
+/* Cabinets: the study's are 290-350 px. */
+html[data-theme="walnut-copper"] #sidebar-right { flex-basis: 320px; }
+html[data-theme="walnut-copper"] #sidebar-left { flex-basis: 288px; }
+
+/* Drawer fronts: the study's type (room now that the cabinet is wider). */
+html[data-theme="walnut-copper"] .sidebar-section .section-title,
+html[data-theme="walnut-copper"] .sidebar-section[data-group] .section-title {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+}
+
+/* Tray: opens with a dotted copper bead row and a small rosette in a gap. */
+html[data-theme="walnut-copper"] .sidebar-section:not(.collapsed) > .section-body::before {
+    content: "";
+    display: block;
+    height: 14px;
+    margin: 2px 0 10px;
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'%3E%3Cpath d='M0 0C2 -3 2 -7 0 -8C-2 -7 -2 -3 0 0C3 -2 7 -2 8 0C7 2 3 2 0 0C2 3 2 7 0 8C-2 7 -2 3 0 0C-3 2 -7 2 -8 0C-7 -2 -3 -2 0 0Z' fill='none' stroke='%23d68c5c' stroke-width='1'/%3E%3Ccircle r='1.4' fill='%23f2b38a'/%3E%3C/svg%3E") center / 14px 14px no-repeat,
+        radial-gradient(circle, rgba(214, 140, 92, 0.75) 0 1px, transparent 1.4px) left center / 6px 6px repeat-x;
+    -webkit-mask: linear-gradient(90deg, #000 calc(50% - 13px), transparent calc(50% - 13px) calc(50% - 8px), #000 calc(50% - 8px) calc(50% + 8px), transparent calc(50% + 8px) calc(50% + 13px), #000 calc(50% + 13px));
+    mask: linear-gradient(90deg, #000 calc(50% - 13px), transparent calc(50% - 13px) calc(50% - 8px), #000 calc(50% - 8px) calc(50% + 8px), transparent calc(50% + 8px) calc(50% + 13px), #000 calc(50% + 13px));
+}
+
+/* Panes: taller, engraved type. Icon squares, tip glyphs, swatches and the
+   ghost rows keep their own size. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(button, .btn):not(.btn--icon):not(.btn--ghost):not(.brush-tip-btn):not(.arm-tip-btn):not(.palette-chip):not([style*="background"]):not(.hk-picker-clear):not(.lsb-toggle):not(.lsb-rail-label) {
+    min-height: 36px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    /* Michroma is wide: a label too long for a half-width pane wraps onto a
+       second line (the pane grows) rather than losing words. */
+    white-space: normal;
+    line-height: 1.3;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .brush-radio-row > button {
+    min-height: 30px;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+}
+
+/* Control names: engraved Michroma; values in Share Tech Mono. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .control-group label,
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .checkbox-group label {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .value-display {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    color: var(--lit);
+}
+
+/* ── Swirl Together: the study's room drawer proportions ── */
+html[data-theme="walnut-copper"] #multiArtistPanel :is(.mp-status-row, #multiplayerStatus) {
+    font-family: var(--ui-font-display);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+}
+html[data-theme="walnut-copper"] #roomDisplay {
+    font-size: 24px;
+    letter-spacing: 0.35em;
+    padding: 6px 4px 6px 14px;
+    text-align: center;
+}
+html[data-theme="walnut-copper"] #mpActivity {
+    min-height: 63px;          /* three lines on a 21 px pitch */
+    font-size: 12px;
+    line-height: 21px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 6px 12px;
+}
+
+} /* @layer theme */

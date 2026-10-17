@@ -74,6 +74,17 @@ html[data-theme="walnut-copper"] {
     --wood-parquet: url(../assets/textures/parquet-diagonal.jpg);
     --mesh-dim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.12' stroke-width='1.1'/%3E%3C/svg%3E");
 
+    /* The legacy ground scale (00-tokens) as walnut glass: every plate that
+       reads a --ground-* / --bg-* token (switch rows, wells, popovers) warms
+       with it. Same lightness steps as before. */
+    --ground-950: #0b0705;
+    --ground-900: #100a07;
+    --ground-800: #170f0a;
+    --ground-700: #1d130d;
+    --ground-500: #3b2a1f;
+    --ui-surface-raised: #261810;
+    --bg-panel: rgba(16, 10, 7, 0.96);
+
     /* Roles (css/00-tokens.css) re-pointed at the materials */
     --ui-text: #eadccb;
     --ui-text-muted: #a8937c;
@@ -413,6 +424,11 @@ html[data-theme="walnut-copper"] .mp-peer-touch input[type=range] {
     }
 }
 
+/* Empty hotkey slots (js/17 reserves one on every unbound row so columns
+   align): never painted, and not reserved either, as the left bar already
+   does (21-sidebar #sidebar-left .hk-cap-empty): values sit at the end of
+   their tubes, as in the study. */
+html[data-theme="walnut-copper"] .hk-cap-empty { display: none; }
 /* Key hints beside controls (.hk-cap): small engraved keycaps. */
 html[data-theme="walnut-copper"] .hk-cap {
     font-family: var(--ui-font-mono);

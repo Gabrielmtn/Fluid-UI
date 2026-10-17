@@ -1,9 +1,9 @@
 {
  "name": "arm-tip-menu",
- "generated": "2026-10-17T07:41:00.663Z",
+ "generated": "2026-10-17T18:21:01.111Z",
  "env": {
-  "date": "2026-10-17T07:41:00.663Z",
-  "headCommit": "c4796dac21008b26528e57f813425ffb7bd58490",
+  "date": "2026-10-17T18:21:01.111Z",
+  "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -14,7 +14,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:58518/index.html",
+  "url": "http://127.0.0.1:55906/index.html",
   "layoutChoice": null,
   "uiVisibilityState": null,
   "hiddenUiKeys": [],
@@ -63,10 +63,10 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 8,
-    "y": 454,
+    "x": 43,
+    "y": 488,
     "w": 212,
-    "h": 216
+    "h": 213
    },
    "parentChain": [],
    "axProps": {
@@ -104,8 +104,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 13,
-    "y": 492,
+    "x": 48,
+    "y": 525,
     "w": 202,
     "h": 26
    },
@@ -148,8 +148,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 13,
-    "y": 520,
+    "x": 48,
+    "y": 553,
     "w": 100,
     "h": 26
    },
@@ -192,8 +192,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 115,
-    "y": 520,
+    "x": 150,
+    "y": 553,
     "w": 100,
     "h": 26
    },
@@ -236,8 +236,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 13,
-    "y": 548,
+    "x": 48,
+    "y": 581,
     "w": 100,
     "h": 26
    },
@@ -280,8 +280,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 115,
-    "y": 548,
+    "x": 150,
+    "y": 581,
     "w": 100,
     "h": 26
    },
@@ -324,8 +324,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 13,
-    "y": 576,
+    "x": 48,
+    "y": 609,
     "w": 100,
     "h": 26
    },

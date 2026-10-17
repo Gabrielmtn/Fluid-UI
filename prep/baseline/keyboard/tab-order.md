@@ -1,13 +1,13 @@
 # Keyboard focus order — Tab and Shift+Tab through the whole UI
 
-Generated 2026-10-17T12:52:16.275Z by `prep/baseline/scripts/tab-order.js` (F4). Machine copy: `tab-order.json`. Notes, caveats and the `--check` result: `NOTES.md`.
+Generated 2026-10-17T18:22:04.944Z by `prep/baseline/scripts/tab-order.js` (F4). Machine copy: `tab-order.json`. Notes, caveats and the `--check` result: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T12:52:16.275Z |
-| headCommit | c4796dac21008b26528e57f813425ffb7bd58490 |
+| date | 2026-10-17T18:22:04.944Z |
+| headCommit | 4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7 |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -19,7 +19,7 @@ Generated 2026-10-17T12:52:16.275Z by `prep/baseline/scripts/tab-order.js` (F4).
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:63619/index.html |
+| url | http://127.0.0.1:56108/index.html |
 | titlebarVisible | false |
 | leftFolded | false |
 | rightFolded | false |
@@ -157,208 +157,208 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 20 | mixer-strip |  | top | button | #mixer-strip > div.mixer-stack:nth-of-type(12) > div.mixer-actions:nt… | button | Clear (c) | 46 | Y |
 | 21 | mixer-strip |  | top | button | #pauseBtn | button | ⏸ (c) | 47 | Y |
 | 22 | mixer-strip |  | top | button | #freezeBtn | button | Stop (c) | 48 | Y |
-| 23 | sidebar-left | Brush Size | left | input[range] | #brushSizePerceptual | slider | Brush Size (c) | 51 | Y |
-| 24 | sidebar-left |  | left | input[range] | #brushSteady | slider | STABILIZATION 0% (c) | 53 | Y |
-| 25 | sidebar-left | Brush | left | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | BRUSH (c) | 57 | Y |
-| 26 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | + New Brush Preset (c) | 60 | Y |
-| 27 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Fluid (c) | 63 | Y |
-| 28 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Pressure (c) | 64 | Y |
-| 29 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Collider (c) | 65 | Y |
-| 30 | sidebar-left | Brush | left | input[checkbox] | #cursorToggle | checkbox | Show Cursor (c) | 72 | Y |
-| 31 | sidebar-left | Brush | left | input[checkbox] | #brushGhostToggle | checkbox | BRUSH GHOST 100% (c) | 75 | Y |
-| 32 | sidebar-left | Brush | left | input[range] | #brushGhostOpacity | slider | Brush ghost opacity (c) | 76 | Y |
-| 33 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | TIP (c) | 77 | Y |
-| 34 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ◌ (c) | 78 | Y |
-| 35 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ⬤ (c) | 79 | Y |
-| 36 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ■ (c) | 80 | Y |
-| 37 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ▬ (c) | 81 | Y |
-| 38 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ◯ (c) | 82 | Y |
-| 39 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-shapes-area:nth-of-type(2) > div.brush-… | button | ＋ (c) | 83 | Y |
-| 40 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-shapes-area:nth-of-type(2) > div.brush-… | button | Clipboard (c) | 84 | Y |
-| 41 | sidebar-left | Brush | left | input[range] | #brushAngle | slider | ANGLE 0° (c) | 89 | Y |
-| 42 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | On Move (c) | 91 | Y |
-| 43 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Constant (c) | 92 | Y |
-| 44 | sidebar-left | Brush | left | input[range] | #brushDabInterval | slider | INTERVAL 4 ms · 250/s (c) | 96 | Y |
-| 45 | sidebar-left | Brush | left | input[range] | #brushFlow | slider | FLOW 100% (c) | 98 | Y |
-| 46 | sidebar-left | Brush | left | input[range] | #brushJitter | slider | JITTER 0% (c) | 100 | Y |
-| 47 | sidebar-left | Multi-Brush | left | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | MULTI-BRUSH (c) | 102 | Y |
-| 48 | sidebar-left | Multi-Brush | left | input[range] | #multiplier | slider | Multi-Brush (c) | 104 | Y |
-| 49 | sidebar-left | Multi-Brush | left | select | #symmetryMode | combobox | SYMMETRY (c) | 106 | Y |
-| 50 | sidebar-left | Multi-Brush | left | input[checkbox] | #symmetrySameAngle | checkbox | Same angle on every arm (c) | 107 | Y |
-| 51 | sidebar-left | Multi-Brush | left | input[checkbox] | #symmetryFaceCenter | checkbox | Stay oriented to the center (c) | 109 | Y |
-| 52 | sidebar-left | Multi-Brush | left | input[range] | #symmetryHold | slider | HOLD SYMMETRY 0.00 (c) | 112 | Y |
-| 53 | sidebar-left | Multi-Brush | left | input[color] | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | ColorWell | Arm 1 color (c) | 113 | Y |
-| 54 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Main (c) | 115 | Y |
-| 55 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Custom (c) | 116 | Y |
-| 56 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Random (c) | 117 | Y |
-| 57 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Palette (c) | 118 | Y |
-| 58 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | checkbox | Pressure (c) | 119 | Y |
-| 59 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Brush 1 tip: same as the brush (c) | 120 | Y |
-| 60 | sidebar-left | Stroke and replay | left | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | STROKE AND REPLAY (c) | 122 | Y |
-| 61 | sidebar-left | Stroke and replay | left | select | #buttonMode_left | combobox | LEFT CLICK (c) | 125 | Y |
-| 62 | sidebar-left | Stroke and replay | left | select | #buttonMode_right | combobox | RIGHT CLICK (c) | 141 | Y |
-| 63 | sidebar-left | Stroke and replay | left | select | #buttonMode_middle | combobox | MIDDLE CLICK (MOUSE 3) (c) | 157 | Y |
-| 64 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Edit the menu (c) | 171 | Y |
-| 65 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Set key (c) | 173 | Y |
-| 66 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Set key (c) | 175 | Y |
-| 67 | sidebar-left | Stroke and replay | left | input[checkbox] | #strokeLockGuides | checkbox | Show guides (c) | 177 | Y |
-| 68 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Stroke (c) | 180 | Y |
-| 69 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Time (c) | 181 | Y |
-| 70 | sidebar-left | Stroke and replay | left | input[range] | #replaySpeed | slider | REPLAY SPEED 1× (c) | 185 | Y |
-| 71 | sidebar-left | Stroke and replay | left | input[checkbox] | #preserveRandomness | checkbox | Preserve Randomness (c) | 186 | Y |
-| 72 | sidebar-left | Stroke and replay | left | select | #splatInMode | combobox |  (c) | 189 | Y |
-| 73 | sidebar-left | Stroke and replay | left | select | #splatOutMode | combobox |  (c) | 192 | Y |
-| 74 | main-area |  |  | button | #main-area > div.lsb-edge:nth-of-type(2) > button.lsb-toggle.btn--icon | button | Left-facing sideways arrows icon: collapses the… (c) | 198 | Y |
-| 75 | sidebar-right | Swirl Together | right | span | #sidebar-right > div.sidebar-section:nth-of-type(2) > div.section-hea… | button | SWIRL TOGETHER (c) | 214 | Y |
-| 76 | sidebar-right | Swirl Together | right | button | #createRoomBtn | button | Start a room (c) | 215 | Y |
-| 77 | sidebar-right | Swirl Together | right | button | #strangerBtn | button | Stranger (c) | 216 | Y |
-| 78 | sidebar-right | Swirl Together | right | input[text] | #joinRoomInput | textbox | Room code to join (c) | 217 | Y |
-| 79 | sidebar-right | Swirl Together | right | button | #joinRoomBtn | button | Join (c) | 218 | Y |
-| 80 | sidebar-right | Swirl Together | right | button | #phonePadBtn | button | Sync phone (c) | 219 | Y |
-| 81 | sidebar-right | Swirl Together | right | button | #shareLookBtn | button | Link to current settings (c) | 220 | Y |
-| 82 | sidebar-right | Simulation | right | span | #sidebar-right > div.sidebar-section:nth-of-type(3) > div.section-hea… | button | SIMULATION (c) | 229 | Y |
-| 83 | sidebar-right | Simulation | right | select | #fpsCap | combobox | FPS LIMIT (c) | 231 | Y |
-| 84 | sidebar-right | Simulation | right | input[range] | #pressureDissipation | slider | PRESSURE DISSIPATION 0.950 (c) | 233 | Y |
-| 85 | sidebar-right | Simulation | right | input[range] | #pressureIteration | slider | PRESSURE ITERATION 25 (c) | 235 | Y |
-| 86 | sidebar-right | Simulation | right | input[range] | #wetInfluence | slider | DRYING 0.14 (c) | 237 | Y |
-| 87 | sidebar-right | Simulation | right | input[range] | #wetDrying | slider | DRY TIME 4.5s (c) | 239 | Y |
-| 88 | sidebar-right | Simulation | right | input[range] | #grainCleanup | slider | GRAIN CLEANUP 0.75 (c) | 241 | Y |
-| 89 | sidebar-right | Simulation | right | input[checkbox] | #macCormackToggle | checkbox | Crisp Advection (c) | 242 | Y |
-| 90 | sidebar-right | Simulation | right | input[checkbox] | #multigridToggle | checkbox | Multigrid Pressure (c) | 244 | Y |
-| 91 | sidebar-right | Simulation | right | input[range] | #mgCycles | slider | V-CYCLES 2 (c) | 247 | Y |
-| 92 | sidebar-right | Simulation | right | input[range] | #mgPre | slider | PRE-SMOOTH 2 (c) | 249 | Y |
-| 93 | sidebar-right | Simulation | right | input[range] | #mgPost | slider | POST-SMOOTH 2 (c) | 251 | Y |
-| 94 | sidebar-right | Simulation | right | input[range] | #mgCoarse | slider | COARSE SOLVE 8 (c) | 253 | Y |
-| 95 | sidebar-right | Simulation | right | input[range] | #mgRelax | slider | RELAXATION 1.00 (c) | 255 | Y |
-| 96 | sidebar-right | Colors and palettes | right | span | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-hea… | button | COLORS AND PALETTES (c) | 257 | Y |
-| 97 | sidebar-right | Colors and palettes | right | div | #paletteSelect | combobox | Palette (c) | 259 | Y |
-| 98 | sidebar-right | Colors and palettes | right | div | #palettePreview > div.palette-chip-wrap:nth-of-type(1) > div.palette-… | button | #2C5F2D (c) | 260 | Y |
-| 99 | sidebar-right | Colors and palettes | right | button | #paletteAddChip | button | + (c) | 265 | Y |
-| 100 | sidebar-right | Colors and palettes | right | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Export this (c) | 267 | Y |
-| 101 | sidebar-right | Colors and palettes | right | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Export all (c) | 268 | Y |
-| 102 | sidebar-right | Colors and palettes | right | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Import (c) | 269 | Y |
-| 103 | sidebar-right | Layers | right | span | #sidebar-right > div.sidebar-section.section-layers:nth-of-type(5) > … | button | LAYERS (c) | 272 | Y |
-| 104 | sidebar-right | Layers | right | button | #uploadBtn | button | Import (c) | 274 | Y |
-| 105 | sidebar-right | Layers | right | button | #captureBtn | button | Visible to layer (c) | 275 | Y |
-| 106 | sidebar-right | Layers | right | button | #flattenLayersBtn | button | Flatten (c) | 276 | Y |
-| 107 | sidebar-right | Layers | right | button | #addCollisionLayerBtn | button | Collider (c) | 277 | Y |
-| 108 | sidebar-right | Layers | right | input[text] | #layersPanel > div.layer-item.layer-item-collapsible:nth-of-type(2) >… | textbox |  (c) | 280 | Y |
-| 109 | sidebar-right | Layers | right | input[checkbox] | #layersPanel > div.layer-item.layer-item-collapsible:nth-of-type(2) >… | checkbox | Show or hide this layer (c) | 282 | Y |
-| 110 | sidebar-right | Layers | right | button | #sidebar-right > div.sidebar-section.section-layers:nth-of-type(5) > … | button | + New Path (c) | 283 | Y |
-| 111 | sidebar-right | Layers | right | button | #pathLayersList > div.path-empty-state > button.path-empty-create | button | + Create Path Layer (c) | 284 | Y |
-| 112 | sidebar-right | Layers | right | input[checkbox] | #hoverCaptureToggle | checkbox | Enable Capture on Hover (c) | 285 | Y |
-| 113 | sidebar-right | Layers | right | input[checkbox] | #detachCaptureToggle | checkbox | Detach Capture Area (c) | 287 | Y |
-| 114 | sidebar-right | Layers | right | input[checkbox] | #showPreviewLayersCb | checkbox | Show Preview Layers (c) | 289 | Y |
-| 115 | sidebar-right | Mutate shader | right | span | #mutation-section > div.section-header:nth-of-type(1) > span.section-… | button | MUTATE SHADER (c) | 293 | Y |
-| 116 | sidebar-right | Mutate shader | right | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | Basic (c) | 295 | Y |
-| 117 | sidebar-right | Mutate shader | right | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | All (c) | 296 | Y |
-| 118 | sidebar-right | Mutate shader | right | input[range] | #mutationStrength | slider | Strength of mutate, larger creates wider swings… (c) | 299 | Y |
-| 119 | sidebar-right | Mutate shader | right | select | #mutationCount | combobox |  (c) | 301 | Y |
-| 120 | sidebar-right | Mutate shader | right | button | #mutationGenerate | button | Mutate M (c) | 302 | Y |
-| 121 | sidebar-right | Mutate shader | right | button | #mutationReset | button | Reset (c) | 305 | Y |
-| 122 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Colors (c) | 308 | Y |
-| 123 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Kaleido (c) | 310 | Y |
-| 124 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Sim (c) | 312 | Y |
-| 125 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Effects (c) | 314 | Y |
-| 126 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Audio (c) | 316 | Y |
-| 127 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-hea… | button | EFFECTS (c) | 318 | Y |
-| 128 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Light Source (c) | 319 | Y |
-| 129 | sidebar-right | Effects | right | input[checkbox] | #enableLighting | checkbox | Light Source (c) | 320 | Y |
-| 130 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Light Shift (c) | 330 | Y |
-| 131 | sidebar-right | Effects | right | input[checkbox] | #enableLightShift | checkbox | Light Shift (c) | 331 | Y |
-| 132 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Glow (c) | 345 | Y |
-| 133 | sidebar-right | Effects | right | input[checkbox] | #glowToggle | checkbox | Glow (c) | 346 | Y |
-| 134 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Surface Shading (c) | 363 | Y |
-| 135 | sidebar-right | Effects | right | input[checkbox] | #displayShadingToggle | checkbox | Surface Shading (c) | 364 | Y |
-| 136 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Dither (c) | 378 | Y |
-| 137 | sidebar-right | Effects | right | input[checkbox] | #ditherToggle | checkbox | Dither (c) | 379 | Y |
-| 138 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Gravity Direction (c) | 394 | Y |
-| 139 | sidebar-right | Effects | right | input[checkbox] | #pressureConstant | checkbox | Gravity Direction (c) | 395 | Y |
-| 140 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Border (c) | 397 | Y |
-| 141 | sidebar-right | Effects | right | input[checkbox] | #overflowToggle | checkbox | Border (c) | 398 | Y |
-| 142 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Breathing (c) | 402 | Y |
-| 143 | sidebar-right | Effects | right | input[checkbox] | #breathingToggle | checkbox | Breathing (c) | 403 | Y |
-| 144 | sidebar-right | Animations | right | span | #sidebar-right > div.sidebar-section:nth-of-type(8) > div.section-hea… | button | ANIMATIONS (c) | 414 | Y |
-| 145 | sidebar-right | Animations | right | button | #recMiniRecordBtn | button | ●Record (c) | 415 | Y |
-| 146 | sidebar-right | Animations | right | button | #recLen4 | button | 4 s (c) | 419 | Y |
-| 147 | sidebar-right | Animations | right | button | #recLen8 | button | 8 s (c) | 420 | Y |
-| 148 | sidebar-right | Animations | right | button | #recLen15 | button | 15 s (c) | 421 | Y |
-| 149 | sidebar-right | Animations | right | button | #recLen30 | button | 30 s (c) | 422 | Y |
-| 150 | sidebar-right | Animations | right | button | #recSrcMe | button | Local Only (c) | 424 | Y |
-| 151 | sidebar-right | Animations | right | button | #recSrcAll | button | Everything (c) | 425 | Y |
-| 152 | sidebar-right | Animations | right | button | #sidebar-right > div.sidebar-section:nth-of-type(8) > div.section-bod… | button | Saved Animations ▾ (c) | 428 | Y |
-| 153 | sidebar-right | Audio | right | span | #sidebar-right > div.sidebar-section:nth-of-type(9) > div.section-hea… | button | AUDIO (c) | 430 | Y |
-| 154 | sidebar-right | Audio | right | select | #audioMode | combobox | AUDIO MODE (c) | 432 | Y |
-| 155 | sidebar-right | Audio | right | input[checkbox] | #audioTimingToggle | checkbox | Visualize Audio Timing (c) | 445 | Y |
-| 156 | sidebar-right | Kaleidoscope | right | span | #sidebar-right > div.sidebar-section:nth-of-type(10) > div.section-he… | button | KALEIDOSCOPE (c) | 448 | Y |
-| 157 | sidebar-right | Kaleidoscope | right | input[checkbox] | #mandalaToggle | switch | Mandala Overlay (c) | 449 | Y |
-| 158 | sidebar-right | Kaleidoscope | right | input[checkbox] | #kaleidoToggle | switch | Kaleido (c) | 475 | Y |
-| 159 | sidebar-right | Text | right | span | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-he… | button | TEXT (c) | 496 | Y |
-| 160 | sidebar-right | Text | right | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | + Add Text (c) | 497 | Y |
-| 161 | sidebar-right | Text | right | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | Arrange on Canvas (c) | 498 | Y |
-| 162 | sidebar-right | Text | right | button | #textOverlayClearAll | button | Clear All (c) | 538 | Y |
-| 163 | sidebar-right | Focus | right | span | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-he… | button | FOCUS (c) | 543 | Y |
-| 164 | sidebar-right | Focus | right | input[checkbox] | #focusModeToggle | checkbox | Focus Mode (F) (c) | 544 | Y |
-| 165 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 9:16 TikTok (c) | 547 | Y |
-| 166 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 1:1 Square (c) | 548 | Y |
-| 167 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 16:9 YouTube (c) | 549 | Y |
-| 168 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 21:9 Ultra (c) | 550 | Y |
-| 169 | sidebar-right | Focus | right | input[checkbox] | #streamFormatLock | checkbox | Lock Format (c) | 551 | Y |
-| 170 | sidebar-right | Display | right | span | #sidebar-right > div.sidebar-section:nth-of-type(13) > div.section-he… | button | DISPLAY (c) | 554 | Y |
-| 171 | sidebar-right | Display | right | input[checkbox] | #photoSafeToggle | checkbox | Reduce flashing and rapid brightness changes (c) | 555 | Y |
-| 172 | sidebar-right | Display | right | button | #photoWarnShowBtn | button | Show photosensitivity warning (c) | 557 | Y |
-| 173 | sidebar-right | Display | right | a | #sidebar-right > div.sidebar-section:nth-of-type(13) > div.section-bo… | link | Learn more about photosensitivity (Epilepsy Fou… (c) | 558 | Y |
-| 174 | sidebar-right | Display | right | select | #windowMode | combobox | WINDOW MODE F11 (c) | 560 | Y |
-| 175 | sidebar-right | Display | right | button | #penWindowBtn | button | PEN INPUT WINDOW (c) | 562 | Y |
-| 176 | sidebar-right | Display | right | select | #penWindowMirror | combobox | PEN WINDOW MIRROR (c) | 564 | Y |
-| 177 | sidebar-right | Display | right | button | #penWindowScreens > button | button | Find Screens (c) | 566 | Y |
-| 178 | sidebar-right | Display | right | input[color] | #backgroundColorPicker | ColorWell | BACKGROUND COLOR (c) | 568 | Y |
-| 179 | sidebar-right | Display | right | input[checkbox] | #transparentMode | checkbox | Transparent Background (c) | 569 | Y |
-| 180 | sidebar-right | Display | right | input[range] | #canvasOpacity | slider | CANVAS OPACITY (SIM VISIBILITY) 100% (c) | 573 | Y |
-| 181 | sidebar-right | Display | right | input[checkbox] | #preserveFluidOpacity | checkbox | Empty Alpha Locked (c) | 574 | Y |
-| 182 | sidebar-right | Display | right | input[checkbox] | #showCanvasHandles | checkbox | Show Canvas Border & Handles (c) | 578 | Y |
-| 183 | sidebar-right | Display | right | input[checkbox] | #lockCanvasBorders | checkbox | Lock Canvas Borders (c) | 580 | Y |
-| 184 | sidebar-right | Display | right | input[checkbox] | #statsToggle | checkbox | Debug Info (c) | 582 | Y |
-| 185 | sidebar-right | Export | right | span | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-he… | button | EXPORT (c) | 585 | Y |
-| 186 | sidebar-right | Export | right | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | Save Project (c) | 587 | Y |
-| 187 | sidebar-right | Export | right | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | Load Project (c) | 588 | Y |
-| 188 | sidebar-right | Export | right | button | #exportVideoBtn | button | Video (c) | 591 | Y |
-| 189 | sidebar-right | Export | right | button | #exportGifBtn | button | GIF (c) | 592 | Y |
-| 190 | sidebar-right | Export | right | button | #exportStillBtn | button | Save picture (c) | 593 | Y |
-| 191 | sidebar-right | Export | right | button | #exportSequenceBtn | button | Sequence (c) | 594 | Y |
-| 192 | sidebar-right | Export | right | select | #exportGround | combobox | Background (c) | 596 | Y |
-| 193 | sidebar-right | Export | right | input[number] | #exportVideoDuration | spinbutton |  (c) | 600 | Y |
-| 194 | sidebar-right | Export | right | select | #exportVideoFPS | combobox |  (c) | 602 | Y |
-| 195 | sidebar-right | Export | right | input[number] | #exportGifDuration | spinbutton |  (c) | 605 | Y |
-| 196 | sidebar-right | Export | right | select | #exportGifFPS | combobox |  (c) | 607 | Y |
-| 197 | sidebar-right | Settings | right | span | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-he… | button | SETTINGS (c) | 609 | Y |
-| 198 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Simple (c) | 611 | Y |
-| 199 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Everything (c) | 612 | Y |
-| 200 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Visible sections 28 / 28 ▾ (c) | 613 | Y |
-| 201 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + Bind a control Ctrl+Shift+H (c) | 671 | Y |
-| 202 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Your hotkeys ▾ (c) | 672 | Y |
-| 203 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Brush Size” off the menu (c) | 674 | Y |
-| 204 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Material Type - Fluid” off the menu (c) | 675 | Y |
-| 205 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Viscosity” off the menu (c) | 676 | Y |
-| 206 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Isolation” off the menu (c) | 677 | Y |
-| 207 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Laminar / Blend” off the menu (c) | 678 | Y |
-| 208 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Multi-Brush” off the menu (c) | 679 | Y |
-| 209 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Time” off the menu (c) | 680 | Y |
-| 210 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Density” off the menu (c) | 681 | Y |
-| 211 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Velocity” off the menu (c) | 682 | Y |
-| 212 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + Add from the interface (c) | 683 | Y |
-| 213 | sidebar-right | Settings | right | input[text] | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | textbox | Label for a new key item (c) | 684 | Y |
-| 214 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Its key (c) | 685 | Y |
-| 215 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Add (c) | 687 | Y |
-| 216 | sidebar-right | Settings | right | button | #saveSettingsBtn | button | Save settings (c) | 690 | Y |
-| 217 | sidebar-right | Settings | right | button | #loadSettingsBtn | button | Load (c) | 691 | Y |
-| 218 | sidebar-right | Settings | right | button | #clearSettingsBtn | button | Clear (c) | 692 | Y |
-| 219 | sidebar-right | Settings | right | input[checkbox] | #autoloadSettings | checkbox | Load saved on start (c) | 693 | Y |
-| 220 | sidebar-right | Settings | right | button | #exportAllPresetsBtn | button | ⤓ Export Presets (c) | 696 | Y |
-| 221 | sidebar-right | Settings | right | button | #importPresetsBtn | button | ⤒ Import Presets (c) | 697 | Y |
-| 222 | overlay:quality-underbar |  | bottom | button | #quality-underbar > div.qub-dd:nth-of-type(1) > button.qub-dd-btn | button | IMAGE SHARPNESS 2048 (c) | 822 | Y |
-| 223 | overlay:quality-underbar |  | bottom | button | #quality-underbar > div.qub-dd:nth-of-type(2) > button.qub-dd-btn | button | MOTION DETAIL 1024 (c) | 825 | Y |
-| 224 | overlay:quality-underbar |  | bottom | button | #resetAppBtn | button | Reset app (c) | 831 | Y |
+| 23 | sidebar-left | Brush Size | left | input[range] | #brushSizePerceptual | slider | Brush Size (c) | 52 | Y |
+| 24 | sidebar-left |  | left | input[range] | #brushSteady | slider | STABILIZATION 0% (c) | 54 | Y |
+| 25 | sidebar-left | Brush | left | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | BRUSH (c) | 58 | Y |
+| 26 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | + NEW BRUSH PRESET (c) | 61 | Y |
+| 27 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | FLUID (c) | 64 | Y |
+| 28 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | PRESSURE (c) | 65 | Y |
+| 29 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | COLLIDER (c) | 66 | Y |
+| 30 | sidebar-left | Brush | left | input[checkbox] | #cursorToggle | checkbox | SHOW CURSOR (c) | 73 | Y |
+| 31 | sidebar-left | Brush | left | input[checkbox] | #brushGhostToggle | checkbox | BRUSH GHOST 100% (c) | 76 | Y |
+| 32 | sidebar-left | Brush | left | input[range] | #brushGhostOpacity | slider | Brush ghost opacity (c) | 77 | Y |
+| 33 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | TIP (c) | 78 | Y |
+| 34 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ◌ (c) | 79 | Y |
+| 35 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ⬤ (c) | 80 | Y |
+| 36 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ■ (c) | 81 | Y |
+| 37 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ▬ (c) | 82 | Y |
+| 38 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-tip-row:nth-of-type(1) > button.brush-t… | button | ◯ (c) | 83 | Y |
+| 39 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-shapes-area:nth-of-type(2) > div.brush-… | button | ＋ (c) | 84 | Y |
+| 40 | sidebar-left | Brush | left | button | #brushTipFoldBody > div.brush-shapes-area:nth-of-type(2) > div.brush-… | button | Clipboard (c) | 85 | Y |
+| 41 | sidebar-left | Brush | left | input[range] | #brushAngle | slider | ANGLE 0° (c) | 90 | Y |
+| 42 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | ON MOVE (c) | 92 | Y |
+| 43 | sidebar-left | Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | CONSTANT (c) | 93 | Y |
+| 44 | sidebar-left | Brush | left | input[range] | #brushDabInterval | slider | INTERVAL 4 ms · 250/s (c) | 97 | Y |
+| 45 | sidebar-left | Brush | left | input[range] | #brushFlow | slider | FLOW 100% (c) | 99 | Y |
+| 46 | sidebar-left | Brush | left | input[range] | #brushJitter | slider | JITTER 0% (c) | 101 | Y |
+| 47 | sidebar-left | Multi-Brush | left | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | MULTI-BRUSH (c) | 103 | Y |
+| 48 | sidebar-left | Multi-Brush | left | input[range] | #multiplier | slider | Multi-Brush (c) | 105 | Y |
+| 49 | sidebar-left | Multi-Brush | left | select | #symmetryMode | combobox | SYMMETRY (c) | 107 | Y |
+| 50 | sidebar-left | Multi-Brush | left | input[checkbox] | #symmetrySameAngle | checkbox | SAME ANGLE ON EVERY ARM (c) | 108 | Y |
+| 51 | sidebar-left | Multi-Brush | left | input[checkbox] | #symmetryFaceCenter | checkbox | STAY ORIENTED TO THE CENTER (c) | 110 | Y |
+| 52 | sidebar-left | Multi-Brush | left | input[range] | #symmetryHold | slider | HOLD SYMMETRY 0.00 (c) | 113 | Y |
+| 53 | sidebar-left | Multi-Brush | left | input[color] | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | ColorWell | Arm 1 color (c) | 114 | Y |
+| 54 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | MAIN (c) | 116 | Y |
+| 55 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | CUSTOM (c) | 117 | Y |
+| 56 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | RANDOM (c) | 118 | Y |
+| 57 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | PALETTE (c) | 119 | Y |
+| 58 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | checkbox | PRESSURE (c) | 120 | Y |
+| 59 | sidebar-left | Multi-Brush | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Brush 1 tip: same as the brush (c) | 121 | Y |
+| 60 | sidebar-left | Stroke and replay | left | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | STROKE AND REPLAY (c) | 123 | Y |
+| 61 | sidebar-left | Stroke and replay | left | select | #buttonMode_left | combobox | LEFT CLICK (c) | 126 | Y |
+| 62 | sidebar-left | Stroke and replay | left | select | #buttonMode_right | combobox | RIGHT CLICK (c) | 142 | Y |
+| 63 | sidebar-left | Stroke and replay | left | select | #buttonMode_middle | combobox | MIDDLE CLICK (MOUSE 3) (c) | 158 | Y |
+| 64 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | EDIT THE MENU (c) | 172 | Y |
+| 65 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | SET KEY (c) | 174 | Y |
+| 66 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | SET KEY (c) | 176 | Y |
+| 67 | sidebar-left | Stroke and replay | left | input[checkbox] | #strokeLockGuides | checkbox | SHOW GUIDES (c) | 178 | Y |
+| 68 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | STROKE (c) | 181 | Y |
+| 69 | sidebar-left | Stroke and replay | left | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | TIME (c) | 182 | Y |
+| 70 | sidebar-left | Stroke and replay | left | input[range] | #replaySpeed | slider | REPLAY SPEED 1× (c) | 186 | Y |
+| 71 | sidebar-left | Stroke and replay | left | input[checkbox] | #preserveRandomness | checkbox | PRESERVE RANDOMNESS (c) | 187 | Y |
+| 72 | sidebar-left | Stroke and replay | left | select | #splatInMode | combobox |  (c) | 190 | Y |
+| 73 | sidebar-left | Stroke and replay | left | select | #splatOutMode | combobox |  (c) | 193 | Y |
+| 74 | main-area |  |  | button | #main-area > div.lsb-edge:nth-of-type(2) > button.lsb-toggle.btn--icon | button | Left-facing sideways arrows icon: collapses the… (c) | 199 | Y |
+| 75 | sidebar-right | Swirl Together | right | span | #sidebar-right > div.sidebar-section:nth-of-type(2) > div.section-hea… | button | SWIRL TOGETHER (c) | 216 | Y |
+| 76 | sidebar-right | Swirl Together | right | button | #createRoomBtn | button | START A ROOM (c) | 217 | Y |
+| 77 | sidebar-right | Swirl Together | right | button | #strangerBtn | button | STRANGER (c) | 218 | Y |
+| 78 | sidebar-right | Swirl Together | right | input[text] | #joinRoomInput | textbox | Room code to join (c) | 219 | Y |
+| 79 | sidebar-right | Swirl Together | right | button | #joinRoomBtn | button | JOIN (c) | 220 | Y |
+| 80 | sidebar-right | Swirl Together | right | button | #phonePadBtn | button | SYNC PHONE (c) | 221 | Y |
+| 81 | sidebar-right | Swirl Together | right | button | #shareLookBtn | button | LINK TO CURRENT SETTINGS (c) | 222 | Y |
+| 82 | sidebar-right | Simulation | right | span | #sidebar-right > div.sidebar-section:nth-of-type(3) > div.section-hea… | button | SIMULATION (c) | 231 | Y |
+| 83 | sidebar-right | Simulation | right | select | #fpsCap | combobox | FPS LIMIT (c) | 233 | Y |
+| 84 | sidebar-right | Simulation | right | input[range] | #pressureDissipation | slider | PRESSURE DISSIPATION 0.950 (c) | 235 | Y |
+| 85 | sidebar-right | Simulation | right | input[range] | #pressureIteration | slider | PRESSURE ITERATION 25 (c) | 237 | Y |
+| 86 | sidebar-right | Simulation | right | input[range] | #wetInfluence | slider | DRYING 0.14 (c) | 239 | Y |
+| 87 | sidebar-right | Simulation | right | input[range] | #wetDrying | slider | DRY TIME 4.5s (c) | 241 | Y |
+| 88 | sidebar-right | Simulation | right | input[range] | #grainCleanup | slider | GRAIN CLEANUP 0.75 (c) | 243 | Y |
+| 89 | sidebar-right | Simulation | right | input[checkbox] | #macCormackToggle | checkbox | CRISP ADVECTION (c) | 244 | Y |
+| 90 | sidebar-right | Simulation | right | input[checkbox] | #multigridToggle | checkbox | MULTIGRID PRESSURE (c) | 246 | Y |
+| 91 | sidebar-right | Simulation | right | input[range] | #mgCycles | slider | V-CYCLES 2 (c) | 249 | Y |
+| 92 | sidebar-right | Simulation | right | input[range] | #mgPre | slider | PRE-SMOOTH 2 (c) | 251 | Y |
+| 93 | sidebar-right | Simulation | right | input[range] | #mgPost | slider | POST-SMOOTH 2 (c) | 253 | Y |
+| 94 | sidebar-right | Simulation | right | input[range] | #mgCoarse | slider | COARSE SOLVE 8 (c) | 255 | Y |
+| 95 | sidebar-right | Simulation | right | input[range] | #mgRelax | slider | RELAXATION 1.00 (c) | 257 | Y |
+| 96 | sidebar-right | Colors and palettes | right | span | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-hea… | button | COLORS AND PALETTES (c) | 259 | Y |
+| 97 | sidebar-right | Colors and palettes | right | div | #paletteSelect | combobox | Palette (c) | 261 | Y |
+| 98 | sidebar-right | Colors and palettes | right | div | #palettePreview > div.palette-chip-wrap:nth-of-type(1) > div.palette-… | button | #2C5F2D (c) | 262 | Y |
+| 99 | sidebar-right | Colors and palettes | right | button | #paletteAddChip | button | + (c) | 267 | Y |
+| 100 | sidebar-right | Colors and palettes | right | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Export this (c) | 269 | Y |
+| 101 | sidebar-right | Colors and palettes | right | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Export all (c) | 270 | Y |
+| 102 | sidebar-right | Colors and palettes | right | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Import (c) | 271 | Y |
+| 103 | sidebar-right | Layers | right | span | #sidebar-right > div.sidebar-section.section-layers:nth-of-type(5) > … | button | LAYERS (c) | 274 | Y |
+| 104 | sidebar-right | Layers | right | button | #uploadBtn | button | IMPORT (c) | 276 | Y |
+| 105 | sidebar-right | Layers | right | button | #captureBtn | button | VISIBLE TO LAYER (c) | 277 | Y |
+| 106 | sidebar-right | Layers | right | button | #flattenLayersBtn | button | FLATTEN (c) | 278 | Y |
+| 107 | sidebar-right | Layers | right | button | #addCollisionLayerBtn | button | COLLIDER (c) | 279 | Y |
+| 108 | sidebar-right | Layers | right | input[text] | #layersPanel > div.layer-item.layer-item-collapsible:nth-of-type(2) >… | textbox |  (c) | 282 | Y |
+| 109 | sidebar-right | Layers | right | input[checkbox] | #layersPanel > div.layer-item.layer-item-collapsible:nth-of-type(2) >… | checkbox | Show or hide this layer (c) | 284 | Y |
+| 110 | sidebar-right | Layers | right | button | #sidebar-right > div.sidebar-section.section-layers:nth-of-type(5) > … | button | + NEW PATH (c) | 285 | Y |
+| 111 | sidebar-right | Layers | right | button | #pathLayersList > div.path-empty-state > button.path-empty-create | button | + CREATE PATH LAYER (c) | 286 | Y |
+| 112 | sidebar-right | Layers | right | input[checkbox] | #hoverCaptureToggle | checkbox | ENABLE CAPTURE ON HOVER (c) | 287 | Y |
+| 113 | sidebar-right | Layers | right | input[checkbox] | #detachCaptureToggle | checkbox | DETACH CAPTURE AREA (c) | 289 | Y |
+| 114 | sidebar-right | Layers | right | input[checkbox] | #showPreviewLayersCb | checkbox | SHOW PREVIEW LAYERS (c) | 291 | Y |
+| 115 | sidebar-right | Mutate shader | right | span | #mutation-section > div.section-header:nth-of-type(1) > span.section-… | button | MUTATE SHADER (c) | 295 | Y |
+| 116 | sidebar-right | Mutate shader | right | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | BASIC (c) | 297 | Y |
+| 117 | sidebar-right | Mutate shader | right | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | ALL (c) | 298 | Y |
+| 118 | sidebar-right | Mutate shader | right | input[range] | #mutationStrength | slider | Strength of mutate, larger creates wider swings… (c) | 301 | Y |
+| 119 | sidebar-right | Mutate shader | right | select | #mutationCount | combobox |  (c) | 303 | Y |
+| 120 | sidebar-right | Mutate shader | right | button | #mutationGenerate | button | MUTATE M (c) | 304 | Y |
+| 121 | sidebar-right | Mutate shader | right | button | #mutationReset | button | RESET (c) | 307 | Y |
+| 122 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Colors (c) | 310 | Y |
+| 123 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Kaleido (c) | 312 | Y |
+| 124 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Sim (c) | 314 | Y |
+| 125 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Effects (c) | 316 | Y |
+| 126 | sidebar-right | Mutate shader | right | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Audio (c) | 318 | Y |
+| 127 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-hea… | button | EFFECTS (c) | 320 | Y |
+| 128 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Light Source (c) | 321 | Y |
+| 129 | sidebar-right | Effects | right | input[checkbox] | #enableLighting | checkbox | LIGHT SOURCE (c) | 322 | Y |
+| 130 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Light Shift (c) | 332 | Y |
+| 131 | sidebar-right | Effects | right | input[checkbox] | #enableLightShift | checkbox | LIGHT SHIFT (c) | 333 | Y |
+| 132 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Glow (c) | 347 | Y |
+| 133 | sidebar-right | Effects | right | input[checkbox] | #glowToggle | checkbox | GLOW (c) | 348 | Y |
+| 134 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Surface Shading (c) | 365 | Y |
+| 135 | sidebar-right | Effects | right | input[checkbox] | #displayShadingToggle | checkbox | SURFACE SHADING (c) | 366 | Y |
+| 136 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Dither (c) | 380 | Y |
+| 137 | sidebar-right | Effects | right | input[checkbox] | #ditherToggle | checkbox | DITHER (c) | 381 | Y |
+| 138 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Gravity Direction (c) | 396 | Y |
+| 139 | sidebar-right | Effects | right | input[checkbox] | #pressureConstant | checkbox | GRAVITY DIRECTION (c) | 397 | Y |
+| 140 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Border (c) | 399 | Y |
+| 141 | sidebar-right | Effects | right | input[checkbox] | #overflowToggle | checkbox | BORDER (c) | 400 | Y |
+| 142 | sidebar-right | Effects | right | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Breathing (c) | 404 | Y |
+| 143 | sidebar-right | Effects | right | input[checkbox] | #breathingToggle | checkbox | BREATHING (c) | 405 | Y |
+| 144 | sidebar-right | Animations | right | span | #sidebar-right > div.sidebar-section:nth-of-type(8) > div.section-hea… | button | ANIMATIONS (c) | 416 | Y |
+| 145 | sidebar-right | Animations | right | button | #recMiniRecordBtn | button | ●RECORD (c) | 417 | Y |
+| 146 | sidebar-right | Animations | right | button | #recLen4 | button | 4 S (c) | 421 | Y |
+| 147 | sidebar-right | Animations | right | button | #recLen8 | button | 8 S (c) | 422 | Y |
+| 148 | sidebar-right | Animations | right | button | #recLen15 | button | 15 S (c) | 423 | Y |
+| 149 | sidebar-right | Animations | right | button | #recLen30 | button | 30 S (c) | 424 | Y |
+| 150 | sidebar-right | Animations | right | button | #recSrcMe | button | LOCAL ONLY (c) | 426 | Y |
+| 151 | sidebar-right | Animations | right | button | #recSrcAll | button | EVERYTHING (c) | 427 | Y |
+| 152 | sidebar-right | Animations | right | button | #sidebar-right > div.sidebar-section:nth-of-type(8) > div.section-bod… | button | SAVED ANIMATIONS ▾ (c) | 430 | Y |
+| 153 | sidebar-right | Audio | right | span | #sidebar-right > div.sidebar-section:nth-of-type(9) > div.section-hea… | button | AUDIO (c) | 432 | Y |
+| 154 | sidebar-right | Audio | right | select | #audioMode | combobox | AUDIO MODE (c) | 434 | Y |
+| 155 | sidebar-right | Audio | right | input[checkbox] | #audioTimingToggle | checkbox | VISUALIZE AUDIO TIMING (c) | 447 | Y |
+| 156 | sidebar-right | Kaleidoscope | right | span | #sidebar-right > div.sidebar-section:nth-of-type(10) > div.section-he… | button | KALEIDOSCOPE (c) | 450 | Y |
+| 157 | sidebar-right | Kaleidoscope | right | input[checkbox] | #mandalaToggle | switch | MANDALA OVERLAY (c) | 451 | Y |
+| 158 | sidebar-right | Kaleidoscope | right | input[checkbox] | #kaleidoToggle | switch | KALEIDO (c) | 477 | Y |
+| 159 | sidebar-right | Text | right | span | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-he… | button | TEXT (c) | 498 | Y |
+| 160 | sidebar-right | Text | right | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | + ADD TEXT (c) | 499 | Y |
+| 161 | sidebar-right | Text | right | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | ARRANGE ON CANVAS (c) | 500 | Y |
+| 162 | sidebar-right | Text | right | button | #textOverlayClearAll | button | CLEAR ALL (c) | 540 | Y |
+| 163 | sidebar-right | Focus | right | span | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-he… | button | FOCUS (c) | 545 | Y |
+| 164 | sidebar-right | Focus | right | input[checkbox] | #focusModeToggle | checkbox | FOCUS MODE (F) (c) | 546 | Y |
+| 165 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 9:16 TIKTOK (c) | 549 | Y |
+| 166 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 1:1 SQUARE (c) | 550 | Y |
+| 167 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 16:9 YOUTUBE (c) | 551 | Y |
+| 168 | sidebar-right | Focus | right | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 21:9 ULTRA (c) | 552 | Y |
+| 169 | sidebar-right | Focus | right | input[checkbox] | #streamFormatLock | checkbox | LOCK FORMAT (c) | 553 | Y |
+| 170 | sidebar-right | Display | right | span | #sidebar-right > div.sidebar-section:nth-of-type(13) > div.section-he… | button | DISPLAY (c) | 556 | Y |
+| 171 | sidebar-right | Display | right | input[checkbox] | #photoSafeToggle | checkbox | REDUCE FLASHING AND RAPID BRIGHTNESS CHANGES (c) | 557 | Y |
+| 172 | sidebar-right | Display | right | button | #photoWarnShowBtn | button | SHOW PHOTOSENSITIVITY WARNING (c) | 559 | Y |
+| 173 | sidebar-right | Display | right | a | #sidebar-right > div.sidebar-section:nth-of-type(13) > div.section-bo… | link | Learn more about photosensitivity (Epilepsy Fou… (c) | 560 | Y |
+| 174 | sidebar-right | Display | right | select | #windowMode | combobox | WINDOW MODE F11 (c) | 562 | Y |
+| 175 | sidebar-right | Display | right | button | #penWindowBtn | button | PEN INPUT WINDOW (c) | 564 | Y |
+| 176 | sidebar-right | Display | right | select | #penWindowMirror | combobox | PEN WINDOW MIRROR (c) | 566 | Y |
+| 177 | sidebar-right | Display | right | button | #penWindowScreens > button | button | FIND SCREENS (c) | 568 | Y |
+| 178 | sidebar-right | Display | right | input[color] | #backgroundColorPicker | ColorWell | BACKGROUND COLOR (c) | 570 | Y |
+| 179 | sidebar-right | Display | right | input[checkbox] | #transparentMode | checkbox | TRANSPARENT BACKGROUND (c) | 571 | Y |
+| 180 | sidebar-right | Display | right | input[range] | #canvasOpacity | slider | CANVAS OPACITY (SIM VISIBILITY) 100% (c) | 575 | Y |
+| 181 | sidebar-right | Display | right | input[checkbox] | #preserveFluidOpacity | checkbox | EMPTY ALPHA LOCKED (c) | 576 | Y |
+| 182 | sidebar-right | Display | right | input[checkbox] | #showCanvasHandles | checkbox | SHOW CANVAS BORDER & HANDLES (c) | 580 | Y |
+| 183 | sidebar-right | Display | right | input[checkbox] | #lockCanvasBorders | checkbox | LOCK CANVAS BORDERS (c) | 582 | Y |
+| 184 | sidebar-right | Display | right | input[checkbox] | #statsToggle | checkbox | DEBUG INFO (c) | 584 | Y |
+| 185 | sidebar-right | Export | right | span | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-he… | button | EXPORT (c) | 587 | Y |
+| 186 | sidebar-right | Export | right | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | SAVE PROJECT (c) | 589 | Y |
+| 187 | sidebar-right | Export | right | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | LOAD PROJECT (c) | 590 | Y |
+| 188 | sidebar-right | Export | right | button | #exportVideoBtn | button | VIDEO (c) | 593 | Y |
+| 189 | sidebar-right | Export | right | button | #exportGifBtn | button | GIF (c) | 594 | Y |
+| 190 | sidebar-right | Export | right | button | #exportStillBtn | button | SAVE PICTURE (c) | 595 | Y |
+| 191 | sidebar-right | Export | right | button | #exportSequenceBtn | button | SEQUENCE (c) | 596 | Y |
+| 192 | sidebar-right | Export | right | select | #exportGround | combobox | Background (c) | 598 | Y |
+| 193 | sidebar-right | Export | right | input[number] | #exportVideoDuration | spinbutton |  (c) | 602 | Y |
+| 194 | sidebar-right | Export | right | select | #exportVideoFPS | combobox |  (c) | 604 | Y |
+| 195 | sidebar-right | Export | right | input[number] | #exportGifDuration | spinbutton |  (c) | 607 | Y |
+| 196 | sidebar-right | Export | right | select | #exportGifFPS | combobox |  (c) | 609 | Y |
+| 197 | sidebar-right | Settings | right | span | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-he… | button | SETTINGS (c) | 611 | Y |
+| 198 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | SIMPLE (c) | 613 | Y |
+| 199 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | EVERYTHING (c) | 614 | Y |
+| 200 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | VISIBLE SECTIONS 28 / 28 ▾ (c) | 615 | Y |
+| 201 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + BIND A CONTROL CTRL+SHIFT+H (c) | 673 | Y |
+| 202 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | YOUR HOTKEYS ▾ (c) | 674 | Y |
+| 203 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Brush Size” off the menu (c) | 676 | Y |
+| 204 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Material Type - Fluid” off the menu (c) | 677 | Y |
+| 205 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Viscosity” off the menu (c) | 678 | Y |
+| 206 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Isolation” off the menu (c) | 679 | Y |
+| 207 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Laminar / Blend” off the menu (c) | 680 | Y |
+| 208 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Multi-Brush” off the menu (c) | 681 | Y |
+| 209 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Time” off the menu (c) | 682 | Y |
+| 210 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Density” off the menu (c) | 683 | Y |
+| 211 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Velocity” off the menu (c) | 684 | Y |
+| 212 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + ADD FROM THE INTERFACE (c) | 685 | Y |
+| 213 | sidebar-right | Settings | right | input[text] | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | textbox | Label for a new key item (c) | 686 | Y |
+| 214 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | ITS KEY (c) | 687 | Y |
+| 215 | sidebar-right | Settings | right | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | ADD (c) | 689 | Y |
+| 216 | sidebar-right | Settings | right | button | #saveSettingsBtn | button | SAVE SETTINGS (c) | 692 | Y |
+| 217 | sidebar-right | Settings | right | button | #loadSettingsBtn | button | LOAD (c) | 693 | Y |
+| 218 | sidebar-right | Settings | right | button | #clearSettingsBtn | button | CLEAR (c) | 694 | Y |
+| 219 | sidebar-right | Settings | right | input[checkbox] | #autoloadSettings | checkbox | LOAD SAVED ON START (c) | 695 | Y |
+| 220 | sidebar-right | Settings | right | button | #exportAllPresetsBtn | button | ⤓ EXPORT PRESETS (c) | 698 | Y |
+| 221 | sidebar-right | Settings | right | button | #importPresetsBtn | button | ⤒ IMPORT PRESETS (c) | 699 | Y |
+| 222 | overlay:quality-underbar |  | bottom | button | #quality-underbar > div.qub-dd:nth-of-type(1) > button.qub-dd-btn | button | IMAGE SHARPNESS 2048 (c) | 824 | Y |
+| 223 | overlay:quality-underbar |  | bottom | button | #quality-underbar > div.qub-dd:nth-of-type(2) > button.qub-dd-btn | button | MOTION DETAIL 1024 (c) | 827 | Y |
+| 224 | overlay:quality-underbar |  | bottom | button | #resetAppBtn | button | Reset app (c) | 833 | Y |
 | 225 |  |  |  |  | (document: focus left the page) |  |  |  |  |
 
 ## Reverse order (Shift+Tab), every stop
@@ -368,16 +368,16 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 0 | overlay:quality-underbar |  | button | #resetAppBtn | button | Reset app |
 | 1 | overlay:quality-underbar |  | button | #quality-underbar > div.qub-dd:nth-of-type(2) > button.qub-dd-btn | button | MOTION DETAIL 1024 |
 | 2 | overlay:quality-underbar |  | button | #quality-underbar > div.qub-dd:nth-of-type(1) > button.qub-dd-btn | button | IMAGE SHARPNESS 2048 |
-| 3 | sidebar-right | Settings | button | #importPresetsBtn | button | ⤒ Import Presets |
-| 4 | sidebar-right | Settings | button | #exportAllPresetsBtn | button | ⤓ Export Presets |
-| 5 | sidebar-right | Settings | input[checkbox] | #autoloadSettings | checkbox | Load saved on start |
-| 6 | sidebar-right | Settings | button | #clearSettingsBtn | button | Clear |
-| 7 | sidebar-right | Settings | button | #loadSettingsBtn | button | Load |
-| 8 | sidebar-right | Settings | button | #saveSettingsBtn | button | Save settings |
-| 9 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Add |
-| 10 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Its key |
+| 3 | sidebar-right | Settings | button | #importPresetsBtn | button | ⤒ IMPORT PRESETS |
+| 4 | sidebar-right | Settings | button | #exportAllPresetsBtn | button | ⤓ EXPORT PRESETS |
+| 5 | sidebar-right | Settings | input[checkbox] | #autoloadSettings | checkbox | LOAD SAVED ON START |
+| 6 | sidebar-right | Settings | button | #clearSettingsBtn | button | CLEAR |
+| 7 | sidebar-right | Settings | button | #loadSettingsBtn | button | LOAD |
+| 8 | sidebar-right | Settings | button | #saveSettingsBtn | button | SAVE SETTINGS |
+| 9 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | ADD |
+| 10 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | ITS KEY |
 | 11 | sidebar-right | Settings | input[text] | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | textbox | Label for a new key item |
-| 12 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + Add from the interface |
+| 12 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + ADD FROM THE INTERFACE |
 | 13 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Velocity” off the menu |
 | 14 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Density” off the menu |
 | 15 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Time” off the menu |
@@ -387,80 +387,80 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 19 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Viscosity” off the menu |
 | 20 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Material Type - Fluid” off the menu |
 | 21 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Take “Brush Size” off the menu |
-| 22 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Your hotkeys ▾ |
-| 23 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + Bind a control Ctrl+Shift+H |
-| 24 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Visible sections 28 / 28 ▾ |
-| 25 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Everything |
-| 26 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | Simple |
+| 22 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | YOUR HOTKEYS ▾ |
+| 23 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | + BIND A CONTROL CTRL+SHIFT+H |
+| 24 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | VISIBLE SECTIONS 28 / 28 ▾ |
+| 25 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | EVERYTHING |
+| 26 | sidebar-right | Settings | button | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-bo… | button | SIMPLE |
 | 27 | sidebar-right | Settings | span | #sidebar-right > div.sidebar-section:nth-of-type(15) > div.section-he… | button | SETTINGS |
 | 28 | sidebar-right | Export | select | #exportGifFPS | combobox |  |
 | 29 | sidebar-right | Export | input[number] | #exportGifDuration | spinbutton |  |
 | 30 | sidebar-right | Export | select | #exportVideoFPS | combobox |  |
 | 31 | sidebar-right | Export | input[number] | #exportVideoDuration | spinbutton |  |
 | 32 | sidebar-right | Export | select | #exportGround | combobox | Background |
-| 33 | sidebar-right | Export | button | #exportSequenceBtn | button | Sequence |
-| 34 | sidebar-right | Export | button | #exportStillBtn | button | Save picture |
+| 33 | sidebar-right | Export | button | #exportSequenceBtn | button | SEQUENCE |
+| 34 | sidebar-right | Export | button | #exportStillBtn | button | SAVE PICTURE |
 | 35 | sidebar-right | Export | button | #exportGifBtn | button | GIF |
-| 36 | sidebar-right | Export | button | #exportVideoBtn | button | Video |
-| 37 | sidebar-right | Export | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | Load Project |
-| 38 | sidebar-right | Export | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | Save Project |
+| 36 | sidebar-right | Export | button | #exportVideoBtn | button | VIDEO |
+| 37 | sidebar-right | Export | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | LOAD PROJECT |
+| 38 | sidebar-right | Export | button | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-bo… | button | SAVE PROJECT |
 | 39 | sidebar-right | Export | span | #sidebar-right > div.sidebar-section:nth-of-type(14) > div.section-he… | button | EXPORT |
-| 40 | sidebar-right | Display | input[checkbox] | #statsToggle | checkbox | Debug Info |
-| 41 | sidebar-right | Display | input[checkbox] | #lockCanvasBorders | checkbox | Lock Canvas Borders |
-| 42 | sidebar-right | Display | input[checkbox] | #showCanvasHandles | checkbox | Show Canvas Border & Handles |
-| 43 | sidebar-right | Display | input[checkbox] | #preserveFluidOpacity | checkbox | Empty Alpha Locked |
+| 40 | sidebar-right | Display | input[checkbox] | #statsToggle | checkbox | DEBUG INFO |
+| 41 | sidebar-right | Display | input[checkbox] | #lockCanvasBorders | checkbox | LOCK CANVAS BORDERS |
+| 42 | sidebar-right | Display | input[checkbox] | #showCanvasHandles | checkbox | SHOW CANVAS BORDER & HANDLES |
+| 43 | sidebar-right | Display | input[checkbox] | #preserveFluidOpacity | checkbox | EMPTY ALPHA LOCKED |
 | 44 | sidebar-right | Display | input[range] | #canvasOpacity | slider | CANVAS OPACITY (SIM VISIBILITY) 100% |
-| 45 | sidebar-right | Display | input[checkbox] | #transparentMode | checkbox | Transparent Background |
+| 45 | sidebar-right | Display | input[checkbox] | #transparentMode | checkbox | TRANSPARENT BACKGROUND |
 | 46 | sidebar-right | Display | input[color] | #backgroundColorPicker | ColorWell | BACKGROUND COLOR |
-| 47 | sidebar-right | Display | button | #penWindowScreens > button | button | Find Screens |
+| 47 | sidebar-right | Display | button | #penWindowScreens > button | button | FIND SCREENS |
 | 48 | sidebar-right | Display | select | #penWindowMirror | combobox | PEN WINDOW MIRROR |
 | 49 | sidebar-right | Display | button | #penWindowBtn | button | PEN INPUT WINDOW |
 | 50 | sidebar-right | Display | select | #windowMode | combobox | WINDOW MODE F11 |
 | 51 | sidebar-right | Display | a | #sidebar-right > div.sidebar-section:nth-of-type(13) > div.section-bo… | link | Learn more about photosensitivity (Epilepsy Fou… |
-| 52 | sidebar-right | Display | button | #photoWarnShowBtn | button | Show photosensitivity warning |
-| 53 | sidebar-right | Display | input[checkbox] | #photoSafeToggle | checkbox | Reduce flashing and rapid brightness changes |
+| 52 | sidebar-right | Display | button | #photoWarnShowBtn | button | SHOW PHOTOSENSITIVITY WARNING |
+| 53 | sidebar-right | Display | input[checkbox] | #photoSafeToggle | checkbox | REDUCE FLASHING AND RAPID BRIGHTNESS CHANGES |
 | 54 | sidebar-right | Display | span | #sidebar-right > div.sidebar-section:nth-of-type(13) > div.section-he… | button | DISPLAY |
-| 55 | sidebar-right | Focus | input[checkbox] | #streamFormatLock | checkbox | Lock Format |
-| 56 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 21:9 Ultra |
-| 57 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 16:9 YouTube |
-| 58 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 1:1 Square |
-| 59 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 9:16 TikTok |
-| 60 | sidebar-right | Focus | input[checkbox] | #focusModeToggle | checkbox | Focus Mode (F) |
+| 55 | sidebar-right | Focus | input[checkbox] | #streamFormatLock | checkbox | LOCK FORMAT |
+| 56 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 21:9 ULTRA |
+| 57 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 16:9 YOUTUBE |
+| 58 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 1:1 SQUARE |
+| 59 | sidebar-right | Focus | button | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-bo… | button | 9:16 TIKTOK |
+| 60 | sidebar-right | Focus | input[checkbox] | #focusModeToggle | checkbox | FOCUS MODE (F) |
 | 61 | sidebar-right | Focus | span | #sidebar-right > div.sidebar-section:nth-of-type(12) > div.section-he… | button | FOCUS |
-| 62 | sidebar-right | Text | button | #textOverlayClearAll | button | Clear All |
-| 63 | sidebar-right | Text | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | Arrange on Canvas |
-| 64 | sidebar-right | Text | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | + Add Text |
+| 62 | sidebar-right | Text | button | #textOverlayClearAll | button | CLEAR ALL |
+| 63 | sidebar-right | Text | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | ARRANGE ON CANVAS |
+| 64 | sidebar-right | Text | button | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-bo… | button | + ADD TEXT |
 | 65 | sidebar-right | Text | span | #sidebar-right > div.sidebar-section:nth-of-type(11) > div.section-he… | button | TEXT |
-| 66 | sidebar-right | Kaleidoscope | input[checkbox] | #kaleidoToggle | switch | Kaleido |
-| 67 | sidebar-right | Kaleidoscope | input[checkbox] | #mandalaToggle | switch | Mandala Overlay |
+| 66 | sidebar-right | Kaleidoscope | input[checkbox] | #kaleidoToggle | switch | KALEIDO |
+| 67 | sidebar-right | Kaleidoscope | input[checkbox] | #mandalaToggle | switch | MANDALA OVERLAY |
 | 68 | sidebar-right | Kaleidoscope | span | #sidebar-right > div.sidebar-section:nth-of-type(10) > div.section-he… | button | KALEIDOSCOPE |
-| 69 | sidebar-right | Audio | input[checkbox] | #audioTimingToggle | checkbox | Visualize Audio Timing |
+| 69 | sidebar-right | Audio | input[checkbox] | #audioTimingToggle | checkbox | VISUALIZE AUDIO TIMING |
 | 70 | sidebar-right | Audio | select | #audioMode | combobox | AUDIO MODE |
 | 71 | sidebar-right | Audio | span | #sidebar-right > div.sidebar-section:nth-of-type(9) > div.section-hea… | button | AUDIO |
-| 72 | sidebar-right | Animations | button | #sidebar-right > div.sidebar-section:nth-of-type(8) > div.section-bod… | button | Saved Animations ▾ |
-| 73 | sidebar-right | Animations | button | #recSrcAll | button | Everything |
-| 74 | sidebar-right | Animations | button | #recSrcMe | button | Local Only |
-| 75 | sidebar-right | Animations | button | #recLen30 | button | 30 s |
-| 76 | sidebar-right | Animations | button | #recLen15 | button | 15 s |
-| 77 | sidebar-right | Animations | button | #recLen8 | button | 8 s |
-| 78 | sidebar-right | Animations | button | #recLen4 | button | 4 s |
-| 79 | sidebar-right | Animations | button | #recMiniRecordBtn | button | ●Record |
+| 72 | sidebar-right | Animations | button | #sidebar-right > div.sidebar-section:nth-of-type(8) > div.section-bod… | button | SAVED ANIMATIONS ▾ |
+| 73 | sidebar-right | Animations | button | #recSrcAll | button | EVERYTHING |
+| 74 | sidebar-right | Animations | button | #recSrcMe | button | LOCAL ONLY |
+| 75 | sidebar-right | Animations | button | #recLen30 | button | 30 S |
+| 76 | sidebar-right | Animations | button | #recLen15 | button | 15 S |
+| 77 | sidebar-right | Animations | button | #recLen8 | button | 8 S |
+| 78 | sidebar-right | Animations | button | #recLen4 | button | 4 S |
+| 79 | sidebar-right | Animations | button | #recMiniRecordBtn | button | ●RECORD |
 | 80 | sidebar-right | Animations | span | #sidebar-right > div.sidebar-section:nth-of-type(8) > div.section-hea… | button | ANIMATIONS |
-| 81 | sidebar-right | Effects | input[checkbox] | #breathingToggle | checkbox | Breathing |
+| 81 | sidebar-right | Effects | input[checkbox] | #breathingToggle | checkbox | BREATHING |
 | 82 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Breathing |
-| 83 | sidebar-right | Effects | input[checkbox] | #overflowToggle | checkbox | Border |
+| 83 | sidebar-right | Effects | input[checkbox] | #overflowToggle | checkbox | BORDER |
 | 84 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Border |
-| 85 | sidebar-right | Effects | input[checkbox] | #pressureConstant | checkbox | Gravity Direction |
+| 85 | sidebar-right | Effects | input[checkbox] | #pressureConstant | checkbox | GRAVITY DIRECTION |
 | 86 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Gravity Direction |
-| 87 | sidebar-right | Effects | input[checkbox] | #ditherToggle | checkbox | Dither |
+| 87 | sidebar-right | Effects | input[checkbox] | #ditherToggle | checkbox | DITHER |
 | 88 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Dither |
-| 89 | sidebar-right | Effects | input[checkbox] | #displayShadingToggle | checkbox | Surface Shading |
+| 89 | sidebar-right | Effects | input[checkbox] | #displayShadingToggle | checkbox | SURFACE SHADING |
 | 90 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Surface Shading |
-| 91 | sidebar-right | Effects | input[checkbox] | #glowToggle | checkbox | Glow |
+| 91 | sidebar-right | Effects | input[checkbox] | #glowToggle | checkbox | GLOW |
 | 92 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Glow |
-| 93 | sidebar-right | Effects | input[checkbox] | #enableLightShift | checkbox | Light Shift |
+| 93 | sidebar-right | Effects | input[checkbox] | #enableLightShift | checkbox | LIGHT SHIFT |
 | 94 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Light Shift |
-| 95 | sidebar-right | Effects | input[checkbox] | #enableLighting | checkbox | Light Source |
+| 95 | sidebar-right | Effects | input[checkbox] | #enableLighting | checkbox | LIGHT SOURCE |
 | 96 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-bod… | image | Preview Light Source |
 | 97 | sidebar-right | Effects | span | #sidebar-right > div.sidebar-section:nth-of-type(7) > div.section-hea… | button | EFFECTS |
 | 98 | sidebar-right | Mutate shader | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Audio |
@@ -468,24 +468,24 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 100 | sidebar-right | Mutate shader | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Sim |
 | 101 | sidebar-right | Mutate shader | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Kaleido |
 | 102 | sidebar-right | Mutate shader | input[checkbox] | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-lo… | checkbox | Colors |
-| 103 | sidebar-right | Mutate shader | button | #mutationReset | button | Reset |
-| 104 | sidebar-right | Mutate shader | button | #mutationGenerate | button | Mutate M |
+| 103 | sidebar-right | Mutate shader | button | #mutationReset | button | RESET |
+| 104 | sidebar-right | Mutate shader | button | #mutationGenerate | button | MUTATE M |
 | 105 | sidebar-right | Mutate shader | select | #mutationCount | combobox |  |
 | 106 | sidebar-right | Mutate shader | input[range] | #mutationStrength | slider | Strength of mutate, larger creates wider swings… |
-| 107 | sidebar-right | Mutate shader | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | All |
-| 108 | sidebar-right | Mutate shader | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | Basic |
+| 107 | sidebar-right | Mutate shader | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | ALL |
+| 108 | sidebar-right | Mutate shader | button | #mutation-section > div.section-body:nth-of-type(2) > div.mutation-co… | button | BASIC |
 | 109 | sidebar-right | Mutate shader | span | #mutation-section > div.section-header:nth-of-type(1) > span.section-… | button | MUTATE SHADER |
-| 110 | sidebar-right | Layers | input[checkbox] | #showPreviewLayersCb | checkbox | Show Preview Layers |
-| 111 | sidebar-right | Layers | input[checkbox] | #detachCaptureToggle | checkbox | Detach Capture Area |
-| 112 | sidebar-right | Layers | input[checkbox] | #hoverCaptureToggle | checkbox | Enable Capture on Hover |
-| 113 | sidebar-right | Layers | button | #pathLayersList > div.path-empty-state > button.path-empty-create | button | + Create Path Layer |
-| 114 | sidebar-right | Layers | button | #sidebar-right > div.sidebar-section.section-layers:nth-of-type(5) > … | button | + New Path |
+| 110 | sidebar-right | Layers | input[checkbox] | #showPreviewLayersCb | checkbox | SHOW PREVIEW LAYERS |
+| 111 | sidebar-right | Layers | input[checkbox] | #detachCaptureToggle | checkbox | DETACH CAPTURE AREA |
+| 112 | sidebar-right | Layers | input[checkbox] | #hoverCaptureToggle | checkbox | ENABLE CAPTURE ON HOVER |
+| 113 | sidebar-right | Layers | button | #pathLayersList > div.path-empty-state > button.path-empty-create | button | + CREATE PATH LAYER |
+| 114 | sidebar-right | Layers | button | #sidebar-right > div.sidebar-section.section-layers:nth-of-type(5) > … | button | + NEW PATH |
 | 115 | sidebar-right | Layers | input[checkbox] | #layersPanel > div.layer-item.layer-item-collapsible:nth-of-type(2) >… | checkbox | Show or hide this layer |
 | 116 | sidebar-right | Layers | input[text] | #layersPanel > div.layer-item.layer-item-collapsible:nth-of-type(2) >… | textbox |  |
-| 117 | sidebar-right | Layers | button | #addCollisionLayerBtn | button | Collider |
-| 118 | sidebar-right | Layers | button | #flattenLayersBtn | button | Flatten |
-| 119 | sidebar-right | Layers | button | #captureBtn | button | Visible to layer |
-| 120 | sidebar-right | Layers | button | #uploadBtn | button | Import |
+| 117 | sidebar-right | Layers | button | #addCollisionLayerBtn | button | COLLIDER |
+| 118 | sidebar-right | Layers | button | #flattenLayersBtn | button | FLATTEN |
+| 119 | sidebar-right | Layers | button | #captureBtn | button | VISIBLE TO LAYER |
+| 120 | sidebar-right | Layers | button | #uploadBtn | button | IMPORT |
 | 121 | sidebar-right | Layers | span | #sidebar-right > div.sidebar-section.section-layers:nth-of-type(5) > … | button | LAYERS |
 | 122 | sidebar-right | Colors and palettes | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Import |
 | 123 | sidebar-right | Colors and palettes | button | #sidebar-right > div.sidebar-section:nth-of-type(4) > div.section-bod… | button | Export all |
@@ -499,8 +499,8 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 131 | sidebar-right | Simulation | input[range] | #mgPost | slider | POST-SMOOTH 2 |
 | 132 | sidebar-right | Simulation | input[range] | #mgPre | slider | PRE-SMOOTH 2 |
 | 133 | sidebar-right | Simulation | input[range] | #mgCycles | slider | V-CYCLES 2 |
-| 134 | sidebar-right | Simulation | input[checkbox] | #multigridToggle | checkbox | Multigrid Pressure |
-| 135 | sidebar-right | Simulation | input[checkbox] | #macCormackToggle | checkbox | Crisp Advection |
+| 134 | sidebar-right | Simulation | input[checkbox] | #multigridToggle | checkbox | MULTIGRID PRESSURE |
+| 135 | sidebar-right | Simulation | input[checkbox] | #macCormackToggle | checkbox | CRISP ADVECTION |
 | 136 | sidebar-right | Simulation | input[range] | #grainCleanup | slider | GRAIN CLEANUP 0.75 |
 | 137 | sidebar-right | Simulation | input[range] | #wetDrying | slider | DRY TIME 4.5s |
 | 138 | sidebar-right | Simulation | input[range] | #wetInfluence | slider | DRYING 0.14 |
@@ -508,46 +508,46 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 140 | sidebar-right | Simulation | input[range] | #pressureDissipation | slider | PRESSURE DISSIPATION 0.950 |
 | 141 | sidebar-right | Simulation | select | #fpsCap | combobox | FPS LIMIT |
 | 142 | sidebar-right | Simulation | span | #sidebar-right > div.sidebar-section:nth-of-type(3) > div.section-hea… | button | SIMULATION |
-| 143 | sidebar-right | Swirl Together | button | #shareLookBtn | button | Link to current settings |
-| 144 | sidebar-right | Swirl Together | button | #phonePadBtn | button | Sync phone |
-| 145 | sidebar-right | Swirl Together | button | #joinRoomBtn | button | Join |
+| 143 | sidebar-right | Swirl Together | button | #shareLookBtn | button | LINK TO CURRENT SETTINGS |
+| 144 | sidebar-right | Swirl Together | button | #phonePadBtn | button | SYNC PHONE |
+| 145 | sidebar-right | Swirl Together | button | #joinRoomBtn | button | JOIN |
 | 146 | sidebar-right | Swirl Together | input[text] | #joinRoomInput | textbox | Room code to join |
-| 147 | sidebar-right | Swirl Together | button | #strangerBtn | button | Stranger |
-| 148 | sidebar-right | Swirl Together | button | #createRoomBtn | button | Start a room |
+| 147 | sidebar-right | Swirl Together | button | #strangerBtn | button | STRANGER |
+| 148 | sidebar-right | Swirl Together | button | #createRoomBtn | button | START A ROOM |
 | 149 | sidebar-right | Swirl Together | span | #sidebar-right > div.sidebar-section:nth-of-type(2) > div.section-hea… | button | SWIRL TOGETHER |
 | 150 | main-area |  | button | #main-area > div.lsb-edge:nth-of-type(2) > button.lsb-toggle.btn--icon | button | Left-facing sideways arrows icon: collapses the… |
 | 151 | sidebar-left | Stroke and replay | select | #splatOutMode | combobox |  |
 | 152 | sidebar-left | Stroke and replay | select | #splatInMode | combobox |  |
-| 153 | sidebar-left | Stroke and replay | input[checkbox] | #preserveRandomness | checkbox | Preserve Randomness |
+| 153 | sidebar-left | Stroke and replay | input[checkbox] | #preserveRandomness | checkbox | PRESERVE RANDOMNESS |
 | 154 | sidebar-left | Stroke and replay | input[range] | #replaySpeed | slider | REPLAY SPEED 1× |
-| 155 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Time |
-| 156 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Stroke |
-| 157 | sidebar-left | Stroke and replay | input[checkbox] | #strokeLockGuides | checkbox | Show guides |
-| 158 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Set key |
-| 159 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Set key |
-| 160 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Edit the menu |
+| 155 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | TIME |
+| 156 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | STROKE |
+| 157 | sidebar-left | Stroke and replay | input[checkbox] | #strokeLockGuides | checkbox | SHOW GUIDES |
+| 158 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | SET KEY |
+| 159 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | SET KEY |
+| 160 | sidebar-left | Stroke and replay | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | EDIT THE MENU |
 | 161 | sidebar-left | Stroke and replay | select | #buttonMode_middle | combobox | MIDDLE CLICK (MOUSE 3) |
 | 162 | sidebar-left | Stroke and replay | select | #buttonMode_right | combobox | RIGHT CLICK |
 | 163 | sidebar-left | Stroke and replay | select | #buttonMode_left | combobox | LEFT CLICK |
 | 164 | sidebar-left | Stroke and replay | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | STROKE AND REPLAY |
 | 165 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Brush 1 tip: same as the brush |
-| 166 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | checkbox | Pressure |
-| 167 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Palette |
-| 168 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Random |
-| 169 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Custom |
-| 170 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Main |
+| 166 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | checkbox | PRESSURE |
+| 167 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | PALETTE |
+| 168 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | RANDOM |
+| 169 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | CUSTOM |
+| 170 | sidebar-left | Multi-Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | MAIN |
 | 171 | sidebar-left | Multi-Brush | input[color] | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | ColorWell | Arm 1 color |
 | 172 | sidebar-left | Multi-Brush | input[range] | #symmetryHold | slider | HOLD SYMMETRY 0.00 |
-| 173 | sidebar-left | Multi-Brush | input[checkbox] | #symmetryFaceCenter | checkbox | Stay oriented to the center |
-| 174 | sidebar-left | Multi-Brush | input[checkbox] | #symmetrySameAngle | checkbox | Same angle on every arm |
+| 173 | sidebar-left | Multi-Brush | input[checkbox] | #symmetryFaceCenter | checkbox | STAY ORIENTED TO THE CENTER |
+| 174 | sidebar-left | Multi-Brush | input[checkbox] | #symmetrySameAngle | checkbox | SAME ANGLE ON EVERY ARM |
 | 175 | sidebar-left | Multi-Brush | select | #symmetryMode | combobox | SYMMETRY |
 | 176 | sidebar-left | Multi-Brush | input[range] | #multiplier | slider | Multi-Brush |
 | 177 | sidebar-left | Multi-Brush | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | MULTI-BRUSH |
 | 178 | sidebar-left | Brush | input[range] | #brushJitter | slider | JITTER 0% |
 | 179 | sidebar-left | Brush | input[range] | #brushFlow | slider | FLOW 100% |
 | 180 | sidebar-left | Brush | input[range] | #brushDabInterval | slider | INTERVAL 4 ms · 250/s |
-| 181 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | Constant |
-| 182 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | On Move |
+| 181 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | CONSTANT |
+| 182 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | ON MOVE |
 | 183 | sidebar-left | Brush | input[range] | #brushAngle | slider | ANGLE 0° |
 | 184 | sidebar-left | Brush | button | #brushTipFoldBody > div.brush-shapes-area:nth-of-type(2) > div.brush-… | button | Clipboard |
 | 185 | sidebar-left | Brush | button | #brushTipFoldBody > div.brush-shapes-area:nth-of-type(2) > div.brush-… | button | ＋ |
@@ -559,11 +559,11 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 191 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | TIP |
 | 192 | sidebar-left | Brush | input[range] | #brushGhostOpacity | slider | Brush ghost opacity |
 | 193 | sidebar-left | Brush | input[checkbox] | #brushGhostToggle | checkbox | BRUSH GHOST 100% |
-| 194 | sidebar-left | Brush | input[checkbox] | #cursorToggle | checkbox | Show Cursor |
-| 195 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Collider |
-| 196 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Pressure |
-| 197 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | Fluid |
-| 198 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | + New Brush Preset |
+| 194 | sidebar-left | Brush | input[checkbox] | #cursorToggle | checkbox | SHOW CURSOR |
+| 195 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | COLLIDER |
+| 196 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | PRESSURE |
+| 197 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | radio | FLUID |
+| 198 | sidebar-left | Brush | button | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | + NEW BRUSH PRESET |
 | 199 | sidebar-left | Brush | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | BRUSH |
 | 200 | sidebar-left |  | input[range] | #brushSteady | slider | STABILIZATION 0% |
 | 201 | sidebar-left | Brush Size | input[range] | #brushSizePerceptual | slider | Brush Size |

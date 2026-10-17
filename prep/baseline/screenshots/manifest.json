@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-17T17:25:53.645Z",
- "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
+ "generated": "2026-10-17T18:09:14.094Z",
+ "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
  "script": "prep/baseline/scripts/screenshots.js",
  "mode": "capture",
  "seed": {
@@ -19,8 +19,8 @@
    "width": 1366,
    "height": 768,
    "env": {
-    "date": "2026-10-17T17:25:53.645Z",
-    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
+    "date": "2026-10-17T18:09:14.094Z",
+    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -68,8 +68,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "2048x1405",
-     "sim": "1024x703",
+     "dye": "2048x1563",
+     "sim": "1024x782",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -128,11 +128,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 639
      },
      "what": "left sidebar open (Brush section open as at boot)",
@@ -140,7 +140,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639,
       "visible": true
      },
@@ -151,11 +151,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 639
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
@@ -165,7 +165,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639,
       "visible": true
      }
@@ -175,11 +175,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 639
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
@@ -189,7 +189,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639,
       "visible": true
      }
@@ -199,11 +199,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 639
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
@@ -213,7 +213,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 639,
       "visible": true
      }
@@ -221,13 +221,13 @@
     {
      "file": "1366/section-swirl-together.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
@@ -235,9 +235,9 @@
      "section": "Swirl Together",
      "group": "core",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -245,13 +245,13 @@
     {
      "file": "1366/section-simulation.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
@@ -259,9 +259,9 @@
      "section": "Simulation",
      "group": "core",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -269,13 +269,13 @@
     {
      "file": "1366/section-colors-and-palettes.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
@@ -283,9 +283,9 @@
      "section": "Colors and palettes",
      "group": "core",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -293,13 +293,13 @@
     {
      "file": "1366/section-layers.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
@@ -307,9 +307,9 @@
      "section": "Layers",
      "group": "core",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -317,13 +317,13 @@
     {
      "file": "1366/section-mutate-shader.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
@@ -331,9 +331,9 @@
      "section": "Mutate shader",
      "group": "core",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -341,13 +341,13 @@
     {
      "file": "1366/section-effects.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
@@ -355,9 +355,9 @@
      "section": "Effects",
      "group": "expressive",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -365,13 +365,13 @@
     {
      "file": "1366/section-animations.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
@@ -379,9 +379,9 @@
      "section": "Animations",
      "group": "expressive",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -389,13 +389,13 @@
     {
      "file": "1366/section-audio.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
@@ -403,9 +403,9 @@
      "section": "Audio",
      "group": "expressive",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -413,13 +413,13 @@
     {
      "file": "1366/section-kaleidoscope.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
@@ -427,9 +427,9 @@
      "section": "Kaleidoscope",
      "group": "expressive",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -437,13 +437,13 @@
     {
      "file": "1366/section-text.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
@@ -451,9 +451,9 @@
      "section": "Text",
      "group": "expressive",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -461,13 +461,13 @@
     {
      "file": "1366/section-focus.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
@@ -475,9 +475,9 @@
      "section": "Focus",
      "group": "system",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -485,13 +485,13 @@
     {
      "file": "1366/section-display.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
@@ -499,9 +499,9 @@
      "section": "Display",
      "group": "system",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -509,13 +509,13 @@
     {
      "file": "1366/section-export.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
@@ -523,9 +523,9 @@
      "section": "Export",
      "group": "system",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -533,13 +533,13 @@
     {
      "file": "1366/section-settings.png",
      "clip": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 639
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
@@ -547,9 +547,9 @@
      "section": "Settings",
      "group": "system",
      "rect": {
-      "x": 1086,
+      "x": 1046,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 639,
       "visible": true
      }
@@ -590,22 +590,22 @@
     {
      "file": "1366/state-expanded.png",
      "clip": {
-      "x": 1095,
+      "x": 1055,
       "y": 128,
-      "w": 248,
+      "w": 288,
       "h": 166
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 166
      },
      "what": "\"Simulation\" header expanded (aria-expanded=true) with the top of its body",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"true\"]",
      "section": "Simulation",
      "rect": {
-      "x": 1095,
+      "x": 1055,
       "y": 128,
-      "w": 248,
+      "w": 288,
       "h": 46,
       "visible": true
      }
@@ -613,14 +613,14 @@
     {
      "file": "1366/state-checked-on.png",
      "clip": {
-      "x": 1108,
-      "y": 515,
-      "w": 222,
-      "h": 25
+      "x": 1068,
+      "y": 523,
+      "w": 262,
+      "h": 22
      },
      "png": {
-      "width": 222,
-      "height": 25
+      "width": 262,
+      "height": 22
      },
      "what": "#macCormackToggle row as at boot (checked)",
      "selector": "#macCormackToggle",
@@ -628,24 +628,24 @@
       "checked": true
      },
      "rect": {
-      "x": 1112,
-      "y": 519,
-      "w": 214,
-      "h": 17,
+      "x": 1072,
+      "y": 527,
+      "w": 254,
+      "h": 14,
       "visible": true
      }
     },
     {
      "file": "1366/state-checked-off.png",
      "clip": {
-      "x": 1108,
-      "y": 436,
-      "w": 222,
-      "h": 25
+      "x": 1068,
+      "y": 437,
+      "w": 262,
+      "h": 22
      },
      "png": {
-      "width": 222,
-      "height": 25
+      "width": 262,
+      "height": 22
      },
      "what": "#macCormackToggle row after one click (unchecked)",
      "selector": "#macCormackToggle",
@@ -653,32 +653,32 @@
       "checked": false
      },
      "rect": {
-      "x": 1112,
-      "y": 440,
-      "w": 214,
-      "h": 17,
+      "x": 1072,
+      "y": 441,
+      "w": 254,
+      "h": 14,
       "visible": true
      }
     },
     {
      "file": "1366/state-collapsed.png",
      "clip": {
-      "x": 1095,
+      "x": 1055,
       "y": 191,
-      "w": 248,
+      "w": 288,
       "h": 46
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 46
      },
      "what": "\"Simulation\" header collapsed (aria-expanded=false)",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"false\"]",
      "section": "Simulation",
      "rect": {
-      "x": 1095,
+      "x": 1055,
       "y": 191,
-      "w": 248,
+      "w": 288,
       "h": 46,
       "visible": true
      }
@@ -721,13 +721,13 @@
      "file": "1366/state-disabled.png",
      "clip": {
       "x": 13,
-      "y": 414,
-      "w": 206,
-      "h": 54
+      "y": 413,
+      "w": 246,
+      "h": 56
      },
      "png": {
-      "width": 206,
-      "height": 54
+      "width": 246,
+      "height": 56
      },
      "what": "#brushTipTexture (disabled range) and its row",
      "selector": "#brushTipTexture:disabled",
@@ -739,9 +739,9 @@
      },
      "rect": {
       "x": 17,
-      "y": 418,
-      "w": 198,
-      "h": 46,
+      "y": 417,
+      "w": 238,
+      "h": 48,
       "visible": true
      },
      "alsoDisabledInSectionShots": [
@@ -840,43 +840,43 @@
    "simProbe": {
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
-     "x": 272,
+     "x": 312,
      "y": 153,
-     "w": 790,
+     "w": 710,
      "h": 542,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 3852,
+     "lit": 3612,
      "max": 131,
-     "px": 428180
+     "px": 384820
     },
     "screenshotAfter": {
-     "lit": 170824,
-     "max": 189,
-     "px": 428180
+     "lit": 157478,
+     "max": 186,
+     "px": 384820
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5089871552491103,
-     "res": "2048x1405"
+     "coverage": 0.5194175363883557,
+     "res": "2048x1563"
     },
     "display": {
-     "meanLum": 0.1284347378874849,
-     "maxLum": 0.3549443137254902,
-     "res": "197x135"
+     "meanLum": 0.1299500058835883,
+     "maxLum": 0.3482023529411764,
+     "res": "177x135"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 21.2
+   "seconds": 21.4
   },
   {
    "width": 1440,
    "height": 900,
    "env": {
-    "date": "2026-10-17T17:25:53.645Z",
-    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
+    "date": "2026-10-17T18:09:14.094Z",
+    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -924,8 +924,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "2048x1598",
-     "sim": "1024x799",
+     "dye": "2048x1761",
+     "sim": "1024x880",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -984,11 +984,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 771
      },
      "what": "left sidebar open (Brush section open as at boot)",
@@ -996,7 +996,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771,
       "visible": true
      },
@@ -1007,11 +1007,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 771
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
@@ -1021,7 +1021,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771,
       "visible": true
      }
@@ -1031,11 +1031,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 771
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
@@ -1045,7 +1045,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771,
       "visible": true
      }
@@ -1055,11 +1055,11 @@
      "clip": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 771
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
@@ -1069,7 +1069,7 @@
      "rect": {
       "x": 0,
       "y": 129,
-      "w": 248,
+      "w": 288,
       "h": 771,
       "visible": true
      }
@@ -1077,13 +1077,13 @@
     {
      "file": "1440/section-swirl-together.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
@@ -1091,9 +1091,9 @@
      "section": "Swirl Together",
      "group": "core",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1101,13 +1101,13 @@
     {
      "file": "1440/section-simulation.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
@@ -1115,9 +1115,9 @@
      "section": "Simulation",
      "group": "core",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1125,13 +1125,13 @@
     {
      "file": "1440/section-colors-and-palettes.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
@@ -1139,9 +1139,9 @@
      "section": "Colors and palettes",
      "group": "core",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1149,13 +1149,13 @@
     {
      "file": "1440/section-layers.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
@@ -1163,9 +1163,9 @@
      "section": "Layers",
      "group": "core",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1173,13 +1173,13 @@
     {
      "file": "1440/section-mutate-shader.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
@@ -1187,9 +1187,9 @@
      "section": "Mutate shader",
      "group": "core",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1197,13 +1197,13 @@
     {
      "file": "1440/section-effects.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
@@ -1211,9 +1211,9 @@
      "section": "Effects",
      "group": "expressive",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1221,13 +1221,13 @@
     {
      "file": "1440/section-animations.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
@@ -1235,9 +1235,9 @@
      "section": "Animations",
      "group": "expressive",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1245,13 +1245,13 @@
     {
      "file": "1440/section-audio.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
@@ -1259,9 +1259,9 @@
      "section": "Audio",
      "group": "expressive",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1269,13 +1269,13 @@
     {
      "file": "1440/section-kaleidoscope.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
@@ -1283,9 +1283,9 @@
      "section": "Kaleidoscope",
      "group": "expressive",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1293,13 +1293,13 @@
     {
      "file": "1440/section-text.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
@@ -1307,9 +1307,9 @@
      "section": "Text",
      "group": "expressive",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1317,13 +1317,13 @@
     {
      "file": "1440/section-focus.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
@@ -1331,9 +1331,9 @@
      "section": "Focus",
      "group": "system",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1341,13 +1341,13 @@
     {
      "file": "1440/section-display.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
@@ -1355,9 +1355,9 @@
      "section": "Display",
      "group": "system",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1365,13 +1365,13 @@
     {
      "file": "1440/section-export.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
@@ -1379,9 +1379,9 @@
      "section": "Export",
      "group": "system",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1389,13 +1389,13 @@
     {
      "file": "1440/section-settings.png",
      "clip": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771
      },
      "png": {
-      "width": 280,
+      "width": 320,
       "height": 771
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
@@ -1403,9 +1403,9 @@
      "section": "Settings",
      "group": "system",
      "rect": {
-      "x": 1160,
+      "x": 1120,
       "y": 129,
-      "w": 280,
+      "w": 320,
       "h": 771,
       "visible": true
      }
@@ -1446,22 +1446,22 @@
     {
      "file": "1440/state-expanded.png",
      "clip": {
-      "x": 1169,
+      "x": 1129,
       "y": 128,
-      "w": 248,
+      "w": 288,
       "h": 166
      },
      "png": {
-      "width": 248,
+      "width": 288,
       "height": 166
      },
      "what": "\"Simulation\" header expanded (aria-expanded=true) with the top of its body",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"true\"]",
      "section": "Simulation",
      "rect": {
-      "x": 1169,
+      "x": 1129,
       "y": 128,
-      "w": 248,
+      "w": 288,
       "h": 46,
       "visible": true
      }
@@ -1469,14 +1469,14 @@
     {
      "file": "1440/state-checked-on.png",
      "clip": {
-      "x": 1182,
-      "y": 515,
-      "w": 222,
-      "h": 25
+      "x": 1142,
+      "y": 523,
+      "w": 262,
+      "h": 22
      },
      "png": {
-      "width": 222,
-      "height": 25
+      "width": 262,
+      "height": 22
      },
      "what": "#macCormackToggle row as at boot (checked)",
      "selector": "#macCormackToggle",
@@ -1484,24 +1484,24 @@
       "checked": true
      },
      "rect": {
-      "x": 1186,
-      "y": 519,
-      "w": 214,
-      "h": 17,
+      "x": 1146,
+      "y": 527,
+      "w": 254,
+      "h": 14,
       "visible": true
      }
     },
     {
      "file": "1440/state-checked-off.png",
      "clip": {
-      "x": 1182,
-      "y": 502,
-      "w": 222,
-      "h": 25
+      "x": 1142,
+      "y": 503,
+      "w": 262,
+      "h": 22
      },
      "png": {
-      "width": 222,
-      "height": 25
+      "width": 262,
+      "height": 22
      },
      "what": "#macCormackToggle row after one click (unchecked)",
      "selector": "#macCormackToggle",
@@ -1509,32 +1509,32 @@
       "checked": false
      },
      "rect": {
-      "x": 1186,
-      "y": 506,
-      "w": 214,
-      "h": 17,
+      "x": 1146,
+      "y": 507,
+      "w": 254,
+      "h": 14,
       "visible": true
      }
     },
     {
      "file": "1440/state-collapsed.png",
      "clip": {
-      "x": 1169,
+      "x": 1129,
       "y": 191,
-      "w": 263,
+      "w": 303,
       "h": 46
      },
      "png": {
-      "width": 263,
+      "width": 303,
       "height": 46
      },
      "what": "\"Simulation\" header collapsed (aria-expanded=false)",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"false\"]",
      "section": "Simulation",
      "rect": {
-      "x": 1169,
+      "x": 1129,
       "y": 191,
-      "w": 263,
+      "w": 303,
       "h": 46,
       "visible": true
      }
@@ -1577,13 +1577,13 @@
      "file": "1440/state-disabled.png",
      "clip": {
       "x": 13,
-      "y": 480,
-      "w": 206,
-      "h": 54
+      "y": 479,
+      "w": 246,
+      "h": 56
      },
      "png": {
-      "width": 206,
-      "height": 54
+      "width": 246,
+      "height": 56
      },
      "what": "#brushTipTexture (disabled range) and its row",
      "selector": "#brushTipTexture:disabled",
@@ -1595,9 +1595,9 @@
      },
      "rect": {
       "x": 17,
-      "y": 484,
-      "w": 198,
-      "h": 46,
+      "y": 483,
+      "w": 238,
+      "h": 48,
       "visible": true
      },
      "alsoDisabledInSectionShots": [
@@ -1696,43 +1696,43 @@
    "simProbe": {
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
-     "x": 272,
+     "x": 312,
      "y": 153,
-     "w": 864,
+     "w": 784,
      "h": 674,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 4470,
+     "lit": 4230,
      "max": 131,
-     "px": 582336
+     "px": 528416
     },
     "screenshotAfter": {
-     "lit": 238684,
-     "max": 185,
-     "px": 582336
+     "lit": 221442,
+     "max": 182,
+     "px": 528416
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5215790978958073,
-     "res": "2048x1598"
+     "coverage": 0.531533652310477,
+     "res": "2048x1761"
     },
     "display": {
-     "meanLum": 0.13020758312585315,
-     "maxLum": 0.3453976470588234,
-     "res": "216x168"
+     "meanLum": 0.1316995369576349,
+     "maxLum": 0.3400760784313725,
+     "res": "196x168"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 21.6
+   "seconds": 21.5
   },
   {
    "width": 1920,
    "height": 1080,
    "env": {
-    "date": "2026-10-17T17:25:53.645Z",
-    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
+    "date": "2026-10-17T18:09:14.094Z",
+    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -1771,7 +1771,7 @@
     ],
     "localStorageKeys": 19,
     "displayHz": 60,
-    "displayHzKnown": false,
+    "displayHzKnown": true,
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "underbar": "Image Sharpness2048▾Alt+↑↓Image SharpnessResolution of the paint itself - costs GPU 8192 6144 4096 2048 1536 1024 512 256 Motion Detail1024▾Alt+Shift+↑↓Motion D",
     "colorWell": "#ff0000"
@@ -1780,8 +1780,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "2048x1327",
-     "sim": "1024x663",
+     "dye": "2048x1427",
+     "sim": "1024x714",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -1789,7 +1789,7 @@
     "fpsCap": {
      "before": {
       "hz": 60,
-      "known": false
+      "known": true
      },
      "value": "native",
      "selected": "Native (60 Hz)",
@@ -1840,11 +1840,11 @@
      "clip": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927
      },
      "png": {
-      "width": 278,
+      "width": 323,
       "height": 927
      },
      "what": "left sidebar open (Brush section open as at boot)",
@@ -1852,7 +1852,7 @@
      "rect": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927,
       "visible": true
      },
@@ -1863,11 +1863,11 @@
      "clip": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927
      },
      "png": {
-      "width": 278,
+      "width": 323,
       "height": 927
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
@@ -1877,7 +1877,7 @@
      "rect": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927,
       "visible": true
      }
@@ -1887,11 +1887,11 @@
      "clip": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927
      },
      "png": {
-      "width": 278,
+      "width": 323,
       "height": 927
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
@@ -1901,7 +1901,7 @@
      "rect": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927,
       "visible": true
      }
@@ -1911,11 +1911,11 @@
      "clip": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927
      },
      "png": {
-      "width": 278,
+      "width": 323,
       "height": 927
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
@@ -1925,7 +1925,7 @@
      "rect": {
       "x": 0,
       "y": 153,
-      "w": 278,
+      "w": 323,
       "h": 927,
       "visible": true
      }
@@ -1933,13 +1933,13 @@
     {
      "file": "1920/section-swirl-together.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
@@ -1947,9 +1947,9 @@
      "section": "Swirl Together",
      "group": "core",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -1957,13 +1957,13 @@
     {
      "file": "1920/section-simulation.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
@@ -1971,9 +1971,9 @@
      "section": "Simulation",
      "group": "core",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -1981,13 +1981,13 @@
     {
      "file": "1920/section-colors-and-palettes.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
@@ -1995,9 +1995,9 @@
      "section": "Colors and palettes",
      "group": "core",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2005,13 +2005,13 @@
     {
      "file": "1920/section-layers.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
@@ -2019,9 +2019,9 @@
      "section": "Layers",
      "group": "core",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2029,13 +2029,13 @@
     {
      "file": "1920/section-mutate-shader.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
@@ -2043,9 +2043,9 @@
      "section": "Mutate shader",
      "group": "core",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2053,13 +2053,13 @@
     {
      "file": "1920/section-effects.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
@@ -2067,9 +2067,9 @@
      "section": "Effects",
      "group": "expressive",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2077,13 +2077,13 @@
     {
      "file": "1920/section-animations.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
@@ -2091,9 +2091,9 @@
      "section": "Animations",
      "group": "expressive",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2101,13 +2101,13 @@
     {
      "file": "1920/section-audio.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
@@ -2115,9 +2115,9 @@
      "section": "Audio",
      "group": "expressive",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2125,13 +2125,13 @@
     {
      "file": "1920/section-kaleidoscope.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
@@ -2139,9 +2139,9 @@
      "section": "Kaleidoscope",
      "group": "expressive",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2149,13 +2149,13 @@
     {
      "file": "1920/section-text.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
@@ -2163,9 +2163,9 @@
      "section": "Text",
      "group": "expressive",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2173,13 +2173,13 @@
     {
      "file": "1920/section-focus.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
@@ -2187,9 +2187,9 @@
      "section": "Focus",
      "group": "system",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2197,13 +2197,13 @@
     {
      "file": "1920/section-display.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
@@ -2211,9 +2211,9 @@
      "section": "Display",
      "group": "system",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2221,13 +2221,13 @@
     {
      "file": "1920/section-export.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
@@ -2235,9 +2235,9 @@
      "section": "Export",
      "group": "system",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2245,13 +2245,13 @@
     {
      "file": "1920/section-settings.png",
      "clip": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927
      },
      "png": {
-      "width": 314,
+      "width": 358,
       "height": 927
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
@@ -2259,9 +2259,9 @@
      "section": "Settings",
      "group": "system",
      "rect": {
-      "x": 1606,
+      "x": 1562,
       "y": 153,
-      "w": 314,
+      "w": 358,
       "h": 927,
       "visible": true
      }
@@ -2302,22 +2302,22 @@
     {
      "file": "1920/state-expanded.png",
      "clip": {
-      "x": 1616,
+      "x": 1572,
       "y": 153,
-      "w": 280,
+      "w": 324,
       "h": 172
      },
      "png": {
-      "width": 280,
+      "width": 324,
       "height": 172
      },
      "what": "\"Simulation\" header expanded (aria-expanded=true) with the top of its body",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"true\"]",
      "section": "Simulation",
      "rect": {
-      "x": 1616,
+      "x": 1572,
       "y": 153,
-      "w": 280,
+      "w": 324,
       "h": 52,
       "visible": true
      }
@@ -2325,14 +2325,14 @@
     {
      "file": "1920/state-checked-on.png",
      "clip": {
-      "x": 1631,
-      "y": 586,
-      "w": 250,
-      "h": 27
+      "x": 1587,
+      "y": 591,
+      "w": 294,
+      "h": 24
      },
      "png": {
-      "width": 250,
-      "height": 27
+      "width": 294,
+      "height": 24
      },
      "what": "#macCormackToggle row as at boot (checked)",
      "selector": "#macCormackToggle",
@@ -2340,24 +2340,24 @@
       "checked": true
      },
      "rect": {
-      "x": 1635,
-      "y": 590,
-      "w": 242,
-      "h": 19,
+      "x": 1591,
+      "y": 595,
+      "w": 286,
+      "h": 16,
       "visible": true
      }
     },
     {
      "file": "1920/state-checked-off.png",
      "clip": {
-      "x": 1631,
-      "y": 603,
-      "w": 250,
-      "h": 27
+      "x": 1587,
+      "y": 605,
+      "w": 294,
+      "h": 24
      },
      "png": {
-      "width": 250,
-      "height": 27
+      "width": 294,
+      "height": 24
      },
      "what": "#macCormackToggle row after one click (unchecked)",
      "selector": "#macCormackToggle",
@@ -2365,32 +2365,32 @@
       "checked": false
      },
      "rect": {
-      "x": 1635,
-      "y": 607,
-      "w": 242,
-      "h": 19,
+      "x": 1591,
+      "y": 609,
+      "w": 286,
+      "h": 16,
       "visible": true
      }
     },
     {
      "file": "1920/state-collapsed.png",
      "clip": {
-      "x": 1616,
+      "x": 1572,
       "y": 223,
-      "w": 295,
+      "w": 339,
       "h": 52
      },
      "png": {
-      "width": 295,
+      "width": 339,
       "height": 52
      },
      "what": "\"Simulation\" header collapsed (aria-expanded=false)",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"false\"]",
      "section": "Simulation",
      "rect": {
-      "x": 1616,
+      "x": 1572,
       "y": 223,
-      "w": 295,
+      "w": 339,
       "h": 52,
       "visible": true
      }
@@ -2433,13 +2433,13 @@
      "file": "1920/state-disabled.png",
      "clip": {
       "x": 15,
-      "y": 599,
-      "w": 232,
-      "h": 60
+      "y": 582,
+      "w": 276,
+      "h": 61
      },
      "png": {
-      "width": 232,
-      "height": 60
+      "width": 276,
+      "height": 61
      },
      "what": "#brushTipTexture (disabled range) and its row",
      "selector": "#brushTipTexture:disabled",
@@ -2451,9 +2451,9 @@
      },
      "rect": {
       "x": 19,
-      "y": 603,
-      "w": 224,
-      "h": 52,
+      "y": 586,
+      "w": 268,
+      "h": 53,
       "visible": true
      },
      "alsoDisabledInSectionShots": [
@@ -2552,43 +2552,43 @@
    "simProbe": {
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
-     "x": 302,
+     "x": 347,
      "y": 177,
-     "w": 1281,
+     "w": 1191,
      "h": 830,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 6189,
+     "lit": 5919,
      "max": 131,
-     "px": 1063230
+     "px": 988530
     },
     "screenshotAfter": {
-     "lit": 414044,
-     "max": 191,
-     "px": 1063230
+     "lit": 393129,
+     "max": 190,
+     "px": 988530
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.503534243712321,
-     "res": "2048x1327"
+     "coverage": 0.5104835045112124,
+     "res": "2048x1427"
     },
     "display": {
-     "meanLum": 0.12792561632090343,
-     "maxLum": 0.35859843137254904,
-     "res": "320x207"
+     "meanLum": 0.1288970473641682,
+     "maxLum": 0.35439372549019604,
+     "res": "297x207"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 22.4
+   "seconds": 22.5
   },
   {
    "width": 2560,
    "height": 1440,
    "env": {
-    "date": "2026-10-17T17:25:53.645Z",
-    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
+    "date": "2026-10-17T18:09:14.094Z",
+    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -2636,8 +2636,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "1024x659",
-     "sim": "512x330",
+     "dye": "1024x701",
+     "sim": "512x351",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -2696,11 +2696,11 @@
      "clip": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255
      },
      "png": {
-      "width": 335,
+      "width": 389,
       "height": 1255
      },
      "what": "left sidebar open (Brush section open as at boot)",
@@ -2708,7 +2708,7 @@
      "rect": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255,
       "visible": true
      },
@@ -2719,11 +2719,11 @@
      "clip": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255
      },
      "png": {
-      "width": 335,
+      "width": 389,
       "height": 1255
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
@@ -2733,7 +2733,7 @@
      "rect": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255,
       "visible": true
      }
@@ -2743,11 +2743,11 @@
      "clip": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255
      },
      "png": {
-      "width": 335,
+      "width": 389,
       "height": 1255
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
@@ -2757,7 +2757,7 @@
      "rect": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255,
       "visible": true
      }
@@ -2767,11 +2767,11 @@
      "clip": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255
      },
      "png": {
-      "width": 335,
+      "width": 389,
       "height": 1255
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
@@ -2781,7 +2781,7 @@
      "rect": {
       "x": 0,
       "y": 185,
-      "w": 335,
+      "w": 389,
       "h": 1255,
       "visible": true
      }
@@ -2789,13 +2789,13 @@
     {
      "file": "2560/section-swirl-together.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
@@ -2803,9 +2803,9 @@
      "section": "Swirl Together",
      "group": "core",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2813,13 +2813,13 @@
     {
      "file": "2560/section-simulation.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
@@ -2827,9 +2827,9 @@
      "section": "Simulation",
      "group": "core",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2837,13 +2837,13 @@
     {
      "file": "2560/section-colors-and-palettes.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
@@ -2851,9 +2851,9 @@
      "section": "Colors and palettes",
      "group": "core",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2861,13 +2861,13 @@
     {
      "file": "2560/section-layers.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
@@ -2875,9 +2875,9 @@
      "section": "Layers",
      "group": "core",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2885,13 +2885,13 @@
     {
      "file": "2560/section-mutate-shader.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
@@ -2899,9 +2899,9 @@
      "section": "Mutate shader",
      "group": "core",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2909,13 +2909,13 @@
     {
      "file": "2560/section-effects.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
@@ -2923,9 +2923,9 @@
      "section": "Effects",
      "group": "expressive",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2933,13 +2933,13 @@
     {
      "file": "2560/section-animations.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
@@ -2947,9 +2947,9 @@
      "section": "Animations",
      "group": "expressive",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2957,13 +2957,13 @@
     {
      "file": "2560/section-audio.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
@@ -2971,9 +2971,9 @@
      "section": "Audio",
      "group": "expressive",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -2981,13 +2981,13 @@
     {
      "file": "2560/section-kaleidoscope.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
@@ -2995,9 +2995,9 @@
      "section": "Kaleidoscope",
      "group": "expressive",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -3005,13 +3005,13 @@
     {
      "file": "2560/section-text.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
@@ -3019,9 +3019,9 @@
      "section": "Text",
      "group": "expressive",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -3029,13 +3029,13 @@
     {
      "file": "2560/section-focus.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
@@ -3043,9 +3043,9 @@
      "section": "Focus",
      "group": "system",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -3053,13 +3053,13 @@
     {
      "file": "2560/section-display.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
@@ -3067,9 +3067,9 @@
      "section": "Display",
      "group": "system",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -3077,13 +3077,13 @@
     {
      "file": "2560/section-export.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
@@ -3091,9 +3091,9 @@
      "section": "Export",
      "group": "system",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -3101,13 +3101,13 @@
     {
      "file": "2560/section-settings.png",
      "clip": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255
      },
      "png": {
-      "width": 378,
+      "width": 432,
       "height": 1255
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
@@ -3115,9 +3115,9 @@
      "section": "Settings",
      "group": "system",
      "rect": {
-      "x": 2182,
+      "x": 2128,
       "y": 185,
-      "w": 378,
+      "w": 432,
       "h": 1255,
       "visible": true
      }
@@ -3158,22 +3158,22 @@
     {
      "file": "2560/state-expanded.png",
      "clip": {
-      "x": 2194,
+      "x": 2140,
       "y": 183,
-      "w": 340,
+      "w": 394,
       "h": 182
      },
      "png": {
-      "width": 340,
+      "width": 394,
       "height": 182
      },
      "what": "\"Simulation\" header expanded (aria-expanded=true) with the top of its body",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"true\"]",
      "section": "Simulation",
      "rect": {
-      "x": 2194,
+      "x": 2140,
       "y": 183,
-      "w": 340,
+      "w": 394,
       "h": 62,
       "visible": true
      }
@@ -3181,14 +3181,14 @@
     {
      "file": "2560/state-checked-on.png",
      "clip": {
-      "x": 2213,
-      "y": 706,
-      "w": 303,
-      "h": 31
+      "x": 2159,
+      "y": 717,
+      "w": 357,
+      "h": 27
      },
      "png": {
-      "width": 303,
-      "height": 31
+      "width": 357,
+      "height": 27
      },
      "what": "#macCormackToggle row as at boot (checked)",
      "selector": "#macCormackToggle",
@@ -3196,24 +3196,24 @@
       "checked": true
      },
      "rect": {
-      "x": 2217,
-      "y": 710,
-      "w": 295,
-      "h": 23,
+      "x": 2163,
+      "y": 721,
+      "w": 349,
+      "h": 19,
       "visible": true
      }
     },
     {
      "file": "2560/state-checked-off.png",
      "clip": {
-      "x": 2213,
-      "y": 790,
-      "w": 303,
-      "h": 31
+      "x": 2159,
+      "y": 799,
+      "w": 357,
+      "h": 27
      },
      "png": {
-      "width": 303,
-      "height": 31
+      "width": 357,
+      "height": 27
      },
      "what": "#macCormackToggle row after one click (unchecked)",
      "selector": "#macCormackToggle",
@@ -3221,32 +3221,32 @@
       "checked": false
      },
      "rect": {
-      "x": 2217,
-      "y": 794,
-      "w": 295,
-      "h": 23,
+      "x": 2163,
+      "y": 803,
+      "w": 349,
+      "h": 19,
       "visible": true
      }
     },
     {
      "file": "2560/state-collapsed.png",
      "clip": {
-      "x": 2194,
+      "x": 2140,
       "y": 268,
-      "w": 355,
+      "w": 409,
       "h": 62
      },
      "png": {
-      "width": 355,
+      "width": 409,
       "height": 62
      },
      "what": "\"Simulation\" header collapsed (aria-expanded=false)",
      "selector": "document.querySelectorAll('#sidebar-right .sidebar-section')[1] .section-title[aria-expanded=\"false\"]",
      "section": "Simulation",
      "rect": {
-      "x": 2194,
+      "x": 2140,
       "y": 268,
-      "w": 355,
+      "w": 409,
       "h": 62,
       "visible": true
      }
@@ -3289,13 +3289,13 @@
      "file": "2560/state-disabled.png",
      "clip": {
       "x": 19,
-      "y": 788,
-      "w": 296,
-      "h": 70
+      "y": 836,
+      "w": 335,
+      "h": 73
      },
      "png": {
-      "width": 296,
-      "height": 70
+      "width": 335,
+      "height": 73
      },
      "what": "#brushTipTexture (disabled range) and its row",
      "selector": "#brushTipTexture:disabled",
@@ -3307,9 +3307,9 @@
      },
      "rect": {
       "x": 23,
-      "y": 792,
-      "w": 288,
-      "h": 62,
+      "y": 840,
+      "w": 327,
+      "h": 65,
       "visible": true
      },
      "alsoDisabledInSectionShots": [
@@ -3408,36 +3408,36 @@
    "simProbe": {
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
-     "x": 359,
+     "x": 413,
      "y": 209,
-     "w": 1799,
+     "w": 1691,
      "h": 1158,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 10502,
+     "lit": 10070,
      "max": 131,
-     "px": 2083242
+     "px": 1958178
     },
     "screenshotAfter": {
-     "lit": 807522,
-     "max": 189,
-     "px": 2083242
+     "lit": 773874,
+     "max": 187,
+     "px": 1958178
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.50307343038695,
-     "res": "1024x659"
+     "coverage": 0.5089924549750356,
+     "res": "1024x701"
     },
     "display": {
-     "meanLum": 0.12789939460646138,
-     "maxLum": 0.36113568627450976,
-     "res": "449x289"
+     "meanLum": 0.1286814846897991,
+     "maxLum": 0.356364705882353,
+     "res": "422x289"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 23.7
+   "seconds": 24.4
   }
  ],
  "problems": []
