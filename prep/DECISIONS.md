@@ -52,6 +52,9 @@ Answers to `prep/gaps/SECOND-WAVE.md`'s questions, by its numbers:
 - **Q14 the right sidebar's resize edge** does nothing (pre-existing): not a theme item; listed for a separate fix.
 - **Q15 desktop-only rows:** Gabriel checks them in his Electron build.
 - **Laminar / Blend 0.00:** keeps the app's meaning (neutral middle, -1 full laminar); behaviour is frozen.
+- **Capitals without renaming (from W7):** labels shown in capitals use `font-variant-caps: all-small-caps` at 1/0.7 of the size instead of `text-transform: uppercase`, so screen readers keep each name's own case. It looks the same. The second wave applies it app-wide, which supersedes "leave uppercase names as is".
+- **Overlays close instantly** (easing the close would delay the app's own hide, a timing change). They open on the drawer spring.
+- **Reset app note** keeps its legacy `pointer-events` over the canvas.
 - **Q4 emoji in labels:** Gabriel: replace them with plain text or drawn glyphs like the study (accessible names follow the new words; no behaviour change).
 
 ## Open
