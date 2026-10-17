@@ -245,15 +245,8 @@ html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section
 html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section[data-group="core"] .section-title { --egg: #a9b8ff; }
 html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section[data-group="expressive"] .section-title { --egg: #7ff0d6; }
 html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section[data-group="system"] .section-title { --egg: #c5cfe0; }
-html[data-theme="walnut-copper"] :is(#mpActivity, .mp-room-toast) .mp-activity-who {
-    text-shadow: 0 0 3px currentColor;
-}
-
-/* ── One container per column ─────────────────────────────────────────
-   Moved to css/35-theme-drawers.css: bead rows, headings, no inner boxes. */
-
-/* ── Another player's change (js/06e flashControl) ─────────────────────
-   is in css/39-theme-room.css, with the room drawer and the name chips. */
+/* Drawers, bead rows and headings live in css/35; the room drawer, another
+   player's change and the name chips in css/39. */
 
 /* Empty hotkey slots (js/17 reserves one on every unbound row so columns
    align): never painted, and not reserved either, as the left bar already

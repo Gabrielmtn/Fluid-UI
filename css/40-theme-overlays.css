@@ -1417,11 +1417,11 @@ html[data-theme="walnut-copper"] .demo-clock-cap {
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.7);
 }
+/* The cells keep legacy's face, size and spacing: the bar's container-query
+   cutoffs (css/20 136-162) are measured against them, and wider cells
+   spilled over the right sidebar at 1000-1100 px, putting Reset app under
+   its edge. Only colour and glow change here. */
 html[data-theme="walnut-copper"] #quality-underbar .qub-dd-btn {
-    font-family: var(--ui-font-mono);
-    font-weight: 400;
-    font-size: 12.5px;
-    letter-spacing: 0.04em;
     font-variant-numeric: tabular-nums;
     border-radius: 5px;
     color: var(--lit);
@@ -1432,20 +1432,11 @@ html[data-theme="walnut-copper"] #quality-underbar .qub-dd-chev {
     opacity: 0.9;
 }
 html[data-theme="walnut-copper"] #quality-underbar .qub-size-val {
-    font-family: var(--ui-font-mono);
-    font-size: 12px;
-    letter-spacing: 0.04em;
     color: var(--vfd);
     text-shadow: 0 0 6px rgba(114, 242, 212, 0.55), 0 1px 2px rgba(0, 0, 0, 0.85);
 }
 /* Reset app: a ghost pane, engraved. */
 html[data-theme="walnut-copper"] #quality-underbar .reset-app-btn {
-    font-family: var(--ui-font-display);
-    font-weight: 400;
-    font-size: calc(8.5px / 0.7);
-    line-height: 1;
-    letter-spacing: calc(0.12em * 0.7);
-    font-variant-caps: all-small-caps;
     border-radius: 5px;
 }
 /* The playtest label: engraved, in legacy's face and size. Its width sets

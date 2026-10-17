@@ -438,7 +438,10 @@
         '.section-body > div > .brush-section-label:first-child:not([for]):not(.brush-time-group > *)',
         '.brush-settings-panel > .brush-fold', '.brush-settings-panel > .brush-fold ~ .brush-section-label',
         '.layers-subsection', '.layers-options-group', '.mutation-locks', '#layersPanel > .layer-item',
-        '.fx-cluster + .fx-group', '.control-group:has(#saveSettingsBtn)', 'div:has(> #sidebarPresetList)'
+        '.fx-cluster + .fx-group', '.control-group:has(#saveSettingsBtn)', 'div:has(> #sidebarPresetList)',
+        // The Multi-brush count, moved above the brush screen (js/73): the
+        // study opens a second group there (bead row and rosette).
+        '.wcb-mb > .mixer-channel[data-ui-key="Multi-Brush"]'
     ].join(', ');
     var SECT_AT = [
         '.section-body > .brush-section-label:not(:has(+ select))',
