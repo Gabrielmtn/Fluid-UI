@@ -473,9 +473,8 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-gr
     margin: 0 0 8px;
     padding: 0;
     border: 0;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
+    /* No background or box-shadow here: another player's glow (css/30,
+       .checkbox-group[style*="--ga"]) is drawn on this row. */
 }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group:has(> input[type="checkbox"]:checked + label) { --ci: 1; }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group > .brush-ghost-head {
@@ -642,8 +641,9 @@ html[data-theme="walnut-copper"] #sidebar-right .fx-row > .fx-thumb:is(:hover, :
 }
 html[data-theme="walnut-copper"] #sidebar-right .fx-cluster .checkbox-group { margin-bottom: 8px; }
 
-/* 3g. Mutate's lock bank: one width for the bank (the widest, KALEIDO),
-   8 px apart, wrapping in the column; "Lock:" heads it like a label. */
+/* 3g. Mutate's lock bank: one width for the bank (the widest, EFFECTS,
+   100.8 px, snapped to the 16 px module: 112), 8 px apart, two to a row
+   in the column; "Lock:" heads it like a label. */
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mutation-locks {
     display: flex;
     flex-wrap: wrap;
@@ -1066,6 +1066,10 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-s
    ════════════════════════════════════════════════════════════════════ */
 html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(button, .btn):not(.btn--icon):not(.btn--ghost):not(.brush-tip-btn):not(.arm-tip-btn):not(.palette-chip):not([style*="background"]):not(.hk-picker-clear):not(.lsb-toggle):not(.lsb-rail-label):not(#multiArtistPanel *):not(.arm-row *):not(.brush-shapes-actions *) {
     min-height: 32px;
+}
+/* The corner at css/31's weight (the exclusions in :where), so joined
+   pairs and keycaps keep their own corners. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(button, .btn):where(:not(.btn--icon):not(.btn--ghost):not(.brush-tip-btn):not(.arm-tip-btn):not(.palette-chip):not([style*="background"]):not(.hk-picker-clear):not(.lsb-toggle):not(.lsb-rail-label):not(#multiArtistPanel *):not(.arm-row *):not(.brush-shapes-actions *)) {
     border-radius: 5px;
 }
 html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(.layers-toolbar-grid, .stream-format-grid, .rec-strip-transport, .mutation-actions, #userPresetBulkRow, div:has(> #saveSettingsBtn)) {

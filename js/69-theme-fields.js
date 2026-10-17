@@ -39,10 +39,11 @@
 // (:hover, :focus, .wc-open) are the truth.
 //
 // Also, presentation only:
-//   • a sidebar checkbox's pane is registered with ThemeMotion.pane() the
-//     first time it is touched (pointer, key or focus), so its cathode
-//     strikes and fades on the study's timing (js/71 drives it from the
-//     change event);
+//   • a sidebar checkbox's or radio's pane is registered with
+//     ThemeMotion.pane() the first time it is touched (pointer, key or
+//     focus), so its cathode strikes and fades on the study's timing (js/71
+//     drives it from the change event); a radio's whole group is registered
+//     and synced, so the choice that goes dark fades too;
 //   • Brush ghost's words are wrapped in a span (.wc-cb-txt), so the pane is
 //     as wide as its words and the value stays outside it, as in the study;
 //   • a bound hotkey's keycap is marked with its length (data-wc-keylen) so
