@@ -749,7 +749,9 @@
     }
 
     // ── Render loop (runs only while hovering) ────────────────────────
-    var lastX = 0, lastY = 0, visible = false, rafId = 0;
+    // over = the pointer is on the canvas, tracked even while Show Cursor is
+    // off so switching it back on can draw the cursor where the pointer is.
+    var lastX = 0, lastY = 0, over = false, visible = false, rafId = 0;
     // The pointer the cursor follows, or null for "whatever moves". Set by the
     // Pen Input Window (js/47) and the phone mouse (js/55) while theirs is
     // over the surface: the cursor then tracks that pointer only — a mouse
@@ -815,25 +817,33 @@
 
     canvas.addEventListener('pointerenter', function (e) {
         if (!ownedBy(e)) return;
-        lastX = e.clientX; lastY = e.clientY;
+        lastX = e.clientX; lastY = e.clientY; over = true;
         show();
     });
     canvas.addEventListener('pointermove', function (e) {
         if (!ownedBy(e)) return;
-        lastX = e.clientX; lastY = e.clientY;
+        lastX = e.clientX; lastY = e.clientY; over = true;
         if (!visible) show(); else requestRender();
     });
-    canvas.addEventListener('pointerleave', function (e) { if (ownedBy(e)) hide(); });
+    canvas.addEventListener('pointerleave', function (e) {
+        if (ownedBy(e)) { over = false; hide(); }
+    });
     // Leaving the window by keyboard (Alt+Tab) sends no pointerleave.
     // Not while a remote pen owns the cursor: this window losing focus says
     // nothing about a pen that is drawing through the Pen Input Window.
-    window.addEventListener('blur', function () { if (owner == null) hide(); });
+    window.addEventListener('blur', function () {
+        if (owner == null) { over = false; hide(); }
+    });
 
     // React live to the Show Cursor toggle without needing a mouse move.
+    // Switching it on (C over the canvas) draws the brush cursor at once:
+    // the OS arrow comes back the moment .hide-cursor drops, and until the
+    // next pointermove it was the only cursor on screen.
     var toggle = document.getElementById('cursorToggle');
     if (toggle) {
         toggle.addEventListener('change', function () {
             if (!toggle.checked) hide();
+            else if (over) show();
         });
     }
 
