@@ -361,4 +361,26 @@ html[data-theme="walnut-copper"] :is(#mpActivity, .mp-room-toast) .mp-activity-w
     text-shadow: 0 0 3px currentColor;
 }
 
+/* ── One container per column ─────────────────────────────────────────
+   Inside a drawer nothing draws a second box. Panels give up their plates;
+   sub-groups open with the study's small dotted copper rule instead. */
+html[data-theme="walnut-copper"] .section-body .arm-colors-panel {
+    box-shadow: none;
+    background: transparent;
+}
+html[data-theme="walnut-copper"] .section-body :is(.layers-subsection, .layers-options-group, .path-empty-state, .mutation-locks) {
+    border: 0;
+    border-top: 2px dotted rgba(214, 140, 92, 0.45);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] .section-body .layer-item {
+    border-color: rgba(214, 140, 92, 0.35);
+    background: rgba(8, 4, 2, 0.25);
+}
+html[data-theme="walnut-copper"] .section-body .layer-item-header {
+    background: transparent;
+}
+
 } /* @layer theme */

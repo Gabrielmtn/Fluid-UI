@@ -176,19 +176,22 @@ html[data-theme="walnut-copper"] select {
     background-color: #110b08;
     color-scheme: dark;
 }
+/* !important on the paint: a few selects are painted by script through
+   style.cssText (js/20 SECTION_SELECT_CSS), and an inline declaration
+   beats every layer unless the author rule is !important. */
 html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) select {
-    border: 1px solid var(--cu);
-    border-radius: 6px;
+    border: 1px solid var(--cu) !important;
+    border-radius: 6px !important;
     padding-right: 30px;
     background:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='28' viewBox='0 0 24 28'%3E%3Cpath d='M0.5 5V23' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M9 11.5L12.5 15L16 11.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E") right 2px center / 24px 28px no-repeat,
         var(--mesh-dim) center / 7px 12.12px,
-        linear-gradient(170deg, #1a1210, #090605);
-    color: color-mix(in oklab, var(--lit) 60%, var(--unlit));
+        linear-gradient(170deg, #1a1210, #090605) !important;
+    color: color-mix(in oklab, var(--lit) 60%, var(--unlit)) !important;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 210, 170, 0.14);
 }
 html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) select:is(:hover, :focus) {
-    color: var(--lit);
+    color: var(--lit) !important;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 210, 170, 0.14), 0 0 10px rgba(255, 110, 30, 0.25);
 }
 /* The material picker is text inside a fader label, not a field. */
