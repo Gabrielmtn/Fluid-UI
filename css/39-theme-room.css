@@ -1,11 +1,558 @@
 /* ================================================================
-   css/39-theme-room.css - Walnut & Copper: Swirl Together drawer: panes that never wrap, nixie room code, pilot
-   lamp, the VFD change log (#mpActivity), name chips.
-   Owner: the room workstream. Loads after css/30-34, inside @layer theme,
+   css/39-theme-room.css - Walnut & Copper: the Swirl Together drawer.
+   The room column (study 815-845, CSS 459-494): the sharing line with its
+   pilot lamp, the change log on a VFD screen, the panes in one or two per
+   row; the room code as nixie tubes in the Invite popover; another
+   player's glow on the control they moved, and their name chip.
+   Owner: the room workstream. Loads after css/30-38, inside @layer theme,
    so a rule here wins a tie with the earlier theme sheets. Theme rules are
    scoped to html[data-theme="walnut-copper"]. Button colour may live here
-   (js/38 sanctions css/31 and 33-39 theme sheets).
+   (js/38 sanctions css/31 and 33-39 theme sheets). The screen, the nixies
+   and the change lines are built by js/74 as aria-hidden mirrors of the
+   app's own elements (#mpActivity, #roomName), which stay the source of
+   truth and stay in the accessibility tree.
    ================================================================ */
 @layer theme {
+
+/* ── The panel: one column, no box of its own ─────────────────────────
+   The drawer's tray is the only container (study: one copper line per
+   column); the legacy plate, its border and its 12 px padding go, so the
+   panes run the tray's full width like the study's (.fil, padding 2 px). */
+html[data-theme="walnut-copper"] #multiArtistPanel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ui-text);
+}
+/* 8 px between the parts of a column, 6 px between panes in a row (study
+   .fil gap 8, .row2 gap 6). 06e shows and hides both views inline. */
+html[data-theme="walnut-copper"] #mpDisconnected {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+}
+html[data-theme="walnut-copper"] #mpConnected {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 6px;
+}
+html[data-theme="walnut-copper"] #mpConnected > :is(.mp-status-row, .wc-feed) { flex: 0 0 100%; }
+/* Invite, the room menu and Leave share the last row: the two wrappers
+   step aside so their buttons are the row's items (order unchanged). */
+html[data-theme="walnut-copper"] #mpConnected > :is(.mp-room-bar, .mp-foot) { display: contents; }
+
+/* ── Panes in the drawer ──────────────────────────────────────────────
+   Paint comes from the cathode pane (css/31); this sets their tier. The
+   two doors keep the study's main height (48 px); the rest are the compact
+   tier (study .cp.sm: 32 px, 9 px Michroma at .12em, 5 px corners). The
+   column here is 254 px against the study's 296, so the doors take the
+   compact tier's 9 px type too: START A ROOM at the study's 10.5 px would
+   not fit a half-width pane on one line. Labels never wrap. (#sidebar-right
+   leads each selector: css/34's sidebar pane rule carries one id and ten
+   classes, and these must outrank it.) */
+html[data-theme="walnut-copper"] #sidebar-right #multiArtistPanel :where(button, .btn):not(.btn--icon) {
+    min-height: 0;
+    height: 32px;
+    margin: 0;
+    padding: 0 10px;
+    border-radius: 5px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: 9px;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+html[data-theme="walnut-copper"] #multiArtistPanel .mp-door-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+/* START A ROOM is 111 px of the 122 a half pane holds inside its border:
+   the study's own pane leaves it 5 px a side too. */
+html[data-theme="walnut-copper"] #sidebar-right #multiArtistPanel .mp-door-row > button {
+    width: 100%;
+    min-width: 0;
+    height: 48px;
+    padding: 0 2px;
+    border-radius: 7px;
+}
+/* Sync phone (js/54), Link to current settings, Reconnect: full width. The
+   inline margin on Reconnect is markup's, so it needs !important here. */
+html[data-theme="walnut-copper"] #sidebar-right #mpDisconnected > button {
+    display: block;
+    width: 100%;
+    margin: 0 !important;
+}
+
+/* The code field and Join (study .line: .tf + .cp.sm, 8 px apart). The
+   field's paint is the theme's text field; this sets the study's size and
+   type (.tf: 32 px, Share Tech Mono 14 px, 9 px in). */
+html[data-theme="walnut-copper"] #multiArtistPanel .mp-join-row {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    margin: 0;
+}
+html[data-theme="walnut-copper"] #joinRoomInput {
+    height: 32px;
+    padding: 0 9px;
+    border-radius: 5px;
+    font: 400 14px/1 var(--ui-font-mono);
+    letter-spacing: 0.03em;
+}
+html[data-theme="walnut-copper"] #joinRoomInput::placeholder {
+    font: 400 14px/1 var(--ui-font-mono);
+    letter-spacing: 0.03em;
+    text-transform: none;
+    color: var(--unlit);
+    opacity: 1;
+}
+html[data-theme="walnut-copper"] #sidebar-right #joinRoomBtn {
+    flex: none;
+}
+
+/* Out of a room the study's column has a second frame for the phone and
+   the link: a bead row with a rosette resting in its gap, 40 px between the
+   join row and Sync phone (frame padding 8, frame gap 10, next frame's
+   head 22). Drawn under the join row; the rosette turns with the drawer's
+   own (--rot, written on the section by js/71). */
+html[data-theme="walnut-copper"] #mpDisconnected > .mp-join-row { margin-bottom: 32px; }
+html[data-theme="walnut-copper"] #mpDisconnected > .mp-join-row::before,
+html[data-theme="walnut-copper"] #mpDisconnected > .mp-join-row::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] #mpDisconnected > .mp-join-row::after {
+    left: 2px;
+    right: 2px;
+    top: calc(100% + 24px);
+    border-top: 2px dotted rgba(214, 140, 92, 0.55);
+    -webkit-mask: linear-gradient(90deg, #000 calc(50% - 13px), transparent calc(50% - 13px) calc(50% + 13px), #000 calc(50% + 13px));
+    mask: linear-gradient(90deg, #000 calc(50% - 13px), transparent calc(50% - 13px) calc(50% + 13px), #000 calc(50% + 13px));
+}
+html[data-theme="walnut-copper"] #mpDisconnected > .mp-join-row::before {
+    left: 50%;
+    top: calc(100% + 18px);
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    opacity: 0.8;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'%3E%3Cpath d='M0 0C2 -3 2 -7 0 -8C-2 -7 -2 -3 0 0C3 -2 7 -2 8 0C7 2 3 2 0 0C2 3 2 7 0 8C-2 7 -2 3 0 0C-3 2 -7 2 -8 0C-7 -2 -3 -2 0 0Z' fill='none' stroke='%23d68c5c' stroke-width='1'/%3E%3Ccircle r='1.4' fill='%23f2b38a'/%3E%3C/svg%3E") center / contain no-repeat;
+    transform: rotate(var(--rot, 0deg));
+}
+
+/* A note under the doors (06e showMpError): the study's hint type. */
+html[data-theme="walnut-copper"] #mpError {
+    margin: 0;
+    font: 400 12px/1.45 var(--ui-font-body);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+
+/* ── In a room: the sharing line and its pilot lamp ───────────────────
+   Study .roomstat: a 12 px pilot lamp, 9 px gap, the engraved label. The
+   lamp says what 06e's dot said: teal (the VFD's colour) once someone else
+   is here, amber while you wait, breathing (06e's own pulse) while it
+   connects. The label is the study's .lbl at 9.5 px / .14em: "Sharing
+   settings · 3 here" then fits the 254 px column on one line, as it does
+   in the study's; longer lines wrap under it, lamp on the first line. */
+html[data-theme="walnut-copper"] #mpConnected .mp-status-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin: 0;
+    padding-top: 2px;
+    font: 400 9.5px/1.35 var(--ui-font-display);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] #multiplayerStatus {
+    min-width: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    text-wrap: pretty;
+}
+/* Study .lamp + .lamp.live (368-371, 460), literal; --ci is the lamp's
+   brightness (the theme's registered cathode property, never --i). */
+html[data-theme="walnut-copper"] #connectionDot {
+    --ci: 1;
+    --gc: 255 110 30;
+    flex: none;
+    width: 12px;
+    height: 12px;
+    margin-top: 0.4px;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 38% 32%, rgba(255, 244, 228, calc(0.12 + var(--ci) * 0.65)), transparent 42%),
+        radial-gradient(circle, rgb(var(--gc) / calc(0.1 + var(--ci) * 0.85)) 0 50%, rgb(var(--gc) / calc(var(--ci) * 0.3)) 70%, transparent 72%),
+        var(--mesh-dim) center / 2.5px 4.33px,
+        #120c0a;
+    box-shadow:
+        inset 0 0 0 1.5px var(--cu),
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        0 0 calc(var(--ci) * 12px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+}
+html[data-theme="walnut-copper"] #connectionDot.mp-dot-connected { --gc: 114 242 212; }
+
+/* ── The change log: a VFD screen (study .scr.feed, 267-269, 467, 491-494)
+   js/74 builds it after #mpActivity and mirrors that line onto it. The
+   screen is the column's full width and the study's height: three lines on
+   a 21 px pitch inside 8 / 10 px of glass. */
+html[data-theme="walnut-copper"] .wc-feed {
+    --you: #ff8a3d;
+    --mesh-vfd: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%2372f2d4' stroke-opacity='.15' stroke-width='1.1'/%3E%3C/svg%3E");
+    position: relative;
+    box-sizing: border-box;
+    min-height: 78px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background:
+        radial-gradient(ellipse at center, rgba(40, 160, 130, 0.11), transparent 72%),
+        var(--mesh-vfd) center / 2.5px 4.33px,
+        #040b0a;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.15),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.6);
+    cursor: default;
+    -webkit-user-select: none;
+    user-select: none;
+}
+/* Scanlines and the glass highlight, over the text (study .scr::after). */
+html[data-theme="walnut-copper"] .wc-feed::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 8px;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px),
+        linear-gradient(160deg, rgba(220, 255, 245, 0.06), transparent 40%);
+}
+html[data-theme="walnut-copper"] .wc-notes {
+    position: relative;
+    height: 63px;
+    overflow: hidden;
+    contain: layout;
+    font: 400 12px/21px var(--ui-font-mono);
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.55);
+}
+/* One line (study .nline 76-79): js/74 moves it on the spring (transform)
+   and sets its brightness (opacity); nothing here animates. */
+html[data-theme="walnut-copper"] .wc-nline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 21px;
+    line-height: 21px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    opacity: 0;
+    will-change: transform, opacity;
+}
+html[data-theme="walnut-copper"] .wc-nline i {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 8px;
+    border-radius: 50%;
+    vertical-align: 1px;
+    background: var(--c);
+    box-shadow: 0 0 8px var(--c);
+}
+html[data-theme="walnut-copper"] .wc-nline .wc-who {
+    color: var(--c);
+    text-shadow: 0 0 7px var(--c);
+}
+/* Nothing to show (study .nempty 494, stepFeed 2835): "Quiet · no changes
+   yet", "Offline", or 06e's own sentence while the room is together. */
+html[data-theme="walnut-copper"] .wc-nempty {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 8px;
+    font: 400 12px/21px var(--ui-font-mono);
+    color: var(--vfd);
+    opacity: 0.55;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] .wc-feed.has-lines .wc-nempty { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] .wc-nempty { transition: none; }
+}
+
+/* #mpActivity stays the room's live region and the source of the screen:
+   off screen, never display:none from the theme (06e hides it itself while
+   nobody else is here). */
+html[data-theme="walnut-copper"] #mpActivity {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* ── The connected row: Invite, the room menu, Leave ──────────────────
+   Study .row2 of compact panes (Copy code | Leave): the two halves share
+   the row, the square menu pane between them (study .cp.sm.sq). */
+html[data-theme="walnut-copper"] #sidebar-right #mpConnected :is(#mpInviteBtn, #disconnectBtn) {
+    flex: 1 1 0;
+    min-width: 0;
+}
+html[data-theme="walnut-copper"] #sidebar-right #mpConnected #mpMenuBtn {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border-radius: 5px;
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* ── The room's two popovers (Invite, the room menu) ──────────────────
+   06e mounts them on <body>, over the canvas: each is a small cabinet in
+   the sidebars' walnut with the one copper line (study .cab 427-429). */
+html[data-theme="walnut-copper"] .mp-pop.brush-shape-menu {
+    border-color: transparent;
+    border-radius: 12px;
+    background-color: #2a170c;
+    background-image: var(--key-light), var(--sheen-side), var(--wood-herringbone);
+    background-size: auto, auto, 566px 566px;
+    box-shadow:
+        0 30px 60px -28px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.45),
+        inset 0 0 30px rgba(0, 0, 0, 0.45);
+    color: var(--ui-text);
+}
+
+/* ── The Invite popover: the room code as nixie tubes ─────────────────
+   Its width fits the longest pane on one line (Room link + current
+   settings). The code well, the QR, the hint and the two copies keep their
+   order; #roomName keeps its text for screen readers and for selection,
+   laid over the tubes and drawn clear. */
+html[data-theme="walnut-copper"] .mp-pop.brush-shape-menu#mpInvitePop {
+    width: 300px;
+    padding: 14px 12px;
+}
+html[data-theme="walnut-copper"] #mpInvitePop :is(button, .btn):not(.btn--icon) {
+    min-height: 0;
+    height: 32px;
+    margin: 0;
+    padding: 0 10px;
+    border-radius: 5px;
+    font: 400 9px/1 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+html[data-theme="walnut-copper"] #roomDisplay {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] #roomDisplay .mp-invite-head { margin: 0; gap: 8px; }
+html[data-theme="walnut-copper"] #roomDisplay .mp-room-label {
+    font: 400 9.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--engrave);
+}
+/* Code / QR / Hide: one joined strip (study .joined), square inner corners. */
+html[data-theme="walnut-copper"] #roomDisplay .mp-share-modes { gap: 0; }
+html[data-theme="walnut-copper"] #mpInvitePop #roomDisplay .mp-share-modes > button {
+    height: 24px;
+    padding: 0 8px;
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    border-radius: 0;
+}
+html[data-theme="walnut-copper"] #mpInvitePop #roomDisplay .mp-share-modes > button:first-child { border-radius: 5px 0 0 5px; }
+html[data-theme="walnut-copper"] #mpInvitePop #roomDisplay .mp-share-modes > button:last-child { border-radius: 0 5px 5px 0; }
+/* The code and its tubes share one cell: the tubes are the picture, the
+   text above them is clear (still read, still selectable). */
+html[data-theme="walnut-copper"] #roomName,
+html[data-theme="walnut-copper"] #roomDisplay > .wc-nixies {
+    grid-row: 2;
+    grid-column: 1;
+}
+html[data-theme="walnut-copper"] #roomName {
+    position: relative;
+    z-index: 1;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: 400 22px/44px var(--ui-font-mono);
+    letter-spacing: 0.75em;
+    text-indent: 0.75em;
+    color: transparent;
+    text-shadow: none;
+}
+html[data-theme="walnut-copper"] #roomName::selection { color: transparent; background: rgba(255, 120, 40, 0.28); }
+/* Study .nixies / .nx / .nxsep (461-466), values literal; one tube per
+   character, a copper dash after the third (the study's K7Q-X4M). */
+html[data-theme="walnut-copper"] .wc-nixies {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 0;
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] .wc-nixies[hidden] { display: none; }
+html[data-theme="walnut-copper"] .wc-nx {
+    width: 26px;
+    height: 40px;
+    border-radius: 13px 13px 5px 5px;
+    display: grid;
+    place-items: center;
+    font: 400 22px/1 var(--ui-font-mono);
+    color: var(--lit);
+    text-shadow: 0 0 6px rgba(255, 120, 40, 0.9), 0 0 14px rgba(255, 70, 10, 0.55);
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(255, 110, 30, 0.24), transparent 70%),
+        var(--mesh-dim) center / 2.5px 4.33px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow: inset 0 0 0 1.2px rgba(214, 140, 92, 0.75), inset 0 1px 0 1.2px rgba(255, 220, 190, 0.15), 0 3px 0 -1px var(--cu-lo);
+}
+html[data-theme="walnut-copper"] .wc-nxsep {
+    width: 9px;
+    height: 2px;
+    margin: 0 2px;
+    background: var(--cu);
+}
+/* Hidden (Code / QR / Hide on Hide), and the empty code before a room:
+   the tubes stay dark, so the code is not on screen and the box keeps its
+   size. */
+html[data-theme="walnut-copper"] .wc-nixies.is-masked .wc-nx,
+html[data-theme="walnut-copper"] .wc-nx.is-off {
+    color: rgba(160, 138, 118, 0.45);
+    text-shadow: none;
+    background:
+        var(--mesh-dim) center / 2.5px 4.33px,
+        linear-gradient(170deg, #1a1210, #090605);
+}
+html[data-theme="walnut-copper"] #roomQr { padding: 2px 0; }
+/* The hint (study .hint 331). */
+html[data-theme="walnut-copper"] #shareHint {
+    margin: 0;
+    font: 400 12px/1.45 var(--ui-font-body);
+    color: #cdb79f;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+html[data-theme="walnut-copper"] #copyRoomRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+html[data-theme="walnut-copper"] #mpInvitePop :is(#copyRoomRow > button, #copyRoomLookBtn, #phonePadRoomBtn) {
+    width: 100%;
+    min-width: 0;
+}
+html[data-theme="walnut-copper"] #mpInvitePop > #phonePadRoomBtn { margin-top: 8px; }
+
+/* ── The room toast (06e showRoomToast): a small VFD screen ─────────── */
+html[data-theme="walnut-copper"] .mp-room-toast {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.55);
+    background:
+        radial-gradient(ellipse at center, rgba(40, 160, 130, 0.11), transparent 72%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%2372f2d4' stroke-opacity='.15' stroke-width='1.1'/%3E%3C/svg%3E") center / 2.5px 4.33px,
+        #040b0a;
+    border-color: transparent;
+    border-radius: 8px;
+    padding: 7px 12px;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.15),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Another player's change (js/06e flashControl, js/71 tints) ─────────
+   06e puts .mp-peer-touch and --mp-peer (the player's colour) on the
+   control's face for 1.4 s, renewed through a drag; js/71 then writes
+   --ga (their glow, decaying with τ 1.4 s), --pc (their colour) and --tgc
+   (the glow colour cooling back to orange) on that face. Panes inside take
+   the colour through the cathode pane rule (study .cp: label mixes 70 %
+   toward --pc, glow follows --gc); the face itself glows in their colour
+   while --ga lasts (the study's console draws that glow in WebGL; the CSS
+   ring stands in). The legacy outline pulse is off: --ga is the clock. */
+html[data-theme="walnut-copper"] .mp-peer-touch {
+    outline: 0;
+    animation: none;
+}
+html[data-theme="walnut-copper"] :is(.mixer-channel, .control-group, .checkbox-group)[style*="--ga"] {
+    border-radius: 8px;
+    box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--pc) calc(var(--ga) * 100%), transparent),
+        0 0 16px -2px color-mix(in oklab, var(--pc) calc(var(--ga) * 100%), transparent);
+}
+html[data-theme="walnut-copper"] .mp-peer-touch input[type=range] {
+    --arc: var(--mp-peer, #5ab0ff);
+    --neon-col: radial-gradient(ellipse 100% 55% at 50% 50%, rgba(255, 250, 240, 0.9), var(--mp-peer, #5ab0ff) 50%, transparent 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] .mp-peer-touch {
+        animation: none;
+        box-shadow: 0 0 0 1px var(--mp-peer, #5ab0ff);
+    }
+}
+
+/* ── Name chips (js/71; study .chip 94-99, values literal) ─────────────
+   The chips sit on <body>, outside the zoomed bars, so each one is scaled
+   by the bars' --ui-scale about the point it is pinned to: the same size
+   beside a control at every window width (the study's is unzoomed). */
+html[data-theme="walnut-copper"] .wc-chips { position: fixed; inset: 0; pointer-events: none; z-index: 10050; }
+html[data-theme="walnut-copper"] .wc-chip {
+    --s: var(--ui-scale, 1);
+    position: absolute; z-index: 4; left: 0; top: 0;
+    transform-origin: 50% 100%;
+    transform: translate(-50%, -100%) scale(var(--s));
+    font: 400 9.5px/1 var(--ui-font-display); letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 6px 9px; border-radius: 999px; background: rgba(12, 8, 6, 0.9); color: var(--c); border: 1px solid var(--c);
+    opacity: 0; pointer-events: none; white-space: nowrap;
+    transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.25);
+}
+html[data-theme="walnut-copper"] .wc-chip.show { opacity: 1; transform: translate(-50%, calc(-100% - 8px)) scale(var(--s)); }
+html[data-theme="walnut-copper"] .wc-chip.aside { transform-origin: 0 50%; transform: translate(-6px, -50%) scale(var(--s)); }
+html[data-theme="walnut-copper"] .wc-chip.aside.show { transform: translate(4px, -50%) scale(var(--s)); }
+html[data-theme="walnut-copper"] .wc-chip.aside.flip { transform-origin: 100% 50%; transform: translate(calc(-100% + 6px), -50%) scale(var(--s)); }
+html[data-theme="walnut-copper"] .wc-chip.aside.flip.show { transform: translate(calc(-100% - 4px), -50%) scale(var(--s)); }
+@media (prefers-reduced-motion: reduce) { html[data-theme="walnut-copper"] .wc-chip { transition: none; } }
 
 } /* @layer theme */

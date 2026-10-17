@@ -416,6 +416,9 @@ function renderActivity() {
     el.style.display = together ? '' : 'none';
     if (!together) return;
     var a = (_activity && Date.now() < _activity.until) ? _activity : null;
+    // Presentation hook for the theme's change log (js/74): each change that
+    // lands stamps its hold, even one that leaves the words as they are.
+    if (a && el.dataset.at !== String(a.until)) el.dataset.at = String(a.until);
     // The name is in the key: a Steam name can land after the line is up.
     var key = a ? a.who + '|' + shortName(a.who) + '|' + (a.welcome ? '*' : a.names.join('|')) : '';
     if (el.dataset.key === key && el.childNodes.length) return;
