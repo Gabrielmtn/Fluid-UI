@@ -1,0 +1,225 @@
+/* ================================================================
+   31 — WALNUT & COPPER components (buttons, sliders, fields, inputs)
+   Same contract as 30-theme-walnut-copper.css: @layer theme, scoped to
+   html[data-theme="walnut-copper"], paint only. No padding, size or
+   font-size changes here, so every box keeps its place and the classic
+   theme is untouched.
+
+   Button colour lives in one legacy file, css/01-buttons.css (js/38
+   auditButtons proves no other sheet colours a button), so the pane rules
+   below mirror its states one for one.
+   ================================================================ */
+
+/* Cathode brightness. Registered so it transitions by itself: state comes
+   from ARIA and classes script already writes, and the glow eases with no
+   script and no animation loop. */
+@property --ci { syntax: "<number>"; inherits: false; initial-value: 0; }
+
+@layer theme {
+
+/* ── Cathode pane: every button ─────────────────────────────────────── */
+html[data-theme="walnut-copper"] :is(button, .btn) {
+    --gc: 255 110 30;
+    border-color: var(--cu);
+    border-radius: 6px;
+    background-color: #110b08;
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.55));
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 210, 170, 0.16),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 12px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+    transition: --ci 170ms ease-out, background-color 120ms, border-color 120ms;
+}
+/* Glass and mesh only where script has not painted the button itself
+   (a colour swatch carries its colour inline). */
+html[data-theme="walnut-copper"] :is(button, .btn):not([style*="background"]) {
+    background-image:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-dim),
+        linear-gradient(170deg, #1a1210, #090605);
+    background-size: auto, 7px 12.12px, auto;
+    background-position: center;
+}
+html[data-theme="walnut-copper"] :is(button, .btn):hover { --ci: 0.3; border-color: var(--cu-hi); }
+html[data-theme="walnut-copper"] :is(button, .btn):active { --ci: 0.75; }
+html[data-theme="walnut-copper"] :is(button[aria-pressed="true"], button.active, .btn[aria-pressed="true"], .btn.active,
+    .btn.ch-ignite-lock.armed, button.btn--emphasis, .btn--emphasis) {
+    --ci: 1;
+    border-color: var(--cu-hi);
+}
+html[data-theme="walnut-copper"] :is(button:disabled, .btn:disabled, .btn[aria-disabled="true"]) {
+    --ci: 0;
+    color: rgba(160, 138, 118, 0.55);
+    border-color: rgba(196, 122, 75, 0.35);
+    text-shadow: none;
+}
+html[data-theme="walnut-copper"] :is(button, .btn):focus-visible { outline-color: var(--ui-focus); }
+
+/* Ghosts: no plate until hover (menus, titlebar, controls over the art). */
+html[data-theme="walnut-copper"] :is(button.btn--ghost, .btn.btn--ghost, .titlebar-button, #quality-underbar .qub-dd-btn,
+    .collision-source-menu button, .arm-tip-menu .arm-tip-opt, .brush-radio-row > button, .arm-push-btn) {
+    background-color: transparent;
+    background-image: none;
+    border-color: transparent;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] :is(button.btn--ghost:hover, .btn.btn--ghost:hover, .titlebar-button:hover,
+    #quality-underbar .qub-dd-btn:hover, #quality-underbar .qub-dd.open .qub-dd-btn, .collision-source-menu button:hover,
+    .arm-tip-menu .arm-tip-opt:hover, .arm-tip-btn.menu-open:not(.active)) {
+    background-color: rgba(26, 16, 12, 0.85);
+    border-color: var(--cu);
+}
+html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-opt.active {
+    background-color: rgba(26, 16, 12, 0.9);
+    border-color: var(--cu-hi);
+}
+
+/* Radio row (Brush > Paint into) and the push box (Multi-Brush pressure):
+   the track is one glass strip; the ring or box in front of each word is a
+   cathode indicator that lights with the choice. */
+html[data-theme="walnut-copper"] .brush-radio-row {
+    background: var(--mesh-dim) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605);
+    border-color: var(--cu);
+}
+html[data-theme="walnut-copper"] :is(.brush-radio-row > button, .arm-push-btn)::before {
+    border-color: #6b5546;
+}
+html[data-theme="walnut-copper"] .brush-radio-row > button.active::before {
+    border-color: #ff9a50;
+    background: radial-gradient(circle, rgb(255 176 110) 0 2.5px, transparent 3px);
+    box-shadow: 0 0 8px rgb(255 110 30 / 0.7);
+}
+html[data-theme="walnut-copper"] .arm-push-btn.active::before {
+    border-color: #ff9a50;
+    background: rgb(255 176 110);
+    box-shadow: inset 0 0 0 1.5px #120c0a, 0 0 8px rgb(255 110 30 / 0.7);
+}
+
+/* Red-tinted panes: destructive and record keep their reserved meaning. */
+html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record) {
+    --gc: 255 80 50;
+    border-color: #b8432c;
+    background-color: #1c0b07;
+    color: color-mix(in oklab, #ffd2c4 calc(var(--ci) * 100%), #e08a76);
+}
+html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record):not([style*="background"]) {
+    background-image:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(0.12 + var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-dim),
+        linear-gradient(170deg, #241008, #0b0503);
+}
+html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record):hover {
+    border-color: #ff6a4d;
+}
+
+/* ── Bargraph tube: every range input ─────────────────────────────────
+   Same box as before (22 px well inside a 44 px hit area). The well
+   becomes dark glass in a copper ring, the fill an IN-9 neon column, and
+   the thumb shows only a white-hot head and the two copper diamonds that
+   mark the value above and below the tube. --thumb-h only sizes the
+   runnable track inside the input; the input's own height comes from
+   --track-h, which is unchanged. */
+html[data-theme="walnut-copper"] input[type=range] {
+    --neon-col: radial-gradient(ellipse 100% 55% at 50% 50%, rgba(255, 236, 204, 0.95), rgba(255, 150, 70, 0.85) 45%, rgba(240, 70, 30, 0.38) 100%);
+    --thumb-h: 40px;
+}
+html[data-theme="walnut-copper"] input[type=range]::-webkit-slider-container {
+    border-radius: 11px;
+    box-shadow:
+        0 0 0 1.5px var(--cu),
+        0 0 0 2.5px rgba(0, 0, 0, 0.6),
+        inset 0 2px 4px rgba(0, 0, 0, 0.75);
+    background:
+        linear-gradient(175deg, rgba(255, 240, 225, 0.13), transparent 45%),
+        var(--neon-col) 0 50% / calc(var(--js, 0) * var(--pos)) 100% no-repeat,
+        linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 12px) 1px no-repeat,
+        var(--mesh-dim) center / 6px 10.4px,
+        linear-gradient(170deg, #171010, #070403);
+}
+/* Laminar / Blend fills from the middle toward the value, as before. */
+html[data-theme="walnut-copper"] :is(#colorBlend, #colorBlendPerceptual)::-webkit-slider-container {
+    --fill-l: min(var(--pos), 50%);
+    --fill-r: max(var(--pos), 50%);
+    background:
+        linear-gradient(175deg, rgba(255, 240, 225, 0.13), transparent 45%),
+        linear-gradient(90deg, transparent var(--fill-l), rgba(255, 150, 70, 0.85) var(--fill-l),
+            rgba(255, 196, 140, 0.9) var(--fill-r), transparent var(--fill-r)) 0 50% / calc(var(--js, 0) * 100%) 60% no-repeat,
+        linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 12px) 1px no-repeat,
+        var(--mesh-dim) center / 6px 10.4px,
+        linear-gradient(170deg, #171010, #070403);
+}
+html[data-theme="walnut-copper"] input[type=range]::-webkit-slider-thumb {
+    border: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='40' viewBox='0 0 16 40'%3E%3Cpath d='M8 1.2L11.6 4.8L8 8.4L4.4 4.8Z M8 31.6L11.6 35.2L8 38.8L4.4 35.2Z' fill='%23180d07' stroke='%23f2b38a' stroke-width='1.4'/%3E%3Crect x='6.5' y='11' width='3' height='18' rx='1.5' fill='%23fff6e6' fill-opacity='.9'/%3E%3C/svg%3E") center / 16px 40px no-repeat;
+    filter: drop-shadow(0 0 3px rgba(255, 140, 60, 0.55));
+}
+html[data-theme="walnut-copper"] input[type=range]:disabled::-webkit-slider-container { opacity: 0.55; }
+html[data-theme="walnut-copper"] input[type=range]:focus-visible { outline-color: var(--ui-focus); }
+
+/* Printed scale under faders: engraved. */
+html[data-theme="walnut-copper"] .fader-scale {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    color: var(--unlit);
+}
+
+/* ── Field: selects (closed state; the native popup stays for now) ──── */
+html[data-theme="walnut-copper"] select {
+    color: var(--lit);
+    border-color: var(--cu);
+    background-color: #110b08;
+    color-scheme: dark;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) select {
+    border: 1px solid var(--cu);
+    border-radius: 6px;
+    padding-right: 30px;
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='28' viewBox='0 0 24 28'%3E%3Cpath d='M0.5 5V23' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M9 11.5L12.5 15L16 11.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E") right 2px center / 24px 28px no-repeat,
+        var(--mesh-dim) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    color: color-mix(in oklab, var(--lit) 60%, var(--unlit));
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 210, 170, 0.14);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) select:is(:hover, :focus) {
+    color: var(--lit);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 210, 170, 0.14), 0 0 10px rgba(255, 110, 30, 0.25);
+}
+/* The material picker is text inside a fader label, not a field. */
+html[data-theme="walnut-copper"] .mixer-channel .ch-label select.material-mode-select {
+    background-color: transparent;
+    color: var(--engrave);
+}
+html[data-theme="walnut-copper"] select option {
+    background: #140c08;
+    color: var(--ui-text);
+}
+
+/* ── Text field ─────────────────────────────────────────────────────── */
+html[data-theme="walnut-copper"] :is(input[type="text"], input[type="number"], input[type="search"], input[type="url"], textarea) {
+    color: var(--lit);
+    caret-color: var(--neon);
+    border-color: rgba(196, 122, 75, 0.75);
+    background-color: #0d0806;
+}
+html[data-theme="walnut-copper"] :is(input[type="text"], input[type="number"], input[type="search"], input[type="url"], textarea):focus {
+    border-color: #ff9a50;
+    box-shadow: 0 0 0 1px rgba(255, 110, 30, 0.35), 0 0 10px rgba(255, 110, 30, 0.25);
+}
+
+/* ── Checkbox and radio: neon accent on the native control ──────────── */
+html[data-theme="walnut-copper"] :is(input[type="checkbox"], input[type="radio"]) {
+    accent-color: #ff8a3d;
+}
+
+/* ── Labels inside drawers: engraved ────────────────────────────────── */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .control-group label {
+    color: var(--engrave);
+}
+
+} /* @layer theme */

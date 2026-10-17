@@ -20,6 +20,9 @@
     // Rules that are ALLOWED to colour a button.
     function isSanctioned(href, selector) {
         if (/01-buttons\.css/.test(href || '')) return true;
+        // The Walnut & Copper theme's one button-colour sheet: the same rule
+        // (one place per theme), scoped to html[data-theme="walnut-copper"].
+        if (/31-theme-components\.css/.test(href || '')) return true;
         // Reserved classes may be declared anywhere, but only these two.
         if (/btn--destructive|btn--record/.test(selector)) return true;
         // The PhotoSafe warning is deliberately exempt: it is the FIRST frame,
