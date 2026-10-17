@@ -1246,6 +1246,9 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker:i
     text-align: center;
     white-space: normal !important;
 }
+/* The study's keycap is 72 px whatever it says: "Press a key" wraps inside
+   it rather than widening it and moving the words beside it. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-picker:is(.is-empty, .is-listening) .hk-picker-key { width: 72px; }
 /* Listening breathes (study: .22 + .32 * (.5 + .5 sin 6T), a 1.05 s cycle). */
 html[data-theme="walnut-copper"] .hk-picker.is-listening .hk-picker-key {
     animation: wc-listen 1.047s ease-in-out infinite;
