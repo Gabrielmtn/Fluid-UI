@@ -101,7 +101,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.
     outline: 2px solid var(--ui-focus);
     outline-offset: 3px;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):disabled {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]):disabled {
     --ci: 0;
     opacity: 0.42;
     cursor: default;
@@ -1052,6 +1052,35 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-section-label + .brush-mode-row:not(.brush-radio-row) { margin: 0 0 8px; }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .ch-seg-switch.ui-vis-presets { margin: 0 0 8px; }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-source > .rec-strip-chips { flex: 1 1 auto; margin-left: 8px; }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   5b. PANE ROWS AND THE COMPACT TIER (study sidebar pattern rule 1, .cp.sm
+   182-186, .row2 / .row3 332-335)
+   Every sidebar pane is the compact tier: 32 px tall with 5 px corners
+   (css/34 had 36 px). Its type stays css/34's (9 px at .06em, 8 px in):
+   the app's columns are 240-255 CSS px against the study's 296, and at
+   the study's .12em the half-width panes (Save project, Load project)
+   break onto two lines. The selector is css/34's pane rule (so this wins
+   by order), minus the drawers W4 and W5 own (the room's panes, the
+   Multi-brush arm rows, the stamp actions). A row of equal panes is 6 px
+   apart, as .row2 / .row3 are; Mutate's four actions are a .row2.
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(button, .btn):not(.btn--icon):not(.btn--ghost):not(.brush-tip-btn):not(.arm-tip-btn):not(.palette-chip):not([style*="background"]):not(.hk-picker-clear):not(.lsb-toggle):not(.lsb-rail-label):not(#multiArtistPanel *):not(.arm-row *):not(.brush-shapes-actions *) {
+    min-height: 32px;
+    border-radius: 5px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(.layers-toolbar-grid, .stream-format-grid, .rec-strip-transport, .mutation-actions, #userPresetBulkRow, div:has(> #saveSettingsBtn)) {
+    gap: 6px !important;   /* the Settings row is laid out inline (gap 8 px) */
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .mutation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .mutation-actions > button { width: 100%; min-width: 0; margin: 0; }
+/* Settings > Radial menu: the key is a compact keycap, the label field takes
+   the rest of the row. */
+html[data-theme="walnut-copper"] #sidebar-right .radial-add .hk-picker { flex: 0 0 auto; }
 
 
 /* ════════════════════════════════════════════════════════════════════
