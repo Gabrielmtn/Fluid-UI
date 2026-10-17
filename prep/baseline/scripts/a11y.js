@@ -754,7 +754,11 @@ function diffRows(label, a, b, outDiffs) {
         const where = label + '[' + i + '] ' + (a[i].selector || '');
         if (pa.selector !== pb.selector) outDiffs.push(where + ': selector ' + JSON.stringify(pa.selector) + ' -> ' + JSON.stringify(pb.selector));
         if (pa.role !== pb.role) outDiffs.push(where + ': role ' + JSON.stringify(pa.role) + ' -> ' + JSON.stringify(pb.role));
-        if (pa.name !== pb.name) outDiffs.push(where + ': name ' + JSON.stringify(pa.name) + ' -> ' + JSON.stringify(pb.name));
+        // A pixel readout inside a name (the radial menu's "Brush Size 41 px")
+        // follows the live canvas height, which settles a few px differently
+        // per boot: compare with the number masked.
+        const pxMask = n => String(n == null ? '' : n).replace(/\d+(\.\d+)?\s*px/g, '# px');
+        if (pxMask(pa.name) !== pxMask(pb.name)) outDiffs.push(where + ': name ' + JSON.stringify(pa.name) + ' -> ' + JSON.stringify(pb.name));
         if (JSON.stringify(pa.state) !== JSON.stringify(pb.state)) outDiffs.push(where + ': state ' + JSON.stringify(pa.state) + ' -> ' + JSON.stringify(pb.state));
         if (pa.keyboard !== pb.keyboard) outDiffs.push(where + ': keyboard ' + pa.keyboard + ' -> ' + pb.keyboard);
     }
