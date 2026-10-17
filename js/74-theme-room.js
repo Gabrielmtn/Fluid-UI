@@ -72,9 +72,6 @@
             }
         });
     }
-    function partsText(parts) {
-        return parts.map(function (p) { return p.who ? '\u0001' : p.text; }).join('');
-    }
 
     // Study notify(): one gesture by one player on one setting is one line
     // (900 ms merge window). Here the newest line also takes a repeat of its
@@ -92,9 +89,9 @@
             L.updated = now;
             L.expires = now + dwell;
             L.pulse = 1;
+            // Same key, same words (a remote key is the whole line; yours is
+            // the control), so nothing is re-rendered while a drag goes on.
             if (who.css && who.css !== L.who.css) { L.who.css = who.css; L.el.style.setProperty('--c', who.css); }
-            var parts = makeParts();
-            if (partsText(parts) !== partsText(L.parts)) { L.parts = parts; renderLine(L); }
         } else {
             // The same words after a pause: the old line cools off and they
             // strike again on top.

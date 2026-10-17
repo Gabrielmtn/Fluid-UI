@@ -481,6 +481,10 @@ html[data-theme="walnut-copper"] #mpInvitePop :is(#copyRoomRow > button, #copyRo
     width: 100%;
     min-width: 0;
 }
+/* Room link + current settings is the copy grid's second row: 6 px under
+   Copy link | Copy code, as the panes inside a row sit (the look-links
+   suite holds it there). */
+html[data-theme="walnut-copper"] #roomDisplay > #copyRoomLookBtn { margin-top: -2px; }
 html[data-theme="walnut-copper"] #mpInvitePop > #phonePadRoomBtn { margin-top: 8px; }
 
 /* ── The room toast (06e showRoomToast): a small VFD screen ─────────── */
