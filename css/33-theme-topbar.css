@@ -86,7 +86,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
         repeating-conic-gradient(from -135deg at 50% 50%, transparent 0 10.857deg, #0d0806 10.857deg 12.857deg),
         /* the arc: lit up to the value, unlit after, nothing in the 90 deg gap */
         conic-gradient(from -135deg at 50% 50%,
-            rgb(255 176 110) 0 calc(var(--t) * 270deg),
+            var(--arc, rgb(255 176 110)) 0 calc(var(--t) * 270deg),
             rgba(160, 120, 92, 0.32) calc(var(--t) * 270deg) 270deg,
             transparent 270deg),
         var(--mesh-dim) center / 6px 10.4px,
@@ -163,7 +163,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="
         var(--orders, linear-gradient(transparent, transparent)),
         conic-gradient(from -120deg at 50% 50%,
             rgba(160, 120, 92, 0.3) 0 var(--lit-from),
-            rgba(255, 150, 70, 0.62) var(--lit-from) var(--lit-to),
+            var(--arc, rgba(255, 150, 70, 0.62)) var(--lit-from) var(--lit-to),
             rgba(160, 120, 92, 0.3) var(--lit-to) 240deg,
             transparent 240deg),
         var(--mesh-dim) center / 6px 10.4px,

@@ -383,4 +383,29 @@ html[data-theme="walnut-copper"] .section-body .layer-item-header {
     background: transparent;
 }
 
+/* ── Another player's change (js/06e flashControl) ─────────────────────
+   06e puts .mp-peer-touch and --mp-peer (the player's colour) on the
+   control's face for 1.4 s, renewed through a drag. The face glows in that
+   colour and cools back; tubes, dial arcs and telegraph sweeps inside it
+   take the player's colour while it lasts. */
+html[data-theme="walnut-copper"] .mp-peer-touch {
+    outline: 0;
+    border-radius: 8px;
+    animation: wc-peer 1.4s ease-out both;
+}
+@keyframes wc-peer {
+    0%   { box-shadow: 0 0 0 1px var(--mp-peer, #5ab0ff), 0 0 16px -2px var(--mp-peer, #5ab0ff); }
+    100% { box-shadow: 0 0 0 1px transparent, 0 0 16px -2px transparent; }
+}
+html[data-theme="walnut-copper"] .mp-peer-touch input[type=range] {
+    --arc: var(--mp-peer, #5ab0ff);
+    --neon-col: radial-gradient(ellipse 100% 55% at 50% 50%, rgba(255, 250, 240, 0.9), var(--mp-peer, #5ab0ff) 50%, transparent 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] .mp-peer-touch {
+        animation: none;
+        box-shadow: 0 0 0 1px var(--mp-peer, #5ab0ff);
+    }
+}
+
 } /* @layer theme */
