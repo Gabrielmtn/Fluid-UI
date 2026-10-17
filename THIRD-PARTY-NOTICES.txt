@@ -74,3 +74,16 @@ Source: https://github.com/huggingface/transformers.js
 
 These models analyze images the user supplies (segmentation masks and
 depth maps). They do not generate imagery.
+
+
+7. Fonts: Michroma, Libre Franklin, Share Tech Mono
+---------------------------------------------------
+The Walnut & Copper interface theme bundles three typefaces as woff2 files
+under assets/fonts/, each under the SIL Open Font License 1.1
+(https://openfontlicense.org). Their full licence texts ship beside them as
+assets/fonts/LICENSE-<font>.txt.
+- Michroma: Copyright 2011 The Michroma Project Authors.
+- Libre Franklin: Copyright 2020 The Libre Franklin Project Authors.
+- Share Tech Mono: Copyright (c) 2012 Carrois Type Design, Ralph du Carrois
+  (Reserved Font Name "Share").
+Files taken from the Fontsource packages (@fontsource/*, 5.3.0).

@@ -1,0 +1,262 @@
+/* ================================================================
+   30 — WALNUT & COPPER theme
+   Spec: design/walnut-copper-theme.md (look), study design/study-lite.html.
+   Every rule is in @layer theme and scoped to
+   html[data-theme="walnut-copper"], so `?theme=classic` (or
+   data-theme="classic") renders the old UI pixel for pixel.
+
+   Presentation only. No rule here may change what a control does, hide a
+   control, or move one out of its order. State is read from ARIA and the
+   classes script already toggles (prep/selector-contract.md).
+
+   Wood: herringbone is the sidebar ground and the top bar's; the diagonal
+   parquet is the drawer fronts (section headers) — Gabriel 2026-10-17,
+   which overrides the theme doc's "parquet retired". No pull bar on the
+   fronts. Stain is a translucent overlay, never background-blend-mode.
+   ================================================================ */
+
+/* Fonts are bundled (assets/fonts, SIL OFL 1.1) so the Steam build works
+   offline. @font-face is not affected by layers. */
+@font-face { font-family: "Michroma"; font-style: normal; font-weight: 400; font-display: swap;
+    src: url(../assets/fonts/michroma-latin-400-normal.woff2) format("woff2");
+    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Michroma"; font-style: normal; font-weight: 400; font-display: swap;
+    src: url(../assets/fonts/michroma-latin-ext-400-normal.woff2) format("woff2");
+    unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "Share Tech Mono"; font-style: normal; font-weight: 400; font-display: swap;
+    src: url(../assets/fonts/share-tech-mono-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 400; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-400-normal.woff2) format("woff2");
+    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 400; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-ext-400-normal.woff2) format("woff2");
+    unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 500; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-500-normal.woff2) format("woff2");
+    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 500; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-ext-500-normal.woff2) format("woff2");
+    unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 600; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-600-normal.woff2) format("woff2");
+    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 600; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-ext-600-normal.woff2) format("woff2");
+    unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 700; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-700-normal.woff2) format("woff2");
+    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 700; font-display: swap;
+    src: url(../assets/fonts/libre-franklin-latin-ext-700-normal.woff2) format("woff2");
+    unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+
+@layer theme {
+
+/* ── Tokens ─────────────────────────────────────────────────────────── */
+html[data-theme="walnut-copper"] {
+    color-scheme: dark;
+
+    /* Materials (theme doc, "Tokens") */
+    --room: #110c09;
+    --room-2: #1a130f;
+    --rule: #3a2c22;
+    --cu: #c47a4b;
+    --cu-hi: #f2b38a;
+    --cu-lo: #5a2e17;
+    --engrave: #e7d2b2;
+    --lit: #ffd9b0;
+    --unlit: #a08a76;
+    --vfd: #72f2d4;
+    --neon: rgb(255 110 30);
+    --stain: rgba(44, 20, 8, 0.732);          /* sidebars: 0.12 + 0.72 x 0.85 */
+    --stain-bar: rgba(44, 20, 8, 0.638);      /* top bar:  0.12 + 0.72 x 0.72 */
+    --wood-herringbone: url(../assets/textures/herringbone-2048.jpg);
+    --wood-parquet: url(../assets/textures/parquet-diagonal.jpg);
+    --mesh-dim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.10' stroke-width='.7'/%3E%3C/svg%3E");
+
+    /* Roles (css/00-tokens.css) re-pointed at the materials */
+    --ui-text: #eadccb;
+    --ui-text-muted: #a8937c;
+    --ui-text-dim: var(--unlit);
+    --ui-label: var(--engrave);
+    --ui-accent: #ff6e1e;
+    --ui-accent-strong: var(--lit);
+    --ui-info: var(--vfd);
+    --ui-danger: #ff6a4d;
+    --ui-focus: #ffb547;
+    --ui-font-body: "Libre Franklin", "Helvetica Neue", Arial, sans-serif;
+    --ui-font-display: "Michroma", "Eurostile", "Arial Black", sans-serif;
+    --ui-font-mono: "Share Tech Mono", ui-monospace, "SFMono-Regular", monospace;
+
+    background: var(--room);
+}
+html[data-theme="walnut-copper"] body {
+    font-family: var(--ui-font-body);
+    color: var(--ui-text);
+    background: var(--room);
+}
+
+/* ── Wood: the two sidebars (herringbone, 566 px tile = 100 px plank) ── */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) {
+    background-color: #2a170c;
+    background-image: linear-gradient(var(--stain), var(--stain)), var(--wood-herringbone);
+    background-size: auto, 566px 566px;
+    /* The one copper line per column; nothing inside draws a second box. */
+    box-shadow: inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.45), inset 0 0 30px rgba(0, 0, 0, 0.45);
+    border-color: transparent;
+    /* Opaque wood: no blur behind it (and no blur on large panels, per spec). */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    color: var(--ui-text);
+}
+html[data-theme="walnut-copper"] #sidebar-right {
+    padding: 10px 8px;
+    scrollbar-color: var(--cu) transparent;
+}
+html[data-theme="walnut-copper"] #sidebar-right::-webkit-scrollbar-track { background: transparent; }
+html[data-theme="walnut-copper"] #sidebar-right::-webkit-scrollbar-thumb { background: var(--cu); border-radius: 3px; }
+
+/* The left bar's sticky head sits on the same wood, so it does not read as
+   a separate black strip when the body scrolls under it. */
+html[data-theme="walnut-copper"] .lsb-head {
+    background-color: #2a170c;
+    background-image: linear-gradient(var(--stain), var(--stain)), var(--wood-herringbone);
+    background-size: auto, 566px 566px;
+    border-bottom: 1px solid rgba(214, 140, 92, 0.35);
+}
+
+/* ── Wood: the top bar (herringbone, 679 px tile = 120 px slat) ── */
+html[data-theme="walnut-copper"] #mixer-strip {
+    background-color: #2a170c;
+    background-image: linear-gradient(var(--stain-bar), var(--stain-bar)), var(--wood-herringbone);
+    background-size: auto, 679px 679px;
+    border-bottom-color: rgba(0, 0, 0, 0.6);
+    color: var(--ui-text);
+}
+
+/* ── Drawers: every section header becomes a drawer front ─────────────
+   Parquet face, copper edge, engraved name, pilot lamp on the left, no
+   pull bar. Open = the front lifts 1 px with a deeper shadow. State is the
+   .collapsed class script already toggles (aria-expanded mirrors it). */
+html[data-theme="walnut-copper"] .sidebar-section {
+    border-bottom: 0;
+    margin-bottom: 6px;
+}
+html[data-theme="walnut-copper"] .section-header {
+    min-height: 46px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    border-radius: 8px;
+    background-color: #24130a;
+    background-image:
+        linear-gradient(180deg, rgba(61, 35, 19, 0.55), rgba(36, 19, 10, 0.7)),
+        var(--wood-parquet);
+    background-size: auto, 480px 480px;
+    box-shadow:
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 2px 0 rgba(255, 210, 170, 0.14),
+        0 2px 0 rgba(0, 0, 0, 0.45);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+html[data-theme="walnut-copper"] .sidebar-section:not(.collapsed) > .section-header {
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 2px 0 rgba(255, 210, 170, 0.14),
+        0 2px 0 rgba(0, 0, 0, 0.45),
+        0 12px 16px -6px rgba(0, 0, 0, 0.85);
+}
+html[data-theme="walnut-copper"] .section-header:has(> .section-title:focus-visible) {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 2px;
+}
+
+/* The engraved name. Beats the group-gradient text fill (21-sidebar's
+   @supports block); the idle easter egg's inline background-image is then
+   invisible at rest, which is the theme's resting state. */
+html[data-theme="walnut-copper"] .sidebar-section .section-title,
+html[data-theme="walnut-copper"] .sidebar-section[data-group] .section-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    white-space: nowrap;
+    text-transform: uppercase;
+    color: var(--engrave);
+    -webkit-text-fill-color: var(--engrave);
+    background: none;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+html[data-theme="walnut-copper"] .section-header:hover .section-title {
+    color: #fff1dc;
+    -webkit-text-fill-color: #fff1dc;
+}
+/* Pilot lamp: dark when closed, struck when open. Decorative; the state is
+   aria-expanded on the title. */
+html[data-theme="walnut-copper"] .section-title::before {
+    content: "";
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #5a3a28, #1c0f08 70%);
+    box-shadow: inset 0 0 0 1px rgba(214, 140, 92, 0.55), 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] .section-title[aria-expanded="true"]::before {
+    background: radial-gradient(circle at 40% 35%, #fff1dc, #ff9a4d 45%, #c4410f 80%);
+    box-shadow: inset 0 0 0 1px rgba(255, 200, 150, 0.6), 0 0 8px rgba(255, 110, 30, 0.75);
+}
+/* No pull bar, no nub: the chevron goes; the lamp and the lift carry state. */
+html[data-theme="walnut-copper"] .section-chevron { display: none; }
+
+/* The tray under an open front. */
+html[data-theme="walnut-copper"] .section-body {
+    margin: 0 5px;
+    border-radius: 0 0 8px 8px;
+    background: linear-gradient(rgba(8, 4, 2, 0.3), rgba(8, 4, 2, 0.08));
+    box-shadow:
+        inset 0 12px 14px -12px rgba(0, 0, 0, 0.95),
+        inset 1px 0 0 rgba(214, 140, 92, 0.3),
+        inset -1px 0 0 rgba(214, 140, 92, 0.3);
+}
+
+/* Badges on a front (Audio's "Under construction") as a small VFD tag. */
+html[data-theme="walnut-copper"] .section-header .section-badge {
+    font: 400 9px/1 var(--ui-font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 6px;
+    border-radius: 3px;
+    color: #ffcf8a;
+    background: rgba(40, 22, 6, 0.85);
+    box-shadow: inset 0 0 0 1px rgba(255, 180, 80, 0.5);
+    text-shadow: 0 0 5px rgba(255, 160, 60, 0.6);
+}
+
+/* ── Top bar type ────────────────────────────────────────────────────── */
+/* Engraved labels on the wood. Libre Franklin at the old label's width for
+   now: Michroma is ~40% wider and would push cells into the More overflow
+   (js/46), which changes what is reachable. The top-bar pass (dials,
+   telegraphs) brings Michroma in with the new cell layout. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-label,
+html[data-theme="walnut-copper"] .lsb-head .ch-label {
+    font-family: var(--ui-font-body);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+/* Values in nixie orange, Share Tech Mono, tabular. */
+html[data-theme="walnut-copper"] .ch-value {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--lit);
+    text-shadow: 0 0 6px rgba(255, 120, 40, 0.75), 0 0 14px rgba(255, 70, 10, 0.35);
+}
+
+
+} /* @layer theme */

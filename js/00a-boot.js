@@ -27,6 +27,17 @@
     'use strict';
 
     var root = document.documentElement;
+
+    // Theme: index.html ships <html data-theme="walnut-copper">. `?theme=classic`
+    // (or window.__themeOverride, set by the baseline gates before any script
+    // runs) puts the old UI back, pixel for pixel: every Walnut & Copper rule
+    // is scoped to that attribute. No storage read here: the first
+    // localStorage read of the process costs ~700 ms (see below).
+    try {
+        var themeAsk = window.__themeOverride || ((/[?&]theme=([\w-]+)/.exec(location.search) || [])[1]);
+        if (themeAsk === 'classic' || themeAsk === 'walnut-copper') root.setAttribute('data-theme', themeAsk);
+    } catch (_) {}
+
     function now() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
     var T0 = now();
     function log(msg) { try { console.log('[boot] ' + msg + ' @' + Math.round(now() - T0) + 'ms'); } catch (_) {} }

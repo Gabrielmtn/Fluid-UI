@@ -73,6 +73,9 @@ const WIDTHS = process.env.WIDTHS
 // Reset-app note (js/60-reset-app.js, shown ~4 s after a quiet boot for 30 s;
 // F0 found it in one capture and not the next).
 const SEED = { 'fluidui.photoWarn.ack.v1': '1', 'fluidui.uiFork.skip': '1', 'fluidFirstRunDone': '1', 'swirlResetHint.v1': '1' };
+// THEME=walnut-copper captures the new theme (use with OUT=<dir>); the gate
+// itself pins classic, which must stay pixel-identical to the pre-theme UI.
+const THEME = process.env.THEME || 'classic';
 const RNG_SEED = 0xBEEF;
 const FRAMES_PER_STEP = 2;      // virtual frames pumped after every interaction
 // Extra Chrome flags on top of the driver's, passed through boot({ args }).
@@ -538,7 +541,7 @@ async function comparePng(baseFile, newFile, diffFile) {
         // state, the left-bar fold and every control persist by settingsManager).
         // Runs after the driver's own seed script (same document, in order).
         await d.send('Page.addScriptToEvaluateOnNewDocument', { source:
-            'try{localStorage.clear();var s=' + JSON.stringify(SEED) + ';for(var k in s)localStorage.setItem(k,s[k]);}catch(e){}window.__skipUIFork=true;' });
+            'try{localStorage.clear();var s=' + JSON.stringify(SEED) + ';for(var k in s)localStorage.setItem(k,s[k]);}catch(e){}window.__skipUIFork=true;window.__themeOverride=' + JSON.stringify(THEME) + ';' });
         for (const [w, h] of WIDTHS) {
             const t0 = Date.now();
             const res = await captureWidth(d, w, h, head, started);
