@@ -1,11 +1,1557 @@
 /* ================================================================
-   css/37-theme-fields.css - Walnut & Copper: Fields (.cp.sel, 48 px), text fields, checkbox panes (.cp.ic), radio
-   banks ("Paint into"), keycaps, inline options.
-   Owner: the fields workstream. Loads after css/30-34, inside @layer theme,
+   css/37-theme-fields.css - Walnut & Copper: fields (.cp.sel, 48 px), text
+   fields, checkbox panes (.cp.ic), radio banks (.cp.ir), joined pairs,
+   keycaps, inline options.
+   Owner: the fields workstream. Loads after css/30-36, inside @layer theme,
    so a rule here wins a tie with the earlier theme sheets. Theme rules are
    scoped to html[data-theme="walnut-copper"]. Button colour may live here
    (js/38 sanctions css/31 and 33-39 theme sheets).
+
+   Values are the study's, literally (design/study-lite.html): the pane
+   172-186, indicators 187-197, joined pairs 198-204, the field 205-216,
+   keycaps 217-230, the text field 373-380 and 473, the sidebar pattern rules
+   1152-1172. --ci is the study's --i (js/71; the app owns --i). Motion is
+   js/69 + js/71 (ThemeMotion): cathodes strike and fade, fields brighten and
+   open on springs. At rest every state is CSS, so a change no event saw
+   (a preset, a room) still shows.
+
+   Element map (no markup changes; js/69 adds only aria-hidden decoration):
+     field ............ every single-choice <select> in both sidebars
+     checkbox pane .... the label of a sidebar checkbox (the row's text), the
+                        <input> itself drawn as the square cathode inside it
+     radio pane ....... Brush > Paint into, the Pressure modes
+     joined pair ...... every two-way choice: On move | Constant, Stroke |
+                        Time, Basic | All, Simple | Everything, Local only |
+                        Everything
+     keycap ........... .hk-picker-key (bindable), .hk-cap (hint)
    ================================================================ */
 @layer theme {
+
+/* ── Materials ───────────────────────────────────────────────────────────
+   The glass is every pane's: the study's mesh, --mesh-pane and its lit twin
+   --mesh-pane-lit (css/31; the app's --mesh-dim is a heavier variant). The
+   field's chevron is a filmstrip of the study's .chev::after at 37 angles
+   (prep/work/W3/gen-chevron.js): a <select> has no pseudo-elements, so the
+   frame for the current --open is picked with background-position. */
+html[data-theme="walnut-copper"] {
+    /* mesh-lit through the study's radial mask (.cp::before), as one image
+       sized to the box, at a field's resting strength (.5 x .3). */
+    --wcf-mesh-lit-field: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='p' width='7' height='12.124' patternUnits='userSpaceOnUse' x='50%25' y='50%25' patternTransform='translate(-3.5 -6.062)'%3E%3Cpath d='M3.5 0L7 2.021V6.062L3.5 8.083L0 6.062V2.021ZM3.5 8.083V12.124' fill='none' stroke='%23ff9a4d' stroke-width='.56'/%3E%3C/pattern%3E%3CradialGradient id='g' cx='.5' cy='.5' r='.7071'%3E%3Cstop offset='.25' stop-color='%23fff'/%3E%3Cstop offset='.8' stop-color='%23000'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='100%25' height='100%25' fill='url(%23g)'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23p)' mask='url(%23m)' opacity='.15'/%3E%3C/svg%3E");
+    --wcf-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='1776' viewBox='0 0 12 1776'%3E%3Cg fill='none' stroke='%23f2b38a' stroke-width='1.5' stroke-linejoin='miter' stroke-miterlimit='4'%3E%3Cpath transform='translate(6 22) rotate(45)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 70) rotate(50)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 118) rotate(55)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 166) rotate(60)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 214) rotate(65)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 262) rotate(70)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 310) rotate(75)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 358) rotate(80)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 406) rotate(85)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 454) rotate(90)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 502) rotate(95)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 550) rotate(100)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 598) rotate(105)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 646) rotate(110)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 694) rotate(115)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 742) rotate(120)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 790) rotate(125)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 838) rotate(130)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 886) rotate(135)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 934) rotate(140)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 982) rotate(145)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1030) rotate(150)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1078) rotate(155)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1126) rotate(160)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1174) rotate(165)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1222) rotate(170)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1270) rotate(175)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1318) rotate(180)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1366) rotate(185)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1414) rotate(190)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1462) rotate(195)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1510) rotate(200)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1558) rotate(205)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1606) rotate(210)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1654) rotate(215)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1702) rotate(220)' d='M2.25-3V2.25H-3'/%3E%3Cpath transform='translate(6 1750) rotate(225)' d='M2.25-3V2.25H-3'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   1. FIELD: every sidebar select is the study's .cp.sel (205-216)
+   48 px glass pane, value in the display face, a 40 px copper chevron cell
+   with its divider. Brightness (--ci) rests at .5 (study sidebarFrame:
+   I = .5 + .5 * hi), .75 under the pointer, 1 with focus or open; js/69
+   eases between them on the local spring and writes --open on the drawer
+   spring while the options open or close. !important where js/20 writes
+   the select's style inline (SECTION_SELECT_CSS). The top bar's material
+   select and the hidden mirrors (#mutationScope) are not fields.
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]) {
+    --ci: 0.5;
+    --open: 0;
+    --gc: var(--tgc, 255 110 30);
+    box-sizing: border-box;
+    height: 48px !important;
+    min-height: 48px;
+    /* The UA centres a select's text with align-items; the Multi-brush
+       panel's legacy rule (all: unset) had dropped it. */
+    align-items: center;
+    padding: 0 50px 0 16px !important;
+    border: 0 !important;
+    border-radius: 7px !important;
+    /* App words are never cut: a value too long for the field takes a
+       tighter tracking (js/69 marks it, data-wc-fit) and then a second
+       line inside the 48 px; no ellipsis. */
+    font: 400 10.5px/1.25 var(--ui-font-display) !important;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-overflow: clip;
+    white-space: normal;
+    cursor: pointer;
+    outline: none;
+    color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit))) !important;
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        var(--wcf-chev) right 13.5px top calc(clamp(0, round(nearest, var(--open) * 36, 1), 36) * -48px) / 12px 1776px no-repeat,
+        linear-gradient(rgba(214, 140, 92, 0.7), rgba(214, 140, 92, 0.7)) right 39px top 6px / 1px calc(100% - 12px) no-repeat,
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        var(--wcf-mesh-lit-field) center / 100% 100% no-repeat,
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605) !important;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2)) !important;
+    color-scheme: dark;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple])[data-wc-fit="tight"] { letter-spacing: 0.06em; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]):hover { --ci: 0.75; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]):is(:focus, .wc-open) { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]).wc-open { --open: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]):focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]):disabled {
+    --ci: 0;
+    opacity: 0.42;
+    cursor: default;
+}
+/* Compact field (study .cp.sel.sm, 207 and 210): a field inside a layer's
+   card (Clip, Collision mode), 32 px with a 24 px chevron cell. */
+html[data-theme="walnut-copper"] #sidebar-right .layer-item select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]) {
+    height: 32px !important;
+    min-height: 32px;
+    padding: 0 30px 0 9px !important;
+    border-radius: 5px !important;
+    font-size: 9px !important;
+    background:
+        var(--wcf-chev) right 5.5px top calc(-8px + clamp(0, round(nearest, var(--open) * 36, 1), 36) * -48px) / 12px 1776px no-repeat,
+        linear-gradient(rgba(214, 140, 92, 0.7), rgba(214, 140, 92, 0.7)) right 23px top 5px / 1px calc(100% - 10px) no-repeat,
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        var(--wcf-mesh-lit-field) center / 100% 100% no-repeat,
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605) !important;
+}
+/* Inline disclosures as fields (prep/DECISIONS.md): Visible sections,
+   Your hotkeys and Saved animations open their lists in place under them,
+   as a field's options do, so they take the field: 48 px glass, the label
+   in the display face, the count in the mono face, the chevron cell turning
+   with aria-expanded (--open, js/69 on the drawer spring). They are buttons
+   whose --ci js/71 drives as panes, so a field's level here is --fl (.5 at
+   rest, .75 under the pointer, 1 focused or open; js/69 eases it). Their
+   ▾ glyphs give way to the drawn chevron (and leave the accessible name). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head) {
+    --fl: 0.5;
+    --open: 0;
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    height: auto !important;
+    min-height: 48px !important;
+    padding: 6px 50px 6px 16px !important;
+    border: 0 !important;
+    border-radius: 7px !important;
+    font: 400 10.5px/1.25 var(--ui-font-display) !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase;
+    text-align: left;
+    white-space: normal !important;
+    cursor: pointer;
+    opacity: 1;
+    color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--fl) * 100%), var(--unlit))) !important;
+    text-shadow:
+        0 0 calc(1px + var(--fl) * 5px) rgb(var(--gc) / calc(var(--fl) * 0.95)),
+        0 0 calc(var(--fl) * 16px) rgb(var(--gc) / calc(var(--fl) * 0.6)) !important;
+    background:
+        var(--wcf-chev) right 13.5px top calc(clamp(0, round(nearest, var(--open) * 36, 1), 36) * -48px) / 12px 1776px no-repeat,
+        linear-gradient(rgba(214, 140, 92, 0.7), rgba(214, 140, 92, 0.7)) right 39px top 6px / 1px calc(100% - 12px) no-repeat,
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        var(--wcf-mesh-lit-field) center / 100% 100% no-repeat,
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--fl) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605) !important;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--fl) * 14px) rgb(var(--gc) / calc(var(--fl) * 0.3)),
+        0 0 calc(var(--fl) * 14px) rgb(var(--gc) / calc(var(--fl) * 0.2)) !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head)[data-wc-fit="tight"] { letter-spacing: 0.06em !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head):hover { --fl: 0.75; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head):is(:focus, [aria-expanded="true"]) { --fl: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head)[aria-expanded="true"] { --open: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger-chev, .hk-list-trigger-chev, .anim-lib-head-chev) { display: none !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger-label, .hk-list-trigger-label) { flex: 0 1 auto; min-width: 0; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.ui-vis-trigger-count, .hk-list-trigger-count) {
+    margin-left: auto;
+    flex: none;
+    font: 400 12.5px/1 var(--ui-font-mono);
+    letter-spacing: 0.04em;
+    text-transform: none;
+    opacity: 1;
+}
+
+/* A layer card's field row (Clip, Collision mode): its caption above the
+   field (study .field, Clip / Collision mode), and the field and Clip's
+   Inv pane sharing the row under it, so the value keeps the row's width. */
+html[data-theme="walnut-copper"] #sidebar-right .layer-prop:has(> select) {
+    flex-wrap: wrap;
+    row-gap: 5px;
+    column-gap: 8px;
+}
+html[data-theme="walnut-copper"] #sidebar-right .layer-prop:has(> select) > .layer-prop-label {
+    flex: 0 0 100%;
+    width: 100%;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    white-space: normal;
+}
+html[data-theme="walnut-copper"] #sidebar-right .layer-prop:has(> select) > select { flex: 1 1 0; min-width: 0; }
+html[data-theme="walnut-copper"] #sidebar-right .layer-prop:has(> select) > .layer-check { flex: none; }
+/* Selects outside the sidebars (the recorder drawer, dialogs) keep the
+   theme's paint; the top bar's material picker is drawn by css/33. */
+html[data-theme="walnut-copper"] select {
+    color: var(--lit);
+    border-color: var(--cu);
+    background-color: #110b08;
+    color-scheme: dark;
+}
+html[data-theme="walnut-copper"] .mixer-channel .ch-label select.material-mode-select {
+    background-color: transparent;
+    color: var(--engrave);
+}
+/* The native list (touch, and anything js/69 leaves to the system). */
+html[data-theme="walnut-copper"] select option {
+    background: #140c08;
+    color: var(--ui-text);
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: var(--ui-font-body);
+}
+
+/* The field's label sits directly above it (study .field: grid, 5 px gap;
+   .lbl 10.5 px Michroma, .18em, engraved). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(> select:not([aria-hidden="true"])) > label {
+    margin: 0 0 5px;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    opacity: 1;
+}
+/* Rhythm: the study's column is one 8 px gap between rows (.fil). A field
+   in a control group leaves the gap to its group; one that js/20 builds
+   bare (Mouse buttons, Splat in / out: inline margin-bottom 6 px, its box
+   10 px) keeps 8 px below itself and its box adds nothing. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(> select:not([aria-hidden="true"])) { margin-bottom: 8px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]) { margin: 0 !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-section-label + select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]) { margin: 0 0 8px !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> .brush-section-label + select[id^="buttonMode_"]) { margin-bottom: 0 !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> .brush-section-label + select[id^="buttonMode_"]) .brush-mode-row { margin-bottom: 8px; }
+/* The brush sidebar's headings and field labels (js/20 sLabel, Mouse
+   buttons, Replay mode, Splat in / out): the study's engraved .sect (a
+   bank's heading, 8 px above it) and .lbl (a field's, 5 px above it). The
+   Tip fold's heading sits inside its fold button and keeps its own. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-section-label:not(.brush-fold-head > *) {
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5);
+    opacity: 1;
+    margin-bottom: 8px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-section-label:has(+ select) {
+    letter-spacing: 0.18em;
+    margin-bottom: 5px;
+}
+/* Rows that put the label beside the field (Mutate's Variants and Scope,
+   Export's Background) stack it above, as every study field does. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.mutation-field, div:has(> label[for="exportGround"])) {
+    display: flex !important;
+    flex-direction: column !important;   /* Export's row is laid out inline (js/20) */
+    align-items: stretch !important;
+    gap: 5px !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> label[for="exportGround"]) { margin: 0 0 8px !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.mutation-field, div:has(> label[for="exportGround"])) > label {
+    margin: 0;
+    text-align: left;
+    /* Small caps at 1 / 0.7 (see 3d): Export's Background names its field
+       in its own case. */
+    font: 400 15px/12.6px var(--ui-font-display);
+    font-variant-caps: all-small-caps;
+    letter-spacing: 1.89px;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    opacity: 1;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.mutation-field, div:has(> label[for="exportGround"])) > select {
+    width: 100%;
+    flex: none;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   2. INLINE OPTIONS (js/69): the study's .lbx under the field (213-216)
+   The list opens inline below the field's row and pushes content down;
+   js/69 springs its height (drawer spring, 180 / 0.85) and drops it when it
+   has closed. Each option is a .cp.sm.ir pane: a round cathode, lit for the
+   chosen value (aria-selected, js/71 cathode timing); the keyboard's active
+   option has the focus ring and a small surge (--wa, js/69).
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] :is(.wc-lbx, .wc-lbx-out) {
+    display: block;
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] .wc-lbx-out { pointer-events: none; }
+html[data-theme="walnut-copper"] .wc-lbx-in {
+    display: grid;
+    gap: 5px;
+    padding: 5px 0 2px;
+}
+html[data-theme="walnut-copper"] .wc-lbx-in.wc-scroll {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cu) transparent;
+    padding-right: 4px;
+}
+html[data-theme="walnut-copper"] .wc-opt {
+    --ci: 0;
+    --wa: 0;
+    --gc: 255 110 30;
+    --ce: min(1, var(--ci) * (1 + var(--wa) * 0.3) + var(--wa) * 0.14);
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 32px;
+    min-width: 32px;
+    padding: 6px 10px 6px 25px;
+    border-radius: 5px;
+    cursor: pointer;
+    /* An option is app copy: it takes a tighter tracking when long (js/69,
+       data-wc-fit) and then a second line, never an ellipsis. Small caps
+       at 1 / 0.7 keep each option's accessible name in its own case. */
+    font: 400 12.857px/11.7px var(--ui-font-display);
+    font-variant-caps: all-small-caps;
+    letter-spacing: 1.08px;
+    text-transform: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    color: color-mix(in oklab, var(--lit) calc(var(--ce) * 100%), var(--unlit));
+    text-shadow:
+        0 0 calc(1px + var(--ce) * 5px) rgb(var(--gc) / calc(var(--ce) * 0.95)),
+        0 0 calc(var(--ce) * 16px) rgb(var(--gc) / calc(var(--ce) * 0.6));
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ce) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ce) * 14px) rgb(var(--gc) / calc(var(--ce) * 0.3)),
+        0 0 calc(var(--ce) * 14px) rgb(var(--gc) / calc(var(--ce) * 0.2));
+}
+html[data-theme="walnut-copper"] .wc-opt::before {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
+    opacity: calc(var(--ce) * 0.3);
+    -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+    mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+}
+html[data-theme="walnut-copper"] .wc-opt::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 3px;
+    pointer-events: none;
+    background: linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%);
+}
+html[data-theme="walnut-copper"] .wc-opt[aria-selected="true"] { --ci: 1; }
+html[data-theme="walnut-copper"] .wc-opt[data-wc-fit="tight"] { letter-spacing: 0.54px; }
+html[data-theme="walnut-copper"] .wc-opt.wc-act { outline: 2px solid var(--ui-focus); outline-offset: -1px; }
+html[data-theme="walnut-copper"] .wc-opt[aria-disabled="true"] { opacity: 0.42; cursor: default; }
+/* The round cathode (study .cp.sm .ind + .cp.ir .ind::after, one element). */
+html[data-theme="walnut-copper"] .wc-opt > .wc-ind {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(circle closest-side, rgb(255 176 110 / var(--ce)) 0 54%, rgb(var(--gc) / calc(var(--ce) * 0.45)) 62%, transparent 100%);
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ce) * 100%), #6b5546),
+        0 0 calc(var(--ce) * 8px) rgb(var(--gc) / calc(var(--ce) * 0.7));
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   3. CHECKBOX PANES: the study's .cp.sm.ic (187-197)
+   The real <input type=checkbox> stays the control (focus, Space, name,
+   .checked): it is drawn as the square cathode with the check, inside the
+   pane its label becomes. The pane's --ci rests in CSS from :checked and
+   js/71 eases it (strike on, afterglow off) after a change it saw; js/69
+   registers the pane (ThemeMotion.pane) the first time it is touched.
+   --ci does not inherit (registered in 31), so the parts take it with
+   --ci: inherit from the pane.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Outside the sidebars (dialogs, the pen window's menus) a checkbox or
+   radio stays native with the neon accent. */
+html[data-theme="walnut-copper"] :is(input[type="checkbox"], input[type="radio"]) {
+    accent-color: #ff8a3d;
+}
+
+/* 3a. Every sidebar checkbox is the square cathode (the study's main-tier
+   indicator, 11 px). Inside a pane it shrinks to the compact 9 px (3c). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="checkbox"]:where(:not(:is(.layer-vis, .layer-check) > input)) {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    box-sizing: border-box;
+    flex: none;
+    width: 11px !important;
+    height: 11px !important;
+    min-width: 11px;
+    margin: 1.5px !important;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546),
+        0 0 calc(var(--ci) * 8px) rgb(var(--gc) / calc(var(--ci) * 0.7));
+    transition: none;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="checkbox"]:where(:not(:is(.layer-vis, .layer-check) > input)):checked { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="checkbox"]:where(:not(:is(.layer-vis, .layer-check) > input))::after {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    left: 3.3px;
+    top: 0.6px;
+    width: 3px;
+    height: 6px;
+    box-sizing: border-box;
+    border: solid rgb(255 196 140 / var(--ci));
+    border-width: 0 1.6px 1.6px 0;
+    border-radius: 0;
+    background: none;
+    transform: rotate(45deg);
+    transition: none;
+    filter: drop-shadow(0 0 3px rgb(var(--gc) / var(--ci)));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="checkbox"]:where(:not(:is(.layer-vis, .layer-check) > input))::before { content: none; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="checkbox"]:where(:not(:is(.layer-vis, .layer-check) > input)):focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="checkbox"]:where(:not(:is(.layer-vis, .layer-check) > input)):disabled { opacity: 0.42; cursor: default; }
+
+/* 3b. The pane. Selectors, by markup:
+     .checkbox-group > input + label ....... most rows (js/20, index.html)
+     .brush-ghost-head > .wc-cb-txt ........ Brush ghost (js/69 wraps the
+                                             label's words; value stays out)
+     .checkbox-group > label:has(> input) .. Text overlay rows
+     .mutation-lock-chip ................... Mutate's lock bank
+     .ui-vis-row ........................... Settings > Visible sections
+     .audio-mini-enable .................... Audio's enable
+     .layer-check .......................... a layer's Mask / Collision / Inv */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"] + label,
+        .control-group > .brush-ghost-head > .wc-cb-txt,
+        .checkbox-group > label:has(> input[type="checkbox"]),
+        .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check) {
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 32px;
+    margin: 0 !important;
+    padding: 6px 10px 6px 25px;
+    border: 0;
+    border-radius: 5px;
+    font: 400 9px/1.3 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: normal;
+    text-align: left;
+    opacity: 1;
+    cursor: pointer;
+    color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit)));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"] + label,
+        .control-group > .brush-ghost-head > .wc-cb-txt,
+        .checkbox-group > label:has(> input[type="checkbox"]),
+        .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check)::before {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
+    opacity: calc(var(--ci) * 0.3);
+    -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+    mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"] + label,
+        .control-group > .brush-ghost-head > .wc-cb-txt,
+        .checkbox-group > label:has(> input[type="checkbox"]),
+        .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check)::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 3px;
+    pointer-events: none;
+    background: linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%);
+}
+
+/* A label js/20 sizes inline (Visualize audio timing: font-size 10px). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group > input[type="checkbox"] + label[style*="font-size"] { font-size: 9px !important; }
+
+/* Where the pane's state lives (--ci at rest) and who inherits it. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group:has(> input[type="checkbox"] + label) {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    margin: 0 0 8px;
+    padding: 0;
+    border: 0;
+    /* No background or box-shadow here: another player's glow (css/30,
+       .checkbox-group[style*="--ga"]) is drawn on this row. */
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group:has(> input[type="checkbox"]:checked + label) { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group > .brush-ghost-head {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    margin: 0 0 8px;
+    padding: 0;
+    cursor: default;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group > .brush-ghost-head:has(> input[type="checkbox"]:checked) { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group > label:has(> input[type="checkbox"]), .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check) { --ci: 0; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check):has(> input[type="checkbox"]:checked) { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"] + label,
+        .control-group > .brush-ghost-head > .wc-cb-txt) { --ci: inherit; }
+
+/* 3c. The indicator inside a pane: the compact cathode (9 px, check 2.6 x 5).
+   Beside its label (a sibling): drawn into the label's first module by
+   negative margins (row gap 8 px: 9 + 9 - 26 + 8 = 0). Inside its label:
+   absolutely at the module. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"]:has(+ label),
+        .control-group > .brush-ghost-head > input[type="checkbox"],
+        .checkbox-group > label > input[type="checkbox"],
+        .mutation-lock-chip > input[type="checkbox"], .ui-vis-row > input[type="checkbox"],
+        .audio-mini-enable > input[type="checkbox"]) {
+    --ci: inherit;
+    width: 9px !important;
+    height: 9px !important;
+    min-width: 9px;
+    border-radius: 2px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"]:has(+ label),
+        .control-group > .brush-ghost-head > input[type="checkbox"])::after,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > label > input[type="checkbox"],
+        .mutation-lock-chip > input[type="checkbox"], .ui-vis-row > input[type="checkbox"],
+        .audio-mini-enable > input[type="checkbox"])::after {
+    left: 2.6px;
+    top: 0.2px;
+    width: 2.6px;
+    height: 5px;
+    border-width: 0 1.4px 1.4px 0;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"]:has(+ label),
+        .control-group > .brush-ghost-head > input[type="checkbox"]) {
+    z-index: 1;
+    order: 0;
+    margin: 0 -26px 0 9px !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > label > input[type="checkbox"],
+        .mutation-lock-chip > input[type="checkbox"], .ui-vis-row > input[type="checkbox"],
+        .audio-mini-enable > input[type="checkbox"]) {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    margin: -4.5px 0 0 !important;
+}
+/* The focus ring is the pane's (study .cp:focus-visible), not the box's. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"]:has(+ label),
+        .control-group > .brush-ghost-head > input[type="checkbox"],
+        .checkbox-group > label > input[type="checkbox"],
+        .mutation-lock-chip > input[type="checkbox"], .ui-vis-row > input[type="checkbox"],
+        .audio-mini-enable > input[type="checkbox"]):focus-visible { outline: none; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"]:focus-visible + label,
+        .control-group > .brush-ghost-head:has(> input:focus-visible) > .wc-cb-txt,
+        :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check):has(> input:focus-visible)) {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+/* Disabled: the pane dims (study: a brush beyond the count, .42). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"]:disabled + label,
+        :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check):has(> input:disabled)) {
+    opacity: 0.42;
+    cursor: default;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"]:has(+ label),
+        .checkbox-group > label > input[type="checkbox"],
+        .mutation-lock-chip > input[type="checkbox"], .ui-vis-row > input[type="checkbox"],
+        .audio-mini-enable > input[type="checkbox"]):disabled { opacity: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group > input[type="checkbox"]:disabled:has(+ label) { opacity: 0.42; }
+
+/* 3d. Width. A pane alone on its row fills it (study .wide); one sharing
+   its row with a key (Show cursor + C) or a value (Brush ghost + 100%) is
+   as wide as its words, and the key or value sits at the row's end. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group > input[type="checkbox"] + label {
+    flex: 1 1 auto;
+    order: 0;
+    align-self: auto;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group:has(> .hk-cap:not(.hk-cap-empty)) > input[type="checkbox"] + label { flex: 0 1 auto; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group > label:has(> input[type="checkbox"]) { flex: 1 1 auto; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group > .brush-ghost-head > .wc-cb-txt { flex: 0 1 auto; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group > .brush-ghost-head > .value-display { margin-left: auto; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group > .hk-cap { order: 1; margin-left: auto; }
+
+/* Long labels: js/69 measures a pane's words against its room once it is
+   on screen (and again when its column changes); a label that would wrap
+   at the study's .12em takes .06em (data-wc-fit=tight), and one that still
+   does not fit wraps whole words onto a second line, never an ellipsis. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .checkbox-group > input[type="checkbox"] + label,
+        .control-group > .brush-ghost-head > .wc-cb-txt,
+        .checkbox-group > label:has(> input[type="checkbox"]),
+        .layer-check)[data-wc-fit="tight"] { letter-spacing: 0.06em; }
+
+/* Capitals without renaming (prep/DECISIONS.md, from W7): where a label
+   names its control and the app wrote it in its own case, the capitals are
+   small caps at 1 / 0.7 of the size (Chrome draws them at .7), which looks
+   the same as uppercase while the accessible name stays as written. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check) {
+    /* !important: the pane rule above carries more weight (its :is list). */
+    text-transform: none !important;
+    font-variant-caps: all-small-caps !important;
+    font-size: 12.857px !important;
+    line-height: 11.7px !important;
+    letter-spacing: 1.08px !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check)[data-wc-fit="tight"] { letter-spacing: 0.54px !important; }
+
+/* 3e. Master toggles (Kaleidoscope's feature heads): the study's wide
+   checkbox pane (Simulation's Gravity direction, .cp.sm.ic.wide), not a
+   switch in a header bar; the panel under it loses its card (one container
+   per column). Still role=switch underneath. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group.checkbox-group.feature-head {
+    min-height: 32px;
+    margin: 0 0 8px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group.checkbox-group.feature-head > label {
+    order: 0;
+    align-self: auto;
+    font-size: 9px;
+    font-weight: 400;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group.checkbox-group.feature-head > input[type="checkbox"] {
+    order: 0;
+    border: 0;
+    background: transparent;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .feature-head > input[type="checkbox"]::after {
+    left: 2.6px;
+    top: 0.2px;
+    width: 2.6px;
+    height: 5px;
+    border-radius: 0;
+    background: none;
+    transform: rotate(45deg);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .feature-head + .feature-body {
+    margin: 0 0 8px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+}
+
+/* 3f. Effects rows: the still beside the pane, in the study's glass thumb
+   frame (.thumb, 387-389), as tall as the pane. */
+html[data-theme="walnut-copper"] #sidebar-right .fx-row > .fx-thumb {
+    width: 32px;
+    height: 32px;
+    padding: 3px;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 6px;
+    background: #0b0706;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu);
+}
+html[data-theme="walnut-copper"] #sidebar-right .fx-row > .fx-thumb img { border-radius: 3px; }
+html[data-theme="walnut-copper"] #sidebar-right .fx-row > .fx-thumb:is(:hover, :focus-visible) {
+    border: 0;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu-hi);
+}
+html[data-theme="walnut-copper"] #sidebar-right .fx-cluster .checkbox-group { margin-bottom: 8px; }
+
+/* 3g. Mutate's lock bank: one width for the bank (the widest, EFFECTS,
+   100.8 px, snapped to the 16 px module: 112), 8 px apart, two to a row
+   in the column; "Lock:" heads it like a label. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mutation-locks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 0 0;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mutation-locks > .mutation-locks-label {
+    flex: 1 0 100%;
+    margin: 0;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mutation-lock-chip {
+    flex: 0 0 112px;
+    width: 112px;
+    white-space: nowrap;
+}
+
+/* 3h. Layers: a captioned check (Mask, Collision, Inv) is a pane whose
+   indicator is the row's own box (.layer-vis-box; the input is hidden by
+   the legacy sheet); the bare show / hide and invert checks are the square
+   cathode in a 32 px glass square. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-check { padding-left: 25px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.layer-check, .layer-vis) > .layer-vis-box {
+    --ci: inherit;
+    --gc: var(--tgc, 255 110 30);
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546),
+        0 0 calc(var(--ci) * 8px) rgb(var(--gc) / calc(var(--ci) * 0.7));
+    transition: none;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.layer-check, .layer-vis) > .layer-vis-box::after {
+    --ci: inherit;
+    left: 2.6px;
+    top: 0.2px;
+    width: 2.6px;
+    height: 5px;
+    box-sizing: border-box;
+    border: solid rgb(255 196 140 / var(--ci));
+    border-width: 0 1.4px 1.4px 0;
+    opacity: 1;
+    transition: none;
+    filter: drop-shadow(0 0 3px rgb(var(--gc) / var(--ci)));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-vis {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    box-sizing: border-box;
+    border-radius: 5px;
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-vis:has(> input:checked) { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-vis > .layer-vis-box { left: 11.5px; margin-top: -4.5px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .layer-vis:has(> input:focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 3px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.layer-vis, .layer-check) > input:focus-visible + .layer-vis-box { outline: none; }
+
+/* 3i. In a panel that spaces its rows with a flex gap (Multi-brush, Mutate)
+   the gap is the rhythm; the rows add no margin of their own. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.arm-colors-rows, .mutation-controls) > :is(.checkbox-group:has(> input[type="checkbox"] + label), .control-group:has(> select:not([aria-hidden="true"]))) {
+    margin-bottom: 0;
+}
+/* Every other checkbox row keeps the study's 8 px rhythm. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group:has(> label > input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+}
+html[data-theme="walnut-copper"] #sidebar-right .ui-vis-row { margin: 0 0 6px !important; }
+/* "always shown" on the pinned row: a hint in the body face (study .hint),
+   at the pane's end. */
+html[data-theme="walnut-copper"] #sidebar-right .ui-vis-row > .ui-vis-row-hint {
+    margin-left: auto;
+    padding-left: 8px;
+    font: 400 11px/1.2 var(--ui-font-body);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    color: #cdb79f;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+    opacity: 1;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   4. RADIO PANES: the study's .cp.sm.ir (187-194) in a bank
+   Paint into: one width for the bank, 8 px apart, wrapping to the column,
+   so COLLIDER takes a second row as in the study instead of being clipped.
+   The width is the study's rule (the widest member, PRESSURE, 114.6 px,
+   snapped to the 16 px module), tightened to 112 px: the app's brush
+   column is 240 CSS px (the study's 296), and 128 + 8 + 128 would leave
+   one pane per row. PRESSURE's last letter takes 2.6 px of its 10 px
+   right padding. The Pressure modes are a four-way choice: the same
+   panes, two by two, on the same 112 px grid. Focus's formats and the
+   Animations take lengths are radio banks too (role radio, aria-checked:
+   js/20, js/21, js/03 and index.html), the formats two by two and the
+   lengths four across under the clock. A long label takes a tighter
+   tracking (js/69, data-wc-fit) and then a second line, never clipped.
+   Still buttons lit by .active / aria-checked (js/71 cathode). W4 owns the
+   Multi-brush arm strip (.arm-mode-wrap), which is excluded here.
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-radio-row:not(.arm-mode-wrap) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> .control-group #brushVelStrength) > .brush-mode-row {
+    gap: 8px;
+    margin: 0 0 8px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button {
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    isolation: isolate;
+    justify-content: flex-start;
+    gap: 0;
+    box-sizing: border-box;
+    height: auto !important;
+    min-height: 32px !important;
+    min-width: 32px;
+    margin: 0;
+    padding: 6px 10px 6px 25px !important;
+    border: 0;
+    border-radius: 5px;
+    font: 400 9px/1.3 var(--ui-font-display) !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase;
+    text-align: left;
+    white-space: normal !important;
+    opacity: 1;
+    background:
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button[data-wc-fit="tight"] { letter-spacing: 0.06em !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row) > button {
+    flex: 0 0 112px;
+    width: 112px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stream-format-grid > button { width: 100%; min-width: 0; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:hover { opacity: 1; }
+/* The round cathode: ring, glow and the lit dot in one element. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button::before {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle closest-side, rgb(255 176 110 / var(--ci)) 0 54%, rgb(var(--gc) / calc(var(--ci) * 0.45)) 62%, transparent 100%);
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546),
+        0 0 calc(var(--ci) * 8px) rgb(var(--gc) / calc(var(--ci) * 0.7));
+}
+/* The lit mesh (study .cp::before). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button::after {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
+    opacity: calc(var(--ci) * 0.3);
+    -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+    mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+}
+/* The take lengths: four across under the clock, on the study's card
+   tightening (.card .cp.sm.ic: indicator at 7 px, 8.5 px type), so "30 s"
+   keeps its words on one line in a quarter of the column. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-length { flex-wrap: wrap; row-gap: 8px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-length > .rec-strip-chips {
+    flex: 1 0 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0;
+}
+/* (Written on the bank's own selector plus the ids, so it outweighs it.) */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is(#recLen4, #recLen8, #recLen15, #recLen30) {
+    width: 100%;
+    padding: 6px 6px 6px 21px !important;
+    font-size: 8.5px !important;
+    letter-spacing: 0.06em !important;
+    white-space: nowrap !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is(#recLen4, #recLen8, #recLen15, #recLen30)::before { left: 7px; }
+
+
+/* Native radios (Kaleidoscope > Mandala > Fill: Off / Fit / Full): the
+   label is the pane, the <input type=radio> its round cathode (study
+   .cp.sm.ir .ind + ::after), one width for the bank. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="radio"] {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    box-sizing: border-box;
+    flex: none;
+    width: 9px;
+    height: 9px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546),
+        0 0 calc(var(--ci) * 8px) rgb(var(--gc) / calc(var(--ci) * 0.7));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="radio"]:checked { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="radio"]::after {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    background: rgb(255 176 110 / var(--ci));
+    box-shadow: 0 0 6px rgb(var(--gc) / var(--ci));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mandala-radio {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group .mandala-radio > label {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    isolation: isolate;
+    flex: 1 1 0;
+    min-width: max-content;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    box-sizing: border-box;
+    height: 32px;
+    margin: 0;
+    padding: 0 10px 0 25px;
+    border: 0;
+    border-radius: 5px;
+    opacity: 1;
+    cursor: pointer;
+    font: 400 9px/1 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit)));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group .mandala-radio > label:has(> input:checked) { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group .mandala-radio > label::before {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
+    opacity: calc(var(--ci) * 0.3);
+    -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+    mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mandala-radio > label > input[type="radio"] {
+    --ci: inherit;
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    margin-top: -4.5px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mandala-radio > label:has(> input:focus-visible) {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   5. JOINED PAIRS: two-way choices are one strip (study .joined, 198-204)
+   Square inner corners, no gap, no indicator; one side lit. Compact tier
+   (32 px, 8.5 px type, .06em) where the study puts On move | Constant in a
+   drawer; main tier (48 px, 10.5 px, .16em) for a section's own mode
+   (study: Replay's Stroke | Time).
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:not(.brush-radio-row),
+        .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets,
+        .rec-strip-source > .rec-strip-chips) {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:not(.brush-radio-row),
+        .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets,
+        .rec-strip-source > .rec-strip-chips) > button {
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    isolation: isolate;
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 32px !important;
+    min-height: 32px !important;
+    margin: 0;
+    padding: 0 6px !important;
+    border: 0;
+    border-radius: 0;
+    justify-content: center;
+    font: 400 8.5px/1 var(--ui-font-display) !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase;
+    white-space: nowrap !important;
+    opacity: 1;
+    background:
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:not(.brush-radio-row),
+        .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets,
+        .rec-strip-source > .rec-strip-chips) > button:first-child { border-radius: 5px 0 0 5px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:not(.brush-radio-row),
+        .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets,
+        .rec-strip-source > .rec-strip-chips) > button:last-child { border-radius: 0 5px 5px 0; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:not(.brush-radio-row),
+        .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets,
+        .rec-strip-source > .rec-strip-chips) > button:hover { opacity: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:not(.brush-radio-row),
+        .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets,
+        .rec-strip-source > .rec-strip-chips) > button::after {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--mesh-pane-lit) center / 7px 12.12px;
+    opacity: calc(var(--ci) * 0.3);
+    -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+    mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+}
+/* Main tier: a section's own mode (Replay: Stroke | Time; Interface:
+   Simple | Everything). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:has(> .brush-mode-btn[data-mode]),
+        .ch-seg-switch.ui-vis-presets) > button {
+    height: 48px !important;
+    min-height: 48px !important;
+    font-size: 10.5px !important;
+    letter-spacing: 0.16em !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:has(> .brush-mode-btn[data-mode]),
+        .ch-seg-switch.ui-vis-presets) > button:first-child { border-radius: 7px 0 0 7px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+        .brush-section-label + .brush-mode-row:has(> .brush-mode-btn[data-mode]),
+        .ch-seg-switch.ui-vis-presets) > button:last-child { border-radius: 0 7px 7px 0; }
+/* Rows around the strips. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-section-label + .brush-mode-row:not(.brush-radio-row) { margin: 0 0 8px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .ch-seg-switch.ui-vis-presets { margin: 0 0 8px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-source > .rec-strip-chips { flex: 1 1 auto; margin-left: 8px; }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   5b. PANE ROWS AND THE COMPACT TIER (study sidebar pattern rule 1, .cp.sm
+   182-186, .row2 / .row3 332-335)
+   Every sidebar pane is the compact tier: 32 px tall with 5 px corners
+   (css/34 had 36 px). Its type stays css/34's (9 px at .06em, 8 px in):
+   the app's columns are 240-255 CSS px against the study's 296, and at
+   the study's .12em the half-width panes (Save project, Load project)
+   break onto two lines. The selector is css/34's pane rule (so this wins
+   by order), minus the drawers W4 and W5 own (the room's panes, the
+   Multi-brush arm rows, the stamp actions). A row of equal panes is 6 px
+   apart, as .row2 / .row3 are; Mutate's four actions are a .row2.
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(button, .btn):not(.btn--icon):not(.btn--ghost):not(.brush-tip-btn):not(.arm-tip-btn):not(.palette-chip):not([style*="background"]):not(.hk-picker-clear):not(.lsb-toggle):not(.lsb-rail-label):not(#multiArtistPanel *):not(.arm-row *):not(.brush-shapes-actions *) {
+    min-height: 32px;
+}
+/* The corner at css/31's weight (the exclusions in :where), so joined
+   pairs and keycaps keep their own corners. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(button, .btn):where(:not(.btn--icon):not(.btn--ghost):not(.brush-tip-btn):not(.arm-tip-btn):not(.palette-chip):not([style*="background"]):not(.hk-picker-clear):not(.lsb-toggle):not(.lsb-rail-label):not(#multiArtistPanel *):not(.arm-row *):not(.brush-shapes-actions *)) {
+    border-radius: 5px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) :is(.layers-toolbar-grid, .stream-format-grid, .rec-strip-transport, .mutation-actions, #userPresetBulkRow, div:has(> #saveSettingsBtn)) {
+    gap: 6px !important;   /* the Settings row is laid out inline (gap 8 px) */
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .mutation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .mutation-actions > button { width: 100%; min-width: 0; margin: 0; }
+/* Settings > Radial menu: the key is a compact keycap, the label field takes
+   the rest of the row. */
+html[data-theme="walnut-copper"] #sidebar-right .radial-add .hk-picker { flex: 0 0 auto; }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   6. TEXT FIELD: the study's .tf (373-380, 473)
+   Glass with the mesh, Share Tech Mono 14 px; unlit until focused, then it
+   strikes. Paint applies to every text input (modals too, as before) with
+   !important where script styles a field inline (Text overlay, Export);
+   the study's 32 px geometry applies in the sidebars. Multi-line fields
+   keep their height.
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea) {
+    color: var(--unlit) !important;
+    caret-color: #ffb070;
+    border-color: transparent !important;
+    background: var(--mesh-pane) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605) !important;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
+    transition: color 0.2s, text-shadow 0.2s;
+}
+html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea):hover { color: #c8ad94 !important; }
+html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea):focus {
+    outline: none;
+    color: var(--lit) !important;
+    text-shadow: 0 0 6px rgba(255, 120, 40, 0.85);
+}
+html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea):focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea)::selection { background: rgba(255, 120, 40, 0.4); }
+html[data-theme="walnut-copper"] :is(input, textarea)[aria-invalid="true"] {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px #ff6a4d, inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
+}
+/* (The room drawer's code field is W5's row: it keeps its own height, level
+   with its Join button.) */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"]):not(.layer-title):not(#multiArtistPanel *) {
+    box-sizing: border-box;
+    height: 32px !important;
+    padding: 0 9px !important;
+    border: 0 !important;
+    border-radius: 5px !important;
+    font: 400 14px/1 var(--ui-font-mono) !important;
+    letter-spacing: 0.03em;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) textarea {
+    border: 0 !important;
+    border-radius: 5px !important;
+    padding: 8px 9px !important;
+    font: 400 14px/1.35 var(--ui-font-mono) !important;
+    letter-spacing: 0.03em;
+}
+/* A layer's name: the field beside its thumbnail (study .lyr-head .tf). */
+html[data-theme="walnut-copper"] #sidebar-right .layer-item-header .layer-title {
+    box-sizing: border-box;
+    height: 32px !important;
+    padding: 0 9px !important;
+    border: 0 !important;
+    border-radius: 5px !important;
+    font: 400 14px/1 var(--ui-font-mono) !important;
+    letter-spacing: 0.03em;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   7. KEYCAPS: the study's .kc (217-224) and copper ring .clr (225-230)
+   A cathode window with a second copper line inside, like a keycap face;
+   the bound key in Share Tech Mono, unlit; breathing while it listens; lit
+   while the key is held. A stroke lock's key is the main keycap (72 x 48);
+   other bindable keys in the sidebars and the key hints beside checkbox
+   panes are the compact one (48 x 32). js/69 marks a bound key's length
+   (data-wc-keylen) so a single key is set large and a combo fits.
+   ════════════════════════════════════════════════════════════════════ */
+/* Pickers outside the sidebars (the Ctrl+Shift+H bar): the keycap face on
+   their own sizes, as before. */
+html[data-theme="walnut-copper"] .hk-picker-key {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 3px #0c0806,
+        inset 0 0 0 4px rgba(196, 122, 75, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.35));
+}
+html[data-theme="walnut-copper"] .hk-picker-clear {
+    border-radius: 50%;
+    border-color: var(--cu);
+    background: radial-gradient(circle, rgba(255, 130, 50, 0), transparent) !important;
+    color: var(--cu-hi);
+    text-shadow: none;
+}
+/* !important on type, padding and height: css/34's pane rule for every
+   sidebar button carries an ID and eight :not()s (specificity 1,10,1). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-key {
+    --gc: var(--tgc, 255 110 30);
+    flex: none;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    min-width: 48px;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 6px !important;
+    margin: 0;
+    border: 0;
+    border-radius: 6px;
+    font: 400 15px/1 var(--ui-font-mono) !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    white-space: nowrap !important;
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 6px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        radial-gradient(ellipse at center, rgb(var(--gc) / calc(var(--ci) * 0.3)), transparent 72%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 0 0 4px #0c0806,
+        inset 0 0 0 5px rgba(196, 122, 75, 0.55),
+        inset 0 0 calc(var(--ci) * 12px) rgb(var(--gc) / calc(var(--ci) * 0.35));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-key[data-wc-keylen="1"] { font-size: 22px !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-key[data-wc-keylen="l"] { font-size: 12px !important; }
+/* Main keycap: a stroke lock's key, with its words beside it. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-picker { flex: none; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-picker-row { gap: 9px; align-items: center; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-picker-key {
+    min-width: 72px;
+    height: 48px !important;
+    min-height: 48px !important;
+    padding: 0 4px !important;
+    border-radius: 9px;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 0 0 5px #0c0806,
+        inset 0 0 0 6px rgba(196, 122, 75, 0.55),
+        inset 0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.35)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.22));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row { gap: 9px; align-items: center; }
+/* Unbound or listening: the words in the study's listening type
+   (.kc.listen: Michroma 7.5 px, .1em, centred). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker:is(.is-empty, .is-listening) .hk-picker-key {
+    font: 400 7.5px/1.2 var(--ui-font-display) !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    text-align: center;
+    white-space: normal !important;
+}
+/* The study's keycap is 72 px whatever it says: "Press a key" wraps inside
+   it rather than widening it and moving the words beside it. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-picker:is(.is-empty, .is-listening) .hk-picker-key { width: 72px; }
+/* Listening breathes (study: .22 + .32 * (.5 + .5 sin 6T), a 1.05 s cycle). */
+html[data-theme="walnut-copper"] .hk-picker.is-listening .hk-picker-key {
+    animation: wc-listen 1.047s ease-in-out infinite;
+}
+@keyframes wc-listen {
+    0%, 100% { --ci: 0.22; }
+    50% { --ci: 0.54; }
+}
+@media (prefers-reduced-motion: reduce) {
+    /* !important: js/71 writes the key's --ci inline as a pane. */
+    html[data-theme="walnut-copper"] .hk-picker.is-listening .hk-picker-key { animation: none; --ci: 0.54 !important; }
+}
+/* The clear key: the study's copper ring with an X (.clr). In the sidebars
+   it out-ranks the ghost rule in css/31 (an ID in its :is()). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear {
+    position: relative;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    font-size: 0;
+    color: transparent;
+    text-shadow: none;
+    background: radial-gradient(circle, rgba(255, 130, 50, 0), transparent) !important;
+    box-shadow: inset 0 0 0 1.5px var(--cu), inset 0 1px 0 1.5px rgba(255, 210, 170, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.5);
+    transition: box-shadow 0.25s, background 0.25s;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear::before,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 12px;
+    height: 1.6px;
+    margin: -0.8px 0 0 -6px;
+    background: var(--cu-hi);
+    border-radius: 1px;
+    transform: rotate(45deg);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear::after { transform: rotate(-45deg); }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear:hover {
+    background: radial-gradient(circle, rgba(255, 130, 50, 0.22), transparent 70%) !important;
+    box-shadow: inset 0 0 0 1.5px var(--cu-hi), 0 0 10px rgba(255, 120, 40, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear:active { background: radial-gradient(circle, rgba(255, 130, 50, 0.45), transparent 70%) !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px; }
+/* Settings rows: the compact ring (.clr.sm, 28 px). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.hk-row:not(.stroke-lock-row), .radial-add) .hk-picker-clear { width: 28px; height: 28px; min-width: 28px; min-height: 28px; }
+/* The words beside a stroke lock's key (study .lock .txt: .lbl over .sub).
+   They wrap rather than lose letters to an ellipsis. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-row-text { min-width: 0; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-row-name {
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stroke-lock-row .hk-row-sub {
+    margin-top: 3px;
+    font: 400 12px/1.3 var(--ui-font-body);
+    color: #c9b39b;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* A key hint beside a checkbox pane: the compact keycap face (.kc.sm), as
+   the study shows Show cursor's key. It only shows the key (js/17); it
+   lights while that modifier is held (.lit). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group > .hk-cap:not(.hk-cap-empty) {
+    --ci: 0;
+    --gc: 255 110 30;
+    flex: none;
+    box-sizing: border-box;
+    min-width: 48px;
+    height: 32px;
+    padding: 0 6px;
+    margin-left: auto;
+    border: 0;
+    border-radius: 6px;
+    font: 400 15px/1 var(--ui-font-mono);
+    letter-spacing: 0;
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 6px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        radial-gradient(ellipse at center, rgb(var(--gc) / calc(var(--ci) * 0.3)), transparent 72%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 0 0 4px #0c0806,
+        inset 0 0 0 5px rgba(196, 122, 75, 0.55),
+        inset 0 0 calc(var(--ci) * 12px) rgb(var(--gc) / calc(var(--ci) * 0.35));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-group > .hk-cap.lit:not(.hk-cap-empty) { --ci: 1; }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   8. FORCED COLOURS (study 105-109, 322-326, 399)
+   The glass, glow and box-shadow bezels are dropped by the system, so every
+   field, text field and pane draws a ButtonText border; native checkboxes
+   and radios come back so their state reads in system colours. The chosen
+   or checked pane carries a thick inner Highlight edge, and keyboard focus
+   a Highlight outline outside it, so the two never look alike.
+   ════════════════════════════════════════════════════════════════════ */
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(input[type="checkbox"]:where(:not(:is(.layer-vis, .layer-check) > input)), input[type="radio"]) {
+        -webkit-appearance: auto;
+        appearance: auto;
+    }
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(input[type="checkbox"], input[type="radio"])::after { content: none; }
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(select:not(.material-mode-select):not([aria-hidden="true"]), :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head),
+            :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea), :is(.checkbox-group > input[type="checkbox"] + label, .control-group > .brush-ghost-head > .wc-cb-txt, .checkbox-group > label:has(> input[type="checkbox"]), .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis, .mandala-radio > label), :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button, :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button, .hk-picker-key, .hk-picker-clear) {
+        border: 1px solid ButtonText !important;
+    }
+    html[data-theme="walnut-copper"] .wc-opt { border: 1px solid ButtonText; }
+    /* Chosen: a thick inner edge. */
+    html[data-theme="walnut-copper"] .wc-opt[aria-selected="true"],
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is([aria-checked="true"], [aria-pressed="true"], .active),
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button:is([aria-checked="true"], [aria-pressed="true"], .active),
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group:has(> input:checked) > label, .control-group > .brush-ghost-head:has(> input:checked) > .wc-cb-txt,
+            :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis, .mandala-radio > label):has(> input:checked)) {
+        border: 3px solid Highlight !important;
+    }
+    /* Focus: an outline outside the pane. */
+    html[data-theme="walnut-copper"] .wc-opt.wc-act,
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(select:not(.material-mode-select), :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head), :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea), :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button, :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button, .hk-picker-key, .hk-picker-clear):focus-visible,
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group > input:focus-visible + label, .control-group > .brush-ghost-head:has(> input:focus-visible) > .wc-cb-txt,
+            :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis, .mandala-radio > label):has(> input:focus-visible)) {
+        outline: 2px solid Highlight !important;
+        outline-offset: 3px !important;
+    }
+    html[data-theme="walnut-copper"] .wc-opt.wc-act { outline-offset: 2px !important; }
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear::before,
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear::after { background: ButtonText; }
+}
 
 } /* @layer theme */

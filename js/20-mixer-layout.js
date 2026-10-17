@@ -3936,7 +3936,17 @@
         libList.style.display = 'none';
         function syncLibHead() {
             const open = libList.style.display !== 'none';
-            libHead.textContent = 'Saved Animations ' + (open ? '▴' : '▾');
+            // The arrow is drawn (aria-hidden), so the name is the words.
+            libHead.textContent = '';
+            const libLabel = document.createElement('span');
+            libLabel.className = 'anim-lib-head-label';
+            libLabel.textContent = 'Saved Animations';
+            const libChev = document.createElement('span');
+            libChev.className = 'anim-lib-head-chev';
+            libChev.setAttribute('aria-hidden', 'true');
+            libChev.textContent = ' ' + (open ? '▴' : '▾');
+            libHead.appendChild(libLabel);
+            libHead.appendChild(libChev);
             libHead.setAttribute('aria-expanded', open ? 'true' : 'false');
         }
         libHead.addEventListener('click', () => {
@@ -7977,6 +7987,10 @@
 
         var fmtGrid = document.createElement('div');
         fmtGrid.className = 'stream-format-grid';
+        // A pick-one bank: radio semantics for assistive tech (aria-checked
+        // follows .active in js/21); clicks and keys are unchanged.
+        fmtGrid.setAttribute('role', 'radiogroup');
+        fmtGrid.setAttribute('aria-label', 'Format');
 
         var formats = (window.focusMode && window.focusMode.FORMATS) || [];
         var btns = [];
@@ -7987,6 +8001,8 @@
                 btn.type = 'button';
                 btn.textContent = fmt.label;
                 btn.dataset.formatId = fmt.id;
+                btn.setAttribute('role', 'radio');
+                btn.setAttribute('aria-checked', 'false');
                 btn.addEventListener('click', function () {
                     if (btn.classList.contains('active')) {
                         if (window.focusMode) window.focusMode.clearFormat();

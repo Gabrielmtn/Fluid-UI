@@ -149,6 +149,7 @@ button:active,
 button[aria-pressed="true"],
 button.active,
 .btn[aria-pressed="true"],
+button[role="radio"][aria-checked="true"],
 .btn.active {
     background: oklch(25% calc(var(--sec-c) * 0.62) var(--sec-h));
     border-color: oklch(45% calc(var(--sec-c) * 0.70) var(--sec-h));
