@@ -1,3 +1,4 @@
+@layer legacy {
 /* ================================================================
    24-PALETTE-FROM-IMAGE: the inline panel js/65 builds under the
    palette tags: the picture with a marker per colour, the colours as
@@ -180,4 +181,5 @@
     display: flex;
     justify-content: flex-end;
     gap: 6px;
+}
 }

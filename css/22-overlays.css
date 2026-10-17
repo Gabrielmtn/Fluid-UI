@@ -1,3 +1,4 @@
+@layer legacy {
 /* ================================================================
    OVERLAYS & FEATURES - focus mode, stream formats, collision, mutation, path layers
    (part of former mixer-layout.css, lines 1255-2021; cascade order preserved)
@@ -2686,3 +2687,4 @@ body.text-arrange-active #canvas-size-display {
    part of it — the invite comes and goes with the kind of room, this does
    not (js/54-phone-pads.js mountButtons). Same 12px rhythm as the rows it
    sits between (21-sidebar.css); adjacent margins collapse. */
+}

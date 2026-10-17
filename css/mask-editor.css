@@ -1,3 +1,4 @@
+@layer legacy {
 /* Layer Masking System Styles */
 
 .mask-zoom-btn {
@@ -749,3 +750,4 @@
 .mask-filter-hint { margin-bottom: 8px; }
 .mask-filter-row { margin-bottom: 6px; }
 .mask-filter-row input[type="color"] { height: 26px; }
+}

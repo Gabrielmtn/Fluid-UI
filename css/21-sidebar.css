@@ -1,3 +1,4 @@
+@layer legacy {
 /* ================================================================
    RIGHT SIDEBAR - main area, sections, controls, layers, brush, compact window
    (part of former mixer-layout.css, lines 405-1254; cascade order preserved)
@@ -2524,3 +2525,4 @@ body.compact-ui #sidebar-right.collapsed > .rsb-rail { display: flex; }
 }
 #sidebar-left .sidebar-section .ch-fader .fader-stack { flex: 1 1 auto; min-width: 0; }
 #sidebar-left .sidebar-section .ch-fader input[type="range"] { width: 100%; }
+}

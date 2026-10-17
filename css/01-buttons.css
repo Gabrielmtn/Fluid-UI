@@ -1,3 +1,4 @@
+@layer legacy {
 /* ================================================================
    01-BUTTONS — one button style for the whole app.
 
@@ -441,3 +442,4 @@ button.btn--record:disabled {
    live DOM and reports any button whose computed colour does not come
    from these tokens.
    ================================================================ */
+}

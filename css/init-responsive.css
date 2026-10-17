@@ -1,3 +1,4 @@
+@layer legacy {
 /* ================================================================
    INIT & RESPONSIVE — Splash screen, entrance animations,
    responsive typography, and panel resize foundation
@@ -634,3 +635,4 @@ html.boot-fade.booting #canvas-area {
 #sidebar-right .layers-panel::-webkit-scrollbar { width: 4px; }
 #sidebar-right .layers-panel::-webkit-scrollbar-track { background: transparent; }
 #sidebar-right .layers-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+}

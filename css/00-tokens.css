@@ -1,3 +1,9 @@
+/* Cascade layer order for the whole app (Walnut & Copper step 1). Declared here,
+   in the first stylesheet, so it is fixed before any rule is seen. Earlier
+   layers lose on normal declarations and WIN on !important ones. */
+@layer reset, tokens, legacy, theme, overrides;
+
+@layer tokens {
 /* ================================================================
    00-TOKENS — design tokens (single source of truth)
    Linked FIRST, before all other stylesheets.
@@ -92,4 +98,5 @@
     --z-modal: 2000;
     --z-toast: 3000;
     --z-splash: 99999;
+}
 }

@@ -1,3 +1,4 @@
+@layer legacy {
 /* ================================================================
    23-COLOUR-PICKER — the shared picker (js/64-colour-picker.js), its
    popover, the eyedropper loupe, and the palette row's inline feedback.
@@ -566,3 +567,4 @@ body.cp-sampling #customCursor { visibility: hidden !important; }
     color: var(--ink-300);
 }
 :is(#sidebar-right, #sidebar-left) .palette-label .hk-cap { margin-left: auto; text-transform: none; }
+}

@@ -1,3 +1,4 @@
+@layer legacy {
         * {
             margin: 0;
             padding: 0;
@@ -1400,4 +1401,5 @@ body.photosafe-on canvas {
     body.photosafe-on canvas {
         transition-duration: 0.4s !important;
     }
+}
 }

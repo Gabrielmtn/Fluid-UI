@@ -1,3 +1,4 @@
+@layer legacy {
 /* Light Source Inline Controls - Minimal CSS (most styling is inline in HTML) */
 
 /* Smooth transitions for light dot */
@@ -19,3 +20,4 @@
 }
 
 /* Gradient overlay (no transition — composited updates only) */
+}

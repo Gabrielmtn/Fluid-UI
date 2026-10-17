@@ -1,3 +1,4 @@
+@layer legacy {
 /* ========================================
    FADER — the one slider treatment
    Design handoff 2026-08 (COMPONENTS.md 4.1):
@@ -229,4 +230,5 @@ input[type=range]::-moz-range-thumb {
     .encapsulated-slider {
         min-height: 28px;
     }
+}
 }

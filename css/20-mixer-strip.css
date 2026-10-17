@@ -1,3 +1,4 @@
+@layer legacy {
 /* ================================================================
    MIXER STRIP - body layout, top strip, channels, action buttons, arm-colors dropdown
    (part of former mixer-layout.css, lines 1-404; cascade order preserved)
@@ -1606,4 +1607,5 @@ input[type="color"].arm-picker::-moz-color-swatch { border: 0; border-radius: 3p
     font-size: 10px;
     line-height: 1.35;
     color: var(--ink-500, #7b828e);
+}
 }

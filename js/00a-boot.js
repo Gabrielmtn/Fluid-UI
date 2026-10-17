@@ -365,8 +365,13 @@
         root.classList.add('boot-cursor');
         curStyle = document.createElement('style');
         curStyle.id = 'boot-cursor-style';
-        curStyle.textContent = 'html.boot-cursor, html.boot-cursor * { cursor: url("' +
-            CUR_SRC + '") ' + CUR_HOT + ' ' + CUR_HOT + ', progress !important; }';
+        // In the `reset` cascade layer (declared in css/00-tokens.css): an
+        // !important in an EARLIER layer beats one in a later layer and beats
+        // unlayered ones, so this still wins over legacy rules such as
+        // `.hide-cursor { cursor: none !important }`, which the canvas carries
+        // from page load. Left unlayered, it would lose to them.
+        curStyle.textContent = '@layer reset { html.boot-cursor, html.boot-cursor * { cursor: url("' +
+            CUR_SRC + '") ' + CUR_HOT + ' ' + CUR_HOT + ', progress !important; } }';
         (document.head || root).appendChild(curStyle);
     }
 
