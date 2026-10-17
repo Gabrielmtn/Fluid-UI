@@ -741,6 +741,19 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-gr
     margin: 0 0 8px;
 }
 html[data-theme="walnut-copper"] #sidebar-right .ui-vis-row { margin: 0 0 6px !important; }
+/* "always shown" on the pinned row: a hint in the body face (study .hint),
+   at the pane's end. */
+html[data-theme="walnut-copper"] #sidebar-right .ui-vis-row > .ui-vis-row-hint {
+    margin-left: auto;
+    padding-left: 8px;
+    font: 400 11px/1.2 var(--ui-font-body);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    color: #cdb79f;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+    opacity: 1;
+}
 
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1425,11 +1438,21 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
     }
     html[data-theme="walnut-copper"] .wc-opt { border: 1px solid ButtonText; }
     html[data-theme="walnut-copper"] .wc-opt[aria-selected="true"] { outline: 3px solid Highlight; }
-    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group:has(> input:checked) > label, :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check):has(> input:checked)) {
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group:has(> input:checked) > label, .control-group > .brush-ghost-head:has(> input:checked) > .wc-cb-txt, :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis):has(> input:checked)) {
         outline: 3px solid Highlight;
     }
     html[data-theme="walnut-copper"] .hk-picker-clear::before,
     html[data-theme="walnut-copper"] .hk-picker-clear::after { background: ButtonText; }
+    /* The chosen pane of a radio bank or joined pair (study 108, 324). */
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
+            .brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row,
+            .brush-section-label + .brush-mode-row:not(.brush-radio-row),
+            .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets,
+            .rec-strip-source > .rec-strip-chips) > button:is([aria-checked="true"], [aria-pressed="true"], .active),
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mandala-radio > label:has(> input:checked) {
+        outline: 3px solid Highlight;
+        outline-offset: -3px;
+    }
 }
 
 } /* @layer theme */
