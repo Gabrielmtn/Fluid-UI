@@ -414,7 +414,7 @@
     border-color: rgba(88, 166, 255, 0.45);
 }
 
-.mask-wizard-step.done { color: #3fb950; }
+.mask-wizard-step.done { color: var(--ui-ok); }
 
 .mask-wizard-num {
     display: inline-flex;
@@ -438,7 +438,7 @@
 .mask-wizard-step.done .mask-wizard-num {
     background: rgba(63, 185, 80, 0.18);
     border-color: rgba(63, 185, 80, 0.5);
-    color: #3fb950;
+    color: var(--ui-ok);
 }
 
 .mask-wizard-sep {
@@ -690,7 +690,7 @@
     height: 8px;
     border-radius: 50%;
 }
-.mask-roto-dot.is-include { background: #3fb950; }
+.mask-roto-dot.is-include { background: var(--ui-ok); }
 .mask-roto-dot.is-exclude { background: #f85149; }
 
 .mask-roto-actions {

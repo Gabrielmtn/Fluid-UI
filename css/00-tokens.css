@@ -16,10 +16,36 @@
    sets at runtime).
    ================================================================ */
 :root {
+    /* ── Role tokens (Walnut & Copper step 2) ──────────────────────────
+       Named by ROLE, not colour, holding TODAY's values, so nothing on
+       screen changes. A theme overrides these (in @layer theme, scoped to
+       [data-theme]) and everything below that aliases them follows. */
+    --ui-surface: rgba(0, 0, 0, 0.88);                             /* sidebar bodies */
+    --ui-surface-bar: linear-gradient(180deg, #13171f, #0b0e14);   /* the top bar */
+    --ui-surface-raised: #232830;                                  /* raised cells, inputs */
+    --ui-text: #f2f3f5;          /* body text and values */
+    --ui-text-muted: #b9bec7;    /* secondary text, unit suffixes */
+    --ui-text-dim: #7b828e;      /* hints, counts, disabled */
+    --ui-label: rgba(255, 255, 255, 0.55);   /* fader and section labels */
+    --ui-accent: #ec3013;        /* active state */
+    --ui-accent-strong: #ec3013;
+    --ui-info: #f2f3f5;          /* readouts and values */
+    --ui-danger: #ff6b6b;        /* clear and destructive */
+    --ui-ok: #3fb950;
+    --ui-warn: #ffa500;
+    --ui-focus: #fff;            /* focus ring */
+    --ui-radius-sm: 0;
+    --ui-radius-md: 0;
+    --ui-font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    --ui-font-display: var(--ui-font-body);
+    --ui-font-mono: 'Courier New', monospace;
+}
+
+:root {
     /* ── Accent (single accent: selection, primary action, record, focus) ──
        Design-system unification 2026-08: the warm yellow, the cool blue
        #4fc3f7 and the Multi-Brush gold all retired in favour of one red. */
-    --accent: #ec3013;
+    --accent: var(--ui-accent);
     --accent-60: rgba(236, 48, 19, 0.6);
     --accent-40: rgba(236, 48, 19, 0.4);
     --accent-25: rgba(236, 48, 19, 0.25);
@@ -34,13 +60,13 @@
     --ground-900: #0e0f12;   /* panel body */
     --ground-800: #16181d;   /* rack row */
     --ground-700: #191c22;   /* panel header, row hover */
-    --ground-600: #232830;   /* raised cell: steppers, inputs, unselected segments */
+    --ground-600: var(--ui-surface-raised);   /* raised cell: steppers, inputs, unselected segments */
     --ground-500: #2a2e37;   /* cell borders, tick marks */
 
     /* ── Control-surface ink ── */
-    --ink-100: #f2f3f5;      /* labels AND values, full strength */
-    --ink-300: #b9bec7;      /* secondary text, unit suffixes */
-    --ink-500: #7b828e;      /* hints, counts, disabled */
+    --ink-100: var(--ui-text);      /* labels AND values, full strength */
+    --ink-300: var(--ui-text-muted);      /* secondary text, unit suffixes */
+    --ink-500: var(--ui-text-dim);      /* hints, counts, disabled */
 
     /* ── Heat: filled portion of a range. Nothing else. ── */
     --heat-0: #f0a626;
@@ -51,9 +77,9 @@
     --chrome-1: #9aa1ad;
 
     /* ── Status ── */
-    --ok: #3fb950;
-    --warn: #ffa500;
-    --danger: #ff6b6b;
+    --ok: var(--ui-ok);
+    --warn: var(--ui-warn);
+    --danger: var(--ui-danger);
 
     /* ── Surfaces (LEGACY names — now aliases of the ground scale, per
        COMPONENTS.md: "a replacement for the surface tokens, not an
@@ -83,13 +109,13 @@
     --sp-5: 16px;
 
     /* ── Radii — flattened to 0 (design handoff 2026-08) ── */
-    --radius-sm: 0;
-    --radius-md: 0;
-    --radius-lg: 0;
+    --radius-sm: var(--ui-radius-sm);
+    --radius-md: var(--ui-radius-md);
+    --radius-lg: var(--ui-radius-md);
 
     /* ── Font stack ── */
-    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
-    --font-mono: 'Courier New', monospace;
+    --font-ui: var(--ui-font-body);
+    --font-mono: var(--ui-font-mono);
 
     /* ── Z-index scale ── */
     --z-canvas: 0;

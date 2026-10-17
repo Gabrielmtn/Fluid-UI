@@ -107,7 +107,7 @@
 /* Keyboard focus: a white ring with a dark edge, because the bar sits on the
    painting and either colour alone vanishes on some dye. */
 #quality-underbar .qub-dd-btn:focus-visible {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--ui-focus);
     outline-offset: 2px;
     box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.6);
 }
@@ -207,7 +207,7 @@
 /* The arrows move focus through the options (20 makeQubDropdown). */
 #quality-underbar .qub-dd-opt:focus { outline: none; }
 #quality-underbar .qub-dd-opt:focus-visible {
-    outline: 2px solid #fff;
+    outline: 2px solid var(--ui-focus);
     outline-offset: -2px;
 }
 /* Compact window (js/13): the height goes to the canvas. */
@@ -228,7 +228,7 @@ body > .controls {
     flex: 0 0 auto;
     display: flex;
     align-items: stretch;
-    background: linear-gradient(180deg, #13171f, #0b0e14);
+    background: var(--ui-surface-bar);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     padding: 0 4px;
@@ -275,7 +275,7 @@ body > .controls {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: rgba(255, 255, 255, 0.55);
+    color: var(--ui-label);
     white-space: nowrap;
     text-align: center;
     font-weight: 700;
@@ -362,7 +362,7 @@ body > .controls {
 .ch-value {
     font-family: 'Courier New', monospace;
     font-size: 13px;
-    color: var(--ink-100, #f2f3f5);
+    color: var(--ui-info);
     text-align: center;
     line-height: 1.2;
     min-height: 16px;
@@ -1298,7 +1298,7 @@ input[type="color"].arm-picker::-moz-color-swatch { border: 0; border-radius: 3p
     opacity: 0.8;
 }
 .brush-preset-del:hover {
-    color: #ff6b6b;
+    color: var(--ui-danger);
     opacity: 1;
 }
 .brush-presets-chips:empty {
