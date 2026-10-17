@@ -259,4 +259,10 @@ html[data-theme="walnut-copper"] .ch-value {
 }
 
 
+/* The quality underbar's captions (Image sharpness, Motion detail, Canvas):
+   engraved and legible (>= 4.5:1 on the room colour). */
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd-cap {
+    color: var(--ui-text-muted);
+}
+
 } /* @layer theme */
