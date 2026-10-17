@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-17T17:08:55.226Z",
- "headCommit": "185649d56ff91e12dec01cceaecfa80a760a0ad6",
+ "generated": "2026-10-17T17:25:53.645Z",
+ "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
  "script": "prep/baseline/scripts/screenshots.js",
  "mode": "capture",
  "seed": {
@@ -19,8 +19,8 @@
    "width": 1366,
    "height": 768,
    "env": {
-    "date": "2026-10-17T17:08:55.226Z",
-    "headCommit": "185649d56ff91e12dec01cceaecfa80a760a0ad6",
+    "date": "2026-10-17T17:25:53.645Z",
+    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -59,7 +59,7 @@
     ],
     "localStorageKeys": 19,
     "displayHz": 60,
-    "displayHzKnown": false,
+    "displayHzKnown": true,
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "underbar": "Image Sharpness2048▾Alt+↑↓Image SharpnessResolution of the paint itself - costs GPU 8192 6144 4096 2048 1536 1024 512 256 Motion Detail1024▾Alt+Shift+↑↓Motion D",
     "colorWell": "#ff0000"
@@ -68,8 +68,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "1024x717",
-     "sim": "512x358",
+     "dye": "2048x1405",
+     "sim": "1024x703",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -77,7 +77,7 @@
     "fpsCap": {
      "before": {
       "hz": 60,
-      "known": false
+      "known": true
      },
      "value": "native",
      "selected": "Native (60 Hz)",
@@ -107,11 +107,11 @@
       "x": 0,
       "y": 0,
       "w": 1366,
-      "h": 118
+      "h": 129
      },
      "png": {
       "width": 1366,
-      "height": 118
+      "height": 129
      },
      "what": "top bar",
      "selector": "#mixer-strip",
@@ -119,7 +119,7 @@
       "x": 0,
       "y": 0,
       "w": 1366,
-      "h": 118,
+      "h": 129,
       "visible": true
      }
     },
@@ -127,21 +127,21 @@
      "file": "1366/left-sidebar.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 248,
-      "height": 650
+      "height": 639
      },
      "what": "left sidebar open (Brush section open as at boot)",
      "selector": "#sidebar-left",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650,
+      "h": 639,
       "visible": true
      },
      "openedByScript": false
@@ -150,13 +150,13 @@
      "file": "1366/left-section-brush.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 248,
-      "height": 650
+      "height": 639
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[0]",
@@ -164,9 +164,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -174,13 +174,13 @@
      "file": "1366/left-section-multi-brush.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 248,
-      "height": 650
+      "height": 639
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[1]",
@@ -188,9 +188,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -198,13 +198,13 @@
      "file": "1366/left-section-stroke-and-replay.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 248,
-      "height": 650
+      "height": 639
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[2]",
@@ -212,9 +212,9 @@
      "group": "expressive",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -222,13 +222,13 @@
      "file": "1366/section-swirl-together.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[0]",
@@ -236,9 +236,9 @@
      "group": "core",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -246,13 +246,13 @@
      "file": "1366/section-simulation.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[1]",
@@ -260,9 +260,9 @@
      "group": "core",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -270,13 +270,13 @@
      "file": "1366/section-colors-and-palettes.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[2]",
@@ -284,9 +284,9 @@
      "group": "core",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -294,13 +294,13 @@
      "file": "1366/section-layers.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[3]",
@@ -308,9 +308,9 @@
      "group": "core",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -318,13 +318,13 @@
      "file": "1366/section-mutate-shader.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[4]",
@@ -332,9 +332,9 @@
      "group": "core",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -342,13 +342,13 @@
      "file": "1366/section-effects.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[5]",
@@ -356,9 +356,9 @@
      "group": "expressive",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -366,13 +366,13 @@
      "file": "1366/section-animations.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[6]",
@@ -380,9 +380,9 @@
      "group": "expressive",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -390,13 +390,13 @@
      "file": "1366/section-audio.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[7]",
@@ -404,9 +404,9 @@
      "group": "expressive",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -414,13 +414,13 @@
      "file": "1366/section-kaleidoscope.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[8]",
@@ -428,9 +428,9 @@
      "group": "expressive",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -438,13 +438,13 @@
      "file": "1366/section-text.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[9]",
@@ -452,9 +452,9 @@
      "group": "expressive",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -462,13 +462,13 @@
      "file": "1366/section-focus.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[10]",
@@ -476,9 +476,9 @@
      "group": "system",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -486,13 +486,13 @@
      "file": "1366/section-display.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[11]",
@@ -500,9 +500,9 @@
      "group": "system",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -510,13 +510,13 @@
      "file": "1366/section-export.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[12]",
@@ -524,9 +524,9 @@
      "group": "system",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -534,13 +534,13 @@
      "file": "1366/section-settings.png",
      "clip": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650
+      "h": 639
      },
      "png": {
       "width": 280,
-      "height": 650
+      "height": 639
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[13]",
@@ -548,9 +548,9 @@
      "group": "system",
      "rect": {
       "x": 1086,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 650,
+      "h": 639,
       "visible": true
      }
     },
@@ -560,11 +560,11 @@
       "x": 0,
       "y": 0,
       "w": 1366,
-      "h": 118
+      "h": 129
      },
      "png": {
       "width": 1366,
-      "height": 118
+      "height": 129
      },
      "what": "top bar with #freezeBtn (Stop) pressed",
      "selector": "#freezeBtn[aria-pressed=\"true\"]",
@@ -576,12 +576,12 @@
       "x": 0,
       "y": 0,
       "w": 1366,
-      "h": 118,
+      "h": 129,
       "visible": true
      },
      "control": {
       "x": 1290,
-      "y": 62,
+      "y": 67,
       "w": 64,
       "h": 20,
       "visible": true
@@ -591,7 +591,7 @@
      "file": "1366/state-expanded.png",
      "clip": {
       "x": 1095,
-      "y": 117,
+      "y": 128,
       "w": 248,
       "h": 166
      },
@@ -604,7 +604,7 @@
      "section": "Simulation",
      "rect": {
       "x": 1095,
-      "y": 117,
+      "y": 128,
       "w": 248,
       "h": 46,
       "visible": true
@@ -614,7 +614,7 @@
      "file": "1366/state-checked-on.png",
      "clip": {
       "x": 1108,
-      "y": 504,
+      "y": 515,
       "w": 222,
       "h": 25
      },
@@ -629,7 +629,7 @@
      },
      "rect": {
       "x": 1112,
-      "y": 508,
+      "y": 519,
       "w": 214,
       "h": 17,
       "visible": true
@@ -639,7 +639,7 @@
      "file": "1366/state-checked-off.png",
      "clip": {
       "x": 1108,
-      "y": 430,
+      "y": 436,
       "w": 222,
       "h": 25
      },
@@ -654,7 +654,7 @@
      },
      "rect": {
       "x": 1112,
-      "y": 434,
+      "y": 440,
       "w": 214,
       "h": 17,
       "visible": true
@@ -664,7 +664,7 @@
      "file": "1366/state-collapsed.png",
      "clip": {
       "x": 1095,
-      "y": 180,
+      "y": 191,
       "w": 248,
       "h": 46
      },
@@ -677,7 +677,7 @@
      "section": "Simulation",
      "rect": {
       "x": 1095,
-      "y": 180,
+      "y": 191,
       "w": 248,
       "h": 46,
       "visible": true
@@ -689,16 +689,16 @@
       "x": 0,
       "y": 0,
       "w": 1366,
-      "h": 118
+      "h": 129
      },
      "png": {
       "width": 1366,
-      "height": 118
+      "height": 129
      },
      "what": "top bar with #curl focused via the keyboard (:focus-visible)",
      "selector": "#curl:focus-visible",
      "state": {
-      "tabWentTo": "input#viscosity",
+      "tabWentTo": "input#colorBlendPerceptual",
       "active": "input#curl",
       "focusVisible": true
      },
@@ -706,13 +706,13 @@
       "x": 0,
       "y": 0,
       "w": 1366,
-      "h": 118,
+      "h": 129,
       "visible": true
      },
      "control": {
       "x": 14,
-      "y": 64,
-      "w": 164,
+      "y": 74,
+      "w": 162,
       "h": 30,
       "visible": true
      }
@@ -721,7 +721,7 @@
      "file": "1366/state-disabled.png",
      "clip": {
       "x": 13,
-      "y": 409,
+      "y": 414,
       "w": 206,
       "h": 54
      },
@@ -739,7 +739,7 @@
      },
      "rect": {
       "x": 17,
-      "y": 413,
+      "y": 418,
       "w": 198,
       "h": 46,
       "visible": true
@@ -784,7 +784,7 @@
       "open": true,
       "pointer": {
        "x": 667,
-       "y": 419
+       "y": 424
       }
      },
      "rect": {
@@ -809,7 +809,7 @@
      },
      "rect": {
       "x": 920,
-      "y": 88,
+      "y": 93,
       "w": 268,
       "h": 269,
       "visible": true
@@ -829,7 +829,7 @@
      },
      "rect": {
       "x": 1126,
-      "y": 123,
+      "y": 134,
       "w": 236,
       "h": 618,
       "visible": true
@@ -841,42 +841,42 @@
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
      "x": 272,
-     "y": 142,
+     "y": 153,
      "w": 790,
-     "h": 553,
+     "h": 542,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 3885,
+     "lit": 3852,
      "max": 131,
-     "px": 436870
+     "px": 428180
     },
     "screenshotAfter": {
-     "lit": 175242,
-     "max": 186,
-     "px": 436870
+     "lit": 170824,
+     "max": 189,
+     "px": 428180
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5110690703451883,
-     "res": "1024x717"
+     "coverage": 0.5089871552491103,
+     "res": "2048x1405"
     },
     "display": {
-     "meanLum": 0.12869828472844405,
-     "maxLum": 0.35439372549019604,
-     "res": "197x138"
+     "meanLum": 0.1284347378874849,
+     "maxLum": 0.3549443137254902,
+     "res": "197x135"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 22.2
+   "seconds": 21.2
   },
   {
    "width": 1440,
    "height": 900,
    "env": {
-    "date": "2026-10-17T17:08:55.226Z",
-    "headCommit": "185649d56ff91e12dec01cceaecfa80a760a0ad6",
+    "date": "2026-10-17T17:25:53.645Z",
+    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -915,7 +915,7 @@
     ],
     "localStorageKeys": 19,
     "displayHz": 60,
-    "displayHzKnown": false,
+    "displayHzKnown": true,
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "underbar": "Image Sharpness2048▾Alt+↑↓Image SharpnessResolution of the paint itself - costs GPU 8192 6144 4096 2048 1536 1024 512 256 Motion Detail1024▾Alt+Shift+↑↓Motion D",
     "colorWell": "#ff0000"
@@ -924,8 +924,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "1024x812",
-     "sim": "512x406",
+     "dye": "2048x1598",
+     "sim": "1024x799",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -933,7 +933,7 @@
     "fpsCap": {
      "before": {
       "hz": 60,
-      "known": false
+      "known": true
      },
      "value": "native",
      "selected": "Native (60 Hz)",
@@ -963,11 +963,11 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 118
+      "h": 129
      },
      "png": {
       "width": 1440,
-      "height": 118
+      "height": 129
      },
      "what": "top bar",
      "selector": "#mixer-strip",
@@ -975,7 +975,7 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 118,
+      "h": 129,
       "visible": true
      }
     },
@@ -983,21 +983,21 @@
      "file": "1440/left-sidebar.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 248,
-      "height": 782
+      "height": 771
      },
      "what": "left sidebar open (Brush section open as at boot)",
      "selector": "#sidebar-left",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782,
+      "h": 771,
       "visible": true
      },
      "openedByScript": false
@@ -1006,13 +1006,13 @@
      "file": "1440/left-section-brush.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 248,
-      "height": 782
+      "height": 771
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[0]",
@@ -1020,9 +1020,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1030,13 +1030,13 @@
      "file": "1440/left-section-multi-brush.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 248,
-      "height": 782
+      "height": 771
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[1]",
@@ -1044,9 +1044,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1054,13 +1054,13 @@
      "file": "1440/left-section-stroke-and-replay.png",
      "clip": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 248,
-      "height": 782
+      "height": 771
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[2]",
@@ -1068,9 +1068,9 @@
      "group": "expressive",
      "rect": {
       "x": 0,
-      "y": 118,
+      "y": 129,
       "w": 248,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1078,13 +1078,13 @@
      "file": "1440/section-swirl-together.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[0]",
@@ -1092,9 +1092,9 @@
      "group": "core",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1102,13 +1102,13 @@
      "file": "1440/section-simulation.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[1]",
@@ -1116,9 +1116,9 @@
      "group": "core",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1126,13 +1126,13 @@
      "file": "1440/section-colors-and-palettes.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[2]",
@@ -1140,9 +1140,9 @@
      "group": "core",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1150,13 +1150,13 @@
      "file": "1440/section-layers.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[3]",
@@ -1164,9 +1164,9 @@
      "group": "core",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1174,13 +1174,13 @@
      "file": "1440/section-mutate-shader.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[4]",
@@ -1188,9 +1188,9 @@
      "group": "core",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1198,13 +1198,13 @@
      "file": "1440/section-effects.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[5]",
@@ -1212,9 +1212,9 @@
      "group": "expressive",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1222,13 +1222,13 @@
      "file": "1440/section-animations.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[6]",
@@ -1236,9 +1236,9 @@
      "group": "expressive",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1246,13 +1246,13 @@
      "file": "1440/section-audio.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[7]",
@@ -1260,9 +1260,9 @@
      "group": "expressive",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1270,13 +1270,13 @@
      "file": "1440/section-kaleidoscope.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[8]",
@@ -1284,9 +1284,9 @@
      "group": "expressive",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1294,13 +1294,13 @@
      "file": "1440/section-text.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[9]",
@@ -1308,9 +1308,9 @@
      "group": "expressive",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1318,13 +1318,13 @@
      "file": "1440/section-focus.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[10]",
@@ -1332,9 +1332,9 @@
      "group": "system",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1342,13 +1342,13 @@
      "file": "1440/section-display.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[11]",
@@ -1356,9 +1356,9 @@
      "group": "system",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1366,13 +1366,13 @@
      "file": "1440/section-export.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[12]",
@@ -1380,9 +1380,9 @@
      "group": "system",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1390,13 +1390,13 @@
      "file": "1440/section-settings.png",
      "clip": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782
+      "h": 771
      },
      "png": {
       "width": 280,
-      "height": 782
+      "height": 771
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[13]",
@@ -1404,9 +1404,9 @@
      "group": "system",
      "rect": {
       "x": 1160,
-      "y": 118,
+      "y": 129,
       "w": 280,
-      "h": 782,
+      "h": 771,
       "visible": true
      }
     },
@@ -1416,11 +1416,11 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 118
+      "h": 129
      },
      "png": {
       "width": 1440,
-      "height": 118
+      "height": 129
      },
      "what": "top bar with #freezeBtn (Stop) pressed",
      "selector": "#freezeBtn[aria-pressed=\"true\"]",
@@ -1432,12 +1432,12 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 118,
+      "h": 129,
       "visible": true
      },
      "control": {
       "x": 1364,
-      "y": 62,
+      "y": 67,
       "w": 64,
       "h": 20,
       "visible": true
@@ -1447,7 +1447,7 @@
      "file": "1440/state-expanded.png",
      "clip": {
       "x": 1169,
-      "y": 117,
+      "y": 128,
       "w": 248,
       "h": 166
      },
@@ -1460,7 +1460,7 @@
      "section": "Simulation",
      "rect": {
       "x": 1169,
-      "y": 117,
+      "y": 128,
       "w": 248,
       "h": 46,
       "visible": true
@@ -1470,7 +1470,7 @@
      "file": "1440/state-checked-on.png",
      "clip": {
       "x": 1182,
-      "y": 504,
+      "y": 515,
       "w": 222,
       "h": 25
      },
@@ -1485,7 +1485,7 @@
      },
      "rect": {
       "x": 1186,
-      "y": 508,
+      "y": 519,
       "w": 214,
       "h": 17,
       "visible": true
@@ -1495,7 +1495,7 @@
      "file": "1440/state-checked-off.png",
      "clip": {
       "x": 1182,
-      "y": 496,
+      "y": 502,
       "w": 222,
       "h": 25
      },
@@ -1510,7 +1510,7 @@
      },
      "rect": {
       "x": 1186,
-      "y": 500,
+      "y": 506,
       "w": 214,
       "h": 17,
       "visible": true
@@ -1520,7 +1520,7 @@
      "file": "1440/state-collapsed.png",
      "clip": {
       "x": 1169,
-      "y": 180,
+      "y": 191,
       "w": 263,
       "h": 46
      },
@@ -1533,7 +1533,7 @@
      "section": "Simulation",
      "rect": {
       "x": 1169,
-      "y": 180,
+      "y": 191,
       "w": 263,
       "h": 46,
       "visible": true
@@ -1545,11 +1545,11 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 118
+      "h": 129
      },
      "png": {
       "width": 1440,
-      "height": 118
+      "height": 129
      },
      "what": "top bar with #curl focused via the keyboard (:focus-visible)",
      "selector": "#curl:focus-visible",
@@ -1562,13 +1562,13 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 118,
+      "h": 129,
       "visible": true
      },
      "control": {
       "x": 14,
-      "y": 64,
-      "w": 164,
+      "y": 74,
+      "w": 162,
       "h": 30,
       "visible": true
      }
@@ -1577,7 +1577,7 @@
      "file": "1440/state-disabled.png",
      "clip": {
       "x": 13,
-      "y": 475,
+      "y": 480,
       "w": 206,
       "h": 54
      },
@@ -1595,7 +1595,7 @@
      },
      "rect": {
       "x": 17,
-      "y": 479,
+      "y": 484,
       "w": 198,
       "h": 46,
       "visible": true
@@ -1640,7 +1640,7 @@
       "open": true,
       "pointer": {
        "x": 704,
-       "y": 485
+       "y": 490
       }
      },
      "rect": {
@@ -1665,7 +1665,7 @@
      },
      "rect": {
       "x": 994,
-      "y": 88,
+      "y": 93,
       "w": 268,
       "h": 269,
       "visible": true
@@ -1685,7 +1685,7 @@
      },
      "rect": {
       "x": 1200,
-      "y": 123,
+      "y": 134,
       "w": 236,
       "h": 618,
       "visible": true
@@ -1697,42 +1697,42 @@
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
      "x": 272,
-     "y": 142,
+     "y": 153,
      "w": 864,
-     "h": 685,
+     "h": 674,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 4503,
+     "lit": 4470,
      "max": 131,
-     "px": 591840
+     "px": 582336
     },
     "screenshotAfter": {
-     "lit": 242959,
-     "max": 180,
-     "px": 591840
+     "lit": 238684,
+     "max": 185,
+     "px": 582336
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5233905961360837,
-     "res": "1024x812"
+     "coverage": 0.5215790978958073,
+     "res": "2048x1598"
     },
     "display": {
-     "meanLum": 0.13027154189335174,
-     "maxLum": 0.34456392156862736,
-     "res": "216x171"
+     "meanLum": 0.13020758312585315,
+     "maxLum": 0.3453976470588234,
+     "res": "216x168"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 22.4
+   "seconds": 21.6
   },
   {
    "width": 1920,
    "height": 1080,
    "env": {
-    "date": "2026-10-17T17:08:55.226Z",
-    "headCommit": "185649d56ff91e12dec01cceaecfa80a760a0ad6",
+    "date": "2026-10-17T17:25:53.645Z",
+    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -1780,8 +1780,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "1024x673",
-     "sim": "512x337",
+     "dye": "2048x1327",
+     "sim": "1024x663",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -1819,11 +1819,11 @@
       "x": 0,
       "y": 0,
       "w": 1920,
-      "h": 141
+      "h": 153
      },
      "png": {
       "width": 1920,
-      "height": 141
+      "height": 153
      },
      "what": "top bar",
      "selector": "#mixer-strip",
@@ -1831,7 +1831,7 @@
       "x": 0,
       "y": 0,
       "w": 1920,
-      "h": 141,
+      "h": 153,
       "visible": true
      }
     },
@@ -1839,21 +1839,21 @@
      "file": "1920/left-sidebar.png",
      "clip": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 278,
-      "height": 939
+      "height": 927
      },
      "what": "left sidebar open (Brush section open as at boot)",
      "selector": "#sidebar-left",
      "rect": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939,
+      "h": 927,
       "visible": true
      },
      "openedByScript": false
@@ -1862,13 +1862,13 @@
      "file": "1920/left-section-brush.png",
      "clip": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 278,
-      "height": 939
+      "height": 927
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[0]",
@@ -1876,9 +1876,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -1886,13 +1886,13 @@
      "file": "1920/left-section-multi-brush.png",
      "clip": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 278,
-      "height": 939
+      "height": 927
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[1]",
@@ -1900,9 +1900,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -1910,13 +1910,13 @@
      "file": "1920/left-section-stroke-and-replay.png",
      "clip": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 278,
-      "height": 939
+      "height": 927
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[2]",
@@ -1924,9 +1924,9 @@
      "group": "expressive",
      "rect": {
       "x": 0,
-      "y": 141,
+      "y": 153,
       "w": 278,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -1934,13 +1934,13 @@
      "file": "1920/section-swirl-together.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[0]",
@@ -1948,9 +1948,9 @@
      "group": "core",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -1958,13 +1958,13 @@
      "file": "1920/section-simulation.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[1]",
@@ -1972,9 +1972,9 @@
      "group": "core",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -1982,13 +1982,13 @@
      "file": "1920/section-colors-and-palettes.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[2]",
@@ -1996,9 +1996,9 @@
      "group": "core",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2006,13 +2006,13 @@
      "file": "1920/section-layers.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[3]",
@@ -2020,9 +2020,9 @@
      "group": "core",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2030,13 +2030,13 @@
      "file": "1920/section-mutate-shader.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[4]",
@@ -2044,9 +2044,9 @@
      "group": "core",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2054,13 +2054,13 @@
      "file": "1920/section-effects.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[5]",
@@ -2068,9 +2068,9 @@
      "group": "expressive",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2078,13 +2078,13 @@
      "file": "1920/section-animations.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[6]",
@@ -2092,9 +2092,9 @@
      "group": "expressive",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2102,13 +2102,13 @@
      "file": "1920/section-audio.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[7]",
@@ -2116,9 +2116,9 @@
      "group": "expressive",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2126,13 +2126,13 @@
      "file": "1920/section-kaleidoscope.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[8]",
@@ -2140,9 +2140,9 @@
      "group": "expressive",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2150,13 +2150,13 @@
      "file": "1920/section-text.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[9]",
@@ -2164,9 +2164,9 @@
      "group": "expressive",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2174,13 +2174,13 @@
      "file": "1920/section-focus.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[10]",
@@ -2188,9 +2188,9 @@
      "group": "system",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2198,13 +2198,13 @@
      "file": "1920/section-display.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[11]",
@@ -2212,9 +2212,9 @@
      "group": "system",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2222,13 +2222,13 @@
      "file": "1920/section-export.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[12]",
@@ -2236,9 +2236,9 @@
      "group": "system",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2246,13 +2246,13 @@
      "file": "1920/section-settings.png",
      "clip": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939
+      "h": 927
      },
      "png": {
       "width": 314,
-      "height": 939
+      "height": 927
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[13]",
@@ -2260,9 +2260,9 @@
      "group": "system",
      "rect": {
       "x": 1606,
-      "y": 141,
+      "y": 153,
       "w": 314,
-      "h": 939,
+      "h": 927,
       "visible": true
      }
     },
@@ -2272,11 +2272,11 @@
       "x": 0,
       "y": 0,
       "w": 1920,
-      "h": 141
+      "h": 153
      },
      "png": {
       "width": 1920,
-      "height": 141
+      "height": 153
      },
      "what": "top bar with #freezeBtn (Stop) pressed",
      "selector": "#freezeBtn[aria-pressed=\"true\"]",
@@ -2288,12 +2288,12 @@
       "x": 0,
       "y": 0,
       "w": 1920,
-      "h": 141,
+      "h": 153,
       "visible": true
      },
      "control": {
       "x": 1835,
-      "y": 73,
+      "y": 80,
       "w": 72,
       "h": 22,
       "visible": true
@@ -2303,7 +2303,7 @@
      "file": "1920/state-expanded.png",
      "clip": {
       "x": 1616,
-      "y": 140,
+      "y": 153,
       "w": 280,
       "h": 172
      },
@@ -2316,7 +2316,7 @@
      "section": "Simulation",
      "rect": {
       "x": 1616,
-      "y": 140,
+      "y": 153,
       "w": 280,
       "h": 52,
       "visible": true
@@ -2326,7 +2326,7 @@
      "file": "1920/state-checked-on.png",
      "clip": {
       "x": 1631,
-      "y": 574,
+      "y": 586,
       "w": 250,
       "h": 27
      },
@@ -2341,7 +2341,7 @@
      },
      "rect": {
       "x": 1635,
-      "y": 578,
+      "y": 590,
       "w": 242,
       "h": 19,
       "visible": true
@@ -2351,7 +2351,7 @@
      "file": "1920/state-checked-off.png",
      "clip": {
       "x": 1631,
-      "y": 597,
+      "y": 603,
       "w": 250,
       "h": 27
      },
@@ -2366,7 +2366,7 @@
      },
      "rect": {
       "x": 1635,
-      "y": 601,
+      "y": 607,
       "w": 242,
       "h": 19,
       "visible": true
@@ -2376,7 +2376,7 @@
      "file": "1920/state-collapsed.png",
      "clip": {
       "x": 1616,
-      "y": 211,
+      "y": 223,
       "w": 295,
       "h": 52
      },
@@ -2389,7 +2389,7 @@
      "section": "Simulation",
      "rect": {
       "x": 1616,
-      "y": 211,
+      "y": 223,
       "w": 295,
       "h": 52,
       "visible": true
@@ -2401,11 +2401,11 @@
       "x": 0,
       "y": 0,
       "w": 1920,
-      "h": 141
+      "h": 153
      },
      "png": {
       "width": 1920,
-      "height": 141
+      "height": 153
      },
      "what": "top bar with #curl focused via the keyboard (:focus-visible)",
      "selector": "#curl:focus-visible",
@@ -2418,13 +2418,13 @@
       "x": 0,
       "y": 0,
       "w": 1920,
-      "h": 141,
+      "h": 153,
       "visible": true
      },
      "control": {
       "x": 16,
-      "y": 76,
-      "w": 184,
+      "y": 87,
+      "w": 182,
       "h": 34,
       "visible": true
      }
@@ -2496,7 +2496,7 @@
       "open": true,
       "pointer": {
        "x": 942,
-       "y": 586
+       "y": 592
       }
      },
      "rect": {
@@ -2521,7 +2521,7 @@
      },
      "rect": {
       "x": 1422,
-      "y": 102,
+      "y": 108,
       "w": 268,
       "h": 269,
       "visible": true
@@ -2541,7 +2541,7 @@
      },
      "rect": {
       "x": 1652,
-      "y": 146,
+      "y": 158,
       "w": 264,
       "h": 687,
       "visible": true
@@ -2553,42 +2553,42 @@
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
      "x": 302,
-     "y": 165,
+     "y": 177,
      "w": 1281,
-     "h": 842,
+     "h": 830,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 6225,
+     "lit": 6189,
      "max": 131,
-     "px": 1078602
+     "px": 1063230
     },
     "screenshotAfter": {
-     "lit": 421768,
-     "max": 188,
-     "px": 1078602
+     "lit": 414044,
+     "max": 191,
+     "px": 1063230
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5050656458952452,
-     "res": "1024x673"
+     "coverage": 0.503534243712321,
+     "res": "2048x1327"
     },
     "display": {
-     "meanLum": 0.1281690616596678,
+     "meanLum": 0.12792561632090343,
      "maxLum": 0.35859843137254904,
-     "res": "320x210"
+     "res": "320x207"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 23
+   "seconds": 22.4
   },
   {
    "width": 2560,
    "height": 1440,
    "env": {
-    "date": "2026-10-17T17:08:55.226Z",
-    "headCommit": "185649d56ff91e12dec01cceaecfa80a760a0ad6",
+    "date": "2026-10-17T17:25:53.645Z",
+    "headCommit": "29ce1f20d0b8d1681b72bb7db4cc1acb82cd87f5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -2636,8 +2636,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "1024x668",
-     "sim": "512x334",
+     "dye": "1024x659",
+     "sim": "512x330",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -2675,11 +2675,11 @@
       "x": 0,
       "y": 0,
       "w": 2560,
-      "h": 170
+      "h": 185
      },
      "png": {
       "width": 2560,
-      "height": 170
+      "height": 185
      },
      "what": "top bar",
      "selector": "#mixer-strip",
@@ -2687,7 +2687,7 @@
       "x": 0,
       "y": 0,
       "w": 2560,
-      "h": 170,
+      "h": 185,
       "visible": true
      }
     },
@@ -2695,21 +2695,21 @@
      "file": "2560/left-sidebar.png",
      "clip": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 335,
-      "height": 1270
+      "height": 1255
      },
      "what": "left sidebar open (Brush section open as at boot)",
      "selector": "#sidebar-left",
      "rect": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      },
      "openedByScript": false
@@ -2718,13 +2718,13 @@
      "file": "2560/left-section-brush.png",
      "clip": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 335,
-      "height": 1270
+      "height": 1255
      },
      "what": "left sidebar, \"Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[0]",
@@ -2732,9 +2732,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2742,13 +2742,13 @@
      "file": "2560/left-section-multi-brush.png",
      "clip": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 335,
-      "height": 1270
+      "height": 1255
      },
      "what": "left sidebar, \"Multi-Brush\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[1]",
@@ -2756,9 +2756,9 @@
      "group": "core",
      "rect": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2766,13 +2766,13 @@
      "file": "2560/left-section-stroke-and-replay.png",
      "clip": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 335,
-      "height": 1270
+      "height": 1255
      },
      "what": "left sidebar, \"Stroke and replay\" open alone, header at the top",
      "selector": "#sidebar-left .sidebar-section[2]",
@@ -2780,9 +2780,9 @@
      "group": "expressive",
      "rect": {
       "x": 0,
-      "y": 170,
+      "y": 185,
       "w": 335,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2790,13 +2790,13 @@
      "file": "2560/section-swirl-together.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Swirl Together\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[0]",
@@ -2804,9 +2804,9 @@
      "group": "core",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2814,13 +2814,13 @@
      "file": "2560/section-simulation.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Simulation\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[1]",
@@ -2828,9 +2828,9 @@
      "group": "core",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2838,13 +2838,13 @@
      "file": "2560/section-colors-and-palettes.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Colors and palettes\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[2]",
@@ -2852,9 +2852,9 @@
      "group": "core",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2862,13 +2862,13 @@
      "file": "2560/section-layers.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Layers\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[3]",
@@ -2876,9 +2876,9 @@
      "group": "core",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2886,13 +2886,13 @@
      "file": "2560/section-mutate-shader.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Mutate shader\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[4]",
@@ -2900,9 +2900,9 @@
      "group": "core",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2910,13 +2910,13 @@
      "file": "2560/section-effects.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Effects\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[5]",
@@ -2924,9 +2924,9 @@
      "group": "expressive",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2934,13 +2934,13 @@
      "file": "2560/section-animations.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Animations\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[6]",
@@ -2948,9 +2948,9 @@
      "group": "expressive",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2958,13 +2958,13 @@
      "file": "2560/section-audio.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Audio\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[7]",
@@ -2972,9 +2972,9 @@
      "group": "expressive",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -2982,13 +2982,13 @@
      "file": "2560/section-kaleidoscope.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Kaleidoscope\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[8]",
@@ -2996,9 +2996,9 @@
      "group": "expressive",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -3006,13 +3006,13 @@
      "file": "2560/section-text.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Text\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[9]",
@@ -3020,9 +3020,9 @@
      "group": "expressive",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -3030,13 +3030,13 @@
      "file": "2560/section-focus.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Focus\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[10]",
@@ -3044,9 +3044,9 @@
      "group": "system",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -3054,13 +3054,13 @@
      "file": "2560/section-display.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Display\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[11]",
@@ -3068,9 +3068,9 @@
      "group": "system",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -3078,13 +3078,13 @@
      "file": "2560/section-export.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Export\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[12]",
@@ -3092,9 +3092,9 @@
      "group": "system",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -3102,13 +3102,13 @@
      "file": "2560/section-settings.png",
      "clip": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270
+      "h": 1255
      },
      "png": {
       "width": 378,
-      "height": 1270
+      "height": 1255
      },
      "what": "right sidebar, \"Settings\" open alone, header at the top",
      "selector": "#sidebar-right .sidebar-section[13]",
@@ -3116,9 +3116,9 @@
      "group": "system",
      "rect": {
       "x": 2182,
-      "y": 170,
+      "y": 185,
       "w": 378,
-      "h": 1270,
+      "h": 1255,
       "visible": true
      }
     },
@@ -3128,11 +3128,11 @@
       "x": 0,
       "y": 0,
       "w": 2560,
-      "h": 170
+      "h": 185
      },
      "png": {
       "width": 2560,
-      "height": 170
+      "height": 185
      },
      "what": "top bar with #freezeBtn (Stop) pressed",
      "selector": "#freezeBtn[aria-pressed=\"true\"]",
@@ -3144,12 +3144,12 @@
       "x": 0,
       "y": 0,
       "w": 2560,
-      "h": 170,
+      "h": 185,
       "visible": true
      },
      "control": {
       "x": 2428,
-      "y": 89,
+      "y": 96,
       "w": 86,
       "h": 27,
       "visible": true
@@ -3159,7 +3159,7 @@
      "file": "2560/state-expanded.png",
      "clip": {
       "x": 2194,
-      "y": 168,
+      "y": 183,
       "w": 340,
       "h": 182
      },
@@ -3172,7 +3172,7 @@
      "section": "Simulation",
      "rect": {
       "x": 2194,
-      "y": 168,
+      "y": 183,
       "w": 340,
       "h": 62,
       "visible": true
@@ -3182,7 +3182,7 @@
      "file": "2560/state-checked-on.png",
      "clip": {
       "x": 2213,
-      "y": 692,
+      "y": 706,
       "w": 303,
       "h": 31
      },
@@ -3197,7 +3197,7 @@
      },
      "rect": {
       "x": 2217,
-      "y": 696,
+      "y": 710,
       "w": 295,
       "h": 23,
       "visible": true
@@ -3207,7 +3207,7 @@
      "file": "2560/state-checked-off.png",
      "clip": {
       "x": 2213,
-      "y": 776,
+      "y": 790,
       "w": 303,
       "h": 31
      },
@@ -3222,7 +3222,7 @@
      },
      "rect": {
       "x": 2217,
-      "y": 780,
+      "y": 794,
       "w": 295,
       "h": 23,
       "visible": true
@@ -3232,7 +3232,7 @@
      "file": "2560/state-collapsed.png",
      "clip": {
       "x": 2194,
-      "y": 254,
+      "y": 268,
       "w": 355,
       "h": 62
      },
@@ -3245,7 +3245,7 @@
      "section": "Simulation",
      "rect": {
       "x": 2194,
-      "y": 254,
+      "y": 268,
       "w": 355,
       "h": 62,
       "visible": true
@@ -3257,11 +3257,11 @@
       "x": 0,
       "y": 0,
       "w": 2560,
-      "h": 170
+      "h": 185
      },
      "png": {
       "width": 2560,
-      "height": 170
+      "height": 185
      },
      "what": "top bar with #curl focused via the keyboard (:focus-visible)",
      "selector": "#curl:focus-visible",
@@ -3274,12 +3274,12 @@
       "x": 0,
       "y": 0,
       "w": 2560,
-      "h": 170,
+      "h": 185,
       "visible": true
      },
      "control": {
       "x": 19,
-      "y": 92,
+      "y": 105,
       "w": 242,
       "h": 41,
       "visible": true
@@ -3289,7 +3289,7 @@
      "file": "2560/state-disabled.png",
      "clip": {
       "x": 19,
-      "y": 773,
+      "y": 788,
       "w": 296,
       "h": 70
      },
@@ -3307,7 +3307,7 @@
      },
      "rect": {
       "x": 23,
-      "y": 777,
+      "y": 792,
       "w": 288,
       "h": 62,
       "visible": true
@@ -3352,7 +3352,7 @@
       "open": true,
       "pointer": {
        "x": 1258,
-       "y": 780
+       "y": 788
       }
      },
      "rect": {
@@ -3377,7 +3377,7 @@
      },
      "rect": {
       "x": 1932,
-      "y": 122,
+      "y": 129,
       "w": 268,
       "h": 269,
       "visible": true
@@ -3397,7 +3397,7 @@
      },
      "rect": {
       "x": 2237,
-      "y": 175,
+      "y": 190,
       "w": 319,
       "h": 821,
       "visible": true
@@ -3409,35 +3409,35 @@
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "canvasRect": {
      "x": 359,
-     "y": 194,
+     "y": 209,
      "w": 1799,
-     "h": 1173,
+     "h": 1158,
      "visible": true
     },
     "screenshotBefore": {
-     "lit": 8772,
+     "lit": 10502,
      "max": 131,
-     "px": 2110227
+     "px": 2083242
     },
     "screenshotAfter": {
-     "lit": 819575,
-     "max": 188,
-     "px": 2110227
+     "lit": 807522,
+     "max": 189,
+     "px": 2083242
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5043038922155688,
-     "res": "1024x668"
+     "coverage": 0.50307343038695,
+     "res": "1024x659"
     },
     "display": {
-     "meanLum": 0.1279833872591176,
-     "maxLum": 0.35859843137254904,
-     "res": "449x293"
+     "meanLum": 0.12789939460646138,
+     "maxLum": 0.36113568627450976,
+     "res": "449x289"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 26
+   "seconds": 23.7
   }
  ],
  "problems": []

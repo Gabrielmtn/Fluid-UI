@@ -123,7 +123,7 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail }); con
         check('R2 ...on slow frames too (one long step a frame)', onRing(s, 0.5), s);
         s = await spin({ steady: 0.3, stillMs: 1500 });
         check('R3 Steady 30%: every dab on the circle', onRing(s, 0.5), s);
-        check('R3 ...the head goes round at Steady\'s top speed, not the hand\'s', atPace(s, 0.3) && handPace > vmax(0.3) * 1.2,
+        check('R3 ...the head goes round at Steady\'s top speed, not the hand\'s', atPace(s, 0.3) && handPace > vmax(0.3) * 1.1,   // 1.1: the Walnut & Copper bar is taller, so the canvas and ring are smaller (hand ~3,280 vs cap ~2,780 at 1584x805)
             { pace: s.head && s.head.pace, vmax: Math.round(vmax(0.3)), hand: Math.round(handPace) });
         check('R3 ...never turning back, and caught up once the hand stopped', s.head && s.head.back === 0 && s.head.gapEnd <= 0.09 * 24 * g.k + 1.5, s.head);
         s = await spin({ steady: 1 });

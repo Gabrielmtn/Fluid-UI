@@ -205,14 +205,18 @@ html[data-theme="walnut-copper"] select option {
 }
 
 /* ── Text field ─────────────────────────────────────────────────────── */
-html[data-theme="walnut-copper"] :is(input[type="text"], input[type="number"], input[type="search"], input[type="url"], textarea) {
-    color: var(--lit);
+/* !important on the paint: several fields (Text overlay content / size /
+   padding / radius, Export durations) are styled inline by script, and an
+   inline declaration beats every layer otherwise. */
+html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], textarea) {
+    color: var(--lit) !important;
     caret-color: var(--neon);
-    border-color: rgba(196, 122, 75, 0.75);
-    background-color: #0d0806;
+    border-color: rgba(196, 122, 75, 0.75) !important;
+    background: var(--mesh-dim) center / 3.5px 6.06px, linear-gradient(170deg, #150d09, #070403) !important;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
 }
-html[data-theme="walnut-copper"] :is(input[type="text"], input[type="number"], input[type="search"], input[type="url"], textarea):focus {
-    border-color: #ff9a50;
+html[data-theme="walnut-copper"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], textarea):focus {
+    border-color: #ff9a50 !important;
     box-shadow: 0 0 0 1px rgba(255, 110, 30, 0.35), 0 0 10px rgba(255, 110, 30, 0.25);
 }
 

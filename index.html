@@ -240,6 +240,14 @@
     <link rel="stylesheet" href="css/23-colour-picker.css">
     <link rel="stylesheet" href="css/24-palette-from-image.css">
     <link rel="stylesheet" href="css/init-responsive.css">
+    <!-- Walnut & Copper faces, preloaded: the strip's overflow (js/46) parks
+         cells by measured width and keeps them parked without clear room, so
+         a boot that measured before the fonts landed could park a different
+         cell than one that measured after. -->
+    <link rel="preload" href="assets/fonts/michroma-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/share-tech-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/libre-franklin-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/libre-franklin-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="css/30-theme-walnut-copper.css">
     <link rel="stylesheet" href="css/31-theme-components.css">
     <link rel="stylesheet" href="css/32-theme-remap.css">
@@ -1994,6 +2002,7 @@
     <!-- Walnut & Copper inline fields (js/69-theme-fields.js): sidebar selects open
          their options inline under the walnut-copper theme. -->
     <script src="js/69-theme-fields.js"></script>
+    <script src="js/70-theme-telegraphs.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">
