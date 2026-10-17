@@ -52,7 +52,7 @@ Answers to `prep/gaps/SECOND-WAVE.md`'s questions, by its numbers:
 - **Q14 the right sidebar's resize edge** does nothing (pre-existing): not a theme item; listed for a separate fix.
 - **Q15 desktop-only rows:** Gabriel checks them in his Electron build.
 - **Laminar / Blend 0.00:** keeps the app's meaning (neutral middle, -1 full laminar); behaviour is frozen.
-- **Q4 emoji in labels:** asked (changes visible wording).
+- **Q4 emoji in labels:** Gabriel: replace them with plain text or drawn glyphs like the study (accessible names follow the new words; no behaviour change).
 
 ## Open
 
