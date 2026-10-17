@@ -252,6 +252,7 @@
         power(t, live);
     }
 
+    var uid = 0;
     // Once per row js/20 builds: the head line for the custom brush screen
     // (the row's own tip square moves onto it as the caption), and the
     // Pressure pane's indicator. Nothing the row's handlers hold is replaced.
@@ -273,8 +274,16 @@
             cap.className = 'wcb-cap';
             cap.setAttribute('aria-hidden', 'true');
             tipBtn.appendChild(cap);
+            // The square's name: js/20's own label, plus the brush's tip when
+            // the arm follows it, since the caption shows that tip's name
+            // (a visible label must be part of the name).
+            var nm = document.createElement('span');
+            nm.hidden = true;
+            nm.id = 'wcb-tipname-' + (++uid);
+            head.appendChild(nm);
+            tipBtn.setAttribute('aria-labelledby', nm.id);
             mid.insertBefore(head, push);
-            d.head = head; d.cap = cap;
+            d.head = head; d.cap = cap; d.nm = nm;
         }
         if (push && !push.querySelector('.wcb-ind')) {
             var ind = document.createElement('i');
@@ -294,7 +303,7 @@
         return s;
     }
     function choiceList() {
-        var out = [{ v: null, name: 'Same as the brush (' + brushName() + ')', mask: brushMask() }];
+        var out = [{ v: null, name: 'Same as the brush, ' + brushName(), mask: brushMask() }];
         for (var t = 0; t < 5; t++) out.push({ v: t, name: TIP_NAMES[t], mask: tipMask(t) });
         shapes().forEach(function (s) { out.push({ v: s.id, name: s.name || 'Shape', mask: urlMask(s.dataURL) }); });
         return out;
@@ -373,7 +382,12 @@
                 var on = i === MB.sel;
                 row.classList.toggle('wcb-arm-on', on);
                 row.classList.toggle('wcb-arm-off', !on);
-                dressRow(row);
+                var d = dressRow(row);
+                if (d.nm) {
+                    var lab = d.tipBtn.getAttribute('aria-label') || '';
+                    // A comma, not brackets: label-in-name checks drop bracketed text.
+                    setText(d.nm, armTip(i) === null ? lab + ', ' + brushName() : lab);
+                }
                 var info = rowInfo(row);
                 var pk = row.querySelector('input.arm-picker');
                 if (pk) setVar(pk, '--sc', info.rgb);
