@@ -560,11 +560,19 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
 }
+/* The value sits in the head row css/36 lays out in the header (study
+   .mslide .head, 495-496): on the label's baseline, 4 px in from the right,
+   in the study's .val type. */
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-value {
-    position: absolute;
-    right: 16px;
-    top: 77px;   /* the head row (measured: the scale row sits at 77 px in the cell) */
-    font-size: 12.5px;
+    position: static;
+    grid-area: 2 / 2;
+    min-height: 0;
+    padding-right: 4px;
+    font: 400 13px/1 var(--ui-font-mono);
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 /* Labels whole and on one line across the bar: no ellipsis (the cell's
