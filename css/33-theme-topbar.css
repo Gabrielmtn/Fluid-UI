@@ -97,6 +97,8 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
     [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range]::-webkit-slider-thumb {
     width: 2px;
     height: var(--dial);
+    border: 0;
+    box-shadow: none;
     background: transparent;
     filter: none;
 }
@@ -181,7 +183,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Time
     --orders: repeating-conic-gradient(from -120deg at 50% 50%, transparent 0 38.5deg, #0d0806 38.5deg 40deg);
 }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) input[type=range]::-webkit-slider-thumb {
-    width: 2px; height: var(--dial); background: transparent; filter: none;
+    width: 2px; height: var(--dial); border: 0; box-shadow: none; background: transparent; filter: none;
 }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) input[type=range]:focus-visible {
     outline: 2px solid var(--ui-focus); outline-offset: 6px; border-radius: 50%;
