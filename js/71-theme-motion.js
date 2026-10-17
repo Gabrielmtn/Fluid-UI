@@ -12,7 +12,9 @@
 // What it drives (presentation only; no behaviour, value or sync change):
 //   --ci   every pane (button / .btn / inline option): cathode on/off with the
 //          study's timing (on 45 ms local / 220 ms remote, off 300 / 450 ms,
-//          170 ms strike flicker on a local turn-on) plus the press surge.
+//          170 ms strike flicker on a local turn-on) plus the press surge,
+//          and while Ignite burns, the light it throws on the top-bar panes
+//          around it (falloff e^(-d / 220 px)).
 //   --dp   every drawer (.sidebar-section): the drawer spring (180 / 0.85).
 //          Opening and closing glide (study setDrawer / stepDrawers) without
 //          animating layout: the layout changes once per toggle, one
@@ -138,6 +140,7 @@
     }
     function write(r) {
         var I = r.cath.out() * (1 + r.surge.x * 0.3) + r.surge.x * 0.14;
+        if (r.igK) I += IG.flick * 0.5 * r.igK;                 // the burn's falloff (below)
         var s = Math.min(1, I).toFixed(3);
         if (s !== r.last) { r.el.style.setProperty('--ci', s); r.last = s; }
     }
@@ -145,6 +148,46 @@
         var r = paneRec(el, true);
         var on = isOn(el);
         if (on !== r.cath.on) { r.cath.set(on, remoteNow()); wake(r); }
+        if (el.classList.contains('ch-nudge-btn')) igniteSync(el);
+    }
+
+    // ── Ignite: the burn lights the panes around it (study 3263-3305) ──
+    // While Ignite burns (held: .active, locked: .locked) its level rises in
+    // ~1/6 s and falls with τ 0.35 s after; each top-bar pane brightens by
+    // flick * 0.5 * e^(-d / 220 px), d its distance from Ignite, measured
+    // once when the burn starts. flick is the study's random 0.55-1 per frame
+    // (x 0.7); with PhotoSafe on ("reduce flashing", the default) it is the
+    // steady mean, a glow without the flicker. Reduced motion: nothing.
+    var IG = { on: false, level: 0, flick: 0, near: [], rec: { kind: 'ignite' } };
+    function igniteSync(btn) {
+        var on = !RM && (btn.classList.contains('active') || btn.classList.contains('locked'));
+        if (on === IG.on) return;
+        IG.on = on;
+        if (on) {
+            var z = parseFloat(getComputedStyle(root).getPropertyValue('--ui-scale')) || 1;
+            var b = btn.getBoundingClientRect(), cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+            IG.near.forEach(function (r) { r.igK = 0; });
+            IG.near = [];
+            btn.closest('#mixer-strip').querySelectorAll(PANE).forEach(function (el) {
+                var r = el._wc;
+                if (el === btn || !r || r.transient) return;
+                var q = el.getBoundingClientRect();
+                if (!q.width) return;
+                var k = Math.exp(-Math.hypot(q.left + q.width / 2 - cx, q.top + q.height / 2 - cy) / z / 220);
+                if (k > 0.02) { r.igK = k; IG.near.push(r); }
+            });
+        }
+        wake(IG.rec);
+    }
+    function stepIgnite(dt) {
+        IG.level = IG.on ? Math.min(1, IG.level + dt * 6) : IG.level * Math.exp(-dt / 0.35);
+        var done = !IG.on && IG.level < 0.004;
+        if (done) IG.level = 0;
+        var safe = document.body.classList.contains('photosafe-on');
+        IG.flick = IG.level * (safe ? 0.775 : 0.55 + 0.45 * Math.random()) * 0.7;
+        IG.near.forEach(function (r) { write(r); if (done) r.igK = 0; });
+        if (done) IG.near = [];
+        return done;
     }
     function paneOf(t) { var el = t && t.closest ? t.closest(PANE) : null; return el && inScope(el) ? el : null; }
     function surge(el, v) {
@@ -588,8 +631,9 @@
                 r.cath.step(dt); r.surge.step(dt); write(r);
                 done = r.cath.settled() && r.surge.settled();
                 if (done && r.transient) { r.el.style.removeProperty('--ci'); r.last = ''; }
-            } else if (r.kind === 'column') {
-                // After every drawer has stepped: the offsets read their springs.
+            } else if (r.kind === 'column' || r.kind === 'ignite') {
+                // After every drawer and pane has stepped: the column offsets
+                // read the drawers' springs, the burn adds to the panes' light.
                 (cols || (cols = [])).push(r);
             } else if (r.kind === 'drawer') {
                 done = stepDrawer(r, dt);
@@ -615,7 +659,7 @@
             }
             if (done) active.delete(r);
         });
-        if (cols) cols.forEach(function (c) { if (stepColumn(c, dt)) active.delete(c); });
+        if (cols) cols.forEach(function (c) { if (c.kind === 'ignite' ? stepIgnite(dt) : stepColumn(c, dt)) active.delete(c); });
     };
 
     // Pane widths are fixed in CSS (33-theme-topbar), snapped to the 24 px
