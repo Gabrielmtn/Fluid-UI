@@ -68,9 +68,17 @@ html[data-theme="walnut-copper"] {
     --unlit: #a08a76;
     --vfd: #72f2d4;
     --neon: rgb(255 110 30);
-    --stain: rgba(44, 20, 8, 0.732);          /* sidebars: 0.12 + 0.72 x 0.85 */
-    --stain-bar: rgba(44, 20, 8, 0.12);       /* top bar: lightest stain, the console is the brightest wood */
-    --wood-herringbone: url(../assets/textures/herringbone-2048.jpg);
+    /* Walnut: the study's stain is baked into the texture
+       (scripts/theme/bake-walnut.js: oak x rgb(130,111,97)); no overlay. */
+    --wood-herringbone: url(../assets/textures/herringbone-walnut-2048.jpg);
+    /* Art-deco column sheen (study shader: cos(2pi*8u + .789)): each tile
+       holds 16 half-columns leaning opposite ways; alternate ones catch the
+       fixed key light. Bands one half-column wide, phase-locked to the tile
+       origin (first lit band starts 0.0469 tile left of it). */
+    --sheen-bar: repeating-linear-gradient(90deg, rgba(255, 168, 96, 0.10) 0 42.44px, rgba(36, 14, 4, 0.12) 42.44px 84.88px);
+    --sheen-side: repeating-linear-gradient(90deg, rgba(255, 168, 96, 0.09) 0 35.38px, rgba(36, 14, 4, 0.11) 35.38px 70.75px);
+    /* The fixed key light, upper left, falling off across the surface. */
+    --key-light: linear-gradient(100deg, rgba(255, 170, 90, 0.14), rgba(255, 150, 70, 0.04) 40%, rgba(20, 8, 2, 0.16) 90%);
     --wood-parquet: url(../assets/textures/parquet-diagonal.jpg);
     --mesh-dim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.12' stroke-width='1.1'/%3E%3C/svg%3E");
 
@@ -110,8 +118,9 @@ html[data-theme="walnut-copper"] body {
 /* ── Wood: the two sidebars (herringbone, 566 px tile = 100 px plank) ── */
 html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) {
     background-color: #2a170c;
-    background-image: linear-gradient(var(--stain), var(--stain)), var(--wood-herringbone);
-    background-size: auto, 566px 566px;
+    background-image: var(--key-light), var(--sheen-side), var(--wood-herringbone);
+    background-size: auto, auto, 566px 566px;
+    background-position: 0 0, -26.55px 0, 0 0;
     /* The one copper line per column; nothing inside draws a second box. */
     box-shadow: inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.45), inset 0 0 30px rgba(0, 0, 0, 0.45);
     border-color: transparent;
@@ -131,21 +140,18 @@ html[data-theme="walnut-copper"] #sidebar-right::-webkit-scrollbar-thumb { backg
    a separate black strip when the body scrolls under it. */
 html[data-theme="walnut-copper"] .lsb-head {
     background-color: #2a170c;
-    background-image: linear-gradient(var(--stain), var(--stain)), var(--wood-herringbone);
-    background-size: auto, 566px 566px;
+    background-image: var(--key-light), var(--sheen-side), var(--wood-herringbone);
+    background-size: auto, auto, 566px 566px;
+    background-position: 0 0, -26.55px 0, 0 0;
     border-bottom: 1px solid rgba(214, 140, 92, 0.35);
 }
 
 /* ── Wood: the top bar (herringbone, 679 px tile = 120 px slat) ── */
 html[data-theme="walnut-copper"] #mixer-strip {
     background-color: #2a170c;
-    /* A fixed warm key light from the upper left over the stained wood. */
-    background-image:
-        linear-gradient(160deg, rgba(255, 196, 130, 0.16), transparent 45%, rgba(0, 0, 0, 0.18)),
-        linear-gradient(rgba(206, 104, 34, 0.30), rgba(206, 104, 34, 0.30)),
-        linear-gradient(var(--stain-bar), var(--stain-bar)),
-        var(--wood-herringbone);
-    background-size: auto, auto, auto, 679px 679px;
+    background-image: var(--key-light), var(--sheen-bar), var(--wood-herringbone);
+    background-size: auto, auto, 679px 679px;
+    background-position: 0 0, -31.84px 0, 0 0;
     border-bottom-color: rgba(0, 0, 0, 0.6);
     color: var(--ui-text);
 }

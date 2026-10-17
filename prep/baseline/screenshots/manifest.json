@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-17T18:48:41.193Z",
- "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
+ "generated": "2026-10-17T18:58:12.086Z",
+ "headCommit": "5b5076fd60b141d1769d7ed8db4cef4cd51250c5",
  "script": "prep/baseline/scripts/screenshots.js",
  "mode": "capture",
  "seed": {
@@ -19,8 +19,8 @@
    "width": 1366,
    "height": 768,
    "env": {
-    "date": "2026-10-17T18:48:41.193Z",
-    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
+    "date": "2026-10-17T18:58:12.086Z",
+    "headCommit": "5b5076fd60b141d1769d7ed8db4cef4cd51250c5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -852,31 +852,31 @@
      "px": 384820
     },
     "screenshotAfter": {
-     "lit": 156994,
-     "max": 186,
+     "lit": 157502,
+     "max": 181,
      "px": 384820
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5183224104859335,
+     "coverage": 0.5195712116368286,
      "res": "1024x782"
     },
     "display": {
-     "meanLum": 0.1297880332008135,
-     "maxLum": 0.3479349019607843,
+     "meanLum": 0.12999786536686758,
+     "maxLum": 0.3476517647058824,
      "res": "177x135"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 24.6
+   "seconds": 22.7
   },
   {
    "width": 1440,
    "height": 900,
    "env": {
-    "date": "2026-10-17T18:48:41.193Z",
-    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
+    "date": "2026-10-17T18:58:12.086Z",
+    "headCommit": "5b5076fd60b141d1769d7ed8db4cef4cd51250c5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -1708,31 +1708,31 @@
      "px": 528416
     },
     "screenshotAfter": {
-     "lit": 220772,
-     "max": 181,
+     "lit": 221585,
+     "max": 177,
      "px": 528416
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5303444602272728,
+     "coverage": 0.5317371715198863,
      "res": "1024x880"
     },
     "display": {
-     "meanLum": 0.13150206947064386,
-     "maxLum": 0.3400760784313725,
+     "meanLum": 0.13175934176050838,
+     "maxLum": 0.33865568627450976,
      "res": "196x168"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 24.5
+   "seconds": 22.9
   },
   {
    "width": 1920,
    "height": 1080,
    "env": {
-    "date": "2026-10-17T18:48:41.193Z",
-    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
+    "date": "2026-10-17T18:58:12.086Z",
+    "headCommit": "5b5076fd60b141d1769d7ed8db4cef4cd51250c5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -2564,31 +2564,31 @@
      "px": 988530
     },
     "screenshotAfter": {
-     "lit": 392006,
-     "max": 188,
+     "lit": 393329,
+     "max": 185,
      "px": 988530
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5095098586309523,
+     "coverage": 0.5106491815476191,
      "res": "1024x714"
     },
     "display": {
-     "meanLum": 0.12872329964415896,
-     "maxLum": 0.3549443137254902,
+     "meanLum": 0.12902728433014687,
+     "maxLum": 0.35439372549019604,
      "res": "297x207"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 28.4
+   "seconds": 24.5
   },
   {
    "width": 2560,
    "height": 1440,
    "env": {
-    "date": "2026-10-17T18:48:41.193Z",
-    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
+    "date": "2026-10-17T18:58:12.086Z",
+    "headCommit": "5b5076fd60b141d1769d7ed8db4cef4cd51250c5",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -3420,24 +3420,24 @@
      "px": 1958178
     },
     "screenshotAfter": {
-     "lit": 771523,
-     "max": 189,
+     "lit": 773874,
+     "max": 187,
      "px": 1958178
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5078682239657631,
+     "coverage": 0.5089924549750356,
      "res": "1024x701"
     },
     "display": {
-     "meanLum": 0.12842549417683302,
-     "maxLum": 0.3552274509803921,
+     "meanLum": 0.1286814846897991,
+     "maxLum": 0.356364705882353,
      "res": "422x289"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 37.5
+   "seconds": 27.7
   }
  ],
  "problems": []
