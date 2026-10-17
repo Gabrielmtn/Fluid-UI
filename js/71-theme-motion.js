@@ -14,11 +14,22 @@
 //          study's timing (on 45 ms local / 220 ms remote, off 300 / 450 ms,
 //          170 ms strike flicker on a local turn-on) plus the press surge.
 //   --dp   every drawer (.sidebar-section): the drawer spring (180 / 0.85).
+//          Opening and closing glide (study setDrawer / stepDrawers) without
+//          animating layout: the layout changes once per toggle, one
+//          measurement is taken then, and the motion is transforms only
+//          (css/35): the tray is clipped to --dp of its height (--wc-H) and
+//          every section in the column rides --wc-y. A closing drawer keeps
+//          its open layout (.wc-closing) until the spring settles.
+//   --wl / --wlc  the drawer's lamp: the spring while it moves, and a flash
+//          in another player's colour when they change something inside a
+//          closed drawer (study 2743-2757).
 //   --sp / --spp  a range input's displayed value while it springs toward a
 //          change (local 600 / 0.70, remote 120 / 0.95); removed once settled,
 //          so programmatic writes always fall back to the live --val.
-//   --rot  the tray rosette: rests, spins ~1.1 s when its drawer's settings
-//          change, settles.
+//   --wc-rot  the atoms: each tray's rosette, one per group that opens with
+//          its own bead row (css/35), and the hub of each top-bar dial. A
+//          flywheel: every change (a drag, a key, a click, another player's
+//          change) adds to its speed; it coasts down when you stop.
 //   --ga / --pc / --tgc  another player's change (06e .mp-peer-touch): glow in
 //          their colour, τ 1.4 s, and their name chip beside the control.
 //
@@ -68,14 +79,33 @@
         }
         return v;
     };
-    function newAtom() { return { a: 0, w: 0, until: -1 }; }
-    function kickAtom(at) { if (at) at.until = T + 1.1; }
-    function stepAtom(at, dt) {
-        var tgt = (!RM && T < at.until) ? 2.4 : 0;
-        at.w += (tgt - at.w) * (1 - Math.exp(-dt / 0.42));
-        if (tgt === 0 && at.w < 1e-3) at.w = 0;
+    // Atoms (study 1234-1242), with momentum. The study holds a 2.4 rad/s
+    // target for 1.1 s per kick, so steady interaction never builds and a
+    // drag just peters out. Here a kick adds an impulse to the target speed
+    // (J, scaled by the time since the last kick up to TREF, so a drag builds
+    // at the same rate whatever the frame or event rate; capped at GMAX), the
+    // target decays with the study's 0.42 s, and the speed eases toward it
+    // with the same 0.42 s. Kicks apply at most once a frame. One change:
+    // ~2.2 rad/s for about a second (the study's spin). A steady drag: ~8
+    // rad/s (3.4x) within 2 s. Let go: it coasts under 0.25 rad/s in ~2.2 s.
+    // Reduced motion: never spins.
+    var FLY = { J: 6, TREF: 0.3, GMAX: 9, TG: 0.42, TW: 0.42 };
+    function newAtom() { return { a: 0, w: 0, g: 0, last: -9, kick: false }; }
+    function kickAtom(at) { if (at && !RM) at.kick = true; }
+    function stepAtom(at, dt, now) {
+        if (at.kick) {
+            at.kick = false;
+            at.g = Math.min(FLY.GMAX, at.g + FLY.J * Math.min(1, (now - at.last) / FLY.TREF));
+            at.last = now;
+        }
+        if (RM) { at.g = at.w = 0; return; }
+        at.g *= Math.exp(-dt / FLY.TG);
+        if (at.g < 1e-3) at.g = 0;
+        at.w += (at.g - at.w) * (1 - Math.exp(-dt / FLY.TW));
+        if (at.g === 0 && at.w < 1e-3) at.w = 0;
         at.a += at.w * dt;
     }
+    function atomResting(at) { return !at.kick && at.g === 0 && at.w === 0; }
 
     var active = new Set();        // records with something still moving
     function wake(r) { active.add(r); }
@@ -136,19 +166,235 @@
     document.addEventListener('keyup', function (e) { var el = paneOf(e.target); if (el) { surge(el, 0); pressed.delete(el); } }, true);
     document.addEventListener('focusout', function (e) { var el = paneOf(e.target); if (el && pressed.has(el)) { surge(el, 0); pressed.delete(el); } }, true);
 
-    // ── Drawers: the drawer spring on --dp ─────────────────────────────
+    // ── Drawers: the drawer spring on --dp, the glide, the lamp ────────
+    // .collapsed (js/20 toggleSection, js/43) stays the truth. A toggle is
+    // seen by the observer below; the study's height animation (a layout
+    // every frame) becomes, per toggle: one class change for a closing
+    // drawer (.wc-closing keeps its layout open while it closes), one
+    // measurement (each toggled tray's height and its column's scroll), and
+    // transforms each frame (css/35). The sections of a column ride --wc-y:
+    //   z + sum over moving drawers above (max(0, x) - 1) * H
+    // where x is the drawer spring and H its tray's height (a moving drawer
+    // is laid out open, so its tray shows x of H and everything below it
+    // closes the rest of the gap). z is the column's scroll compensation:
+    // a scroll jump at the toggle (js/20 anchors the clicked header; native
+    // anchoring) glides out on the drawer spring, and a closing drawer near
+    // the end of a scrolled column leads into the scroll the browser will
+    // clamp when its layout collapses.
+    function isSection(el) { return el.nodeType === 1 && el.classList.contains('sidebar-section'); }
     function drawerRec(sec, create) {
         if (sec._wcd) return sec._wcd;
         if (!create) return null;
         var open = !sec.classList.contains('collapsed');
-        var r = { kind: 'drawer', el: sec, sp: new Spring(open ? 1 : 0, PROF.drawer), atom: newAtom(), last: '', lastRot: '' };
+        var r = { kind: 'drawer', el: sec, title: sec.querySelector('.section-title'), body: sec.querySelector(':scope > .section-body'),
+            sp: new Spring(open ? 1 : 0, PROF.drawer), open: open, moving: false, H: 0, c: null, t0: 0,
+            cl: null, tint: null, last: '', lastL: '', lastC: '' };
         sec._wcd = r;
         sec.style.setProperty('--dp', open ? '1' : '0');
         return r;
     }
-    function syncDrawer(sec) {
-        var r = drawerRec(sec, true), open = !sec.classList.contains('collapsed');
-        if (r.sp.t !== (open ? 1 : 0)) { r.sp.to(open ? 1 : 0, PROF.drawer); wake(r); }
+    // A column: the sections of one sidebar and the element that scrolls them.
+    function columnOf(sec) {
+        var list = sec.parentElement;
+        if (!list) return null;
+        if (list._wcc) return list._wcc;
+        var scroller = sec.closest('#sidebar-left, #sidebar-right') || list;
+        var c = { kind: 'column', list: list, scroller: scroller, secs: [], moving: new Set(), w: new Spring(0, PROF.drawer), za: 0,
+            on: false, tail: 0, pre: null, cache: null };
+        list._wcc = c;
+        // The scroll position before a toggle: read as a header is clicked
+        // (notePre), else the last one seen when a scroll came to rest.
+        scroller.addEventListener('scrollend', function () { c.cache = scroller.scrollTop; }, { passive: true });
+        return c;
+    }
+    function notePre(t) {
+        var sec = t && t.closest && t.closest('.sidebar-section');
+        var c = sec && columnOf(sec);
+        if (!c) return;
+        c.pre = c.scroller.scrollTop;          // one read, at the moment of the toggle
+        setTimeout(function () { c.pre = null; }, 0);
+    }
+    document.addEventListener('click', function (e) {
+        var t = e.target;
+        if (t && t.closest && t.closest('.section-header') && !t.closest('.section-header-actions')) notePre(t);
+    }, true);
+    document.addEventListener('keydown', function (e) {
+        var t = e.target;
+        if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('section-title')) notePre(t);
+    }, true);
+
+    var lastFrame = -1e9;
+    function framesRunning() { return performance.now() - lastFrame < 250; }
+    function toggleDrawers(list) {
+        var cols = new Map();
+        list.forEach(function (r) {
+            var open = !r.el.classList.contains('collapsed');
+            if (open === r.open) return;
+            r.open = open;
+            var c = columnOf(r.el);
+            // At once: reduced motion, a hidden page, no frames to animate on,
+            // or a section js/43 is hiding.
+            if (RM || document.hidden || !c || !r.body || !framesRunning() || r.el.classList.contains('ui-hidden')) { settleDrawer(r); return; }
+            r.el.classList.toggle('wc-closing', !open);
+            r.el.classList.add('wc-mv');
+            r.sp.to(open ? 1 : 0, PROF.drawer);
+            r.moving = true; r.c = c; r.t0 = performance.now();
+            wake(r);
+            if (!cols.has(c)) cols.set(c, []);
+            cols.get(c).push(r);
+        });
+        cols.forEach(function (rs, c) { setupColumn(c, rs); });
+        if (cols.size) setTimeout(stallGuard, 400);
+    }
+    function setupColumn(c, rs) {
+        rs.forEach(function (r) { c.moving.add(r); });
+        c.secs = [].filter.call(c.list.children, isSection);
+        c.secs.forEach(function (s) { s.classList.add('wc-off'); });
+        c.scroller.classList.add('wc-anim');
+        c.on = true; c.tail = 0;
+        // The one measurement: the toggled trays at their open height, and
+        // the scroll, after the toggle's layout.
+        rs.forEach(function (r) { r.H = r.body.offsetHeight; r.el.style.setProperty('--wc-H', r.H + 'px'); });
+        var s = c.scroller.scrollTop, sh = c.scroller.scrollHeight, ch = c.scroller.clientHeight;
+        var before = c.pre != null ? c.pre : c.cache;
+        c.pre = null; c.cache = s;
+        c.za = c.za * Math.max(0, c.w.x) + (before == null ? 0 : s - before);
+        c.w = new Spring(1, PROF.drawer); c.w.to(0, PROF.drawer);
+        // Each closing drawer collapses its layout when it settles; at the end
+        // of a scrolled column that pulls the scroll back. Predict it and lead
+        // into it (earliest toggle settles first).
+        var shk = sh, sk = s;
+        Array.from(c.moving).sort(function (a, b) { return a.t0 - b.t0; }).forEach(function (r) {
+            var x = Math.min(1, Math.max(0, r.sp.x)), v0 = clampTerm(r), T1 = 0;
+            if (!r.open) { shk -= r.H; T1 = Math.max(0, sk - Math.max(0, shk - ch)); sk -= T1; }
+            r.cl = { v0: v0, T: T1, x0: x, open: r.open };
+        });
+        wake(c);
+    }
+    // A drawer's share of its column's scroll lead: glides from where it was
+    // (v0, at x0) to the clamp it will cause (closing) or to 0 (opening).
+    function clampTerm(r) {
+        var k = r.cl;
+        if (!k || !r.moving) return 0;
+        var x = Math.min(1, Math.max(0, r.sp.x));
+        if (!k.open) return k.x0 > 1e-4 ? k.T - (k.T - k.v0) * (x / k.x0) : k.T;
+        return k.x0 < 1 - 1e-4 ? k.v0 * (1 - x) / (1 - k.x0) : 0;
+    }
+    function settleDrawer(r) {
+        r.sp.x = r.sp.t = r.open ? 1 : 0; r.sp.v = 0;
+        r.el.style.setProperty('--dp', r.open ? '1' : '0'); r.last = '';
+        r.moving = false;
+        r.el.classList.remove('wc-closing', 'wc-mv');
+        wake(r);
+    }
+    // No frames (the loop stalled, the page went to the background): land
+    // every moving drawer at once rather than leave one half open.
+    function stallGuard() {
+        if (framesRunning()) return;
+        active.forEach(function (r) { if (r.kind === 'drawer' && r.moving) settleDrawer(r); });
+        active.forEach(function (r) { if (r.kind === 'column') endColumn(r); });
+    }
+    // Still to the eye: under a third of a pixel from rest, barely moving.
+    // (The spring's own 1e-4 rest is ~0.5 s later and would hold a closed
+    // drawer's layout open that long for nothing.)
+    function still(sp, px) { return Math.abs(sp.t - sp.x) * px < 0.3 && Math.abs(sp.v) * px < 6; }
+    function stepDrawer(r, dt) {
+        if (r.moving) {
+            r.sp.step(dt);
+            if (still(r.sp, Math.max(r.H, 60))) { r.sp.x = r.sp.t; r.sp.v = 0; }
+            var d = Math.max(0, Math.min(1.2, r.sp.x)).toFixed(3);
+            if (d !== r.last) { r.el.style.setProperty('--dp', d); r.last = d; }
+            if (r.sp.settled()) { r.moving = false; r.el.classList.remove('wc-closing', 'wc-mv'); }
+        }
+        // The lamp (study 2751-2752): the spring, or a tint while it lasts.
+        var t = r.tint;
+        if (t) {
+            t.a *= Math.exp(-dt / 1.4);
+            if (t.a < 0.01) { r.tint = t = null; r.title.style.removeProperty('--wlc'); r.lastC = ''; }
+        }
+        if (!r.title) return !r.moving;
+        if (r.moving || t) {
+            var L = Math.max(Math.min(1, Math.max(0, r.sp.x)), t ? t.a : 0).toFixed(3);
+            if (L !== r.lastL) { r.title.style.setProperty('--wl', L); r.lastL = L; }
+            if (t) {
+                var m = t.a * 0.85, k = t.rgb;
+                var C = Math.round(255 * (1 - m) + k[0] * m) + ' ' + Math.round(110 * (1 - m) + k[1] * m) + ' ' + Math.round(30 * (1 - m) + k[2] * m);
+                if (C !== r.lastC) { r.title.style.setProperty('--wlc', C); r.lastC = C; }
+            }
+            return false;
+        }
+        if (r.lastL) { r.title.style.removeProperty('--wl'); r.lastL = ''; }
+        return true;
+    }
+    function stepColumn(c, dt) {
+        c.w.step(dt);
+        if (still(c.w, Math.max(Math.abs(c.za), 1))) { c.w.x = c.w.t; c.w.v = 0; }
+        var z = c.za * Math.max(0, c.w.x);
+        c.moving.forEach(function (r) { if (r.moving) z += clampTerm(r); else { r.cl = null; c.moving.delete(r); } });
+        var acc = z;
+        for (var i = 0; i < c.secs.length; i++) {
+            var s = c.secs[i], y = acc.toFixed(2) + 'px';
+            if (s._wcy !== y) { s.style.setProperty('--wc-y', y); s._wcy = y; }
+            var r = s._wcd;
+            if (r && r.moving) acc += (Math.max(0, r.sp.x) - 1) * r.H;
+        }
+        if (c.moving.size || !c.w.settled()) return false;
+        // At rest: one more frame with native scroll anchoring off, so the
+        // layout a closing drawer just collapsed doesn't re-anchor the scroll.
+        if (c.tail++ < 1) return false;
+        endColumn(c);
+        return true;
+    }
+    function endColumn(c) {
+        c.secs.forEach(function (s) { s.classList.remove('wc-off'); s.style.removeProperty('--wc-y'); s._wcy = ''; });
+        c.scroller.classList.remove('wc-anim');
+        c.za = 0; c.w = new Spring(0, PROF.drawer); c.on = false;
+        c.moving.forEach(function (r) { r.cl = null; });
+        c.moving.clear();
+    }
+    // Another player changed something inside a closed drawer: its lamp
+    // flashes in their colour and fades (study 2755-2757).
+    function tintLamp(face) {
+        var sec = face.closest && face.closest('.sidebar-section');
+        var r = sec && drawerRec(sec, true);
+        if (!r || r.open || RM) return;
+        r.tint = { a: 1, rgb: rgbOf(face.style.getPropertyValue('--mp-peer') || '#5ab0ff') };
+        wake(r);
+    }
+
+    // ── Atoms: which one a change spins ────────────────────────────────
+    // Group heads and boxes that open with their own bead row; the same list
+    // as css/35. A change spins its group's atom, or the tray's own (its
+    // first group) when it sits before any of them.
+    var NOT_FIRST = ':not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"])))';
+    var GROUP = [
+        '.section-body > .brush-section-label' + NOT_FIRST + ':not(:has(+ select))',
+        '.section-body > div' + NOT_FIRST + ' > .brush-section-label:first-child:not([for]):not(.brush-time-group > *)',
+        '.brush-settings-panel > .brush-fold', '.brush-settings-panel > .brush-fold ~ .brush-section-label',
+        '.layers-subsection', '.layers-options-group', '.mutation-locks', '#layersPanel > .layer-item',
+        '.fx-cluster + .fx-group', '.control-group:has(#saveSettingsBtn)', 'div:has(> #sidebarPresetList)'
+    ].join(', ');
+    var DIAL = '#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range]';
+    function groupOf(el) {
+        var body = el.closest('.section-body');
+        if (!body) return null;
+        for (var n = el; n && n !== body; n = n.parentElement) {
+            if (n.matches(GROUP)) return n;
+            for (var p = n.previousElementSibling; p; p = p.previousElementSibling) if (p.matches(GROUP)) return p;
+        }
+        return body;
+    }
+    function atomRec(el) {
+        return el._wca || (el._wca = { kind: 'atom', el: el, at: newAtom(), last: '' });
+    }
+    function spin(el) { var r = atomRec(el); kickAtom(r.at); wake(r); }
+    function kickFor(el) {
+        if (RM || !el || !el.closest) return;
+        if (el.matches(DIAL)) { spin(el); return; }
+        var sec = el.closest('.sidebar-section');
+        if (!sec || sec.classList.contains('collapsed')) return;     // nothing to see spin
+        var g = groupOf(el);
+        if (g) spin(g);
     }
 
     // ── Ranges: the displayed value springs toward a change ────────────
@@ -185,7 +431,11 @@
     document.addEventListener('focusin', function (e) { seeRange(e.target); }, true);
     document.addEventListener('input', function (e) {
         var inp = e.target;
-        if (!inp || inp.type !== 'range' || !inScope(inp)) return;
+        if (!inp || !inScope(inp)) return;
+        // Every change spins its atom, a held drag included (study setLocal
+        // kicks on each one); another player's glides arrive here too.
+        kickFor(inp);
+        if (inp.type !== 'range') return;
         var r = rangeRec(inp);
         // While the pointer holds this range the hand IS the value: the spring
         // sits on it (no per-frame write during a drag; the drag forced a style
@@ -194,7 +444,6 @@
         r.sp.to(norm(inp), remoteNow() ? PROF.remote : PROF.local);
         if (r.sp.settled()) return;
         wake(r);
-        kickSectionOf(inp);
     }, true);
     document.addEventListener('change', function (e) {
         var t = e.target;
@@ -202,14 +451,13 @@
         // A checkbox / radio inside a registered pane: its state is a
         // property, not an attribute, so the observer can't see it.
         var p = paneOf(t); if (p && p._wc) syncPane(p);
-        kickSectionOf(t);
+        kickFor(t);
     }, true);
-    function kickSectionOf(el) {
-        var sec = el.closest && el.closest('.sidebar-section');
-        if (!sec) return;
-        var r = drawerRec(sec, true);
-        kickAtom(r.atom); wake(r);
-    }
+    // Buttons, radios and option rows inside a drawer change things too.
+    document.addEventListener('click', function (e) {
+        var t = e.target, b = t && t.closest && t.closest('button, [role="button"], [role="radio"], [role="checkbox"], [role="option"], [role="switch"]');
+        if (b && b.closest('.section-body')) kickFor(b);
+    }, true);
 
     // ── Another player's change: glow in their colour + name chip ──────
     // 06e flashControl marks the control's face .mp-peer-touch and writes
@@ -288,15 +536,23 @@
 
     // ── State changes the app already makes ────────────────────────────
     var mo = new MutationObserver(function (list) {
+        var toggled = [];
         for (var i = 0; i < list.length; i++) {
             var el = list[i].target;
             if (el.nodeType !== 1) continue;
             if (list[i].attributeName === 'class') {
-                if (el.classList.contains('sidebar-section')) { syncDrawer(el); continue; }
-                if (el.classList.contains('mp-peer-touch') && !(list[i].oldValue || '').match(/\bmp-peer-touch\b/)) tint(el);
+                if (el.classList.contains('sidebar-section')) {
+                    var d = drawerRec(el, true);
+                    if (d.open === el.classList.contains('collapsed') && toggled.indexOf(d) < 0) toggled.push(d);
+                    continue;
+                }
+                if (el.classList.contains('mp-peer-touch') && !(list[i].oldValue || '').match(/\bmp-peer-touch\b/)) {
+                    tint(el); tintLamp(el); kickFor(el);
+                }
             }
             if (el.matches && el.matches(PANE) && inScope(el)) syncPane(el);
         }
+        if (toggled.length) toggleDrawers(toggled);
     });
 
     function init() {
@@ -306,6 +562,10 @@
             host.querySelectorAll(PANE).forEach(function (el) { paneRec(el, true); });
             host.querySelectorAll('.sidebar-section').forEach(function (s) { drawerRec(s, true); });
             host.querySelectorAll('input[type=range]').forEach(function (i) { rangeRec(i); });
+        });
+        document.querySelectorAll('#sidebar-left .sidebar-section, #sidebar-right .sidebar-section').forEach(function (s) {
+            var c = columnOf(s);
+            if (c && c.cache == null) c.cache = c.scroller.scrollTop;
         });
         mo.observe(document.body, { subtree: true, attributes: true, attributeOldValue: true,
             attributeFilter: ['class', 'aria-pressed', 'aria-checked', 'aria-selected'] });
@@ -317,23 +577,27 @@
     window.__themeFrame = function () {
         var now = performance.now();
         var dt = lastNow ? Math.min((now - lastNow) / 1000, 0.1) : 0.016;
-        lastNow = now;
+        lastNow = now; lastFrame = now;
         if (chipQueue.length) { var q = chipQueue; chipQueue = []; q.forEach(showChip); }
         if (!active.size) return;
         T += dt;
+        var cols = null;
         active.forEach(function (r) {
             var done = false;
             if (r.kind === 'pane') {
                 r.cath.step(dt); r.surge.step(dt); write(r);
                 done = r.cath.settled() && r.surge.settled();
                 if (done && r.transient) { r.el.style.removeProperty('--ci'); r.last = ''; }
+            } else if (r.kind === 'column') {
+                // After every drawer has stepped: the offsets read their springs.
+                (cols || (cols = [])).push(r);
             } else if (r.kind === 'drawer') {
-                r.sp.step(dt); stepAtom(r.atom, dt);
-                var d = Math.max(0, r.sp.x).toFixed(3);
-                if (d !== r.last) { r.el.style.setProperty('--dp', d); r.last = d; }
-                var rot = (r.atom.a * 57.2958 % 360).toFixed(1) + 'deg';
-                if (rot !== r.lastRot) { r.el.style.setProperty('--rot', rot); r.lastRot = rot; }
-                done = r.sp.settled() && r.atom.w === 0 && T >= r.atom.until;
+                done = stepDrawer(r, dt);
+            } else if (r.kind === 'atom') {
+                stepAtom(r.at, dt, now / 1000);
+                var rot = (r.at.a * 57.2958 % 360).toFixed(1) + 'deg';
+                if (rot !== r.last) { r.el.style.setProperty('--wc-rot', rot); r.last = rot; }
+                done = atomResting(r.at);
             } else if (r.kind === 'range') {
                 r.sp.step(dt);
                 if (r.sp.settled()) {
@@ -351,6 +615,7 @@
             }
             if (done) active.delete(r);
         });
+        if (cols) cols.forEach(function (c) { if (stepColumn(c, dt)) active.delete(c); });
     };
 
     // Pane widths are fixed in CSS (33-theme-topbar), snapped to the 24 px
@@ -383,8 +648,9 @@
         },
         // Re-read a pane's state after a change no attribute shows.
         sync: function (el) { if (el && (el._wc || el.matches(PANE))) syncPane(el); },
-        // Spin the rosette of el's drawer, as a settings change does.
-        kick: function (el) { if (el) kickSectionOf(el); },
+        // Spin the atom of el's group (or of its drawer's tray, or el's dial),
+        // as a settings change does.
+        kick: function (el) { kickFor(el); },
         Spring: Spring, Cathode: Cathode, PROF: PROF,
         reduced: function () { return RM; },
         now: function () { return T; }
