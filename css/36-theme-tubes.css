@@ -1,11 +1,335 @@
 /* ================================================================
-   css/36-theme-tubes.css - Walnut & Copper: Bargraph tubes (every range input): travel inset, empty / low / full
-   states, Laminar from centre, detent ticks, head rows (label left, value right).
-   Owner: the tubes workstream. Loads after css/30-34, inside @layer theme,
-   so a rule here wins a tie with the earlier theme sheets. Theme rules are
-   scoped to html[data-theme="walnut-copper"]. Button colour may live here
-   (js/38 sanctions css/31 and 33-39 theme sheets).
+   css/36-theme-tubes.css - Walnut & Copper: bargraph tubes, every range
+   input except the top bar's dials and telegraphs (css/33 paints those as
+   faces). The study's .lad (study-lite 231-257, peer tint 338-340) on the
+   app's own <input type=range>, with no extra DOM:
+
+     the input           the hit area (the study's .lad): 38 px tall in the
+                         sidebars (44 px for Replay speed and on coarse
+                         pointers), 40 px in the top bar (.mslide .track).
+                         Transparent borders shrink its padding box to the
+                         glass plus its 2.5 px ring, 5.5 px in from each end,
+                         so its background is the glass (.tg) and its inset
+                         shadows are the copper ring and .tg's own shadow.
+     ::-webkit-slider-container
+                         the column (.col): a box from the glass's start to
+                         the value, radius 7, with the white-hot head
+                         (::after), the peer tint (::before) and the glass
+                         sheen over it, and .halo's box-shadow, literally.
+     ::-webkit-slider-runnable-track
+                         taken out of the flow over the whole input, so the
+                         native thumb still runs 8 px .. width - 8 px whatever
+                         the column's width: the copper diamonds (.mk) and
+                         the detent ticks (.ticks) are its layers, the focus
+                         ring its outline.
+     ::-webkit-slider-thumb
+                         the hit point only, transparent.
+
+   One number places everything: --wc-p (0 .. 1.02), js/71's spring (--sp)
+   while the value glides, else the live --val / --min / --max that js/06
+   writes. The glass runs 8 px .. width - 8 px of the input, which is the
+   native 16 px thumb's travel (and js/06 applyFraction's): the column's end,
+   its head and both diamonds sit on the thumb's centre at every value and
+   width. In the sidebars the input sits 8 px in from its row, so the glass
+   is 16 px in, as in the study.
+
+   Owner: the tubes workstream (W2); js/72 writes --steps on stepped
+   sliders. @layer theme, scoped to html[data-theme="walnut-copper"]. No
+   animation: --sp moves only while js/71's spring runs (the study's
+   neonflick runs forever, so it is left out).
    ================================================================ */
 @layer theme {
+
+/* ── 1. Every tube ─────────────────────────────────────────────────────
+   (:where() keeps the dial / telegraph exclusion out of the specificity.) */
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)) {
+    --thumb-w: 16px;
+    /* the box above and below the ring; whole px, as Chrome floors borders */
+    --wc-bv: max(0px, round(down, calc((var(--input-h) - 20px) / 2), 1px));
+    --wc-p: clamp(0, var(--sp, calc((var(--val) - var(--min)) / (var(--max) - var(--min)))), 1.02);
+    --wc-dy: clamp(9.5px, calc((var(--input-h) - 15px) / 2), 13.5px);   /* .mk: 11.5 at 38 px, 13.5 at 44 */
+    --wc-tint: color-mix(in srgb, var(--pc) calc(var(--ga) * 85%), transparent);
+    /* the study's own --mesh-dim (0.7 stroke, 10 % white), as on .lad .tg */
+    --wc-mesh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.10' stroke-width='.7'/%3E%3C/svg%3E");
+    --wc-sheen: linear-gradient(175deg, rgba(255, 240, 225, 0.13), transparent 45%);     /* .glass */
+    /* .col, and its ::before tint (another player's colour, mix-blend-mode
+       color at --ga * 85 %): the colour blend keeps what it covers (each stop
+       over the dark glass) for lightness and takes their hue and chroma, at
+       85 % opacity; at --ga 1 a stop becomes that, between it mixes */
+    --wc-col: radial-gradient(ellipse 100% 55% at 50% 50%,
+        color-mix(in oklab, rgba(255, 236, 204, 0.95), oklch(from var(--pc) 0.916 calc(c * 0.45) h / 0.99) calc(var(--ga) * 100%)),
+        color-mix(in oklab, rgba(255, 150, 70, 0.85), oklch(from var(--pc) 0.689 calc(c * 0.85) h / 0.98) calc(var(--ga) * 100%)) 45%,
+        color-mix(in oklab, rgba(240, 70, 30, 0.35), oklch(from var(--pc) 0.336 c h / 0.9) calc(var(--ga) * 100%)) 100%);
+    --wc-head: radial-gradient(ellipse at 70% 50%, rgba(255, 250, 235, 0.95), transparent 70%);
+
+    /* .mk.up / .mk.dn: a 7 px square with a 1.4 px border turned 45 deg, one
+       10 px tile each (one tile stays crisp at any zoom; split tiles snap
+       apart), centred on the thumb's travel 8px + p * (width - 16px). The
+       study tints them toward another player's colour (--ga * 85 %): js/72
+       writes that colour's twin as --wc-mk-tint on the touched row. */
+    --wc-mk-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 1.04L8.96 5L5 8.96L1.04 5Z' fill='none' stroke='%23f2b38a' stroke-width='1.4'/%3E%3C/svg%3E");
+    --wc-mk-img: -webkit-cross-fade(var(--wc-mk-svg), var(--wc-mk-tint, var(--wc-mk-svg)), calc(var(--ga) * 85%));
+    --wc-mkx: calc(3px + var(--wc-p) * (100% - 6px));             /* the tile's left: centre - 5 */
+    --wc-marks:
+        var(--wc-mk-img) var(--wc-mkx) calc(50% - var(--wc-dy)) / 10px 10px no-repeat,
+        var(--wc-mk-img) var(--wc-mkx) calc(50% + var(--wc-dy)) / 10px 10px no-repeat;
+    /* .ticks: 1.2 x 4 px copper detents spread over the travel, under the
+       glass (top 50% + 9px). Only where js/72 wrote --steps. */
+    --wc-ticks:
+        repeating-linear-gradient(90deg, transparent 0, rgba(214, 140, 92, 0.8) 0.15px 1.05px, transparent 1.2px calc((100% - 1.2px) / var(--steps, 1)))
+        8px calc(50% + 11px) / calc(100% - 16px) calc(4px * min(1, var(--steps, 0))) no-repeat;
+
+    /* The glass and its ring. Borders (transparent, part of the hit area)
+       and a 3 px padding bring the content box to the glass itself: 8 px in
+       from the ends, 14 px tall, corners 7. The ring is drawn inward from
+       the padding edge: copper next to the glass, dark outside it. */
+    position: relative;             /* the track's containing block */
+    box-sizing: border-box;
+    border: solid transparent;
+    border-width: var(--wc-bv) 5px;
+    padding: 3px;
+    border-radius: 15px / calc(var(--wc-bv) + 10px);    /* 7 + 3 + the border */
+    background:
+        var(--wc-sheen),
+        linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 10px) 1px no-repeat,   /* .fila */
+        var(--wc-mesh) center / 6px 10.4px,
+        linear-gradient(170deg, #171010, #070403);
+    background-clip: content-box;
+    background-origin: content-box;
+    box-shadow:
+        inset 0 0 0 1.5px rgb(34 19 10),             /* .tg: 0 0 0 2.5px rgba(0,0,0,.6), over the wood */
+        inset 0 0 0 3px var(--cu),                   /* .tg: 0 0 0 1.5px var(--cu) */
+        inset 0 2px 4px 3px rgba(0, 0, 0, 0.75);     /* .tg: inset 0 2px 4px rgba(0,0,0,.75), from the glass's edge */
+    cursor: ew-resize;
+}
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-container {
+    flex: none;
+    height: 14px;
+    margin: 0;
+    width: calc(min(var(--wc-p), 1) * 100%);             /* 100% = the glass */
+    border-radius: 7px;
+    background:
+        var(--wc-sheen) 0 0 / calc(100% / max(min(var(--wc-p), 1), 0.001)) 100% no-repeat,   /* .glass, over the column */
+        var(--wc-head) 100% 0 / 10px 100% no-repeat,                                          /* .col::after */
+        var(--wc-col);                                                                        /* .col (+ ::before) */
+    box-shadow: 0 0 14px 2px rgba(255, 96, 24, 0.42), 0 0 4px rgba(255, 140, 60, 0.5);       /* .halo */
+}
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-runnable-track {
+    position: absolute;             /* in the input's padding box: back out to its border box */
+    left: -5px;
+    top: calc(-1 * var(--wc-bv));
+    width: calc(100% + 10px);
+    height: var(--input-h);
+    margin: 0;
+    background: var(--wc-ticks), var(--wc-marks);
+}
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-thumb {
+    width: var(--thumb-w);
+    height: var(--input-h);
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    filter: none;
+    cursor: ew-resize;
+}
+/* Focus: the study's .lad:has(input:focus-visible) ring, square, 3 px out
+   (on the track, which covers the input's box; the input's own outline
+   would follow its rounded corners). */
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):focus-visible {
+    outline: none;
+}
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):focus-visible::-webkit-slider-runnable-track {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+
+/* ── 2. Laminar / Blend: the column runs from the centre to the value ──── */
+html[data-theme="walnut-copper"] input[type=range]:is(#colorBlend, #colorBlendPerceptual):not(:where(#mixer-strip > .mixer-channel[data-ui-key="Color Blend"] input)) {
+    --wc-s: min(var(--wc-p), 0.5);
+    --wc-e: min(max(var(--wc-p), 0.5), 1);
+}
+html[data-theme="walnut-copper"] input[type=range]:is(#colorBlend, #colorBlendPerceptual):not(:where(#mixer-strip > .mixer-channel[data-ui-key="Color Blend"] input))::-webkit-slider-container {
+    margin-left: calc(var(--wc-s) * 100%);
+    width: calc((var(--wc-e) - var(--wc-s)) * 100%);
+    background:
+        var(--wc-sheen),
+        /* the head rides the value's end: right of the centre, or left */
+        var(--wc-head) 100% 0 / calc(10px * clamp(0, (var(--wc-p) - 0.5) * 1000, 1)) 100% no-repeat,
+        radial-gradient(ellipse at 30% 50%, rgba(255, 250, 235, 0.95), transparent 70%) 0 0 / calc(10px * clamp(0, (0.5 - var(--wc-p)) * 1000, 1)) 100% no-repeat,
+        var(--wc-col);
+}
+
+/* ── 3. Disabled: dark glass, unlit. The column stays as an unlit trace so
+   the value still reads; no head, no halo, dimmed ring and diamonds. ─── */
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):disabled {
+    --wc-mk-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 1.04L8.96 5L5 8.96L1.04 5Z' fill='none' stroke='%23f2b38a' stroke-opacity='.4' stroke-width='1.4'/%3E%3C/svg%3E");
+    --wc-mk-img: var(--wc-mk-svg);
+    cursor: default;
+    box-shadow: inset 0 0 0 1.5px rgb(34 19 10), inset 0 0 0 3px rgb(130 84 56), inset 0 2px 4px 3px rgba(0, 0, 0, 0.75);
+}
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):disabled::-webkit-slider-container {
+    background: linear-gradient(rgba(160, 138, 118, 0.16), rgba(160, 138, 118, 0.16));
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):disabled::-webkit-slider-thumb {
+    cursor: default;
+}
+
+/* ── 4. Sidebar rows: the study's .head over a .lad.sm ──────────────────
+   Head 13.6 px (label 10.5/1.2 Michroma, value 13/1 Share Tech Mono, on
+   one baseline, 4 px in), the tube box 38 px overlapping it by 1 px (the
+   study's 8 px gap and -9 px margin), 8 px to the next row: a 58.6 px
+   pitch from one label to the next, as in the study. The input sits 8 px
+   in from the row, so its glass is 16 px in. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader) input[type=range] {
+    --input-py: 8px;                /* 22 + 2 x 8 = 38 px */
+    width: calc(100% - 16px);
+    margin-inline: 8px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]) {
+    margin-bottom: 8px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]):last-child {
+    margin-bottom: 0;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]) > label,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-header {
+    align-items: baseline;
+    gap: 8px;
+    padding: 0 4px;
+    margin-bottom: -1px;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-label {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]) > label .value-display,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-value {
+    font: 400 13px/1 var(--ui-font-mono);
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+    text-transform: none;           /* "px", "x", "s" as written */
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    opacity: 1;
+    min-height: 0;
+    /* room for five digits whatever the value, so a long name that wraps
+       keeps its line break while the number changes under a drag */
+    min-width: calc(5ch + 0.3em);
+    text-align: right;
+}
+/* Brush Size reads up to six characters (885 px): keep its wider box. */
+html[data-theme="walnut-copper"] #sidebar-left #mixer-brushValue { min-width: calc(6ch + 0.36em); }
+/* A strip channel in a sidebar (Brush Size, the Multi-Brush count): its
+   header is the head row; the head's -1 px, the channel's 4 px gap and
+   -4 px here = the same 1 px overlap. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-fader {
+    margin-top: -4px;
+}
+/* A disabled row (js/20 greys it with an inline opacity): unlit instead, so
+   the glass stays dark glass. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]:disabled) {
+    opacity: 1 !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]:disabled) > label,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]:disabled) > label .value-display {
+    color: rgba(160, 138, 118, 0.55);
+    text-shadow: none;
+}
+@media (pointer: coarse) {
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader) input[type=range] { --input-py: 11px; }
+}
+/* Replay speed is the study's full-height .lad (44 px). */
+html[data-theme="walnut-copper"] #sidebar-left #replaySpeed { --input-py: 11px; }
+
+/* ── 5. The top bar's tube (Material's slider): the study's .mslide ──────
+   .mslide 495-497: 6 px under the field, the head row 0 4px, then the
+   40 px .track the console glass draws (study shader, TUBE): 14 px glass
+   8 px in from the track's ends, a thin copper wire round it 1.6 px out, a
+   gold column with a hot core and a brighter last stretch, wire diamonds
+   15.5 px above and below the value, no halo. The shader's colours are
+   measured from the study at 1440 (prep/work/W2), so the stand-in matches
+   until the console-glass pass lands. The study runs the travel 14 px in
+   and lights 6 px of glass at 0; here the travel is the glass, as in the
+   sidebars, so 0 is empty and max is full.
+
+   The head row lives in the header, under the field, as a grid row: the
+   slider's name (named for the material, as css/33's printed scale did)
+   left and the header's own value right, on one baseline. Two separate
+   boxes drifted apart under the bar's zoom; one row cannot. The scale row
+   it replaces is aria-hidden; this name is hidden from assistive tech too
+   (content alt ""), the slider keeps its own label. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 10px;                  /* the channel's 4 px gap + .mslide's 6 px margin */
+    align-items: baseline;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-header > .ch-label { grid-area: 1 / 1 / 2 / 3; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-header::after {
+    content: "Vorticity" / "";
+    grid-area: 2 / 1;
+    padding-left: 4px;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"]:has(#materialMode option[value="acrylic"]:checked) .ch-header::after { content: "Wetness" / ""; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"]:has(#materialMode option[value="clay"]:checked) .ch-header::after { content: "Thickness" / ""; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .fader-scale { display: none; }
+/* .mslide is a grid with a 2 px gap: the channel's 4 px gap less 2 */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-fader { margin-top: -2px; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range] {
+    --input-py: 9px;                /* 22 + 2 x 9 = 40 px, .navbar .mslide .track */
+    --wc-dy: 15.5px;
+    /* the wire rhombus: half width 2.88, half height 3.6, a 1.2 px copper
+       wire on its outline, in a tile with room for the wire's tips */
+    --wc-mk-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='10' viewBox='0 0 8 10'%3E%3Cpath d='M4 1.4L6.88 5L4 8.6L1.12 5Z' fill='none' stroke='%23b07a64' stroke-width='1.2'/%3E%3C/svg%3E");
+    --wc-mkx: calc(4px + var(--wc-p) * (100% - 8px));             /* the tile's left: centre - 4 */
+    --wc-marks:
+        var(--wc-mk-img) var(--wc-mkx) calc(50% - var(--wc-dy)) / 8px 10px no-repeat,
+        var(--wc-mk-img) var(--wc-mkx) calc(50% + var(--wc-dy)) / 8px 10px no-repeat;
+    /* the smoked glass, lighter over its upper half, and its filament glow */
+    background:
+        linear-gradient(transparent calc(50% - 1.5px), rgb(150 120 104 / 0.45) 50%, transparent calc(50% + 1.5px)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.4'/%3E%3C/svg%3E") center / 3px 5.2px,
+        linear-gradient(rgb(52 40 33), rgb(48 40 36) 1px, rgb(58 50 45) 3px, rgb(56 47 42) 6px, rgb(44 36 32) 7.5px, rgb(26 20 18) 9px, rgb(26 20 18) 11px, rgb(18 14 12));
+    /* the wire, 1.6 px out from the glass: inward from 3 px out, a soft
+       edge, the pale wire, copper, dark against the glass */
+    box-shadow: inset 0 0 0 1px rgb(112 66 42), inset 0 0 0 2px rgb(156 108 100), inset 0 0 0 2.5px rgb(140 76 50), inset 0 0 0 3px rgb(92 46 24);
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-container {
+    background:
+        /* the last stretch burns brighter (shader: head over 3.5 % of the travel) */
+        linear-gradient(90deg, rgb(255 236 196 / 0), rgb(255 236 196 / 0.32)) 100% 0 / 5px 100% no-repeat,
+        linear-gradient(var(--wc-tint), var(--wc-tint)),
+        /* the gold column, opaque, as measured across the glass */
+        linear-gradient(rgb(77 44 28), rgb(99 57 37) 1.5px, rgb(141 86 54) 2.5px, rgb(185 126 78) 3.5px, rgb(216 162 98) 4.5px, rgb(234 193 123) 5.5px,
+            rgb(241 209 139) 6.5px, rgb(242 212 141) 7.5px, rgb(238 202 128) 8.5px, rgb(226 176 96) 9.5px, rgb(201 134 68) 10.5px,
+            rgb(159 92 47) 11.5px, rgb(111 57 29) 12.5px, rgb(78 41 24));
+    background-blend-mode: normal, color, normal;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]:disabled {
+    box-shadow: inset 0 0 0 1px rgb(96 60 42), inset 0 0 0 2px rgb(118 86 78), inset 0 0 0 3px rgb(70 38 22);
+}
+
+/* Printed scale under faders (popups that still show it): engraved. */
+html[data-theme="walnut-copper"] .fader-scale {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    color: var(--unlit);
+}
 
 } /* @layer theme */

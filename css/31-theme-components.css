@@ -122,56 +122,7 @@ html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record
     border-color: #ff6a4d;
 }
 
-/* ── Bargraph tube: every range input ─────────────────────────────────
-   Same box as before (22 px well inside a 44 px hit area). The well
-   becomes dark glass in a copper ring, the fill an IN-9 neon column, and
-   the thumb shows only a white-hot head and the two copper diamonds that
-   mark the value above and below the tube. --thumb-h only sizes the
-   runnable track inside the input; the input's own height comes from
-   --track-h, which is unchanged. */
-html[data-theme="walnut-copper"] input[type=range] {
-    --neon-col: radial-gradient(ellipse 100% 55% at 50% 50%, rgba(255, 236, 204, 0.95), rgba(255, 150, 70, 0.85) 45%, rgba(240, 70, 30, 0.38) 100%);
-    --thumb-h: 40px;
-}
-html[data-theme="walnut-copper"] input[type=range]::-webkit-slider-container {
-    border-radius: 11px;
-    box-shadow:
-        0 0 0 1.5px var(--cu),
-        0 0 0 2.5px rgba(0, 0, 0, 0.6),
-        inset 0 2px 4px rgba(0, 0, 0, 0.75);
-    background:
-        linear-gradient(175deg, rgba(255, 240, 225, 0.13), transparent 45%),
-        var(--neon-col) 0 50% / calc(var(--js, 0) * var(--spp, var(--pos))) 100% no-repeat,   /* --spp: js/71 spring, while moving */
-        linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 12px) 1px no-repeat,
-        var(--mesh-dim) center / 3.5px 6.06px,
-        linear-gradient(170deg, #171010, #070403);
-}
-/* Laminar / Blend fills from the middle toward the value, as before. */
-html[data-theme="walnut-copper"] :is(#colorBlend, #colorBlendPerceptual)::-webkit-slider-container {
-    --fill-l: min(var(--pos), 50%);
-    --fill-r: max(var(--pos), 50%);
-    background:
-        linear-gradient(175deg, rgba(255, 240, 225, 0.13), transparent 45%),
-        linear-gradient(90deg, transparent var(--fill-l), rgba(255, 150, 70, 0.85) var(--fill-l),
-            rgba(255, 196, 140, 0.9) var(--fill-r), transparent var(--fill-r)) 0 50% / calc(var(--js, 0) * 100%) 60% no-repeat,
-        linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 12px) 1px no-repeat,
-        var(--mesh-dim) center / 3.5px 6.06px,
-        linear-gradient(170deg, #171010, #070403);
-}
-html[data-theme="walnut-copper"] input[type=range]::-webkit-slider-thumb {
-    border: 0;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='40' viewBox='0 0 16 40'%3E%3Cpath d='M8 1.2L11.6 4.8L8 8.4L4.4 4.8Z M8 31.6L11.6 35.2L8 38.8L4.4 35.2Z' fill='%23180d07' stroke='%23f2b38a' stroke-width='1.4'/%3E%3Crect x='6.5' y='11' width='3' height='18' rx='1.5' fill='%23fff6e6' fill-opacity='.9'/%3E%3C/svg%3E") center / 16px 40px no-repeat;
-    filter: drop-shadow(0 0 3px rgba(255, 140, 60, 0.55));
-}
-html[data-theme="walnut-copper"] input[type=range]:disabled::-webkit-slider-container { opacity: 0.55; }
-html[data-theme="walnut-copper"] input[type=range]:focus-visible { outline-color: var(--ui-focus); }
-
-/* Printed scale under faders: engraved. */
-html[data-theme="walnut-copper"] .fader-scale {
-    font-family: var(--ui-font-mono);
-    font-weight: 400;
-    color: var(--unlit);
-}
+/* ── Bargraph tube: every range input → css/36-theme-tubes.css ───────── */
 
 /* ── Field: selects (closed state; the native popup stays for now) ──── */
 html[data-theme="walnut-copper"] select {
