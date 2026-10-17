@@ -5,7 +5,425 @@
    so a rule here wins a tie with the earlier theme sheets. Theme rules are
    scoped to html[data-theme="walnut-copper"]. Button colour may live here
    (js/38 sanctions css/31 and 33-39 theme sheets).
+
+   Study: design/study-lite.html (v19) .cab / .dfront / .dtray 427-458,
+   .lamp 368-372, .fil bead rows 164-169, .sect 157, .subhd 394-395;
+   motion 2720-2758 (setDrawer, stepDrawers). Values are the study's.
+
+   State stays the app's: .collapsed on .sidebar-section (js/20
+   toggleSection) and aria-expanded on the title. js/71 adds presentation
+   classes only while a drawer moves:
+     .wc-closing  a closing drawer keeps its open layout until it settles
+     .wc-mv       the drawer whose tray is sliding (clip + slide below)
+     .wc-off      a section riding the column offset --wc-y (FLIP)
+   and writes --dp (drawer spring), --wc-H (tray height, once per toggle),
+   --wc-y (per section), --wl / --wlc (lamp) and --wc-rot (atoms).
    ================================================================ */
+
+/* Written per frame on the element that uses them, so a change restyles
+   that element only (an inherited property would restyle its subtree). */
+@property --wc-rot { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@property --wc-y { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
 @layer theme {
+
+html[data-theme="walnut-copper"] {
+    /* The study's atom (2845-2847): a six-lobed rose, r = 9|cos 3a|, with a
+       nucleus. Same figure as the telegraph hub. */
+    --wc-atom: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2022%2022%22%3E%3Cpath%20d%3D%22M20.00%2011.00L19.95%2011.31L19.78%2011.61L19.51%2011.89L19.14%2012.14L18.68%2012.35L18.12%2012.51L17.49%2012.62L16.79%2012.66L16.03%2012.63L15.23%2012.54L14.39%2012.37L13.54%2012.13L12.68%2011.82L11.83%2011.44L11.00%2011.00L11.80%2011.50L12.55%2012.05L13.25%2012.63L13.88%2013.25L14.45%2013.89L14.93%2014.54L15.33%2015.18L15.65%2015.81L15.87%2016.41L16.01%2016.97L16.06%2017.48L16.03%2017.92L15.92%2018.30L15.74%2018.59L15.50%2018.79L15.20%2018.90L14.86%2018.91L14.48%2018.82L14.08%2018.62L13.67%2018.32L13.25%2017.92L12.84%2017.43L12.46%2016.84L12.10%2016.17L11.78%2015.43L11.51%2014.62L11.29%2013.77L11.13%2012.87L11.03%2011.94L11.00%2011.00L10.97%2011.94L10.87%2012.87L10.71%2013.77L10.49%2014.63L10.22%2015.43L9.90%2016.17L9.54%2016.84L9.16%2017.43L8.75%2017.92L8.33%2018.32L7.92%2018.62L7.52%2018.82L7.14%2018.91L6.80%2018.90L6.50%2018.79L6.26%2018.59L6.08%2018.30L5.97%2017.92L5.94%2017.48L5.99%2016.97L6.13%2016.41L6.35%2015.81L6.67%2015.18L7.07%2014.54L7.55%2013.89L8.12%2013.25L8.75%2012.63L9.45%2012.05L10.20%2011.50L11.00%2011.00L10.17%2011.44L9.32%2011.82L8.46%2012.13L7.61%2012.37L6.77%2012.54L5.97%2012.63L5.21%2012.66L4.51%2012.62L3.88%2012.51L3.32%2012.35L2.86%2012.14L2.49%2011.89L2.22%2011.61L2.05%2011.31L2.00%2011.00L2.05%2010.69L2.22%2010.39L2.49%2010.11L2.86%209.86L3.32%209.65L3.88%209.49L4.51%209.38L5.21%209.34L5.97%209.37L6.77%209.46L7.61%209.63L8.46%209.87L9.32%2010.18L10.17%2010.56L11.00%2011.00L10.20%2010.50L9.45%209.95L8.75%209.37L8.12%208.75L7.55%208.11L7.07%207.46L6.67%206.82L6.35%206.19L6.13%205.59L5.99%205.03L5.94%204.52L5.97%204.08L6.08%203.70L6.26%203.41L6.50%203.21L6.80%203.10L7.14%203.09L7.52%203.18L7.92%203.38L8.33%203.68L8.75%204.08L9.16%204.57L9.54%205.16L9.90%205.83L10.22%206.57L10.49%207.38L10.71%208.23L10.87%209.13L10.97%2010.06L11.00%2011.00L11.03%2010.06L11.13%209.13L11.29%208.23L11.51%207.37L11.78%206.57L12.10%205.83L12.46%205.16L12.84%204.57L13.25%204.08L13.67%203.68L14.08%203.38L14.48%203.18L14.86%203.09L15.20%203.10L15.50%203.21L15.74%203.41L15.92%203.70L16.03%204.08L16.06%204.52L16.01%205.03L15.87%205.59L15.65%206.19L15.33%206.82L14.93%207.46L14.45%208.11L13.88%208.75L13.25%209.37L12.55%209.95L11.80%2010.50L11.00%2011.00L11.83%2010.56L12.68%2010.18L13.54%209.87L14.39%209.63L15.23%209.46L16.03%209.37L16.79%209.34L17.49%209.38L18.12%209.49L18.68%209.65L19.14%209.86L19.51%2010.11L19.78%2010.39L19.95%2010.69L20.00%2011.00%22%20fill%3D%22none%22%20stroke%3D%22%23d68c5c%22%20stroke-width%3D%221.1%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2211%22%20r%3D%221.6%22%20fill%3D%22%23f2b38a%22%2F%3E%3C%2Fsvg%3E");
+}
+
+/* ── The cabinet: a drawer per section, 6 px apart (study .cab gap) ── */
+html[data-theme="walnut-copper"] .sidebar-section {
+    border-bottom: 0;
+    margin-bottom: 6px;
+}
+
+/* ── Drawer front (study .dfront 434-441) ────────────────────────────
+   Vertical-grain walnut, the inset copper line, a top highlight, and a drop
+   shadow that grows as the drawer pulls out (--dp, the drawer spring). The
+   front sits above its tray (study .dfront-row z-index 1) so the tray slides
+   out from under it. No pull bar (Gabriel). */
+html[data-theme="walnut-copper"] .section-header {
+    position: relative;
+    z-index: 1;
+    min-height: 46px;
+    box-sizing: border-box;
+    gap: 12px;
+    padding: 0 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    background:
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 6px, rgba(255, 200, 150, 0.045) 6px 7px, transparent 7px 13px),
+        linear-gradient(180deg, #3d2313, #24130a);
+    box-shadow:
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 2px 0 rgba(255, 210, 170, 0.14),
+        0 2px 0 rgba(0, 0, 0, 0.45),
+        0 calc(var(--dp, 0) * 12px) calc(var(--dp, 0) * 16px) -6px rgba(0, 0, 0, 0.85);
+    transform: translateY(calc(var(--dp, 0) * -1px));
+}
+html[data-theme="walnut-copper"] .section-header:has(> .section-title:focus-visible) {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 2px;
+}
+
+/* The engraved name (study .dfront type: Michroma 11 px, .22em). Beats the
+   group-gradient text fill (21-sidebar's @supports block). */
+html[data-theme="walnut-copper"] .sidebar-section .section-title,
+html[data-theme="walnut-copper"] .sidebar-section[data-group] .section-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.22em;
+    white-space: nowrap;
+    text-transform: uppercase;
+    color: var(--engrave);
+    -webkit-text-fill-color: var(--engrave);
+    background: none;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+html[data-theme="walnut-copper"] .section-header:hover .section-title {
+    color: #fff1dc;
+    -webkit-text-fill-color: #fff1dc;
+}
+
+/* ── The drawer's pilot lamp (study .lamp.dlamp, 368-372 + 442) ───────
+   A 10 px cathode: lit by --wl (0-1) in --wlc (r g b). At rest it is the
+   drawer's state; while the drawer moves js/71 writes the spring (it
+   strikes as the drawer pulls out and dims as it closes), and a change
+   another player makes inside a closed drawer flashes it in their colour
+   (study 2751-2757). Decorative: the state is aria-expanded. */
+html[data-theme="walnut-copper"] .sidebar-section .section-title { --wl: 0; --wlc: 255 110 30; }
+html[data-theme="walnut-copper"] .sidebar-section:not(.collapsed) .section-title { --wl: 1; }
+html[data-theme="walnut-copper"] .section-title::before {
+    content: "";
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 38% 32%, rgba(255, 244, 228, calc(0.12 + var(--wl) * 0.65)), transparent 42%),
+        radial-gradient(circle, rgb(var(--wlc) / calc(0.1 + var(--wl) * 0.85)) 0 50%, rgb(var(--wlc) / calc(var(--wl) * 0.3)) 70%, transparent 72%),
+        var(--mesh-dim) center / 5px 8.66px,
+        #120c0a;
+    box-shadow:
+        inset 0 0 0 1.5px var(--cu),
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        0 0 calc(var(--wl) * 12px) rgb(var(--wlc) / calc(var(--wl) * 0.6));
+}
+/* No chevron: the lamp and the lift carry the state. */
+html[data-theme="walnut-copper"] .section-chevron { display: none; }
+
+/* Badges on a front (Audio's "Under construction"): study .dtag. */
+html[data-theme="walnut-copper"] .section-header .section-badge {
+    font: 400 9px/1 var(--ui-font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    color: #ffcf8a;
+    background: rgba(40, 22, 6, 0.85);
+    box-shadow: inset 0 0 0 1px rgba(255, 180, 80, 0.5);
+    text-shadow: 0 0 5px rgba(255, 160, 60, 0.6);
+}
+
+/* ── The tray (study .dtray 453-455) ──────────────────────────────────
+   The open look applies to an open drawer and to one that is closing
+   (.wc-closing keeps its layout open until the spring settles; js/71). */
+html[data-theme="walnut-copper"] .sidebar-section > .section-body {
+    position: relative;
+    margin: 0 5px;
+    border-radius: 0 0 8px 8px;
+    background: linear-gradient(rgba(8, 4, 2, 0.5), rgba(8, 4, 2, 0.2));
+    box-shadow:
+        inset 0 12px 14px -12px rgba(0, 0, 0, 0.95),
+        inset 1px 0 0 rgba(214, 140, 92, 0.3),
+        inset -1px 0 0 rgba(214, 140, 92, 0.3);
+    /* The reveal is the motion; no fade (study). */
+    transition: none;
+}
+/* Content starts below the tray's bead row: .dtray 4 + .sp-field 2 + .fil 22. */
+html[data-theme="walnut-copper"] :is(.sidebar-section:not(.collapsed), .sidebar-section.wc-closing) > .section-body {
+    padding-top: 28px;
+    padding-bottom: 16px;
+}
+/* A closing drawer keeps the open layout while it closes (js/71 removes
+   .wc-closing once the drawer spring has settled). */
+html[data-theme="walnut-copper"] .sidebar-section.collapsed.wc-closing {
+    grid-template-rows: auto 1fr;
+}
+html[data-theme="walnut-copper"] .sidebar-section.collapsed.wc-closing > .section-body {
+    opacity: 1;
+    visibility: visible;
+}
+/* A closed tray is out of reach at once, as the study's body.inert = true:
+   it leaves the Tab order and the accessibility tree the moment it closes,
+   even while it is still sliding shut. */
+html[data-theme="walnut-copper"] .sidebar-section.collapsed > .section-body {
+    interactivity: inert;
+}
+
+/* ── Opening and closing (study setDrawer / stepDrawers) ─────────────
+   The study grows the tray's height every frame. Here the layout changes
+   once per toggle and the motion is transforms only: the tray is revealed
+   through a clip as tall as --dp of its height (--wc-H) while it slides
+   14 px down from under its front (study .dtray), and every section in the
+   column rides --wc-y, so the drawers below glide instead of jumping. */
+html[data-theme="walnut-copper"] .sidebar-section.wc-off {
+    transform: translateY(var(--wc-y));
+    will-change: transform;
+}
+html[data-theme="walnut-copper"] .sidebar-section.wc-mv > .section-body {
+    transform: translateY(calc((1 - min(var(--dp), 1)) * -14px));
+    clip-path: inset(
+        calc((1 - min(var(--dp), 1)) * 14px) 0
+        calc(var(--wc-H, 0px) - max(0, var(--dp)) * var(--wc-H, 0px) - (1 - min(var(--dp), 1)) * 14px) 0);
+}
+/* Native scroll anchoring would fight the offsets while the layout settles. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left).wc-anim {
+    overflow-anchor: none;
+}
+
+/* ── Bead rows and atoms (study .fil 164-169) ─────────────────────────
+   "One container per column": a dotted copper bead row opens each group,
+   with a small atom resting in a 26 px gap. The tray's own row opens its
+   first group; every later group heading or group box gets its own. An
+   atom spins when something in its group changes (js/71, --wc-rot). */
+html[data-theme="walnut-copper"] :is(.sidebar-section:not(.collapsed), .sidebar-section.wc-closing) > .section-body::before,
+html[data-theme="walnut-copper"] .section-body :is(
+    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
+    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
+    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
+    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
+    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 12px;
+    border-top: 2px dotted rgba(214, 140, 92, 0.55);
+    pointer-events: none;
+    -webkit-mask: linear-gradient(90deg, #000 calc(50% - 13px), transparent calc(50% - 13px) calc(50% + 13px), #000 calc(50% + 13px));
+    mask: linear-gradient(90deg, #000 calc(50% - 13px), transparent calc(50% - 13px) calc(50% + 13px), #000 calc(50% + 13px));
+}
+html[data-theme="walnut-copper"] :is(.sidebar-section:not(.collapsed), .sidebar-section.wc-closing) > .section-body::after,
+html[data-theme="walnut-copper"] .section-body :is(
+    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
+    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
+    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
+    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
+    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::after {
+    --wc-rot: inherit;
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 6px;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    background: var(--wc-atom) center / contain no-repeat;
+    opacity: 0.8;
+    transform: rotate(var(--wc-rot));
+    pointer-events: none;
+}
+
+/* A group that opens with its own bead row: the study's .fil geometry, the
+   row 6 px and the atom 0 px from the group's top, content 22 px down, and
+   18 px from the group before it (.fil padding-bottom 8 + gap 10). The row
+   spans the tray less 10 px each side, as the tray's own does. */
+html[data-theme="walnut-copper"] .section-body :is(
+    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
+    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
+    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
+    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
+    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList)) {
+    position: relative;
+    margin-top: 18px !important;
+    padding-top: 22px !important;
+    border-top: 0 !important;
+}
+html[data-theme="walnut-copper"] .section-body :is(
+    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
+    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
+    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
+    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
+    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::before {
+    left: -2px;
+    right: -2px;
+    top: 6px;
+}
+html[data-theme="walnut-copper"] .section-body :is(
+    .section-body > .brush-section-label:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))):not(:has(+ select)),
+    .section-body > div:not(:nth-child(1 of :not([hidden], [style*="display: none"], [style*="display:none"], input[type="file"]))) > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
+    .brush-settings-panel > .brush-fold, .brush-settings-panel > .brush-fold ~ .brush-section-label,
+    .layers-subsection, .layers-options-group, .mutation-locks, #layersPanel > .layer-item,
+    .fx-cluster + .fx-group, .control-group:has(#saveSettingsBtn), div:has(> #sidebarPresetList))::after {
+    top: 0;
+}
+/* Mutate's tray is a flex column with a 10 px gap: 8 more makes the 18. */
+html[data-theme="walnut-copper"] .sidebar-section#mutation-section > .section-body > .mutation-locks { margin-top: 8px !important; }
+/* A layer dragged over another: its bead row lights as the drop line. */
+html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel > .layer-item.drag-over::before {
+    border-top: 2px solid var(--cu-hi);
+    box-shadow: 0 0 8px rgba(255, 110, 30, 0.7);
+    -webkit-mask: none;
+    mask: none;
+}
+
+/* ── Group headings: the study's .sect (157) ──────────────────────── */
+html[data-theme="walnut-copper"] .section-body :is(
+    .section-body > .brush-section-label:not(:has(+ select)),
+    .section-body > div > .brush-section-label:first-child:not([for]):not(.brush-time-group > *),
+    .brush-settings-panel > .brush-section-label,
+    .layers-subsection-title, .layers-options-title, .mutation-locks-label, .palette-label,
+    .control-group:has(#saveSettingsBtn) > label, div:has(> #sidebarPresetList) > label) {
+    display: block;
+    /* The gap above is the bead row's (18 px) or the tray's own. */
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 8px !important;
+    font: 400 10.5px/1.2 var(--ui-font-display) !important;
+    letter-spacing: 0.2em !important;
+    text-transform: uppercase !important;
+    color: var(--engrave) !important;
+    opacity: 1;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+/* Headings that share a row keep it: Path Layers beside + New Path, Lock:
+   before its chips, Palettes beside its key hint. */
+html[data-theme="walnut-copper"] .section-body :is(.layers-subsection-title, .mutation-locks-label, .palette-label) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0 !important;
+}
+
+/* ── Minor sub-headings: the study's .subhd (394-395) ─────────────────
+   Centred in the display face between two dotted copper rules. */
+html[data-theme="walnut-copper"] .section-body :is(.ui-vis-group, .layer-group-head:has(> .layer-group-title:only-child)) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 0;
+    margin-top: 4px;
+    font: 400 9.5px/1 var(--ui-font-display);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    opacity: 1;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+}
+html[data-theme="walnut-copper"] .section-body :is(.ui-vis-group, .layer-group-head:has(> .layer-group-title:only-child))::before,
+html[data-theme="walnut-copper"] .section-body :is(.ui-vis-group, .layer-group-head:has(> .layer-group-title:only-child))::after {
+    content: "";
+    flex: 1;
+    border-top: 1.5px dotted rgba(214, 140, 92, 0.45);
+}
+html[data-theme="walnut-copper"] .section-body .layer-group-title {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+}
+
+/* ── No second box inside a drawer ────────────────────────────────────
+   Panels give up their plates and frames; the bead rows above divide the
+   groups. States that carry meaning keep a mark without a box. */
+html[data-theme="walnut-copper"] .section-body .arm-colors-panel {
+    box-shadow: none;
+    background: transparent;
+}
+html[data-theme="walnut-copper"] .section-body :is(.hk-block, .ui-vis-block, .fx-cluster, .layers-options-group .checkbox-group) {
+    border-bottom: 0;
+}
+html[data-theme="walnut-copper"] .section-body :is(.hk-block, .ui-vis-block, .fx-cluster) { padding-bottom: 0; }
+html[data-theme="walnut-copper"] .section-body :is(.layers-options-group, .layer-group, .path-empty-state, .palette-actions) {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] .section-body .layer-group { padding: 0; }
+html[data-theme="walnut-copper"] .section-body .layers-options-group { padding-left: 0; padding-right: 0; padding-bottom: 0; }
+html[data-theme="walnut-copper"] .section-body .palette-actions { padding-top: 0; }
+html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel > .layer-item {
+    margin-bottom: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding-left: 0;
+    padding-right: 0;
+}
+/* The layer you paint into: a warm glow behind its row, not a frame. */
+html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel > .layer-item:is(.active-layer, .raster-active) > .layer-item-header {
+    border-radius: 7px;
+    background: radial-gradient(ellipse 70% 120% at 30% 50%, rgba(255, 110, 30, 0.16), transparent 75%);
+}
+html[data-theme="walnut-copper"] .section-body .layer-item-header {
+    background: transparent;
+}
+/* A picture layer's fold caret: the study's copper disclosure and its ease
+   (.disc::after 384). */
+html[data-theme="walnut-copper"] .section-body .layer-collapse-caret {
+    border-color: var(--cu-hi);
+    transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.25, 1.2);
+}
+html[data-theme="walnut-copper"] .section-body .layers-toolbar {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+/* Drop targets: not there until a layer is being dragged (js/20 sizes them
+   up then), then a lit well. */
+html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel:not(.layers-dragging) .drop-zone {
+    height: 0;
+    margin: 0;
+    border-width: 0;
+}
+html[data-theme="walnut-copper"] #sidebar-right .section-body .drop-zone {
+    border-color: transparent;
+    background: transparent;
+}
+html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel.layers-dragging .drop-zone {
+    border-style: solid;
+    border-color: rgba(214, 140, 92, 0.45);
+    color: var(--engrave);
+    background: linear-gradient(170deg, #1a1210, #090605);
+}
+html[data-theme="walnut-copper"] #sidebar-right .section-body #layersPanel.layers-dragging .drop-zone.drag-over {
+    border-color: var(--cu-hi);
+    box-shadow: 0 0 12px rgba(255, 110, 30, 0.35), inset 0 0 14px rgba(255, 110, 30, 0.25);
+}
+/* Empty animation slots: an unlit glass well with its engraved hint, not a
+   dashed box; a drag over one lights its copper edge. */
+html[data-theme="walnut-copper"] .section-body .anim-slot-empty {
+    border: 0;
+    border-radius: 7px;
+    opacity: 1;
+    color: var(--unlit);
+    font-family: var(--ui-font-display);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: var(--mesh-dim) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(196, 122, 75, 0.35), inset 0 0 0 2px rgba(0, 0, 0, 0.55);
+}
+html[data-theme="walnut-copper"] .section-body .anim-slot-over {
+    border: 0;
+    border-radius: 7px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu-hi), 0 0 12px rgba(255, 110, 30, 0.35);
+}
+
+/* ── Reduced motion: drawers open at once, nothing slides or spins ──── */
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] .sidebar-section.wc-off { transform: none; will-change: auto; }
+    html[data-theme="walnut-copper"] .sidebar-section.wc-mv > .section-body { transform: none; clip-path: none; }
+}
 
 } /* @layer theme */
