@@ -417,7 +417,14 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-gate-toggle .gate-state { disp
 /* Ignite fills its row; the lock is the 40 px square pane. */
 html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { flex: 1 1 auto; min-width: 120px; }
 html[data-theme="walnut-copper"] #mixer-strip .ch-ignite-lock { width: 40px; min-width: 40px; padding: 0; }
-html[data-theme="walnut-copper"] #mixer-strip #pauseBtn { width: 48px; padding: 0; }
+html[data-theme="walnut-copper"] #mixer-strip #pauseBtn { width: 40px; min-width: 40px; padding: 0; }   /* study .navbar .cap.sq */
+/* At 1200 px and below js/46 parks the faders, and the colour and scene
+   clusters must still fit a 769 px window (the narrowest that isn't
+   compact; Stop was cut off there): the bank's padding tightens to 8 px,
+   so RANDOM (78 + 16) rounds to 96 on the 24 px module instead of 120. */
+@media (max-width: 1200px) {
+    html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch > button { width: 96px; padding: 0 8px; }
+}
 /* Clear: the danger tint (study .cap.danger). */
 html[data-theme="walnut-copper"] #mixer-strip .mixer-actions > .btn--destructive { --unlit: #c99a8f; --lit: #ffc9bd; --tgc: 255 58 40; }
 /* The colour well is a pilot cathode (study .lamp, 368-371) lit in the
@@ -456,6 +463,140 @@ html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"
 html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger .mixer-presets-trigger-chev { display: none; }
 /* At 1200 px and below the strip keeps its single row and js/46's More panel
    (the old UI already parked cells at 1366; now every control stays on the bar down to 1201). */
+
+/* ── The bar in a small window (js/13-compact-mode.js) ──────────────────
+   A compact window (768 px wide or less, or 500 px tall or less up to
+   1200 px wide) folds both bars and moves the whole strip into the right
+   one. The rules above assume a bar across the top; here the same
+   components take the column's proportions. Every selector carries
+   body.compact-ui and both ids, so it outranks the top-bar rules wherever
+   they sit. What moves where, and what folds, is js/13's and js/46's. */
+
+/* Folded bars fold. 34's cabinet widths (288 / 320 px) are theme-layer
+   rules, so they beat the legacy fold (css/21: a 32 px rail) and a folded
+   bar kept its full width: in a compact window the two rails took 608 px,
+   and below ~620 px there was no canvas left at all. */
+html[data-theme="walnut-copper"] #sidebar-left.collapsed { flex-basis: 32px; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right.collapsed { flex-basis: 32px; }
+
+/* The strip sits on the column's own wood (a second herringbone at the
+   bar's tile would show a seam), with the study's bead row under it as the
+   divider before the drawers (.fil::before). zoom: the sidebar already
+   carries --ui-scale; the strip's own zoom would square it. */
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip {
+    zoom: 1;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    align-content: flex-start;
+    gap: 14px 8px;
+    padding: 4px 4px 16px;
+    margin: 0 0 12px;
+    background: none;
+    border: 0;
+    border-bottom: 2px dotted rgba(214, 140, 92, 0.55);
+    box-shadow: none;
+    overflow: visible;
+}
+/* Two to a row: Viscosity | Isolation, Laminar / Blend | Time,
+   Density | Velocity (the study's dial and telegraph pairs). */
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip > .mixer-channel {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    max-width: none;
+    border: 0;
+}
+/* Labels take the sidebar's control label (css/34: 9.5 px, 0.12 em), so
+   LAMINAR / BLEND fits half the column. */
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-label {
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+}
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) {
+    padding: 0 0 30px;
+}
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip > .mixer-channel.wc-has-tele {
+    padding: 0 0 2px;
+}
+/* Material type spans the column; its own padding stays the bar's, so the
+   slider's head row lines up the same way it does there. */
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip > .mixer-channel[data-ui-key="Fluid"] {
+    flex-basis: 100%;
+}
+
+/* Colour: One / Random / Palette share the first row; Limit, the colour
+   lamp, Ignite and its lock the second, in reading (and Tab) order. Both
+   toggle rows dissolve so their children are the grid's items (css/21 did
+   this for the Ignite row already; the hold classes still cascade). */
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip > .mixer-channel[data-ui-key="Color"] {
+    flex-basis: 100%;
+    display: grid;
+    grid-template-columns: auto 24px minmax(0, 1fr) 32px;
+    grid-template-areas:
+        "modes modes modes modes"
+        "limit lamp ignite lock";
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+}
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row { display: contents; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-seg-switch {
+    grid-area: modes;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: auto;
+}
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-seg-switch > button { width: auto; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-gate-toggle { grid-area: limit; width: 64px; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide input[type="color"] { grid-area: lamp; justify-self: center; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-nudge-btn { grid-area: ignite; width: auto; min-width: 0; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-ignite-lock { grid-area: lock; width: 32px; min-width: 32px; }
+
+/* Scene: Presets spans the column; Clear, Pause and Stop share the row
+   under it, Pause square (study .nscn). */
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip > .mixer-stack {
+    flex: 1 1 100%;
+    gap: 8px;
+    padding: 0;
+}
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .mixer-actions {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+    padding: 0;
+}
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .mixer-actions .transport-row { display: contents; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .mixer-actions > button.btn--destructive,
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip #freezeBtn { flex: 1 1 0; width: auto; min-width: 0; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip #pauseBtn { flex: none; width: 32px; }
+
+/* The panes take the study's compact tier (.cp.sm 181-185: 32 px, Michroma
+   9 px at 0.12 em, 5 px corners); the fields its small field (.cp.sel.sm,
+   a 24 px chevron cell). */
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip :is(.mixer-channel[data-ui-key="Color"], .mixer-stack) :is(button, .btn) {
+    height: 32px;
+    min-height: 32px;
+    min-width: 32px;
+    padding: 0 8px;
+    border-radius: 5px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+}
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip :is(.ch-ignite-lock, #pauseBtn) { padding: 0; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip #mixerPresetsTrigger {
+    width: 100%;
+    padding: 0 30px 0 9px;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='32' viewBox='0 0 24 32'%3E%3Cpath d='M0.5 5V27' stroke='%23d68c5c' stroke-opacity='.7'/%3E%3Cpath d='M8 14.5L12 18.5L16 14.5' fill='none' stroke='%23f2b38a' stroke-width='1.5'/%3E%3C/svg%3E"),
+        radial-gradient(ellipse 85% 100% at 50% 50%, rgb(255 150 64 / 0.16), transparent 80%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.1'/%3E%3C/svg%3E"),
+        linear-gradient(175deg, #5a4e48, #3a302b 55%, #2a221f);
+    background-size: 24px 32px, auto, 3.5px 6.06px, auto;
+    background-position: right center, center, center, center;
+    background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+}
 
 
 /* == Item 4: hierarchy (study .lbl 40-41, .knob-val 84, .msel 506-512,
