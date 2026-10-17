@@ -182,6 +182,7 @@ html[data-theme="walnut-copper"] .ui-fork-card-title {
 }
 html[data-theme="walnut-copper"] .ui-fork-card-desc {
     font-family: var(--ui-font-body);
+    font-weight: 400;
     font-size: 12px;
     line-height: 1.45;
     color: #cdb79f;

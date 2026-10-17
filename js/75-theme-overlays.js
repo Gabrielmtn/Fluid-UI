@@ -105,7 +105,8 @@
             var now = isOn(el);
             if (now !== r.cath.on) setCath(r, now);
             r.cath.step(dt); r.surge.step(dt);
-            var I = Math.min(1, r.cath.out() * (1 + r.surge.x * 0.3) + r.surge.x * 0.14);
+            // (The surge spring undershoots a little on release: never below 0.)
+            var I = Math.max(0, Math.min(1, r.cath.out() * (1 + r.surge.x * 0.3) + r.surge.x * 0.14));
             var s = I.toFixed(3);
             if (s !== r.last) { el.style.setProperty('--ci', s); r.last = s; }
             var done = r.cath.settled() && r.surge.settled() && (r.surge.t === 0);
