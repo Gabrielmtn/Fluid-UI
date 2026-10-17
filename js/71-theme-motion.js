@@ -270,6 +270,11 @@
 
     var lastFrame = -1e9;
     function framesRunning() { return performance.now() - lastFrame < 250; }
+    // A closing tray leaves Tab and the accessibility tree at once (css/35,
+    // `interactivity: inert`). Where that property is missing (Firefox,
+    // Safari), the tray carries the inert attribute while it slides shut.
+    var CSS_INERT = !!(window.CSS && CSS.supports && CSS.supports('interactivity', 'inert'));
+    function inertWhileClosing(r, on) { if (!CSS_INERT && r.body) r.body.inert = on; }
     function toggleDrawers(list) {
         var cols = new Map();
         list.forEach(function (r) {
@@ -282,6 +287,7 @@
             if (RM || document.hidden || !c || !r.body || !framesRunning() || r.el.classList.contains('ui-hidden')) { settleDrawer(r); return; }
             r.el.classList.toggle('wc-closing', !open);
             r.el.classList.add('wc-mv');
+            inertWhileClosing(r, !open);
             r.sp.to(open ? 1 : 0, PROF.drawer);
             r.moving = true; r.c = c; r.t0 = performance.now();
             wake(r);
@@ -289,12 +295,15 @@
             cols.get(c).push(r);
         });
         cols.forEach(function (rs, c) { setupColumn(c, rs); });
+        // The first painted frame must already show the start of the glide:
+        // js/05j skips the theme hook on frames its FPS cap drops, so write
+        // every value now (a step of zero time), not on the next hook.
+        cols.forEach(function (rs, c) { rs.forEach(function (r) { stepDrawer(r, 0); }); stepColumn(c, 0); });
         if (cols.size) setTimeout(stallGuard, 400);
     }
     function setupColumn(c, rs) {
         rs.forEach(function (r) { c.moving.add(r); });
         c.secs = [].filter.call(c.list.children, isSection);
-        c.secs.forEach(function (s) { s.classList.add('wc-off'); });
         c.scroller.classList.add('wc-anim');
         c.on = true; c.tail = 0;
         // The one measurement: the toggled trays at their open height, and
@@ -330,7 +339,8 @@
         r.el.style.setProperty('--dp', r.open ? '1' : '0'); r.last = '';
         r.moving = false;
         r.el.classList.remove('wc-closing', 'wc-mv');
-        wake(r);
+        inertWhileClosing(r, false);
+        if (!stepDrawer(r, 0)) wake(r);        // the lamp lands now; a tint still fading keeps it awake
     }
     // No frames (the loop stalled, the page went to the background): land
     // every moving drawer at once rather than leave one half open.
@@ -349,7 +359,7 @@
             if (still(r.sp, Math.max(r.H, 60))) { r.sp.x = r.sp.t; r.sp.v = 0; }
             var d = Math.max(0, Math.min(1.2, r.sp.x)).toFixed(3);
             if (d !== r.last) { r.el.style.setProperty('--dp', d); r.last = d; }
-            if (r.sp.settled()) { r.moving = false; r.el.classList.remove('wc-closing', 'wc-mv'); }
+            if (r.sp.settled()) { r.moving = false; r.el.classList.remove('wc-closing', 'wc-mv'); inertWhileClosing(r, false); }
         }
         // The lamp (study 2751-2752): the spring, or a tint while it lasts.
         var t = r.tint;
@@ -376,10 +386,12 @@
         if (still(c.w, Math.max(Math.abs(c.za), 1))) { c.w.x = c.w.t; c.w.v = 0; }
         var z = c.za * Math.max(0, c.w.x);
         c.moving.forEach(function (r) { if (r.moving) z += clampTerm(r); else { r.cl = null; c.moving.delete(r); } });
+        // Straight onto each section's own translate: style and composite
+        // only, and only on the sections that are off their layout.
         var acc = z;
         for (var i = 0; i < c.secs.length; i++) {
-            var s = c.secs[i], y = acc.toFixed(2) + 'px';
-            if (s._wcy !== y) { s.style.setProperty('--wc-y', y); s._wcy = y; }
+            var s = c.secs[i], y = Math.abs(acc) < 0.005 ? '' : '0 ' + acc.toFixed(2) + 'px';
+            if ((s._wcy || '') !== y) { s.style.translate = y; s._wcy = y; }
             var r = s._wcd;
             if (r && r.moving) acc += (Math.max(0, r.sp.x) - 1) * r.H;
         }
@@ -391,7 +403,7 @@
         return true;
     }
     function endColumn(c) {
-        c.secs.forEach(function (s) { s.classList.remove('wc-off'); s.style.removeProperty('--wc-y'); s._wcy = ''; });
+        c.secs.forEach(function (s) { if (s._wcy) { s.style.translate = ''; s._wcy = ''; } });
         c.scroller.classList.remove('wc-anim');
         c.za = 0; c.w = new Spring(0, PROF.drawer); c.on = false;
         c.moving.forEach(function (r) { r.cl = null; });

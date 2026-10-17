@@ -15,15 +15,15 @@
    classes only while a drawer moves:
      .wc-closing  a closing drawer keeps its open layout until it settles
      .wc-mv       the drawer whose tray is sliding (clip + slide below)
-     .wc-off      a section riding the column offset --wc-y (FLIP)
+     .wc-anim     on the sidebar while any of its drawers moves
    and writes --dp (drawer spring), --wc-H (tray height, once per toggle),
-   --wc-y (per section), --wl / --wlc (lamp) and --wc-rot (atoms).
+   --wl / --wlc (lamp), --wc-rot (atoms) and, while a column glides, each
+   section's own `translate`.
    ================================================================ */
 
-/* Written per frame on the element that uses them, so a change restyles
-   that element only (an inherited property would restyle its subtree). */
+/* Written per frame on the element that uses it, so a change restyles that
+   element only (an inherited property would restyle its subtree). */
 @property --wc-rot { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-@property --wc-y { syntax: "<length>"; inherits: false; initial-value: 0px; }
 
 @layer theme {
 
@@ -173,12 +173,9 @@ html[data-theme="walnut-copper"] .sidebar-section.collapsed > .section-body {
    The study grows the tray's height every frame. Here the layout changes
    once per toggle and the motion is transforms only: the tray is revealed
    through a clip as tall as --dp of its height (--wc-H) while it slides
-   14 px down from under its front (study .dtray), and every section in the
-   column rides --wc-y, so the drawers below glide instead of jumping. */
-html[data-theme="walnut-copper"] .sidebar-section.wc-off {
-    transform: translateY(var(--wc-y));
-    will-change: transform;
-}
+   14 px down from under its front (study .dtray), and js/71 sets each
+   section's own `translate`, so the drawers below glide instead of
+   jumping. */
 html[data-theme="walnut-copper"] .sidebar-section.wc-mv > .section-body {
     transform: translateY(calc((1 - min(var(--dp), 1)) * -14px));
     clip-path: inset(
@@ -188,6 +185,12 @@ html[data-theme="walnut-copper"] .sidebar-section.wc-mv > .section-body {
 /* Native scroll anchoring would fight the offsets while the layout settles. */
 html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left).wc-anim {
     overflow-anchor: none;
+}
+/* While a column glides, the closed trays in it (hidden already) are not
+   laid out: Chrome lays the document out again every frame a native
+   <select> moves, and most trays hold one. */
+html[data-theme="walnut-copper"] .wc-anim .sidebar-section.collapsed:not(.wc-closing) > .section-body {
+    content-visibility: hidden;
 }
 
 /* ── Bead rows and atoms (study .fil 164-169) ─────────────────────────
@@ -422,7 +425,6 @@ html[data-theme="walnut-copper"] .section-body .anim-slot-over {
 
 /* ── Reduced motion: drawers open at once, nothing slides or spins ──── */
 @media (prefers-reduced-motion: reduce) {
-    html[data-theme="walnut-copper"] .sidebar-section.wc-off { transform: none; will-change: auto; }
     html[data-theme="walnut-copper"] .sidebar-section.wc-mv > .section-body { transform: none; clip-path: none; }
 }
 
