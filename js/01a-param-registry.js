@@ -156,6 +156,11 @@
         // pixel→origin distance — past 1.0 it would overshoot the origin and
         // start gathering mirrored content on the far side.
         scatterReach: {configKey: null, ui: {min: 0.2, max: 1, step: 0.05}, hard: {min: 0.05, max: 1}, def: 1.0, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.3, max: 1, step: 0.05, scope: "extended"}},
+        // Dither (js/68-dither.js, read live each frame). No `mut`: Mutate
+        // leaves the whole effect alone (ditherToggle below).
+        ditherLevels: {configKey: null, ui: {min: 2, max: 16, step: 1}, hard: {min: 2, max: 16}, def: 4, decimals: 0, category: "display", perfTier: 0, simSlider: false},
+        ditherSize: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 2, decimals: 0, category: "display", perfTier: 0, simSlider: false},
+        ditherPulse: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "audio", perfTier: 0, simSlider: false},
         // ss* sliders removed 2026-08-27 with the Shooting Star row (Animations
         // curation): same load-bearing deletion as ascendToggle below — saved
         // values skip on load and Mutate can't reach the hidden controls.
@@ -215,6 +220,9 @@
         // Colliders block light. mutScope null: with no collision layer it is a
         // no-op, so mutating it would spend a variation slot on nothing.
         scatterBlockToggle: {def: true, mutScope: null},
+        // Dither. mutScope null: it restyles the whole picture, so a card
+        // that switched it on would read as a different app, not a variation.
+        ditherToggle: {def: false, mutScope: null},
         // Photosensitivity protection. mutScope null: Mutate must NEVER flip a
         // safety toggle. Also in 12-save-load's PRESET_SKIP — the preference is
         // per-user (bespoke localStorage key 'fluidui.photoSafe'), and must not
@@ -276,6 +284,8 @@
         scatterSource: {options: ["light", "brush"], def: "light", mut: null},
         breathPattern: {options: ["relaxed", "box", "478"], def: "relaxed", mut: null},
         breathColorMode: {options: ["same", "cycle", "breath"], def: "same", mut: null},
+        ditherPattern: {options: ["bayer", "noise", "halftone", "lines", "custom"], def: "bayer", mut: null},
+        ditherTone: {options: ["retro", "paint", "mono"], def: "retro", mut: null},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         // 'ferro' removed 2026-08-16 — dropping it from options is what makes
         // a saved/mirrored audioMode:'ferro' coerce to the default instead of

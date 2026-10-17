@@ -1179,6 +1179,60 @@
                 <label for="breathCueToggle" style="margin: 0" title="Breathe in / Hold / Breathe out, under the rings">Cue words</label>
             </div>
         </div>
+        <!-- Dither (js/68-dither.js): the paint drawn in a few shades and a
+             pattern. A look on the way out (05a), never written into the
+             paint, so switching it off gives the picture back. -->
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="ditherToggle">
+            <label for="ditherToggle" style="margin: 0">Dither</label>
+        </div>
+        <div id="ditherPanel" class="collapsible" style="display:none;">
+            <div class="control-group">
+                <label for="ditherPattern">Pattern</label>
+                <select id="ditherPattern">
+                    <option value="bayer" selected title="An even grid of dots, like an old computer screen">Bayer</option>
+                    <option value="noise" title="A fine, even grain">Noise</option>
+                    <option value="halftone" title="Round dots that grow with the light, like a printed page">Halftone</option>
+                    <option value="lines" title="Rows that thicken with the light">Lines</option>
+                    <option value="custom" title="A shape you draw on the pad below. Dim paint shows its middle, brighter paint grows it until the shapes meet.">Draw your own</option>
+                </select>
+            </div>
+            <!-- Draw your own: 68 turns the drawing into the order its
+                 squares light in; the strip shows that order on a ramp. -->
+            <div id="ditherDrawGroup" class="control-group dither-draw" style="display:none;">
+                <div class="dither-draw-row">
+                    <canvas id="ditherPad" class="dither-pad" width="192" height="192" tabindex="0"
+                            role="application" aria-label="Pattern pad, 16 by 16 squares. Arrow keys move, Space draws or erases a square."
+                            title="Draw a shape. Start on a drawn square to erase."></canvas>
+                    <canvas id="ditherRamp" class="dither-ramp" width="96" height="192"
+                            title="Your pattern from dark paint (bottom) to bright paint (top)."></canvas>
+                </div>
+                <div class="dither-draw-actions">
+                    <button type="button" id="ditherPadInvert">Invert</button>
+                    <button type="button" id="ditherPadClear" class="btn--destructive">Clear</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="ditherLevels" title="How many shades each color keeps. 2 is the boldest.">Levels <span id="ditherLevelsValue" class="value-display">4</span></label>
+                <input type="range" id="ditherLevels" min="2" max="16" value="4" step="1">
+            </div>
+            <div class="control-group">
+                <label for="ditherSize" title="How big the pattern is, in screen pixels.">Size <span id="ditherSizeValue" class="value-display">2 px</span></label>
+                <input type="range" id="ditherSize" min="1" max="8" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label for="ditherTone">Color</label>
+                <select id="ditherTone">
+                    <option value="retro" selected title="Each color steps on its own, so the paint lands on a small fixed palette">Retro palette</option>
+                    <option value="paint" title="Only the brightness steps; every patch keeps its own color">Paint colors</option>
+                    <option value="mono" title="Shades of gray">Black and white</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="ditherPulse" title="How much the pattern swells on each beat while Audio React is listening.">Beat pulse <span id="ditherPulseValue" class="value-display">0%</span></label>
+                <input type="range" id="ditherPulse" min="0" max="1" value="0" step="0.05">
+            </div>
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="enableLighting">
             <label for="enableLighting" style="margin: 0">Light Source</label>
@@ -1930,6 +1984,9 @@
     <script src="js/64a-colour-math.js"></script>
     <script src="js/64-colour-picker.js"></script>
     <script src="js/65-palette-from-image.js"></script>
+    <!-- Dither (Effects → Dither): the paint in a few shades and a pattern.
+         05j asks it for the shader's values every frame. -->
+    <script src="js/68-dither.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">

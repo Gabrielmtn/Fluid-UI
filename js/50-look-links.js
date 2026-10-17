@@ -70,7 +70,7 @@
 
     var SECTIONS = ['sliders', 'checkboxes', 'selects', 'colors', 'kaleido', 'paletteIndex',
         'paletteName', 'savedColors', 'armColors', 'lightPos', 'lightShiftPath', 'brushState',
-        'material', 'brushTip', 'ssOrigin', 'gravity'];
+        'material', 'brushTip', 'ssOrigin', 'gravity', 'ditherTile'];
     // Never in a link: 12's machine/workflow keys (BASELINE_SKIP) and the
     // recipient's workspace, device and privacy settings.
     var SKIP = {

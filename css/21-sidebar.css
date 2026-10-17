@@ -2233,6 +2233,39 @@ select option {
     font-variant-numeric: tabular-nums;
 }
 
+/* ── Dither: Draw your own (js/68-dither.js) ────────────────────────────
+   The 16x16 pad and, beside it, the pattern on a dark-to-bright ramp.
+   Both are canvases drawn square-for-pixel, so they scale without blur. */
+.dither-draw-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+.dither-pad,
+.dither-ramp {
+    display: block;
+    height: 128px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    image-rendering: pixelated;
+}
+.dither-pad {
+    width: 128px;
+    cursor: crosshair;
+    touch-action: none;   /* the pad owns the drag; no scroll-stealing */
+}
+.dither-pad:focus-visible {
+    outline: 2px solid oklch(80% 0.140 var(--sec-h, 250));
+    outline-offset: 2px;
+}
+.dither-ramp { width: 64px; }
+.dither-draw-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+.dither-draw-actions button { flex: 1; }
+
 /* ── Effect rows (js/20-mixer-layout.js fxRow): [thumbnail][checkbox][label] ──
    The thumbnail is a 26px still of the effect; the card it opens on hover is
    .fx-tip in 22-overlays.css. Buttons are not involved, so nothing here

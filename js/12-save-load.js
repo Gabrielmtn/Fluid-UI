@@ -995,6 +995,9 @@
             userPalettes: userPals,
             lightPos: lightPos,
             lightShiftPath: lightShiftPath,
+            // Dither's drawn pattern (68), only while Draw your own is the
+            // pattern: 64 hex digits, one bit a square.
+            ditherTile: (window.Dither && window.Dither.snapshotTile) ? window.Dither.snapshotTile() : null,
             focusState: focusState,
             brushState: brushState,
             // Material macro layer (Swirl / Gloss Paint — Wetness or Thickness): its core
@@ -1261,6 +1264,15 @@
                 } else if (typeof window.lightShiftWaypoints !== 'undefined') {
                     window.lightShiftWaypoints = JSON.parse(JSON.stringify(snapshot.lightShiftPath));
                 }
+            }
+        } catch(_){}
+
+        // ── Dither's drawn pattern ── only a snapshot that carries one
+        // replaces yours; setTile skips an unchanged drawing and does not
+        // keep a room's or a look link's (their flags).
+        try {
+            if (typeof snapshot.ditherTile === 'string' && window.Dither && window.Dither.setTile) {
+                window.Dither.setTile(snapshot.ditherTile);
             }
         } catch(_){}
 

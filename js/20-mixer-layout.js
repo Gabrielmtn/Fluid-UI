@@ -4342,7 +4342,9 @@
         'border':       { title: 'Border',
             text: 'Open edges. Paint that reaches the rim drains off the canvas instead of bouncing back in. Width sets how far in the drain reaches.' },
         'breathing':    { title: 'Breathing',
-            text: 'A simple visualizer for keeping time during breathing exercises. Relaxed, Box or 4-7-8.' }
+            text: 'A simple visualizer for keeping time during breathing exercises. Relaxed, Box or 4-7-8.' },
+        'dither':       { title: 'Dither',
+            text: 'Draws the paint in a few shades and a pattern, like an old computer screen or a printed page, or in a pattern you draw yourself. The paint underneath is untouched.' }
     };
 
     let fxTipEl = null, fxTipTimer = 0;
@@ -4487,6 +4489,12 @@
         const shadingGroup = document.getElementById('shadingIntensityGroup');
         if (shadingGroup) surface.appendChild(shadingGroup);
         body.appendChild(surface);
+
+        // ── Dither: the paint in a few shades and a pattern (js/68-dither.js) ──
+        // Under Surface Shading: both are how the paint is drawn, not what it does.
+        fxRow('ditherToggle', 'dither', 'Dither', body);
+        const ditherPanel = document.getElementById('ditherPanel');
+        if (ditherPanel) body.appendChild(ditherPanel);
 
         // ── Gravity Direction (was Constant Pressure) ──
         // A canvas-wide push aimed with the pad. Lived in the Brush panel's

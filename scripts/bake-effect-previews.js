@@ -75,7 +75,8 @@
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     const FX_CHECKS = ['enableLighting', 'enableLightShift', 'glowToggle', 'scatterToggle',
-                       'displayShadingToggle', 'pressureConstant', 'overflowToggle', 'breathingToggle'];
+                       'displayShadingToggle', 'pressureConstant', 'overflowToggle', 'breathingToggle',
+                       'ditherToggle'];
     function allOff() {
         FX_CHECKS.forEach((id) => setCheck(id, false));
         ['vibrance', 'ridges'].forEach((id) => setSlider(id, 0));
@@ -377,6 +378,23 @@
             // the loop and never close on itself.
             atStart() { if (window.Breathing && window.Breathing.seek) window.Breathing.seek(0); },
             frame(p) { if (window.Breathing && window.Breathing.seek) window.Breathing.seek(p * 4); }
+        },
+        // Before, then the patterns in turn, ending on Draw your own (a
+        // throwaway profile's pad holds the starter heart), so the card
+        // shows what the Pattern menu does. Sizes are big on purpose: the
+        // GIF is the canvas shrunk to 320 px, and a 2 px pattern would
+        // average back to flat colour on the way down. The still is a heart.
+        'dither': {
+            color: '#ff7a59', size: 1.6, gate: true, flow: 1, warm: 1.2, duration: 5000, flipAt: 0.2, still: 0.9,
+            pen: lissajous(0.30, 0.26, 1, 2),
+            on() { setSelect('ditherTone', 'retro'); setSlider('ditherLevels', 3); setCheck('ditherToggle', true); },
+            frame(p) {
+                if (p < 0.2) return;
+                const which = p < 0.4 ? ['bayer', 6] : (p < 0.6 ? ['halftone', 4] : (p < 0.8 ? ['lines', 4] : ['custom', 3]));
+                if (which[0] === 'custom' && $('ditherTone') && $('ditherTone').value !== 'paint') { setSelect('ditherTone', 'paint'); setSlider('ditherLevels', 2); }
+                if ($('ditherPattern') && $('ditherPattern').value !== which[0]) setSelect('ditherPattern', which[0]);
+                if ($('ditherSize') && +$('ditherSize').value !== which[1]) setSlider('ditherSize', which[1]);
+            }
         },
         // Slider effect under Surface Shading. Not a row (no thumbnail), but
         // baking it the same way gives a before/after proof of the retune:

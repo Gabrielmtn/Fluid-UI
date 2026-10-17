@@ -2610,6 +2610,22 @@
             gl.uniform1i(displayProg.uniforms.uScatter, 12);
             gl.uniform1f(displayProg.uniforms.scatterEnabled, _scatterOn ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.scatterSmooth, config.SCATTER_SMOOTH !== false ? 1.0 : 0.0);
+            // Dither (js/68-dither.js reads its controls live). Size is in
+            // screen px: the drawing buffer is the CSS box x RENDER_SCALE
+            // (01-config), so the cell grows with it and stays the same size
+            // on screen. The pattern is anchored at the canvas centre, so a
+            // Beat pulse swells it from the middle out.
+            const _dither = window.Dither && window.Dither.params();
+            gl.uniform1f(displayProg.uniforms.ditherOn, _dither ? 1.0 : 0.0);
+            if (_dither) {
+                gl.uniform1i(displayProg.uniforms.ditherPattern, _dither.pattern);
+                gl.uniform1f(displayProg.uniforms.ditherLevels, _dither.levels);
+                gl.uniform1f(displayProg.uniforms.ditherCell,
+                    _dither.size * (canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1));
+                gl.uniform1i(displayProg.uniforms.ditherTone, _dither.tone);
+                gl.uniform2f(displayProg.uniforms.ditherOrigin, Math.floor(canvas.width / 2), Math.floor(canvas.height / 2));
+                gl.uniform1i(displayProg.uniforms.uDitherTile, 14);
+            }
             gl.uniform1f(displayProg.uniforms.preserveOpacity, window.preserveFluidOpacity ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.backgroundTransparency, window.backgroundTransparency || 0.0);
             gl.uniform1f(displayProg.uniforms.kaleidoEnabled, window.kaleidoEnabled ? 1.0 : 0.0);
@@ -2649,6 +2665,8 @@
             // Unit 13: Surface Shading's collider mask (read only with walls up).
             gl.activeTexture(gl.TEXTURE13);
             gl.bindTexture(gl.TEXTURE_2D, _shadeWallsOn ? shadeWall.texture : null);
+            // Unit 14: Dither's drawn tile (68 uploads it when the drawing changes).
+            if (_dither) window.Dither.bindTile(gl, 14);
             // PhotoSafe (photosensitivity protection): when on, the display
             // pass renders into safeFrame instead of the canvas, and
             // applyPhotoSafe (05i) measures the frame, updates the limiter,

@@ -173,6 +173,13 @@
             uniform int   lightShiftMode;      // 0=replace,1=tint,2=overlay,3=multiply,4=screen,5=add
             uniform float lightShiftCeiling;   // Gate ceiling (config.BLOOM_CEILING; 0 = Gate off) — density-key reference
             uniform float lightShiftDensity;   // 0-1: how much the pigment-density overblow signal feeds the trigger
+            uniform float ditherOn;       // 1 = Dither on (js/68-dither.js)
+            uniform int   ditherPattern;  // 0 Bayer, 1 Noise, 2 Halftone, 3 Lines, 4 drawn (uDitherTile)
+            uniform float ditherLevels;   // shades per channel, 2 = the boldest
+            uniform float ditherCell;     // one pattern cell in drawing-buffer px (Size x RENDER_SCALE, x Beat pulse)
+            uniform vec2  ditherOrigin;   // the canvas centre, drawing-buffer px: the pattern grows from here
+            uniform sampler2D uDitherTile; // 16x16 R8: the order a drawn tile's squares light in (68 builds it)
+            uniform int   ditherTone;     // 0 retro palette (per channel), 1 paint colours (hue kept), 2 black and white
             const float PI = 3.141592653589793;
             vec3 lsOverlay(vec3 b, vec3 s) {
                 return vec3(
@@ -411,6 +418,59 @@
                              + g1.x * texture(uScatter, vec2(h1.x, h0.y)).rgb)
                      + g1.y * (g0.x * texture(uScatter, vec2(h0.x, h1.y)).rgb
                              + g1.x * texture(uScatter, h1).rgb);
+            }
+            // Dither (js/68-dither.js). Each pattern gives every pixel a
+            // threshold, 0..1; the paint steps up to its next shade where its
+            // own value plus the threshold reaches it, so high thresholds step
+            // up first. The share of pixels that step up is the paint's
+            // value, and a flat patch reads as its own shade from a little
+            // way off. The patterns are fixed to the screen: one that
+            // moved every frame would shimmer (the store dither below says
+            // the same).
+            // Bayer 8x8 by bit interleave: x XOR y and x, bit-reversed.
+            float ditherBayer(vec2 cellXY) {
+                ivec2 i = ivec2(mod(cellXY, 8.0));
+                int x = i.x;
+                int xy = i.x ^ i.y;
+                int v = ((xy & 1) << 5) | ((x & 1) << 4) | ((xy & 2) << 2)
+                      | ((x & 2) << 1) | ((xy & 4) >> 1) | ((x & 4) >> 2);
+                return (float(v) + 0.5) / 64.0;
+            }
+            // angle turns the halftone screen; the other patterns ignore it.
+            float ditherThreshold(vec2 p, float angle) {
+                float c = max(ditherCell, 1.0);
+                float t;
+                if (ditherPattern == 1) {
+                    // White noise per cell (Hoskins' sine-free hash12): grain
+                    // with no grid in it. Interleaved gradient noise was
+                    // tried first and read as the Bayer grid again at 2 px.
+                    vec3 h3 = fract(vec3(floor(p / c).xyx) * 0.1031);
+                    h3 += dot(h3, h3.yzx + 33.33);
+                    t = fract((h3.x + h3.y) * h3.z);
+                } else if (ditherPattern == 2) {
+                    // A dot screen four cells across. Brighter paint grows
+                    // each dot out from its centre until the dots merge.
+                    float ca = cos(angle), sa = sin(angle);
+                    vec2 u = mat2(ca, -sa, sa, ca) * p / (4.0 * c);
+                    t = 0.5 - 0.25 * (cos(2.0 * PI * u.x) + cos(2.0 * PI * u.y));
+                } else if (ditherPattern == 3) {
+                    // Rows four cells apart that thicken out from their middles.
+                    t = abs(2.0 * fract(p.y / (4.0 * c)) - 1.0);
+                } else if (ditherPattern == 4) {
+                    // Drawn: the tile holds each square's place in the order
+                    // (0 = first to light), row 0 the drawing's top, so y is
+                    // flipped (GL y runs up). A HIGH threshold steps up first
+                    // (ditherStep rounds v * n + t down), so first = near 1.
+                    ivec2 ti = ivec2(mod(floor(p / c), 16.0));
+                    t = 1.0 - (texelFetch(uDitherTile, ivec2(ti.x, 15 - ti.y), 0).r * 255.0 + 0.5) / 256.0;
+                } else {
+                    t = ditherBayer(floor(p / c));
+                }
+                return t;
+            }
+            float ditherStep(float v, float t) {
+                float n = max(ditherLevels, 2.0) - 1.0;
+                return min(floor(clamp(v, 0.0, 1.0) * n + t) / n, 1.0);
             }
             void main() {
                 vec4 base = texture(uTexture, vUv);
@@ -772,6 +832,36 @@
                         }
                     }
                     color.rgb = gsum;
+                }
+                // Dither: the paint drawn in a few shades and a pattern. After
+                // the light (tone map, shading, Light Shift, glow), so it
+                // dithers what you see; before the raster stack, so sketch
+                // layers stay clean, as every fluid effect leaves them.
+                if (ditherOn > 0.5) {
+                    vec3 dc = clamp(color.rgb, 0.0, 1.0);
+                    vec2 dp = gl_FragCoord.xy - ditherOrigin;
+                    if (ditherTone == 2) {
+                        float t = ditherThreshold(dp, 0.7854);
+                        dc = vec3(ditherStep(dot(dc, vec3(0.299, 0.587, 0.114)), t));
+                    } else if (ditherTone == 1) {
+                        // Paint colours: the brightness is stepped and the hue
+                        // kept, so each patch is drawn in shades of its own colour.
+                        float t = ditherThreshold(dp, 0.7854);
+                        float v = max(dc.r, max(dc.g, dc.b));
+                        dc *= ditherStep(v, t) / max(v, 1e-4);
+                    } else if (ditherPattern == 2) {
+                        // Halftone in colour: a screen per channel, each at its
+                        // own angle, like the inks of a print.
+                        dc = vec3(ditherStep(dc.r, ditherThreshold(dp, 0.2618)),
+                                  ditherStep(dc.g, ditherThreshold(dp, 1.3090)),
+                                  ditherStep(dc.b, ditherThreshold(dp, 0.7854)));
+                    } else {
+                        // One threshold for all three channels: the steps are
+                        // in brightness, never specks of another hue.
+                        float t = ditherThreshold(dp, 0.7854);
+                        dc = vec3(ditherStep(dc.r, t), ditherStep(dc.g, t), ditherStep(dc.b, t));
+                    }
+                    color.rgb = dc;
                 }
                 // D2 raster layer stack: paint layers composited around the
                 // fluid, AFTER tone-map/shading/glow (fluid effects never

@@ -1374,6 +1374,10 @@
             var tap = ensureExportTap();
             return tap ? tap.stream : null;
         },
+        // The beat envelope, 0-1: kicked by each beat or onset, easing back
+        // to 0 between them (PULSE_RELEASE_MS). 0 while Audio React is off.
+        // Dither's Beat pulse reads it every frame (68).
+        getPulse: function () { return enabled ? beatPulse : 0; },
         getBands: function () {
             return {
                 bass: bass, mid: mid, treble: treble, overall: overall,
