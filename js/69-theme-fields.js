@@ -300,26 +300,47 @@
     // The element that holds a sidebar checkbox's pane state (css/37 §3):
     // the row for <input> + <label for>, the label that wraps the input, or
     // the bare input.
-    function cbPaneOf(t) {
+    function inputOf(t) {
         if (!t || !t.closest || !t.closest('#sidebar-left, #sidebar-right')) return null;
         var inp = null;
-        if (t.matches && t.matches('input[type="checkbox"]')) inp = t;
+        if (t.matches && t.matches('input[type="checkbox"], input[type="radio"]')) inp = t;
         else {
             var lab = t.closest('label');
-            if (lab) inp = lab.control || lab.querySelector('input[type="checkbox"]');
+            if (lab) inp = lab.control || lab.querySelector('input[type="checkbox"], input[type="radio"]');
         }
-        if (!inp || inp.type !== 'checkbox') return null;
+        return inp && (inp.type === 'checkbox' || inp.type === 'radio') ? inp : null;
+    }
+    function cbPaneOf(t) {
+        var inp = inputOf(t);
+        if (!inp) return null;
         var row = inp.parentElement;
         var next = inp.nextElementSibling;
         if (row && row.classList.contains('checkbox-group') && next && next.tagName === 'LABEL') return row;
         return inp.closest('label') || inp;
     }
+    // A radio's group: every sidebar radio with its name. All of them are
+    // registered before the change, so the one that goes dark fades too.
+    function groupOf(inp) {
+        if (!inp || inp.type !== 'radio' || !inp.name) return [];
+        return Array.prototype.filter.call(document.getElementsByName(inp.name), function (r) {
+            return r.type === 'radio' && r.closest('#sidebar-left, #sidebar-right');
+        });
+    }
     function touchPane(t) {
         var tm = TM();
         if (!tm) return;
-        var el = cbPaneOf(t);
-        if (el && !el._wc) tm.pane(el);
+        var inp = inputOf(t);
+        if (!inp) return;
+        (inp.type === 'radio' ? groupOf(inp) : [inp]).forEach(function (i) {
+            var el = cbPaneOf(i);
+            if (el && !el._wc) tm.pane(el);
+        });
     }
+    document.addEventListener('change', function (e) {
+        var tm = TM();
+        if (!tm || !e.target || e.target.type !== 'radio') return;
+        groupOf(e.target).forEach(function (r) { var el = cbPaneOf(r); if (el && el._wc) tm.sync(el); });
+    }, true);
 
     // Mouse / pen: take the press before the OS popup opens.
     document.addEventListener('mousedown', function (e) {

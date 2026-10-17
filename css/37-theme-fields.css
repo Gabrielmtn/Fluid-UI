@@ -844,6 +844,111 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-r
 }
 
 
+/* Native radios (Kaleidoscope > Mandala > Fill: Off / Fit / Full): the
+   label is the pane, the <input type=radio> its round cathode (study
+   .cp.sm.ir .ind + ::after), one width for the bank. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="radio"] {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    box-sizing: border-box;
+    flex: none;
+    width: 9px;
+    height: 9px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546),
+        0 0 calc(var(--ci) * 8px) rgb(var(--gc) / calc(var(--ci) * 0.7));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="radio"]:checked { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="radio"]::after {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    background: rgb(255 176 110 / var(--ci));
+    box-shadow: 0 0 6px rgb(var(--gc) / var(--ci));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mandala-radio {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group .mandala-radio > label {
+    --ci: 0;
+    --gc: var(--tgc, 255 110 30);
+    position: relative;
+    isolation: isolate;
+    flex: 1 1 0;
+    min-width: max-content;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    box-sizing: border-box;
+    height: 32px;
+    margin: 0;
+    padding: 0 10px 0 25px;
+    border: 0;
+    border-radius: 5px;
+    opacity: 1;
+    cursor: pointer;
+    font: 400 9px/1 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit)));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--wcf-mesh) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group .mandala-radio > label:has(> input:checked) { --ci: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group .mandala-radio > label::before {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--wcf-mesh-lit) center / 7px 12.12px;
+    opacity: calc(var(--ci) * 0.3);
+    -webkit-mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+    mask: radial-gradient(ellipse at center, #000 25%, transparent 80%);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mandala-radio > label > input[type="radio"] {
+    --ci: inherit;
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    margin-top: -4.5px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mandala-radio > label:has(> input:focus-visible) {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+
+
 /* ════════════════════════════════════════════════════════════════════
    5. JOINED PAIRS: two-way choices are one strip (study .joined, 198-204)
    Square inner corners, no gap, no indicator; one side lit. Compact tier
