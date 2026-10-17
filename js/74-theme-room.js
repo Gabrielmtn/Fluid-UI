@@ -8,7 +8,8 @@
 // Ported from the study (design/study-lite.html, v19): the cathode screen
 // notifications (1395-1463: NR, DIM, LINE_H, notify, restack, stepLines),
 // the drawer feed (CSS 467, 491-494; markup 825; stepFeed 2835) and
-// nixies() (2764). Timings, levels and pitch are the study's.
+// nixies() (2764). Timings and pitch are the study's; the dim levels are
+// raised to keep every line legible (see DIM).
 //
 // What reaches the screen (presentation only; nothing is sent, announced or
 // changed):
@@ -34,9 +35,14 @@
     var TM = window.ThemeMotion || null;
     var OWN_LINES = true;
 
-    // ── Study 1396-1398, literal ───────────────────────────────────────
+    // ── Study 1396-1398 ────────────────────────────────────────────────
+    // Literal, except the dim levels: the study's 0.62 and 0.40 leave the
+    // older lines at about 3.8:1 and 2.4:1 on this glass. 0.71 is the lowest
+    // brightness that keeps VFD teal at 4.5:1 on the screen's lightest glass
+    // (its centre glow under a scanline and the corner highlight;
+    // prep/work/W5/contrast.js), so the lines step 1 -> 0.855 -> 0.71.
     var NR = { maxLines: 3, dwellYou: 1800, dwellRemote: 4500, merge: 900 };
-    var DIM = [1, 0.62, 0.4, 0.3, 0.24];
+    var DIM = [1, 0.855, 0.71, 0.71, 0.71];
     var LINE_H = 21;
     var QUIET = 'Quiet · no changes yet';
     var OFFLINE = 'Offline';
@@ -57,18 +63,26 @@
     var idleText = '', emptyShown = null, hadLines = false, expTimer = 0;
 
     // ── Lines ──────────────────────────────────────────────────────────
+    // A line is a row of spans: the player's dot and name, the words, and
+    // 06e's count as "+N". When it is too long the words give way first
+    // (css/39), so the count is never cut.
+    function span(cls, text) {
+        var s = document.createElement('span');
+        s.className = cls;
+        s.textContent = text;
+        return s;
+    }
     function renderLine(L) {
         var el = L.el;
         el.textContent = '';
         L.parts.forEach(function (p) {
             if (p.who) {
                 el.appendChild(document.createElement('i'));
-                var w = document.createElement('span');
-                w.className = 'wc-who';
-                w.textContent = L.who.name;
-                el.appendChild(w);
-            } else {
-                el.appendChild(document.createTextNode(p.text));
+                el.appendChild(span('wc-who', L.who.name));
+            } else if (p.more) {
+                el.appendChild(span('wc-more', ' +' + p.more));
+            } else if (p.text) {
+                el.appendChild(span('wc-what', p.text));
             }
         });
     }
@@ -202,14 +216,19 @@
 
     // Study stepFeed(): the empty state shows while no line is live. Its
     // words: 06e's own sentence while the room is together and it names
-    // nobody, "Quiet" in a room, "Offline" until the room answers.
+    // nobody; "Quiet" in a room, and while the lobby looks for a stranger
+    // (no room yet, so nothing to be offline from); "Offline" only while a
+    // room's connection is down (the status line says "Connecting…").
+    function hasRoom() {
+        try { return !!currentRoom; } catch (_) { return false; }   // 06a's, a global let
+    }
     function syncEmpty() {
         if (!feed) return;
         var any = false;
         for (var i = 0; i < lines.length; i++) if (!lines[i].leaving) { any = true; break; }
         if (any !== hadLines) { feed.classList.toggle('has-lines', any); hadLines = any; }
-        var t = seen.shown ? (idleText || QUIET)
-            : (dot && !dot.classList.contains('mp-dot-connecting')) ? QUIET : OFFLINE;
+        var down = !!dot && dot.classList.contains('mp-dot-connecting') && hasRoom();
+        var t = seen.shown ? (idleText || QUIET) : down ? OFFLINE : QUIET;
         if (t !== emptyShown) { empty.textContent = t; emptyShown = t; }
     }
 
@@ -240,11 +259,17 @@
         if (changed || beat) {
             notify(who, who.name + '|' + text, function () {
                 // 06e's nodes in order, its name span as the dot and the name.
-                // "Mika changed Curl" reads as the study's "MIKA › CURL".
+                // "Mika changed Curl and 2 more" reads "MIKA › CURL +2": the
+                // study's separator, and the count kept short so it fits.
                 var parts = [];
                 src.childNodes.forEach(function (n) { parts.push(n === whoEl ? { who: true } : { text: n.textContent }); });
                 if (parts.length > 1 && parts[0].who && /^\s*changed\s+/i.test(parts[1].text)) {
                     parts[1] = { text: ' › ' + parts[1].text.replace(/^\s*changed\s+/i, '') };
+                }
+                var last = parts[parts.length - 1], m = last && !last.who && /\s+and\s+(\d+)\s+more\s*$/i.exec(last.text);
+                if (m) {
+                    last.text = last.text.slice(0, m.index);
+                    parts.push({ more: m[1] });
                 }
                 return parts;
             });
@@ -308,6 +333,22 @@
         render();
     }
 
+    // ── Code / QR / Hide: lit by their own aria-pressed ─────────────────
+    // js/71 keeps a pane's cathode in step only inside the bars, and 06e
+    // moves the Invite popover onto <body>, so a pane registered there
+    // before the move kept its old brightness (Hide pressed, Code still
+    // lit). These three are registered here and re-read on each flip.
+    function wireShareModes() {
+        if (!TM || !TM.pane) return;
+        ['shareModeCode', 'shareModeQr', 'shareModeHidden'].forEach(function (id) {
+            var b = document.getElementById(id);
+            if (!b) return;
+            TM.pane(b, function (el) { return el.getAttribute('aria-pressed') === 'true'; }, { transient: false });
+            TM.sync(b);
+            new MutationObserver(function () { TM.sync(b); }).observe(b, { attributes: true, attributeFilter: ['aria-pressed'] });
+        });
+    }
+
     // ── Build ──────────────────────────────────────────────────────────
     function build() {
         src = document.getElementById('mpActivity');
@@ -330,9 +371,12 @@
             if (conn.style.display === 'none') clearAll(); else readSource();
         }).observe(conn, { attributes: true, attributeFilter: ['style'] });
         if (dot) new MutationObserver(syncEmpty).observe(dot, { attributes: true, attributeFilter: ['class'] });
+        var status = document.getElementById('multiplayerStatus');
+        if (status) new MutationObserver(syncEmpty).observe(status, { childList: true, characterData: true, subtree: true });
         document.addEventListener('input', onLocalChange, true);
         document.addEventListener('change', onLocalChange, true);
         buildNixies();
+        wireShareModes();
         readSource();
         return true;
     }

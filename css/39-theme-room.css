@@ -51,24 +51,25 @@ html[data-theme="walnut-copper"] #mpConnected > :is(.mp-room-bar, .mp-foot) { di
    tier (study .cp.sm: 32 px, 9 px Michroma at .12em, 5 px corners). The
    column here is 254 px against the study's 296, so the doors take the
    compact tier's 9 px type too: START A ROOM at the study's 10.5 px would
-   not fit a half-width pane on one line. Labels never wrap. (#sidebar-right
-   leads each selector: css/34's sidebar pane rule carries one id and ten
-   classes, and these must outrank it.) */
+   not fit a half-width pane on one line. Every label 06e and js/54 write
+   fits its pane on one line at this width; a pane is never cut, so a label
+   that ever outgrows it wraps onto a second line and the pane grows.
+   (#sidebar-right leads each selector: css/34's sidebar pane rule carries
+   one id and ten classes, and these must outrank it.) */
 html[data-theme="walnut-copper"] #sidebar-right #multiArtistPanel :where(button, .btn):not(.btn--icon) {
-    min-height: 0;
-    height: 32px;
+    min-height: 32px;
+    height: auto;
     margin: 0;
-    padding: 0 10px;
+    padding: 6px 10px;
     border-radius: 5px;
     font-family: var(--ui-font-display);
     font-weight: 400;
     font-size: 9px;
-    line-height: 1;
+    line-height: 1.3;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    text-wrap: balance;
 }
 html[data-theme="walnut-copper"] #multiArtistPanel .mp-door-row {
     display: grid;
@@ -80,8 +81,8 @@ html[data-theme="walnut-copper"] #multiArtistPanel .mp-door-row {
 html[data-theme="walnut-copper"] #sidebar-right #multiArtistPanel .mp-door-row > button {
     width: 100%;
     min-width: 0;
-    height: 48px;
-    padding: 0 2px;
+    min-height: 48px;
+    padding: 6px 2px;
     border-radius: 7px;
 }
 /* Sync phone (js/54), Link to current settings, Reconnect: full width. The
@@ -161,17 +162,18 @@ html[data-theme="walnut-copper"] #mpError {
    Study .roomstat: a 12 px pilot lamp, 9 px gap, the engraved label. The
    lamp says what 06e's dot said: teal (the VFD's colour) once someone else
    is here, amber while you wait, breathing (06e's own pulse) while it
-   connects. The label is the study's .lbl at 9.5 px / .14em: "Sharing
-   settings · 3 here" then fits the 254 px column on one line, as it does
-   in the study's; longer lines wrap under it, lamp on the first line. */
+   connects. The label is the study's .lbl (10.5 px / 1.2, .18em, 40-41);
+   in today's 254 px column a line longer than "Connecting…" wraps onto a
+   second line beside the lamp, which sits on the first. (The sidebars widen
+   after the merge.) */
 html[data-theme="walnut-copper"] #mpConnected .mp-status-row {
     display: flex;
     align-items: flex-start;
     gap: 9px;
     margin: 0;
     padding-top: 2px;
-    font: 400 9.5px/1.35 var(--ui-font-display);
-    letter-spacing: 0.14em;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
@@ -191,7 +193,7 @@ html[data-theme="walnut-copper"] #connectionDot {
     flex: none;
     width: 12px;
     height: 12px;
-    margin-top: 0.4px;
+    margin-top: 0.3px;
     border-radius: 50%;
     background:
         radial-gradient(circle at 38% 32%, rgba(255, 244, 228, calc(0.12 + var(--ci) * 0.65)), transparent 42%),
@@ -251,28 +253,39 @@ html[data-theme="walnut-copper"] .wc-notes {
     text-shadow: 0 0 6px rgba(114, 242, 212, 0.55);
 }
 /* One line (study .nline 76-79): js/74 moves it on the spring (transform)
-   and sets its brightness (opacity); nothing here animates. */
+   and sets its brightness (opacity); nothing here animates. It is a row:
+   the dot, the name, the words and 06e's count ("+12"). Too long, the
+   words ellipsize first (they give way a thousand times faster than the
+   name), then the name; the count never shrinks. */
 html[data-theme="walnut-copper"] .wc-nline {
     position: absolute;
     left: 0;
     right: 0;
     top: 0;
+    display: flex;
+    align-items: center;
     height: 21px;
     line-height: 21px;
-    white-space: nowrap;
+    white-space: pre;
     overflow: hidden;
-    text-overflow: ellipsis;
     text-transform: uppercase;
     opacity: 0;
     will-change: transform, opacity;
 }
+html[data-theme="walnut-copper"] .wc-nline > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+html[data-theme="walnut-copper"] .wc-nline > .wc-who { flex: 0 1 auto; }
+html[data-theme="walnut-copper"] .wc-nline > .wc-what { flex: 0 1000 auto; }
+html[data-theme="walnut-copper"] .wc-nline > .wc-more { flex: none; overflow: visible; }
 html[data-theme="walnut-copper"] .wc-nline i {
-    display: inline-block;
+    flex: none;
     width: 7px;
     height: 7px;
     margin-right: 8px;
     border-radius: 50%;
-    vertical-align: 1px;
     background: var(--c);
     box-shadow: 0 0 8px var(--c);
 }
@@ -281,7 +294,9 @@ html[data-theme="walnut-copper"] .wc-nline .wc-who {
     text-shadow: 0 0 7px var(--c);
 }
 /* Nothing to show (study .nempty 494, stepFeed 2835): "Quiet · no changes
-   yet", "Offline", or 06e's own sentence while the room is together. */
+   yet", "Offline", or 06e's own sentence while the room is together. At
+   the oldest line's brightness (0.71, js/74 DIM) rather than the study's
+   0.55, which leaves it near 3.3:1 on this glass. */
 html[data-theme="walnut-copper"] .wc-nempty {
     position: absolute;
     left: 10px;
@@ -289,7 +304,7 @@ html[data-theme="walnut-copper"] .wc-nempty {
     top: 8px;
     font: 400 12px/21px var(--ui-font-mono);
     color: var(--vfd);
-    opacity: 0.55;
+    opacity: 0.71;
     transition: opacity 0.4s ease;
     pointer-events: none;
 }
@@ -315,11 +330,20 @@ html[data-theme="walnut-copper"] #mpActivity {
 }
 
 /* ── The connected row: Invite, the room menu, Leave ──────────────────
-   Study .row2 of compact panes (Copy code | Leave): the two halves share
-   the row, the square menu pane between them (study .cp.sm.sq). */
-html[data-theme="walnut-copper"] #sidebar-right #mpConnected :is(#mpInviteBtn, #disconnectBtn) {
-    flex: 1 1 0;
-    min-width: 0;
+   The study's pane width rule: Leave is its label plus padding on the
+   compact tier's 16 px module (80 px), the menu a 32 px square (.cp.sm.sq),
+   and the primary action, Invite, fills the rest. 06e names it "Invite ▾"
+   in a room and "Sync phone" in a stranger pairing or while the lobby
+   looks; at 254 px either fits whole (Invite gets 130 px, SYNC PHONE needs
+   118). No pane shrinks below its label: a row too narrow for all three
+   breaks, and Leave moves to a second line. */
+html[data-theme="walnut-copper"] #sidebar-right #mpConnected #mpInviteBtn {
+    flex: 1 1 auto;
+    min-width: fit-content;
+}
+html[data-theme="walnut-copper"] #sidebar-right #mpConnected #disconnectBtn {
+    flex: 0 0 80px;
+    min-width: fit-content;
 }
 html[data-theme="walnut-copper"] #sidebar-right #mpConnected #mpMenuBtn {
     flex: 0 0 32px;
@@ -363,24 +387,26 @@ html[data-theme="walnut-copper"] #mpRoomMenu .mp-menu-item[aria-checked="true"] 
 }
 
 /* ── The Invite popover: the room code as nixie tubes ─────────────────
-   Its width fits the longest pane on one line (Room link + current
-   settings). The code well, the QR, the hint and the two copies keep their
-   order; #roomName keeps its text for screen readers and for selection,
-   laid over the tubes and drawn clear. */
+   Its width fits Room link + current settings on one line. The code well,
+   the QR, the hint and the two copies keep their order; #roomName keeps
+   its text for screen readers and for selection, laid over the tubes and
+   drawn clear. Panes never cut a label: js/54 writes the phone row as
+   "Sync phone · your mouse, 2 artists", which wraps inside its pane. */
 html[data-theme="walnut-copper"] .mp-pop.brush-shape-menu#mpInvitePop {
     width: 300px;
     padding: 14px 12px;
 }
 html[data-theme="walnut-copper"] #mpInvitePop :is(button, .btn):not(.btn--icon) {
-    min-height: 0;
-    height: 32px;
+    min-height: 32px;
+    height: auto;
     margin: 0;
-    padding: 0 10px;
+    padding: 6px 10px;
     border-radius: 5px;
-    font: 400 9px/1 var(--ui-font-display);
+    font: 400 9px/1.3 var(--ui-font-display);
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    white-space: nowrap;
+    white-space: normal;
+    text-wrap: balance;
 }
 html[data-theme="walnut-copper"] #roomDisplay {
     display: grid;
@@ -402,12 +428,17 @@ html[data-theme="walnut-copper"] #roomDisplay .mp-room-label {
 /* Code / QR / Hide: one joined strip (study .joined), square inner corners. */
 html[data-theme="walnut-copper"] #roomDisplay .mp-share-modes { gap: 0; }
 html[data-theme="walnut-copper"] #mpInvitePop #roomDisplay .mp-share-modes > button {
+    position: relative;
+    min-height: 24px;
     height: 24px;
     padding: 0 8px;
     font-size: 8.5px;
     letter-spacing: 0.1em;
+    white-space: nowrap;
     border-radius: 0;
 }
+/* Joined, the next pane would paint over a focused one's ring. */
+html[data-theme="walnut-copper"] #mpInvitePop #roomDisplay .mp-share-modes > button:focus-visible { z-index: 1; }
 html[data-theme="walnut-copper"] #mpInvitePop #roomDisplay .mp-share-modes > button:first-child { border-radius: 5px 0 0 5px; }
 html[data-theme="walnut-copper"] #mpInvitePop #roomDisplay .mp-share-modes > button:last-child { border-radius: 0 5px 5px 0; }
 /* The code and its tubes share one cell: the tubes are the picture, the
@@ -474,6 +505,17 @@ html[data-theme="walnut-copper"] .wc-nx.is-off {
     background:
         var(--mesh-dim) center / 2.5px 4.33px,
         linear-gradient(170deg, #1a1210, #090605);
+}
+/* Forced colours draw #roomName's clear text in CanvasText over the tubes,
+   so the code would show twice, spaced to the tubes. There the tubes go
+   and the code is plain text in the system's colours. */
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] #roomDisplay > .wc-nixies { display: none; }
+    html[data-theme="walnut-copper"] #roomName {
+        color: CanvasText;
+        letter-spacing: normal;
+        text-indent: 0;
+    }
 }
 html[data-theme="walnut-copper"] #roomQr { padding: 2px 0; }
 /* The hint (study .hint 331). */
