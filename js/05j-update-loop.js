@@ -2706,6 +2706,9 @@
             window.__drawSerial = (window.__drawSerial | 0) + 1;
             // [GOVERNOR HOOK] feed the adaptive quality governor
             if (window.QualityGovernor) window.QualityGovernor.onFrame(nowMs, cpuMs);
+            // [THEME HOOK] Walnut & Copper motion (js/71): one call per drawn
+            // frame; returns at once when nothing in the UI is moving.
+            if (window.__themeFrame) window.__themeFrame();
             if (!_firstFrameDrawn) {
                 _firstFrameDrawn = true;
                 if (window.Boot) window.Boot.done('frame');

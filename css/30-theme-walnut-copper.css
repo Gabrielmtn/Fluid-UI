@@ -171,16 +171,15 @@ html[data-theme="walnut-copper"] .section-header {
     box-shadow:
         inset 0 0 0 1.5px var(--cu),
         inset 0 2px 0 rgba(255, 210, 170, 0.14),
-        0 2px 0 rgba(0, 0, 0, 0.45);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-html[data-theme="walnut-copper"] .sidebar-section:not(.collapsed) > .section-header {
-    transform: translateY(-1px);
-    box-shadow:
-        inset 0 0 0 1.5px var(--cu),
-        inset 0 2px 0 rgba(255, 210, 170, 0.14),
         0 2px 0 rgba(0, 0, 0, 0.45),
-        0 12px 16px -6px rgba(0, 0, 0, 0.85);
+        0 calc(var(--dp, 0) * 12px) calc(var(--dp, 0) * 16px) -6px rgba(0, 0, 0, 0.85);
+    /* The drawer spring (js/71 writes --dp on the section): the front lifts
+       1 px and its shadow deepens as the drawer pulls out (study .dfront). */
+    transform: translateY(calc(var(--dp, 0) * -1px));
+}
+/* The tray's contents ride 14 px up into place as it opens (study .dtray). */
+html[data-theme="walnut-copper"] .sidebar-section > .section-body > * {
+    transform: translateY(calc((1 - min(var(--dp, 1), 1)) * -14px));
 }
 html[data-theme="walnut-copper"] .section-header:has(> .section-title:focus-visible) {
     outline: 2px solid var(--ui-focus);
@@ -404,14 +403,18 @@ html[data-theme="walnut-copper"] .section-body .layer-item-header {
    control's face for 1.4 s, renewed through a drag. The face glows in that
    colour and cools back; tubes, dial arcs and telegraph sweeps inside it
    take the player's colour while it lasts. */
-html[data-theme="walnut-copper"] .mp-peer-touch {
+html[data-theme="walnut-copper"] .mp-peer-touch,
+html[data-theme="walnut-copper"] [style*="--ga"] {
     outline: 0;
     border-radius: 8px;
-    animation: wc-peer 1.4s ease-out both;
+    animation: none;
 }
-@keyframes wc-peer {
-    0%   { box-shadow: 0 0 0 1px var(--mp-peer, #5ab0ff), 0 0 16px -2px var(--mp-peer, #5ab0ff); }
-    100% { box-shadow: 0 0 0 1px transparent, 0 0 16px -2px transparent; }
+/* js/71 decays --ga with τ 1.4 s on the face 06e marked; the glow is the
+   player's colour (--pc) at that strength. */
+html[data-theme="walnut-copper"] :is(.mixer-channel, .control-group, .checkbox-group)[style*="--ga"] {
+    box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--pc) calc(var(--ga) * 100%), transparent),
+        0 0 16px -2px color-mix(in oklab, var(--pc) calc(var(--ga) * 100%), transparent);
 }
 html[data-theme="walnut-copper"] .mp-peer-touch input[type=range] {
     --arc: var(--mp-peer, #5ab0ff);
@@ -437,5 +440,21 @@ html[data-theme="walnut-copper"] .hk-cap {
     background: linear-gradient(170deg, #1a1210, #090605);
     box-shadow: inset 0 0 0 1px #0c0806, inset 0 0 0 1.5px rgba(196, 122, 75, 0.35);
 }
+
+/* ── Name chips (js/71; study .chip, 94-99, values literal) ─────────── */
+html[data-theme="walnut-copper"] .wc-chips { position: fixed; inset: 0; pointer-events: none; z-index: 10050; }
+html[data-theme="walnut-copper"] .wc-chip {
+    position: absolute; z-index: 4; left: 0; top: 0; transform: translate(-50%, -100%);
+    font: 400 9.5px/1 var(--ui-font-display); letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 6px 9px; border-radius: 999px; background: rgba(12, 8, 6, 0.9); color: var(--c); border: 1px solid var(--c);
+    opacity: 0; pointer-events: none; white-space: nowrap;
+    transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.25);
+}
+html[data-theme="walnut-copper"] .wc-chip.show { opacity: 1; transform: translate(-50%, calc(-100% - 8px)); }
+html[data-theme="walnut-copper"] .wc-chip.aside { transform: translate(-6px, -50%); }
+html[data-theme="walnut-copper"] .wc-chip.aside.show { transform: translate(4px, -50%); }
+html[data-theme="walnut-copper"] .wc-chip.aside.flip { transform: translate(calc(-100% + 6px), -50%); }
+html[data-theme="walnut-copper"] .wc-chip.aside.flip.show { transform: translate(calc(-100% - 4px), -50%); }
+@media (prefers-reduced-motion: reduce) { html[data-theme="walnut-copper"] .wc-chip { transition: none; } }
 
 } /* @layer theme */

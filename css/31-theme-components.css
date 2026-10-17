@@ -17,23 +17,28 @@
 
 @layer theme {
 
-/* ── Cathode pane: every button ─────────────────────────────────────── */
+/* ── Cathode pane: every button ─────────────────────────────────────
+   Study .cp (171-180), values literal; --ci is the study's --i, written by
+   js/71 (cathode + press surge). --ga / --pc / --tgc arrive from a face
+   another player touched (js/71 tints). The 1 px legacy border stays (no
+   box changes size) but goes clear: the bezel is the study's inset copper. */
+html[data-theme="walnut-copper"] { --ga: 0; --pc: #fff; }
 html[data-theme="walnut-copper"] :is(button, .btn) {
-    --gc: 255 110 30;
-    border-color: var(--cu);
-    border-radius: 6px;
+    --gc: var(--tgc, 255 110 30);
+    border-color: transparent;
+    border-radius: 7px;
     background-color: #110b08;
-    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    color: color-mix(in oklab, var(--pc) calc(var(--ga) * 70%), color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit)));
     text-shadow:
         0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
-        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.55));
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.6),
-        inset 0 1px 0 rgba(255, 210, 170, 0.16),
-        inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
         inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
-        0 0 calc(var(--ci) * 12px) rgb(var(--gc) / calc(var(--ci) * 0.2));
-    transition: --ci 170ms ease-out, background-color 120ms, border-color 120ms;
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
 }
 /* Glass and mesh only where script has not painted the button itself
    (a colour swatch carries its colour inline). */
@@ -45,12 +50,11 @@ html[data-theme="walnut-copper"] :is(button, .btn):not([style*="background"]) {
     background-size: auto, 3.5px 6.06px, auto;
     background-position: center;
 }
-html[data-theme="walnut-copper"] :is(button, .btn):hover { --ci: 0.3; border-color: var(--cu-hi); }
-html[data-theme="walnut-copper"] :is(button, .btn):active { --ci: 0.75; }
+
+
 html[data-theme="walnut-copper"] :is(button[aria-pressed="true"], button.active, .btn[aria-pressed="true"], .btn.active,
     .btn.ch-ignite-lock.armed, button.btn--emphasis, .btn--emphasis) {
-    --ci: 1;
-    border-color: var(--cu-hi);
+    --ci: 1;   /* fallback until js/71 registers the pane; its inline value wins after */
 }
 html[data-theme="walnut-copper"] :is(button:disabled, .btn:disabled, .btn[aria-disabled="true"]) {
     --ci: 0;
@@ -137,7 +141,7 @@ html[data-theme="walnut-copper"] input[type=range]::-webkit-slider-container {
         inset 0 2px 4px rgba(0, 0, 0, 0.75);
     background:
         linear-gradient(175deg, rgba(255, 240, 225, 0.13), transparent 45%),
-        var(--neon-col) 0 50% / calc(var(--js, 0) * var(--pos)) 100% no-repeat,
+        var(--neon-col) 0 50% / calc(var(--js, 0) * var(--spp, var(--pos))) 100% no-repeat,   /* --spp: js/71 spring, while moving */
         linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 12px) 1px no-repeat,
         var(--mesh-dim) center / 3.5px 6.06px,
         linear-gradient(170deg, #171010, #070403);
@@ -293,7 +297,6 @@ html[data-theme="walnut-copper"] .wc-opt {
     text-shadow: 0 0 calc(var(--ci) * 6px) rgb(255 110 30 / calc(var(--ci) * 0.9));
     background: var(--mesh-dim) center / 3.5px 6.06px, linear-gradient(170deg, #1a1210, #090605);
     box-shadow: inset 0 0 0 1px rgba(196, 122, 75, 0.7), inset 0 0 calc(var(--ci) * 12px) rgb(255 110 30 / calc(var(--ci) * 0.3));
-    transition: --ci 140ms ease-out;
 }
 /* Radio indicator: the chosen option's cathode is lit. */
 html[data-theme="walnut-copper"] .wc-opt::before {

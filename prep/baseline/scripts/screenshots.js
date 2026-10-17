@@ -535,6 +535,11 @@ async function comparePng(baseFile, newFile, diffFile) {
     try { head = execSync('git rev-parse HEAD', { cwd: ROOT }).toString().trim(); } catch (_) { head = '(git unavailable)'; }
     log('booting headless Chrome through scripts/test/radial-menu/driver.js ...');
     const d = await boot({ seed: SEED, args: CHROME_ARGS });
+    // Settled state: the Walnut & Copper motion (js/71) runs on the real
+    // clock; under prefers-reduced-motion its springs jump to their target
+    // and cathodes switch without flicker or afterglow (the study's rule), so
+    // every shot is of the settled UI. Set before the per-width loads.
+    await d.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     const manifest = { generated: started.toISOString(), headCommit: head, script: 'prep/baseline/scripts/screenshots.js', mode: CHECK ? 'check' : 'capture', seed: SEED, rngSeed: RNG_SEED, framesPerStep: FRAMES_PER_STEP, chromeArgs: CHROME_ARGS, widths: [], problems: [] };
     try {
         // Before every load: wipe the scratch profile's localStorage and put the

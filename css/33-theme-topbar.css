@@ -52,7 +52,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
 /* The input becomes a square the size of the dial. */
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
     [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range] {
-    --t: calc((var(--val) - var(--min)) / (var(--max) - var(--min)));
+    --t: var(--sp, calc((var(--val) - var(--min)) / (var(--max) - var(--min))));   /* --sp: js/71 spring */
     --a: calc(-135deg + var(--t) * 270deg);
     --track-h: var(--dial);
     --input-py: 0px;
@@ -132,7 +132,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) .fader-scale { display: none; }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) .ch-fader { justify-content: center; }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) input[type=range] {
-    --t: calc((var(--val) - var(--min)) / (var(--max) - var(--min)));
+    --t: var(--sp, calc((var(--val) - var(--min)) / (var(--max) - var(--min))));   /* --sp: js/71 spring */
     --a: calc(-120deg + var(--t) * 240deg);
     --track-h: var(--dial);
     --input-py: 0px;

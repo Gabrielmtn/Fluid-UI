@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-17T18:09:14.094Z",
- "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+ "generated": "2026-10-17T18:48:41.193Z",
+ "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
  "script": "prep/baseline/scripts/screenshots.js",
  "mode": "capture",
  "seed": {
@@ -19,8 +19,8 @@
    "width": 1366,
    "height": 768,
    "env": {
-    "date": "2026-10-17T18:09:14.094Z",
-    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+    "date": "2026-10-17T18:48:41.193Z",
+    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -59,7 +59,7 @@
     ],
     "localStorageKeys": 19,
     "displayHz": 60,
-    "displayHzKnown": true,
+    "displayHzKnown": false,
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "underbar": "Image Sharpness2048▾Alt+↑↓Image SharpnessResolution of the paint itself - costs GPU 8192 6144 4096 2048 1536 1024 512 256 Motion Detail1024▾Alt+Shift+↑↓Motion D",
     "colorWell": "#ff0000"
@@ -68,8 +68,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "2048x1563",
-     "sim": "1024x782",
+     "dye": "1024x782",
+     "sim": "512x391",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -77,7 +77,7 @@
     "fpsCap": {
      "before": {
       "hz": 60,
-      "known": true
+      "known": false
      },
      "value": "native",
      "selected": "Native (60 Hz)",
@@ -852,31 +852,31 @@
      "px": 384820
     },
     "screenshotAfter": {
-     "lit": 157478,
+     "lit": 156994,
      "max": 186,
      "px": 384820
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5194175363883557,
-     "res": "2048x1563"
+     "coverage": 0.5183224104859335,
+     "res": "1024x782"
     },
     "display": {
-     "meanLum": 0.1299500058835883,
-     "maxLum": 0.3482023529411764,
+     "meanLum": 0.1297880332008135,
+     "maxLum": 0.3479349019607843,
      "res": "177x135"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 21.4
+   "seconds": 24.6
   },
   {
    "width": 1440,
    "height": 900,
    "env": {
-    "date": "2026-10-17T18:09:14.094Z",
-    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+    "date": "2026-10-17T18:48:41.193Z",
+    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -915,7 +915,7 @@
     ],
     "localStorageKeys": 19,
     "displayHz": 60,
-    "displayHzKnown": true,
+    "displayHzKnown": false,
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "underbar": "Image Sharpness2048▾Alt+↑↓Image SharpnessResolution of the paint itself - costs GPU 8192 6144 4096 2048 1536 1024 512 256 Motion Detail1024▾Alt+Shift+↑↓Motion D",
     "colorWell": "#ff0000"
@@ -924,8 +924,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "2048x1761",
-     "sim": "1024x880",
+     "dye": "1024x880",
+     "sim": "512x440",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -933,7 +933,7 @@
     "fpsCap": {
      "before": {
       "hz": 60,
-      "known": true
+      "known": false
      },
      "value": "native",
      "selected": "Native (60 Hz)",
@@ -1708,31 +1708,31 @@
      "px": 528416
     },
     "screenshotAfter": {
-     "lit": 221442,
-     "max": 182,
+     "lit": 220772,
+     "max": 181,
      "px": 528416
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.531533652310477,
-     "res": "2048x1761"
+     "coverage": 0.5303444602272728,
+     "res": "1024x880"
     },
     "display": {
-     "meanLum": 0.1316995369576349,
+     "meanLum": 0.13150206947064386,
      "maxLum": 0.3400760784313725,
      "res": "196x168"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 21.5
+   "seconds": 24.5
   },
   {
    "width": 1920,
    "height": 1080,
    "env": {
-    "date": "2026-10-17T18:09:14.094Z",
-    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+    "date": "2026-10-17T18:48:41.193Z",
+    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -1771,7 +1771,7 @@
     ],
     "localStorageKeys": 19,
     "displayHz": 60,
-    "displayHzKnown": true,
+    "displayHzKnown": false,
     "glRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "underbar": "Image Sharpness2048▾Alt+↑↓Image SharpnessResolution of the paint itself - costs GPU 8192 6144 4096 2048 1536 1024 512 256 Motion Detail1024▾Alt+Shift+↑↓Motion D",
     "colorWell": "#ff0000"
@@ -1780,8 +1780,8 @@
     "caret": "*, *::before, *::after { caret-color: transparent !important; transition: none !important; animation: none !important; }",
     "harness": {
      "installed": true,
-     "dye": "2048x1427",
-     "sim": "1024x714",
+     "dye": "1024x714",
+     "sim": "512x357",
      "frozen": true,
      "cleared": true,
      "seed": 48879
@@ -1789,7 +1789,7 @@
     "fpsCap": {
      "before": {
       "hz": 60,
-      "known": true
+      "known": false
      },
      "value": "native",
      "selected": "Native (60 Hz)",
@@ -2564,31 +2564,31 @@
      "px": 988530
     },
     "screenshotAfter": {
-     "lit": 393129,
-     "max": 190,
+     "lit": 392006,
+     "max": 188,
      "px": 988530
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5104835045112124,
-     "res": "2048x1427"
+     "coverage": 0.5095098586309523,
+     "res": "1024x714"
     },
     "display": {
-     "meanLum": 0.1288970473641682,
-     "maxLum": 0.35439372549019604,
+     "meanLum": 0.12872329964415896,
+     "maxLum": 0.3549443137254902,
      "res": "297x207"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 22.5
+   "seconds": 28.4
   },
   {
    "width": 2560,
    "height": 1440,
    "env": {
-    "date": "2026-10-17T18:09:14.094Z",
-    "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+    "date": "2026-10-17T18:48:41.193Z",
+    "headCommit": "7cfe5194f9157cde879965777713afccbc74acf9",
     "chrome": "Chrome/155.0.8059.80",
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
     "protocol": "1.3",
@@ -3420,24 +3420,24 @@
      "px": 1958178
     },
     "screenshotAfter": {
-     "lit": 773874,
-     "max": 187,
+     "lit": 771523,
+     "max": 189,
      "px": 1958178
     },
     "dye": {
      "max": 0.9599609375,
-     "coverage": 0.5089924549750356,
+     "coverage": 0.5078682239657631,
      "res": "1024x701"
     },
     "display": {
-     "meanLum": 0.1286814846897991,
-     "maxLum": 0.356364705882353,
+     "meanLum": 0.12842549417683302,
+     "maxLum": 0.3552274509803921,
      "res": "422x289"
     },
     "rendered": true
    },
    "pageExceptions": [],
-   "seconds": 24.4
+   "seconds": 37.5
   }
  ],
  "problems": []
