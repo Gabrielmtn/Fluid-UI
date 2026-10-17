@@ -190,4 +190,36 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="
     html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) { --dial: 76px; }
 }
 
+/* ── Ignite: burns while held (.active) or locked (.locked) ──────────
+   The pane's lit state comes from 31-theme-components (.active). Burning
+   adds the white-hot label over a dark halo and a deeper glow, plus a light
+   flicker that runs only while it burns (never under reduced motion). */
+html[data-theme="walnut-copper"] .ch-nudge-btn:is(.active, .locked) {
+    --ci: 1;
+    color: #fff6e6;
+    text-shadow: 0 0 2px rgba(40, 14, 2, 0.95), 0 0 8px rgba(255, 140, 50, 0.9), 0 0 18px rgba(255, 90, 20, 0.6);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1px rgba(255, 200, 150, 0.35),
+        inset 0 0 22px rgba(255, 110, 30, 0.55),
+        0 0 22px rgba(255, 110, 30, 0.45);
+    animation: wc-burn 2.3s steps(18) infinite;
+}
+@keyframes wc-burn {
+    0%, 100% { filter: brightness(1); }
+    23% { filter: brightness(0.86); }
+    24% { filter: brightness(1); }
+    57% { filter: brightness(0.92); }
+    58% { filter: brightness(1.04); }
+    81% { filter: brightness(0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] .ch-nudge-btn:is(.active, .locked) { animation: none; }
+}
+/* The current-colour well is a pilot lamp in its own colour: a copper
+   bezel around the native colour input (still the same input). */
+html[data-theme="walnut-copper"] #mixer-strip :is(.ch-color-input, input[type="color"]) {
+    box-shadow: 0 0 0 1.5px var(--cu), 0 0 0 3px rgba(0, 0, 0, 0.55), 0 0 10px rgba(255, 200, 150, 0.25);
+}
+
 } /* @layer theme */

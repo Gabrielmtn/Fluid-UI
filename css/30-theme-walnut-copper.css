@@ -315,4 +315,50 @@ html[data-theme="walnut-copper"] .sidebar-section .section-title {
     }
 }
 
+/* ── Swirl Together drawer ─────────────────────────────────────────────
+   No box inside a drawer: the room panel gives up its own plate. The room
+   code reads as nixie glass, the "who changed what" line as a VFD screen. */
+html[data-theme="walnut-copper"] #multiArtistPanel {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] #roomDisplay {
+    font-family: var(--ui-font-mono);
+    letter-spacing: 0.22em;
+    color: var(--lit);
+    text-shadow: 0 0 6px rgba(255, 120, 40, 0.9), 0 0 14px rgba(255, 70, 10, 0.55);
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(255, 110, 30, 0.2), transparent 70%),
+        var(--mesh-dim) center / 5px 8.66px,
+        linear-gradient(170deg, #1a1210, #090605);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1.2px rgba(214, 140, 92, 0.75), inset 0 1px 0 1.2px rgba(255, 220, 190, 0.15), 0 3px 0 -1px var(--cu-lo);
+}
+/* VFD cathode screen (study .scr): near-black teal glass, a faint teal
+   anode mesh, a phosphor glow at the centre, a copper bezel and scanlines.
+   The room feed and the room toast are screens, not panes. */
+html[data-theme="walnut-copper"] :is(#mpActivity, .mp-room-toast) {
+    font-family: var(--ui-font-mono);
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.55);
+    background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px),
+        linear-gradient(160deg, rgba(220, 255, 245, 0.06), transparent 40%),
+        radial-gradient(ellipse at center, rgba(40, 160, 130, 0.11), transparent 72%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%2372f2d4' stroke-opacity='.13' stroke-width='.7'/%3E%3C/svg%3E") center / 5px 8.66px,
+        #040b0a;
+    border-color: transparent;
+    border-radius: 8px;
+    padding: 7px 10px;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.15),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] :is(#mpActivity, .mp-room-toast) .mp-activity-who {
+    text-shadow: 0 0 3px currentColor;
+}
+
 } /* @layer theme */

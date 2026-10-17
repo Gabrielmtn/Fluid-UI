@@ -100,20 +100,21 @@ html[data-theme="walnut-copper"] .arm-push-btn.active::before {
     box-shadow: inset 0 0 0 1.5px #120c0a, 0 0 8px rgb(255 110 30 / 0.7);
 }
 
-/* Red-tinted panes: destructive and record keep their reserved meaning. */
-html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record) {
+/* Red-tinted panes: destructive and record keep their reserved meaning;
+   Leave (the room) is a red pane too, per the theme doc. */
+html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record, button.mp-btn-leave) {
     --gc: 255 80 50;
     border-color: #b8432c;
     background-color: #1c0b07;
     color: color-mix(in oklab, #ffd2c4 calc(var(--ci) * 100%), #e08a76);
 }
-html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record):not([style*="background"]) {
+html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record, button.mp-btn-leave):not([style*="background"]) {
     background-image:
         radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(0.12 + var(--ci) * 0.34)), transparent 75%),
         var(--mesh-dim),
         linear-gradient(170deg, #241008, #0b0503);
 }
-html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record):hover {
+html[data-theme="walnut-copper"] :is(button.btn--destructive, button.btn--record, .btn--destructive, .btn--record, button.mp-btn-leave):hover {
     border-color: #ff6a4d;
 }
 
