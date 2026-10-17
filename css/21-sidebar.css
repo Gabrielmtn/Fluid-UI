@@ -2315,7 +2315,9 @@ select option {
     min-width: 0;
     background: transparent;
     border-right: none;
-    padding: 2px 6px 2px 10px;
+    /* The body sections' 12px inset (.section-body), so Brush Size's fader
+       and readout end where every body fader and readout ends. */
+    padding: 2px 12px;
 }
 #sidebar-left .fader-scale { display: none; }
 /* One row: the fader takes the whole width. */
@@ -2335,23 +2337,16 @@ select option {
     text-align: right;
 }
 /* Interval's readout gains " @1.18x" whenever Time isn't 1 (js/20): 19
-   characters, about 5px more than the 248px bar has beside the hotkey slot,
-   so "@1.18x" broke onto a second line and dropped the name half a line.
-   One line always: the label's 0.4px tracking comes off these 19 characters,
-   which pays for a gap after the name, and an unbound slot gives up the rest. */
+   characters, which once broke "@1.18x" onto a second line and dropped the
+   name half a line. One line always, with a gap after the name. */
 #brushDabIntervalValue {
     white-space: nowrap;
-    letter-spacing: 0;
     padding-left: 6px;
-}
-#brushDabIntervalValue + .hk-cap-empty {
-    flex: 0 1 30px;
-    min-width: 0;
 }
 /* Steady under Brush Size, dressed like it: same inset, the channel label's
    type, the channel value's type (css/20-mixer-strip.css .ch-label/.ch-value). */
 .lsb-steady {
-    padding: 2px 6px 0 10px;
+    padding: 2px 12px 0;
 }
 .lsb-steady > .control-group { margin-bottom: 0; }
 #sidebar-left .lsb-steady > .control-group > label {
@@ -2369,10 +2364,12 @@ select option {
     opacity: 1;
 }
 .lsb-steady > .checkbox-group { margin: 2px 0 0; }
-/* The empty hotkey slot (js/17) keeps body rows in one column with rows that
-   show a modifier cap; the head's Brush Size has none, so in the head it
-   only pushed Steady's value 38px off Brush Size's. A real cap still shows. */
-.lsb-head .hk-cap-empty { display: none; }
+/* The empty hotkey slot (js/17) keeps a row's readout in one column with rows
+   that show a modifier cap. That is the right bar's job: the brush bar's only
+   cap is C on Show Cursor, a checkbox row, so here the slot just stopped every
+   body readout 38px short of its fader's end and off Brush Size's, which has
+   none. Every readout ends at its fader's end instead. A real cap still shows. */
+#sidebar-left .hk-cap-empty { display: none; }
 /* The fold tab: a zero-width strip right after #sidebar-left in #main-area,
    so it rides the bar's outer edge whatever its width (js/20). The tab hangs
    off that edge, half way down. Layout only — the colours are 01-buttons'
