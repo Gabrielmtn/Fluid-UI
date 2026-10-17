@@ -324,7 +324,19 @@ html[data-theme="walnut-copper"] .anim-toggle-row {
    never starts. */
 html[data-theme="walnut-copper"] .sidebar-section .section-title {
     background-image: none !important;
-    transition: -webkit-text-fill-color 0.9s ease, color 0.9s ease, text-shadow 0.9s ease;
+}
+/* The names fade in slowly and ease back out over the study's 1.6 s on a
+   gentle curve (the study's .cabR .dtitle, 564), only while the egg comes and
+   goes: js/37 holds [data-idle-wake] for the fade-out, so a hover on a drawer
+   name stays instant the rest of the time. */
+html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section[data-group] .section-title {
+    transition: -webkit-text-fill-color 2.6s cubic-bezier(0.4, 0, 0.2, 1), color 2.6s cubic-bezier(0.4, 0, 0.2, 1), text-shadow 2.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+html[data-theme="walnut-copper"] #sidebar-right[data-idle-wake] .sidebar-section[data-group] .section-title {
+    transition: -webkit-text-fill-color 1.6s cubic-bezier(0.33, 0, 0.2, 1), color 1.6s cubic-bezier(0.33, 0, 0.2, 1), text-shadow 1.6s cubic-bezier(0.33, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] #sidebar-right:is([data-idle-glow], [data-idle-wake]) .sidebar-section .section-title { transition: none; }
 }
 html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section[data-group] .section-title {
     --egg: #9cc7ff;

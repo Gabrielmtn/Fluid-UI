@@ -136,12 +136,23 @@
 
     // A styling hook only: [data-idle-glow] on the nav while the glow is up,
     // so a theme whose resting labels are not the gradient (Walnut & Copper
-    // engraves them) can fade the gradient in and back out. One attribute
-    // write per idle transition; nothing per frame.
+    // engraves them) can fade the gradient in and back out. On waking,
+    // [data-idle-wake] stays for the length of the theme's fade-out, so the
+    // theme can ease only that fade and keep every other colour change (a
+    // hover) instant. Attribute writes per idle transition; nothing per frame.
+    var WAKE_FADE_MS = 1700;
+    var wakeT = 0;
     function markIdle(on) {
         if (!nav) return;
-        if (on) nav.setAttribute('data-idle-glow', '');
-        else nav.removeAttribute('data-idle-glow');
+        clearTimeout(wakeT);
+        if (on) {
+            nav.removeAttribute('data-idle-wake');
+            nav.setAttribute('data-idle-glow', '');
+        } else if (nav.hasAttribute('data-idle-glow')) {
+            nav.removeAttribute('data-idle-glow');
+            nav.setAttribute('data-idle-wake', '');
+            wakeT = setTimeout(function () { nav.removeAttribute('data-idle-wake'); }, WAKE_FADE_MS);
+        }
     }
 
     function start() {
