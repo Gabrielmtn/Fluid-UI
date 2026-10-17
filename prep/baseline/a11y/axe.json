@@ -1,8 +1,8 @@
 {
- "generated": "2026-10-17T18:21:20.155Z",
+ "generated": "2026-10-17T19:13:31.919Z",
  "env": {
-  "date": "2026-10-17T18:21:20.155Z",
-  "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+  "date": "2026-10-17T19:13:31.919Z",
+  "headCommit": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -13,7 +13,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:57436/index.html",
+  "url": "http://127.0.0.1:58598/index.html",
   "bodyClasses": "web-mode photosafe-on",
   "leftFolded": false,
   "rightFolded": false,
@@ -203,7 +203,7 @@
    "closed": null,
    "note": null,
    "result": {
-    "ms": 498,
+    "ms": 509,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -218,8 +218,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T18:21:34.943Z",
-    "url": "http://127.0.0.1:57436/index.html",
+    "timestamp": "2026-10-17T19:13:46.676Z",
+    "url": "http://127.0.0.1:58598/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -688,7 +688,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"579\" style=\"width: 928px; height: 579px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -1186,7 +1186,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1197,7 +1197,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1208,7 +1208,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1219,7 +1219,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \">Limit<span class=\"gate-state\"></span></button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1230,7 +1230,7 @@
         "target": [
          ".ch-nudge-btn"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\">Ignite</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\" style=\"--ci: 0.000;\">Ignite</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1252,7 +1252,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1263,7 +1263,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1285,7 +1285,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">37 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1351,7 +1351,7 @@
         "target": [
          "button[title=\"Save the current brush setup\"]"
         ],
-        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\">+ New Brush Preset</button>",
+        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\" style=\"--ci: 0.000;\">+ New Brush Preset</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1373,7 +1373,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .active.brush-mode-btn[role=\"radio\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\">Fluid</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\" style=\"--ci: 1.000;\">Fluid</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1384,7 +1384,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(2)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\">Pressure</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Pressure</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1395,7 +1395,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(3)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\">Collider</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Collider</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1419,9 +1419,9 @@
         ],
         "html": "<span class=\"hk-cap\" title=\"Toggle brush cursor\">C</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element content is too short to determine if it is actual text content"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -1441,9 +1441,9 @@
         ],
         "html": "<span id=\"brushGhostOpacityValue\" class=\"value-display\">100%</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -1463,16 +1463,16 @@
         ],
         "html": "<span class=\"brush-section-label\">Tip</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
         "target": [
          ".active[data-tip=\"0\"][title=\"Soft Dab\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\">◌</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\" style=\"--ci: 1.000;\">◌</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -1483,7 +1483,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"1\"][title=\"Solid Circle\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\">⬤</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\" style=\"--ci: 0.000;\">⬤</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
         "checks": [
@@ -1494,7 +1494,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"2\"][title=\"Square brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\">■</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\" style=\"--ci: 0.000;\">■</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -1505,7 +1505,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"3\"][title=\"Rectangle Brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\">▬</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\" style=\"--ci: 0.000;\">▬</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -1516,7 +1516,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"4\"][title=\"Ring brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\">◯</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\" style=\"--ci: 0.000;\">◯</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -1527,7 +1527,7 @@
         "target": [
          ".brush-shape-paste"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\">Clipboard</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\" style=\"--ci: 0.000;\">Clipboard</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1551,42 +1551,9 @@
         ],
         "html": "<span class=\"value-display\" id=\"brushAngleValue\">0°</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-section-label:nth-child(10)"
-        ],
-        "html": "<label class=\"brush-section-label\">Stroke</label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .brush-mode-btn[type=\"button\"]:nth-child(1)"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint only while moving (spacing applies)\">On Move</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .active.brush-mode-btn[type=\"button\"]"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"Paint flows at a steady rate while the pointer is held, even standing still\">Constant</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -1615,7 +1582,7 @@
         "target": [
          "#createRoomBtn"
         ],
-        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\">Start a room</button>",
+        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\" style=\"--ci: 0.000;\">Start a room</bu",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1626,7 +1593,7 @@
         "target": [
          "#strangerBtn"
         ],
-        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\">Stranger</button>",
+        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\" style=\"--ci: 0.000;\">Stranger</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1648,7 +1615,7 @@
         "target": [
          "#joinRoomBtn"
         ],
-        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\">Join</button>",
+        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\" style=\"--ci: 0.000;\">Join</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1659,7 +1626,7 @@
         "target": [
          "#phonePadBtn"
         ],
-        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\">Sync phone</button>",
+        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\" style=\"--ci: 0.000;",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1670,7 +1637,7 @@
         "target": [
          "#shareLookBtn"
         ],
-        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \">Link to current settings</button>",
+        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \" style=\"--ci: 0.000;\">Link to current settings</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -1727,9 +1694,9 @@
         ],
         "html": "<span id=\"pressureValue\" class=\"value-display\">0.950</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -1749,9 +1716,9 @@
         ],
         "html": "<span id=\"iterationValue\" class=\"value-display\">25</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -1771,53 +1738,9 @@
         ],
         "html": "<span id=\"wetInfluenceValue\" class=\"value-display\">0.14</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"wetDrying\"]"
-        ],
-        "html": "<label for=\"wetDrying\" title=\"Drying time in seconds for wet paint to set. Lower = paint dries and holds faster.\">Dry Time <span id=\"wetDryingValue\" class=\"value-display\">4.5s</span><span class=\"hk-cap hk-cap-empty\"></span></label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#wetDryingValue"
-        ],
-        "html": "<span id=\"wetDryingValue\" class=\"value-display\">4.5s</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"grainCleanup\"]"
-        ],
-        "html": "<label for=\"grainCleanup\" title=\"Smooths the finest grain out of paint while it moves. Lower: keeps more of the grain\">Grain Cleanup <span id=\"grainCleanupValue\" class=\"value-display\">0.75</span><span class=\"hk-cap hk-cap-empty\"></span></la",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#grainCleanupValue"
-        ],
-        "html": "<span id=\"grainCleanupValue\" class=\"value-display\">0.75</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -2000,7 +1923,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 389,
+    "ms": 399,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -2015,8 +1938,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T18:21:35.758Z",
-    "url": "http://127.0.0.1:57436/index.html",
+    "timestamp": "2026-10-17T19:13:47.531Z",
+    "url": "http://127.0.0.1:58598/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -2437,7 +2360,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"579\" style=\"width: 928px; height: 579px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -2900,7 +2823,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2911,7 +2834,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2922,7 +2845,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2933,7 +2856,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \">Limit<span class=\"gate-state\"></span></button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2944,7 +2867,7 @@
         "target": [
          ".ch-nudge-btn"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\">Ignite</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\" style=\"--ci: 0.000;\">Ignite</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2966,7 +2889,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2977,7 +2900,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -2999,7 +2922,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">37 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3065,7 +2988,7 @@
         "target": [
          "button[title=\"Save the current brush setup\"]"
         ],
-        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\">+ New Brush Preset</button>",
+        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\" style=\"--ci: 0.000;\">+ New Brush Preset</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3087,7 +3010,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .active.brush-mode-btn[role=\"radio\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\">Fluid</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\" style=\"--ci: 1.000;\">Fluid</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3098,7 +3021,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(2)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\">Pressure</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Pressure</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3109,7 +3032,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(3)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\">Collider</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Collider</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3133,9 +3056,9 @@
         ],
         "html": "<span class=\"hk-cap\" title=\"Toggle brush cursor\">C</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element content is too short to determine if it is actual text content"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -3155,9 +3078,9 @@
         ],
         "html": "<span id=\"brushGhostOpacityValue\" class=\"value-display\">100%</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -3177,16 +3100,16 @@
         ],
         "html": "<span class=\"brush-section-label\">Tip</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
         "target": [
          ".active[data-tip=\"0\"][title=\"Soft Dab\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\">◌</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\" style=\"--ci: 1.000;\">◌</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -3197,7 +3120,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"1\"][title=\"Solid Circle\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\">⬤</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\" style=\"--ci: 0.000;\">⬤</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
         "checks": [
@@ -3208,7 +3131,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"2\"][title=\"Square brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\">■</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\" style=\"--ci: 0.000;\">■</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -3219,7 +3142,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"3\"][title=\"Rectangle Brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\">▬</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\" style=\"--ci: 0.000;\">▬</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -3230,7 +3153,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"4\"][title=\"Ring brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\">◯</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\" style=\"--ci: 0.000;\">◯</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -3241,7 +3164,7 @@
         "target": [
          ".brush-shape-paste"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\">Clipboard</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\" style=\"--ci: 0.000;\">Clipboard</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3265,42 +3188,9 @@
         ],
         "html": "<span class=\"value-display\" id=\"brushAngleValue\">0°</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-section-label:nth-child(10)"
-        ],
-        "html": "<label class=\"brush-section-label\">Stroke</label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .brush-mode-btn[type=\"button\"]:nth-child(1)"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint only while moving (spacing applies)\">On Move</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .active.brush-mode-btn[type=\"button\"]"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"Paint flows at a steady rate while the pointer is held, even standing still\">Constant</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -3329,7 +3219,7 @@
         "target": [
          "#createRoomBtn"
         ],
-        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\">Start a room</button>",
+        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\" style=\"--ci: 0.000;\">Start a room</bu",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3340,7 +3230,7 @@
         "target": [
          "#strangerBtn"
         ],
-        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\">Stranger</button>",
+        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\" style=\"--ci: 0.000;\">Stranger</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3362,7 +3252,7 @@
         "target": [
          "#joinRoomBtn"
         ],
-        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\">Join</button>",
+        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\" style=\"--ci: 0.000;\">Join</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3373,7 +3263,7 @@
         "target": [
          "#phonePadBtn"
         ],
-        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\">Sync phone</button>",
+        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\" style=\"--ci: 0.000;",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3384,7 +3274,7 @@
         "target": [
          "#shareLookBtn"
         ],
-        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \">Link to current settings</button>",
+        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \" style=\"--ci: 0.000;\">Link to current settings</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -3441,9 +3331,9 @@
         ],
         "html": "<span id=\"pressureValue\" class=\"value-display\">0.950</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -3463,9 +3353,9 @@
         ],
         "html": "<span id=\"iterationValue\" class=\"value-display\">25</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -3485,53 +3375,9 @@
         ],
         "html": "<span id=\"wetInfluenceValue\" class=\"value-display\">0.14</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"wetDrying\"]"
-        ],
-        "html": "<label for=\"wetDrying\" title=\"Drying time in seconds for wet paint to set. Lower = paint dries and holds faster.\">Dry Time <span id=\"wetDryingValue\" class=\"value-display\">4.5s</span><span class=\"hk-cap hk-cap-empty\"></span></label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#wetDryingValue"
-        ],
-        "html": "<span id=\"wetDryingValue\" class=\"value-display\">4.5s</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"grainCleanup\"]"
-        ],
-        "html": "<label for=\"grainCleanup\" title=\"Smooths the finest grain out of paint while it moves. Lower: keeps more of the grain\">Grain Cleanup <span id=\"grainCleanupValue\" class=\"value-display\">0.75</span><span class=\"hk-cap hk-cap-empty\"></span></la",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#grainCleanupValue"
-        ],
-        "html": "<span id=\"grainCleanupValue\" class=\"value-display\">0.75</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -4600,7 +4446,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 371,
+    "ms": 347,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -4615,8 +4461,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T18:21:37.210Z",
-    "url": "http://127.0.0.1:57436/index.html",
+    "timestamp": "2026-10-17T19:13:48.982Z",
+    "url": "http://127.0.0.1:58598/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -5085,7 +4931,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"579\" style=\"width: 928px; height: 579px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -5594,7 +5440,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5605,7 +5451,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5616,7 +5462,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5627,7 +5473,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \">Limit<span class=\"gate-state\"></span></button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5638,7 +5484,7 @@
         "target": [
          ".ch-nudge-btn"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\">Ignite</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\" style=\"--ci: 0.000;\">Ignite</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5660,7 +5506,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5671,7 +5517,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5693,7 +5539,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">37 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5759,7 +5605,7 @@
         "target": [
          "button[title=\"Save the current brush setup\"]"
         ],
-        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\">+ New Brush Preset</button>",
+        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\" style=\"--ci: 0.000;\">+ New Brush Preset</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5781,7 +5627,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .active.brush-mode-btn[role=\"radio\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\">Fluid</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\" style=\"--ci: 1.000;\">Fluid</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5792,7 +5638,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(2)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\">Pressure</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Pressure</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5803,7 +5649,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(3)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\">Collider</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Collider</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5827,9 +5673,9 @@
         ],
         "html": "<span class=\"hk-cap\" title=\"Toggle brush cursor\">C</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element content is too short to determine if it is actual text content"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -5849,9 +5695,9 @@
         ],
         "html": "<span id=\"brushGhostOpacityValue\" class=\"value-display\">100%</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -5871,16 +5717,16 @@
         ],
         "html": "<span class=\"brush-section-label\">Tip</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
         "target": [
          ".active[data-tip=\"0\"][title=\"Soft Dab\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\">◌</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\" style=\"--ci: 1.000;\">◌</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -5891,7 +5737,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"1\"][title=\"Solid Circle\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\">⬤</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\" style=\"--ci: 0.000;\">⬤</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
         "checks": [
@@ -5902,7 +5748,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"2\"][title=\"Square brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\">■</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\" style=\"--ci: 0.000;\">■</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -5913,7 +5759,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"3\"][title=\"Rectangle Brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\">▬</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\" style=\"--ci: 0.000;\">▬</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -5924,7 +5770,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"4\"][title=\"Ring brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\">◯</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\" style=\"--ci: 0.000;\">◯</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -5935,7 +5781,7 @@
         "target": [
          ".brush-shape-paste"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\">Clipboard</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\" style=\"--ci: 0.000;\">Clipboard</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -5959,42 +5805,9 @@
         ],
         "html": "<span class=\"value-display\" id=\"brushAngleValue\">0°</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-section-label:nth-child(10)"
-        ],
-        "html": "<label class=\"brush-section-label\">Stroke</label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .brush-mode-btn[type=\"button\"]:nth-child(1)"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint only while moving (spacing applies)\">On Move</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .active.brush-mode-btn[type=\"button\"]"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"Paint flows at a steady rate while the pointer is held, even standing still\">Constant</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -6023,7 +5836,7 @@
         "target": [
          "#createRoomBtn"
         ],
-        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\">Start a room</button>",
+        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\" style=\"--ci: 0.000;\">Start a room</bu",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -6034,7 +5847,7 @@
         "target": [
          "#strangerBtn"
         ],
-        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\">Stranger</button>",
+        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\" style=\"--ci: 0.000;\">Stranger</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -6056,7 +5869,7 @@
         "target": [
          "#joinRoomBtn"
         ],
-        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\">Join</button>",
+        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\" style=\"--ci: 0.000;\">Join</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -6067,7 +5880,7 @@
         "target": [
          "#phonePadBtn"
         ],
-        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\">Sync phone</button>",
+        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\" style=\"--ci: 0.000;",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -6078,7 +5891,7 @@
         "target": [
          "#shareLookBtn"
         ],
-        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \">Link to current settings</button>",
+        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \" style=\"--ci: 0.000;\">Link to current settings</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -6135,9 +5948,9 @@
         ],
         "html": "<span id=\"pressureValue\" class=\"value-display\">0.950</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -6157,9 +5970,9 @@
         ],
         "html": "<span id=\"iterationValue\" class=\"value-display\">25</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -6179,53 +5992,9 @@
         ],
         "html": "<span id=\"wetInfluenceValue\" class=\"value-display\">0.14</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"wetDrying\"]"
-        ],
-        "html": "<label for=\"wetDrying\" title=\"Drying time in seconds for wet paint to set. Lower = paint dries and holds faster.\">Dry Time <span id=\"wetDryingValue\" class=\"value-display\">4.5s</span><span class=\"hk-cap hk-cap-empty\"></span></label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#wetDryingValue"
-        ],
-        "html": "<span id=\"wetDryingValue\" class=\"value-display\">4.5s</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"grainCleanup\"]"
-        ],
-        "html": "<label for=\"grainCleanup\" title=\"Smooths the finest grain out of paint while it moves. Lower: keeps more of the grain\">Grain Cleanup <span id=\"grainCleanupValue\" class=\"value-display\">0.75</span><span class=\"hk-cap hk-cap-empty\"></span></la",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#grainCleanupValue"
-        ],
-        "html": "<span id=\"grainCleanupValue\" class=\"value-display\">0.75</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -6287,7 +6056,7 @@
         "target": [
          ".radial-label.is-slider[role=\"menuitem\"]:nth-child(3) > .radial-label-val"
         ],
-        "html": "<span class=\"radial-label-val\">37 px</span>",
+        "html": "<span class=\"radial-label-val\">31 px</span>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
         "checks": [
@@ -6619,7 +6388,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 362,
+    "ms": 360,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -6634,8 +6403,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T18:21:38.711Z",
-    "url": "http://127.0.0.1:57436/index.html",
+    "timestamp": "2026-10-17T19:13:50.516Z",
+    "url": "http://127.0.0.1:58598/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -7089,7 +6858,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"579\" style=\"width: 928px; height: 579px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -7587,7 +7356,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7598,7 +7367,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7609,7 +7378,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7620,7 +7389,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \">Limit<span class=\"gate-state\"></span></button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7631,7 +7400,7 @@
         "target": [
          ".ch-nudge-btn"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\">Ignite</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\" style=\"--ci: 0.000;\">Ignite</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7653,7 +7422,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7664,7 +7433,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7686,7 +7455,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">37 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7752,7 +7521,7 @@
         "target": [
          "button[title=\"Save the current brush setup\"]"
         ],
-        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\">+ New Brush Preset</button>",
+        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\" style=\"--ci: 0.000;\">+ New Brush Preset</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7774,7 +7543,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .active.brush-mode-btn[role=\"radio\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\">Fluid</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\" style=\"--ci: 1.000;\">Fluid</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7785,7 +7554,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(2)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\">Pressure</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Pressure</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7796,7 +7565,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(3)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\">Collider</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Collider</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7820,9 +7589,9 @@
         ],
         "html": "<span class=\"hk-cap\" title=\"Toggle brush cursor\">C</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element content is too short to determine if it is actual text content"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -7842,9 +7611,9 @@
         ],
         "html": "<span id=\"brushGhostOpacityValue\" class=\"value-display\">100%</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -7864,16 +7633,16 @@
         ],
         "html": "<span class=\"brush-section-label\">Tip</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
         "target": [
          ".active[data-tip=\"0\"][title=\"Soft Dab\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\">◌</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\" style=\"--ci: 1.000;\">◌</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -7884,7 +7653,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"1\"][title=\"Solid Circle\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\">⬤</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\" style=\"--ci: 0.000;\">⬤</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
         "checks": [
@@ -7895,7 +7664,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"2\"][title=\"Square brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\">■</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\" style=\"--ci: 0.000;\">■</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -7906,7 +7675,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"3\"][title=\"Rectangle Brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\">▬</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\" style=\"--ci: 0.000;\">▬</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -7917,7 +7686,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"4\"][title=\"Ring brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\">◯</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\" style=\"--ci: 0.000;\">◯</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -7928,7 +7697,7 @@
         "target": [
          ".brush-shape-paste"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\">Clipboard</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\" style=\"--ci: 0.000;\">Clipboard</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -7952,42 +7721,9 @@
         ],
         "html": "<span class=\"value-display\" id=\"brushAngleValue\">0°</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-section-label:nth-child(10)"
-        ],
-        "html": "<label class=\"brush-section-label\">Stroke</label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .brush-mode-btn[type=\"button\"]:nth-child(1)"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint only while moving (spacing applies)\">On Move</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .active.brush-mode-btn[type=\"button\"]"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"Paint flows at a steady rate while the pointer is held, even standing still\">Constant</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -8016,7 +7752,7 @@
         "target": [
          "#createRoomBtn"
         ],
-        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\">Start a room</button>",
+        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\" style=\"--ci: 0.000;\">Start a room</bu",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -8027,7 +7763,7 @@
         "target": [
          "#strangerBtn"
         ],
-        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\">Stranger</button>",
+        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\" style=\"--ci: 0.000;\">Stranger</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -8049,7 +7785,7 @@
         "target": [
          "#joinRoomBtn"
         ],
-        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\">Join</button>",
+        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\" style=\"--ci: 0.000;\">Join</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -8060,7 +7796,7 @@
         "target": [
          "#phonePadBtn"
         ],
-        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\">Sync phone</button>",
+        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\" style=\"--ci: 0.000;",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -8071,7 +7807,7 @@
         "target": [
          "#shareLookBtn"
         ],
-        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \">Link to current settings</button>",
+        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \" style=\"--ci: 0.000;\">Link to current settings</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -8128,9 +7864,9 @@
         ],
         "html": "<span id=\"pressureValue\" class=\"value-display\">0.950</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -8150,9 +7886,9 @@
         ],
         "html": "<span id=\"iterationValue\" class=\"value-display\">25</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -8172,53 +7908,9 @@
         ],
         "html": "<span id=\"wetInfluenceValue\" class=\"value-display\">0.14</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"wetDrying\"]"
-        ],
-        "html": "<label for=\"wetDrying\" title=\"Drying time in seconds for wet paint to set. Lower = paint dries and holds faster.\">Dry Time <span id=\"wetDryingValue\" class=\"value-display\">4.5s</span><span class=\"hk-cap hk-cap-empty\"></span></label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#wetDryingValue"
-        ],
-        "html": "<span id=\"wetDryingValue\" class=\"value-display\">4.5s</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"grainCleanup\"]"
-        ],
-        "html": "<label for=\"grainCleanup\" title=\"Smooths the finest grain out of paint while it moves. Lower: keeps more of the grain\">Grain Cleanup <span id=\"grainCleanupValue\" class=\"value-display\">0.75</span><span class=\"hk-cap hk-cap-empty\"></span></la",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#grainCleanupValue"
-        ],
-        "html": "<span id=\"grainCleanupValue\" class=\"value-display\">0.75</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -8465,7 +8157,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 349,
+    "ms": 361,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -8480,8 +8172,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T18:21:40.213Z",
-    "url": "http://127.0.0.1:57436/index.html",
+    "timestamp": "2026-10-17T19:13:52.040Z",
+    "url": "http://127.0.0.1:58598/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -8950,7 +8642,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"579\" style=\"width: 928px; height: 579px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -9470,7 +9162,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9481,7 +9173,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9492,7 +9184,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9503,7 +9195,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \">Limit<span class=\"gate-state\"></span></button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9514,7 +9206,7 @@
         "target": [
          ".ch-nudge-btn"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\">Ignite</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\" style=\"--ci: 0.000;\">Ignite</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9536,7 +9228,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9547,7 +9239,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9569,7 +9261,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">37 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9635,7 +9327,7 @@
         "target": [
          "button[title=\"Save the current brush setup\"]"
         ],
-        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\">+ New Brush Preset</button>",
+        "html": "<button type=\"button\" class=\"mixer-preset-save\" title=\"Save the current brush setup\" style=\"--ci: 0.000;\">+ New Brush Preset</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9657,7 +9349,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .active.brush-mode-btn[role=\"radio\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\">Fluid</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"The classic fluid experience by Pavel Dobryakov\" role=\"radio\" aria-checked=\"true\" style=\"--ci: 1.000;\">Fluid</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9668,7 +9360,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(2)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\">Pressure</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Move paint that is already on the canvas.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Pressure</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9679,7 +9371,7 @@
         "target": [
          ".brush-radio-row.brush-mode-row[role=\"radiogroup\"] > .brush-mode-btn[role=\"radio\"][type=\"button\"]:nth-child(3)"
         ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\">Collider</button>",
+        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint a collider layer (appears in the Layers panel) that the fluid flows around.\" role=\"radio\" aria-checked=\"false\" style=\"--ci: 0.000;\">Collider</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9703,9 +9395,9 @@
         ],
         "html": "<span class=\"hk-cap\" title=\"Toggle brush cursor\">C</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element content is too short to determine if it is actual text content"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -9725,9 +9417,9 @@
         ],
         "html": "<span id=\"brushGhostOpacityValue\" class=\"value-display\">100%</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -9747,16 +9439,16 @@
         ],
         "html": "<span class=\"brush-section-label\">Tip</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
         "target": [
          ".active[data-tip=\"0\"][title=\"Soft Dab\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\">◌</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn active\" data-tip=\"0\" title=\"Soft Dab\" style=\"--ci: 1.000;\">◌</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -9767,7 +9459,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"1\"][title=\"Solid Circle\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\">⬤</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"1\" title=\"Solid Circle\" style=\"--ci: 0.000;\">⬤</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
         "checks": [
@@ -9778,7 +9470,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"2\"][title=\"Square brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\">■</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"2\" title=\"Square brush\" style=\"--ci: 0.000;\">■</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -9789,7 +9481,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"3\"][title=\"Rectangle Brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\">▬</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"3\" title=\"Rectangle Brush\" style=\"--ci: 0.000;\">▬</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -9800,7 +9492,7 @@
         "target": [
          "#brushTipFoldBody > .brush-tip-row > .brush-tip-btn[data-tip=\"4\"][title=\"Ring brush\"]"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\">◯</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn\" data-tip=\"4\" title=\"Ring brush\" style=\"--ci: 0.000;\">◯</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters",
         "checks": [
@@ -9811,7 +9503,7 @@
         "target": [
          ".brush-shape-paste"
         ],
-        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\">Clipboard</button>",
+        "html": "<button type=\"button\" class=\"brush-tip-btn brush-shape-paste\" title=\"New brush shape from the clipboard\" style=\"--ci: 0.000;\">Clipboard</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9835,42 +9527,9 @@
         ],
         "html": "<span class=\"value-display\" id=\"brushAngleValue\">0°</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-section-label:nth-child(10)"
-        ],
-        "html": "<label class=\"brush-section-label\">Stroke</label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .brush-mode-btn[type=\"button\"]:nth-child(1)"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn\" title=\"Paint only while moving (spacing applies)\">On Move</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         ".brush-mode-row:nth-child(11) > .active.brush-mode-btn[type=\"button\"]"
-        ],
-        "html": "<button type=\"button\" class=\"brush-mode-btn active\" title=\"Paint flows at a steady rate while the pointer is held, even standing still\">Constant</button>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -9899,7 +9558,7 @@
         "target": [
          "#createRoomBtn"
         ],
-        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\">Start a room</button>",
+        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\" style=\"--ci: 0.000;\">Start a room</bu",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9910,7 +9569,7 @@
         "target": [
          "#strangerBtn"
         ],
-        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\">Stranger</button>",
+        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\" style=\"--ci: 0.000;\">Stranger</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9932,7 +9591,7 @@
         "target": [
          "#joinRoomBtn"
         ],
-        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\">Join</button>",
+        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\" style=\"--ci: 0.000;\">Join</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9943,7 +9602,7 @@
         "target": [
          "#phonePadBtn"
         ],
-        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\">Sync phone</button>",
+        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\" style=\"--ci: 0.000;",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -9954,7 +9613,7 @@
         "target": [
          "#shareLookBtn"
         ],
-        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \">Link to current settings</button>",
+        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \" style=\"--ci: 0.000;\">Link to current settings</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -10011,9 +9670,9 @@
         ],
         "html": "<span id=\"pressureValue\" class=\"value-display\">0.950</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -10033,9 +9692,9 @@
         ],
         "html": "<span id=\"iterationValue\" class=\"value-display\">25</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -10055,53 +9714,9 @@
         ],
         "html": "<span id=\"wetInfluenceValue\" class=\"value-display\">0.14</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"wetDrying\"]"
-        ],
-        "html": "<label for=\"wetDrying\" title=\"Drying time in seconds for wet paint to set. Lower = paint dries and holds faster.\">Dry Time <span id=\"wetDryingValue\" class=\"value-display\">4.5s</span><span class=\"hk-cap hk-cap-empty\"></span></label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#wetDryingValue"
-        ],
-        "html": "<span id=\"wetDryingValue\" class=\"value-display\">4.5s</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"grainCleanup\"]"
-        ],
-        "html": "<label for=\"grainCleanup\" title=\"Smooths the finest grain out of paint while it moves. Lower: keeps more of the grain\">Grain Cleanup <span id=\"grainCleanupValue\" class=\"value-display\">0.75</span><span class=\"hk-cap hk-cap-empty\"></span></la",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#grainCleanupValue"
-        ],
-        "html": "<span id=\"grainCleanupValue\" class=\"value-display\">0.75</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -10110,9 +9725,9 @@
         ],
         "html": "<div class=\"arm-colors-header\">Presets</div>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined because it's partially obscured by another element"
         ]
        },
        {
@@ -10132,9 +9747,9 @@
         ],
         "html": "<span class=\"preset-group-name\">Built in</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined because element contains an image node"
         ]
        },
        {
@@ -10143,9 +9758,9 @@
         ],
         "html": "<span class=\"preset-group-count\">12</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined because element contains an image node"
         ]
        },
        {
@@ -10496,7 +10111,7 @@
    "closed": true,
    "note": null,
    "result": {
-    "ms": 328,
+    "ms": 343,
     "testEngine": {
      "name": "axe-core",
      "version": "4.14.0"
@@ -10511,8 +10126,8 @@
      "orientationAngle": 0,
      "orientationType": "landscape-primary"
     },
-    "timestamp": "2026-10-17T18:21:41.670Z",
-    "url": "http://127.0.0.1:57436/index.html",
+    "timestamp": "2026-10-17T19:13:53.546Z",
+    "url": "http://127.0.0.1:58598/index.html",
     "toolOptions": {
      "resultTypes": [
       "violations",
@@ -10542,7 +10157,7 @@
         "target": [
          ".arm-tip-menu"
         ],
-        "html": "<div class=\"brush-shape-menu arm-tip-menu\" data-group=\"core\" role=\"menu\" style=\"left: 43px; top: 488px;\">",
+        "html": "<div class=\"brush-shape-menu arm-tip-menu\" data-group=\"core\" role=\"menu\" style=\"left: 43px; top: 536px;\">",
         "impact": "critical",
         "failureSummary": "Fix any of the following:\n  Element has children which are not allowed: button",
         "checks": [
@@ -11010,7 +10625,7 @@
         "target": [
          "#canvas"
         ],
-        "html": "<canvas id=\"canvas\" width=\"928\" height=\"579\" style=\"width: 928px; height: 579px; z-index: 1000;\"></canvas>",
+        "html": "<canvas id=\"canvas\" width=\"928\" height=\"483\" style=\"width: 928px; height: 483px; z-index: 1000;\"></canvas>",
         "impact": "moderate",
         "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks",
         "checks": [
@@ -11541,7 +11156,7 @@
         "target": [
          "button[data-brush-mode=\"one\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \">One</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"one\" aria-pressed=\"false\" title=\"Select a single color \" style=\"--ci: 0.000; width: 120px;\">One</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11552,7 +11167,7 @@
         "target": [
          "button[data-brush-mode=\"rnd\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\">Random</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle active\" data-brush-mode=\"rnd\" aria-pressed=\"true\" title=\"a new color each paint (hotkey: R)\" style=\"--ci: 1.000; width: 120px;\">Random</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11563,7 +11178,7 @@
         "target": [
          "button[data-brush-mode=\"step\"]"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\">Palette</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle\" data-brush-mode=\"step\" aria-pressed=\"false\" title=\"Toggles palette mode, steps through the selected palette. Right-click opens the palette.\" style=\"--ci: 0.000; width: 120px;\">Palette</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11574,7 +11189,7 @@
         "target": [
          ".ch-gate-toggle"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \">Limit<span class=\"gate-state\"></span></button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-gate-toggle\" aria-pressed=\"true\" title=\"Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). \" style=\"--ci: 1.000; width: 72px;\">Limit<sp",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11585,7 +11200,7 @@
         "target": [
          ".ch-nudge-btn"
         ],
-        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\">Ignite</button>",
+        "html": "<button type=\"button\" class=\"ch-text-toggle ch-nudge-btn\" title=\"If your paint looks a little dull, hold ignite to add density and brightness.\" style=\"--ci: 0.000;\">Ignite</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11607,7 +11222,7 @@
         "target": [
          "button[onclick=\"clearCanvas()\"]"
         ],
-        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"\" title=\"Clear the canvas\">Clear</button>",
+        "html": "<button class=\"btn--destructive\" onclick=\"clearCanvas()\" style=\"--ci: 0.000; width: 96px;\" title=\"Clear the canvas\">Clear</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11618,7 +11233,7 @@
         "target": [
          "#freezeBtn"
         ],
-        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
+        "html": "<button onclick=\"toggleFreeze()\" id=\"freezeBtn\" style=\"--ci: 0.000; width: 72px;\" title=\"Stop the fluid where it is, you can still paint (Space)\" aria-pressed=\"false\">Stop</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11640,7 +11255,7 @@
         "target": [
          "#mixer-brushValue"
         ],
-        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">37 px</div>",
+        "html": "<div class=\"ch-value\" id=\"mixer-brushValue\">31 px</div>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11686,9 +11301,9 @@
         ],
         "html": "<span id=\"multiplierValue\" class=\"value-display ch-value\" title=\"\">1x</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -11752,9 +11367,9 @@
         ],
         "html": "<span id=\"symmetryHoldValue\" class=\"value-display\">0.00</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -11763,9 +11378,9 @@
         ],
         "html": "<span class=\"arm-label\">1</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element content is too short to determine if it is actual text content"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -11902,17 +11517,6 @@
        },
        {
         "target": [
-         "label[for=\"buttonMode_middle\"]"
-        ],
-        "html": "<label class=\"brush-section-label\" for=\"buttonMode_middle\" title=\"Opens the radial menu at the pointer\">Middle Click (Mouse 3)</label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
          ".lsb-toggle"
         ],
         "html": "<button type=\"button\" class=\"lsb-toggle btn--icon\" title=\"Collapse the brush menu\" aria-label=\"Left-facing sideways arrows icon: collapses the brush menu\" aria-expanded=\"true\">«</button>",
@@ -11937,7 +11541,7 @@
         "target": [
          "#createRoomBtn"
         ],
-        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\">Start a room</button>",
+        "html": "<button id=\"createRoomBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want\" style=\"--ci: 0.000;\">Start a room</bu",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11948,7 +11552,7 @@
         "target": [
          "#strangerBtn"
         ],
-        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\">Stranger</button>",
+        "html": "<button id=\"strangerBtn\" class=\"mp-btn-primary btn--emphasis\" title=\"Connect to a stranger and share settings.\" style=\"--ci: 0.000;\">Stranger</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11970,7 +11574,7 @@
         "target": [
          "#joinRoomBtn"
         ],
-        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\">Join</button>",
+        "html": "<button id=\"joinRoomBtn\" title=\"Join a friend's room with the code or link they sent you\" style=\"--ci: 0.000;\">Join</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11981,7 +11585,7 @@
         "target": [
          "#phonePadBtn"
         ],
-        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\">Sync phone</button>",
+        "html": "<button class=\"mp-btn-phone-door\" id=\"phonePadBtn\" type=\"button\" title=\"Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.\" style=\"--ci: 0.000;",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -11992,7 +11596,7 @@
         "target": [
          "#shareLookBtn"
         ],
-        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \">Link to current settings</button>",
+        "html": "<button type=\"button\" id=\"shareLookBtn\" class=\"mp-btn-share-look\" title=\"Create a shareable link to your current settings \" style=\"--ci: 0.000;\">Link to current settings</button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
         "checks": [
@@ -12049,9 +11653,9 @@
         ],
         "html": "<span id=\"pressureValue\" class=\"value-display\">0.950</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -12071,9 +11675,9 @@
         ],
         "html": "<span id=\"iterationValue\" class=\"value-display\">25</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -12093,53 +11697,9 @@
         ],
         "html": "<span id=\"wetInfluenceValue\" class=\"value-display\">0.14</span>",
         "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
+        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element",
         "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"wetDrying\"]"
-        ],
-        "html": "<label for=\"wetDrying\" title=\"Drying time in seconds for wet paint to set. Lower = paint dries and holds faster.\">Dry Time <span id=\"wetDryingValue\" class=\"value-display\">4.5s</span><span class=\"hk-cap hk-cap-empty\"></span></label>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#wetDryingValue"
-        ],
-        "html": "<span id=\"wetDryingValue\" class=\"value-display\">4.5s</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "label[for=\"grainCleanup\"]"
-        ],
-        "html": "<label for=\"grainCleanup\" title=\"Smooths the finest grain out of paint while it moves. Lower: keeps more of the grain\">Grain Cleanup <span id=\"grainCleanupValue\" class=\"value-display\">0.75</span><span class=\"hk-cap hk-cap-empty\"></span></la",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
-        ]
-       },
-       {
-        "target": [
-         "#grainCleanupValue"
-        ],
-        "html": "<span id=\"grainCleanupValue\" class=\"value-display\">0.75</span>",
-        "impact": "serious",
-        "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient",
-        "checks": [
-         "color-contrast: Element's background color could not be determined due to a background gradient"
+         "color-contrast: Element's background color could not be determined due to a pseudo element"
         ]
        },
        {
@@ -12373,7 +11933,7 @@
         "target": [
          ".arm-tip-btn"
         ],
-        "html": "<button type=\"button\" class=\"arm-tip-btn menu-open\" aria-haspopup=\"menu\" title=\"\" aria-label=\"Brush 1 tip: same as the brush\"><span class=\"arm-tip-icon\">◌</span></button>",
+        "html": "<button type=\"button\" class=\"arm-tip-btn menu-open\" aria-haspopup=\"menu\" title=\"\" aria-label=\"Brush 1 tip: same as the brush\" style=\"--ci: 0.000;\"><span class=\"arm-tip-icon\">◌</span></button>",
         "impact": "serious",
         "failureSummary": "Fix any of the following:\n  Unable to determine if the visible text is part of the accessible name",
         "checks": [

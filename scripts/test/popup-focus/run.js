@@ -57,7 +57,10 @@ const K = { space: [' ', 'Space', 32], enter: ['Enter', 'Enter', 13], esc: ['Esc
         const sp = await where(P);
         check('P4 opened with the mouse: focus not moved in, and Space still freezes', s.shown && !s.inside && sp.frozen, { s, sp });
         await key('space');
-        await d.click(800, 450); await sleep(200);
+        // "Away": a point on the canvas outside the open panel (a fixed 800,450
+        // landed inside it once the Walnut & Copper bar moved the panel).
+        const away = await d.ev(`(function(){ var c = document.getElementById('canvas-area').getBoundingClientRect(); return { x: c.left + 40, y: c.bottom - 40 }; })()`);
+        await d.click(away.x, away.y); await sleep(200);
         check('P4 ...a click away closes it', !(await where(P)).shown);
 
         // ── Colour popover ──

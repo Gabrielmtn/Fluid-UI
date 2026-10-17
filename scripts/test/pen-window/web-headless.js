@@ -388,6 +388,10 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         // ── The native chord: hold Replay with the right button on the main
         // canvas, then left-click and drag the UI with the same mouse ──
         const cvx = info.rect[0] + info.rect[2] * 0.5, cvy = info.rect[1] + info.rect[3] * 0.5;
+        // Re-measure the checkbox right before the chord: the sidebar can sit
+        // differently by now than when cb0 was taken (taller top bar, drawers).
+        const cbNow = await reveal(main, 'cursorToggle');
+        cb0.x = cbNow.x; cb0.y = cbNow.y;
         await main.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cvx, y: cvy, pointerType: 'mouse' });
         await main.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cvx, y: cvy, button: 'right', buttons: 2, clickCount: 1, pointerType: 'mouse' });
         await sleep(30);

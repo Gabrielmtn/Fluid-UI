@@ -85,6 +85,8 @@
     var PANE = 'button, .btn, .wc-opt';
     function inScope(el) { return !!(el && el.closest && el.closest('#mixer-strip, #sidebar-left, #sidebar-right, .mixer-presets-panel, .cp-pop, .arm-tip-menu')); }
     function isOn(el) {
+        // Limit's .active means the limit is OFF; its lit state is aria-pressed.
+        if (el.classList.contains('ch-gate-toggle')) return el.getAttribute('aria-pressed') === 'true';
         return el.getAttribute('aria-pressed') === 'true' || el.getAttribute('aria-checked') === 'true' ||
             el.getAttribute('aria-selected') === 'true' || el.classList.contains('active') || el.classList.contains('locked');
     }
@@ -157,12 +159,25 @@
         // write may have moved it without an event).
         if (r.sp.settled()) { var n = norm(t); r.sp.x = r.sp.t = n; }
     }
-    document.addEventListener('pointerdown', function (e) { seeRange(e.target); }, true);
+    var held = null;
+    document.addEventListener('pointerdown', function (e) {
+        seeRange(e.target);
+        if (e.target && e.target.type === 'range') {
+            var t = e.target;
+            // The first jump (a click on the track) still springs; the drag after it rides the hand.
+            setTimeout(function () { if (held === null) held = t; }, 0);
+        }
+    }, true);
+    ['pointerup', 'pointercancel'].forEach(function (ev) { document.addEventListener(ev, function () { held = null; }, true); });
     document.addEventListener('focusin', function (e) { seeRange(e.target); }, true);
     document.addEventListener('input', function (e) {
         var inp = e.target;
         if (!inp || inp.type !== 'range' || !inScope(inp)) return;
         var r = rangeRec(inp);
+        // While the pointer holds this range the hand IS the value: the spring
+        // sits on it (no per-frame write during a drag; the drag forced a style
+        // recalc a frame). Keys, track clicks and remote changes still spring.
+        if (held === inp) { r.sp.x = r.sp.t = norm(inp); r.sp.v = 0; if (r.last) { inp.style.removeProperty('--sp'); inp.style.removeProperty('--spp'); r.last = ''; } return; }
         r.sp.to(norm(inp), remoteNow() ? PROF.remote : PROF.local);
         if (r.sp.settled()) return;
         wake(r);
@@ -317,6 +332,10 @@
             if (done) active.delete(r);
         });
     };
+
+    // Pane widths are fixed in CSS (33-theme-topbar), snapped to the 24 px
+    // module there: measuring and snapping them here after boot re-flowed the
+    // bar late and resized the canvas under the user.
 
     var tries = 0;
     (function attach() { if (!init() && tries++ < 80) setTimeout(attach, 250); })();

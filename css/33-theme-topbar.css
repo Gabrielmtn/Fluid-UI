@@ -277,7 +277,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
     [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) {
     --dial: 76px;
-    min-width: 104px;
+    min-width: 96px;
     padding-top: 4px;
     padding-bottom: 30px;
 }
@@ -384,5 +384,78 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel.wc-has-tele input
 @media (max-width: 1700px) {
     html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel.wc-has-tele { --dial: 104px; }
 }
+
+/* -- The top-right cluster as cathode panes (study .cap 64-70, 513-562) --
+   One / Random / Palette, Limit, the colour lamp, Ignite and its lock,
+   Presets, Clear, Pause, Stop. 40 px tall, Michroma 10.5 px / 0.16 em; widths
+   snapped to the 24 px module by js/71 (sizePanes). */
+html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-channel[data-ui-key="Color"], .mixer-stack) :is(button, .btn) {
+    height: 40px;
+    min-height: 40px;
+    min-width: 48px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font: 400 10.5px/1 var(--ui-font-display);
+    letter-spacing: 0.12em;   /* 0.16 in the study; tighter so the bar keeps every cell at 1440 */
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+html[data-theme="walnut-copper"] #mixer-strip .ch-toggle-row { gap: 8px; align-items: center; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch { gap: 8px; background: none; border: 0; box-shadow: none; }
+html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] { gap: 8px; background: transparent; border-right-color: transparent; }
+html[data-theme="walnut-copper"] #mixer-strip .mixer-stack { gap: 8px; }
+html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-actions, .transport-row) { gap: 8px; }
+/* Widths snapped to the 24 px module (min 48), fixed here so the bar is final
+   at first layout: One / Random / Palette share the widest (RANDOM, 98 px
+   natural -> 120); Limit 65 -> 72; Clear 77 -> 96; Stop 67 -> 72. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch > button { width: 120px; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-gate-toggle { width: 72px; }
+html[data-theme="walnut-copper"] #mixer-strip .mixer-actions > button.btn--destructive { width: 96px; }
+html[data-theme="walnut-copper"] #mixer-strip #freezeBtn { width: 72px; }
+/* Limit: the word, lit while the limit is on (aria-pressed); no On / Off. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-gate-toggle .gate-state { display: none; }
+/* Ignite fills its row; the lock is the 40 px square pane. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { flex: 1 1 auto; min-width: 120px; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-ignite-lock { width: 40px; min-width: 40px; padding: 0; }
+html[data-theme="walnut-copper"] #mixer-strip #pauseBtn { width: 48px; padding: 0; }
+/* Clear: the danger tint (study .cap.danger). */
+html[data-theme="walnut-copper"] #mixer-strip .mixer-actions > .btn--destructive { --unlit: #c99a8f; --lit: #ffc9bd; --tgc: 255 58 40; }
+/* The colour well is a pilot cathode (study .lamp, 368-371) lit in the
+   current colour; still the same native colour input. */
+html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #120c0a;
+    box-shadow: inset 0 0 0 1.5px var(--cu), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 220, 160, 0.45);
+    cursor: pointer;
+}
+html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] input[type="color"]::-webkit-color-swatch {
+    border: 0;
+    border-radius: 50%;
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.55);
+}
+/* The bar wraps when its groups do not fit, wrapped rows centred (theme doc:
+   "at 1430 px and below the bar wraps"; here it wraps whenever needed). With
+   nothing overflowing, js/46 has nothing to park in More, so every control
+   stays on the bar. */
+@media (min-width: 1201px) {
+    html[data-theme="walnut-copper"] #mixer-strip {
+        flex-wrap: wrap;
+        justify-content: center;
+        row-gap: 4px;
+        overflow-x: hidden;
+    }
+}
+html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger .mixer-presets-trigger-chev { display: none; }
+/* At 1200 px and below the strip keeps its single row and js/46's More panel
+   (the old UI already parked cells at 1366; now every control stays on the bar down to 1201). */
+
 
 } /* @layer theme */

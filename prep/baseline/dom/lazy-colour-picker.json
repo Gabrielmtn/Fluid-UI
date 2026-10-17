@@ -1,9 +1,9 @@
 {
  "name": "colour-picker",
- "generated": "2026-10-17T18:21:01.111Z",
+ "generated": "2026-10-17T19:13:12.625Z",
  "env": {
-  "date": "2026-10-17T18:21:01.111Z",
-  "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+  "date": "2026-10-17T19:13:12.625Z",
+  "headCommit": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -14,7 +14,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:55906/index.html",
+  "url": "http://127.0.0.1:56816/index.html",
   "layoutChoice": null,
   "uiVisibilityState": null,
   "hiddenUiKeys": [],
@@ -64,8 +64,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1138,
-    "y": 93,
+    "x": 1103,
+    "y": 106,
     "w": 268,
     "h": 269
    },
@@ -107,8 +107,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1380,
-    "y": 97,
+    "x": 1345,
+    "y": 110,
     "w": 22,
     "h": 22
    },
@@ -153,8 +153,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1186,
-    "y": 130,
+    "x": 1151,
+    "y": 143,
     "w": 72,
     "h": 22
    },
@@ -209,8 +209,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1263,
-    "y": 131,
+    "x": 1228,
+    "y": 144,
     "w": 37,
     "h": 21
    },
@@ -256,8 +256,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1305,
-    "y": 130,
+    "x": 1270,
+    "y": 143,
     "w": 61,
     "h": 22
    },
@@ -313,8 +313,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1371,
-    "y": 130,
+    "x": 1336,
+    "y": 143,
     "w": 24,
     "h": 22
    },
@@ -364,8 +364,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1167,
-    "y": 164,
+    "x": 1132,
+    "y": 177,
     "w": 180,
     "h": 14
    },
@@ -413,8 +413,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1353,
-    "y": 160,
+    "x": 1318,
+    "y": 173,
     "w": 42,
     "h": 22
    },
@@ -474,8 +474,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1167,
-    "y": 194,
+    "x": 1132,
+    "y": 207,
     "w": 180,
     "h": 14
    },
@@ -523,8 +523,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1353,
-    "y": 190,
+    "x": 1318,
+    "y": 203,
     "w": 42,
     "h": 22
    },
@@ -584,8 +584,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1167,
-    "y": 224,
+    "x": 1132,
+    "y": 237,
     "w": 180,
     "h": 14
    },
@@ -633,8 +633,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1353,
-    "y": 220,
+    "x": 1318,
+    "y": 233,
     "w": 42,
     "h": 22
    },
@@ -690,8 +690,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1210,
-    "y": 299,
+    "x": 1174,
+    "y": 312,
     "w": 186,
     "h": 22
    },
@@ -744,8 +744,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1149,
-    "y": 327,
+    "x": 1114,
+    "y": 340,
     "w": 38,
     "h": 24
    },
@@ -788,8 +788,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1191,
-    "y": 327,
+    "x": 1156,
+    "y": 340,
     "w": 38,
     "h": 24
    },
@@ -832,8 +832,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1233,
-    "y": 327,
+    "x": 1197,
+    "y": 340,
     "w": 38,
     "h": 24
    },
@@ -876,8 +876,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1274,
-    "y": 327,
+    "x": 1239,
+    "y": 340,
     "w": 38,
     "h": 24
    },
@@ -920,8 +920,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1316,
-    "y": 327,
+    "x": 1281,
+    "y": 340,
     "w": 38,
     "h": 24
    },

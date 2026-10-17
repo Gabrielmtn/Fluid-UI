@@ -1,13 +1,13 @@
 # axe-core report — the shipping UI, every surface
 
-Generated 2026-10-17T18:21:20.155Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `axe.json`. Engine: axe-core 4.14.0 (`prep/baseline/vendor/axe.min.js`, MPL-2.0), default rule set (no `runOnly`: WCAG 2.0/2.1/2.2 A and AA rules plus axe best-practice rules; every rule's tags are listed so the two can be told apart), `resultTypes: [violations, incomplete]`, run over `document` with the left bar open and all 17 sidebar sections expanded, then once more with each overlay / popover open. Notes and caveats: `NOTES.md`.
+Generated 2026-10-17T19:13:31.919Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `axe.json`. Engine: axe-core 4.14.0 (`prep/baseline/vendor/axe.min.js`, MPL-2.0), default rule set (no `runOnly`: WCAG 2.0/2.1/2.2 A and AA rules plus axe best-practice rules; every rule's tags are listed so the two can be told apart), `resultTypes: [violations, incomplete]`, run over `document` with the left bar open and all 17 sidebar sections expanded, then once more with each overlay / popover open. Notes and caveats: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T18:21:20.155Z |
-| headCommit | 4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7 |
+| date | 2026-10-17T19:13:31.919Z |
+| headCommit | fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3 |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -18,7 +18,7 @@ Generated 2026-10-17T18:21:20.155Z by `prep/baseline/scripts/a11y.js` (F3). Mach
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:57436/index.html |
+| url | http://127.0.0.1:58598/index.html |
 | bodyClasses | web-mode photosafe-on |
 | leftFolded | false |
 | rightFolded | false |
@@ -29,12 +29,12 @@ Generated 2026-10-17T18:21:20.155Z by `prep/baseline/scripts/a11y.js` (F3). Mach
 
 | Run | State | Opened | Closed | Violations (rules / nodes) | Incomplete (rules / nodes) | Rules passed | Inapplicable | Violation nodes vs main | axe time |
 |---|---|---|---|---|---|---|---|---|---|
-| everything-open | left bar open, all 17 sections expanded, no overlay | n/a | n/a | 8 / 39 | 4 / 88 | 36 | 49 | — | 498 ms |
-| hotkey-overlay | F1 hotkey sheet open (DialogFocus.hold) | yes | yes | 6 / 37 | 3 / 167 | 44 | 44 | 0 new / 2 gone | 389 ms |
-| radial-menu | E radial menu open over the canvas | yes | yes | 8 / 40 | 4 / 107 | 38 | 47 | 1 new / 0 gone | 371 ms |
-| colour-picker | colour picker popover open from the top bar well | yes | yes | 6 / 40 | 4 / 93 | 39 | 48 | 3 new / 2 gone | 362 ms |
-| presets-popup | Presets panel open | yes | yes | 8 / 41 | 4 / 107 | 36 | 49 | 2 new / 0 gone | 349 ms |
-| arm-tip-menu | arm 1 tip menu open (extra, not in the brief's list) | yes | yes | 9 / 43 | 4 / 101 | 36 | 48 | 4 new / 0 gone | 328 ms |
+| everything-open | left bar open, all 17 sections expanded, no overlay | n/a | n/a | 8 / 39 | 4 / 81 | 36 | 49 | — | 509 ms |
+| hotkey-overlay | F1 hotkey sheet open (DialogFocus.hold) | yes | yes | 6 / 37 | 3 / 160 | 44 | 44 | 0 new / 2 gone | 399 ms |
+| radial-menu | E radial menu open over the canvas | yes | yes | 8 / 40 | 4 / 100 | 38 | 47 | 1 new / 0 gone | 347 ms |
+| colour-picker | colour picker popover open from the top bar well | yes | yes | 6 / 40 | 4 / 86 | 39 | 48 | 3 new / 2 gone | 360 ms |
+| presets-popup | Presets panel open | yes | yes | 8 / 41 | 4 / 100 | 36 | 49 | 2 new / 0 gone | 361 ms |
+| arm-tip-menu | arm 1 tip menu open (extra, not in the brief's list) | yes | yes | 9 / 43 | 4 / 96 | 36 | 48 | 4 new / 0 gone | 343 ms |
 
 "Violation nodes vs main": violation (rule + target) pairs present with the overlay open that the main run did not have, and main-run pairs that disappeared while it was open (an overlay's scrim hiding the page, for instance). Full node lists for every run are in `axe.json`.
 
@@ -128,7 +128,7 @@ Ensure all page content is contained by landmarks ([rule](https://dequeuniversit
 | 15 | div[aria-label="Color of each stroke"] | <div class="ch-seg-switch" role="group" aria-label="Color of each stroke"> | Some page content is not contained by landmarks |
 | 16 | #colorPicker | <input type="color" id="colorPicker" value="#ff0000" class="ch-color-input" title="Color Picker. Opens color picker, you can also Alt+click… | Some page content is not contained by landmarks |
 | 17 | #canvas-size-display | <div id="canvas-size-display">928 × 581 · 1.60:1</div> | Some page content is not contained by landmarks |
-| 18 | #canvas | <canvas id="canvas" width="928" height="579" style="width: 928px; height: 579px; z-index: 1000;"></canvas> | Some page content is not contained by landmarks |
+| 18 | #canvas | <canvas id="canvas" width="928" height="483" style="width: 928px; height: 483px; z-index: 1000;"></canvas> | Some page content is not contained by landmarks |
 | 19 | #visualResolutionDdCap | <div class="qub-dd-cap" id="visualResolutionDdCap">Image Sharpness</div> | Some page content is not contained by landmarks |
 | 20 | #physicsResolutionDdCap | <div class="qub-dd-cap" id="physicsResolutionDdCap">Motion Detail</div> | Some page content is not contained by landmarks |
 | 21 | .qub-size | <div class="qub-size" title="The canvas in pixels, and its shape. Pictures and videos come out at this size. Drag the canvas handles or pic… | Some page content is not contained by landmarks |
@@ -191,7 +191,7 @@ Opened by: trusted click on the first #sidebar-left .arm-tip-btn (as F0). Open; 
 
 | Rule | Impact | Target | HTML | Failure summary |
 |---|---|---|---|---|
-| aria-required-children | critical | .arm-tip-menu | <div class="brush-shape-menu arm-tip-menu" data-group="core" role="menu" style="left: 43px; top: 488px;"> | Element has children which are not allowed: button |
+| aria-required-children | critical | .arm-tip-menu | <div class="brush-shape-menu arm-tip-menu" data-group="core" role="menu" style="left: 43px; top: 536px;"> | Element has children which are not allowed: button |
 | region | moderate | .brush-shape-menu-head | <div class="brush-shape-menu-head">Arm 1 tip</div> | Some page content is not contained by landmarks |
 | region | moderate | .arm-tip-sub | <div class="arm-tip-sub">Your shapes</div> | Some page content is not contained by landmarks |
 | region | moderate | .arm-tip-note | <div class="arm-tip-note">None yet. Brush → Tip → ＋ makes one from an image.</div> | Some page content is not contained by landmarks |
@@ -202,7 +202,7 @@ Opened by: trusted click on the first #sidebar-left .arm-tip-btn (as F0). Open; 
 |---|---|---|---|---|
 | aria-valid-attr-value | critical | 2 | wcag2a wcag412 | ARIA attributes must conform to valid values |
 | bypass | serious | 1 | wcag2a wcag241 | Page must have means to bypass repeated blocks |
-| color-contrast | serious | 84 | wcag2aa wcag143 | Elements must meet minimum color contrast ratio thresholds |
+| color-contrast | serious | 77 | wcag2aa wcag143 | Elements must meet minimum color contrast ratio thresholds |
 | label-content-name-mismatch | serious | 1 | wcag21a wcag253 | Elements must have their visible text as part of their accessible name |
 
 ### `aria-valid-attr-value` (incomplete) — ARIA attributes must conform to valid values
@@ -244,11 +244,11 @@ Opened by: trusted click on the first #sidebar-left .arm-tip-btn (as F0). Open; 
 | 20 | #densityValue | <span id="densityValue" class="value-display ch-value">0.9900</span> | color-contrast: Element's background color could not be determined due to a background gradient |
 | 21 | div[data-ui-key="Velocity"] > .ch-header > .ch-label | <div class="ch-label" title="How much velocity to preserve. Can go above 1...">Velocity</div> | color-contrast: Element's background color could not be determined due to a background gradient |
 | 22 | #velocityValue | <span id="velocityValue" class="value-display ch-value">1.0009</span> | color-contrast: Element's background color could not be determined due to a background gradient |
-| 23 | button[data-brush-mode="one"] | <button type="button" class="ch-text-toggle" data-brush-mode="one" aria-pressed="false" title="Select a single color ">… | color-contrast: Element's background color could not be determined due to a background gradient |
+| 23 | button[data-brush-mode="one"] | <button type="button" class="ch-text-toggle" data-brush-mode="one" aria-pressed="false" title="Select a single color " … | color-contrast: Element's background color could not be determined due to a background gradient |
 | 24 | button[data-brush-mode="rnd"] | <button type="button" class="ch-text-toggle active" data-brush-mode="rnd" aria-pressed="true" title="a new color each p… | color-contrast: Element's background color could not be determined due to a background gradient |
 | 25 | button[data-brush-mode="step"] | <button type="button" class="ch-text-toggle" data-brush-mode="step" aria-pressed="false" title="Toggles palette mode, s… | color-contrast: Element's background color could not be determined due to a background gradient |
 
-… 59 more nodes in `axe.json`.
+… 52 more nodes in `axe.json`.
 
 ### `label-content-name-mismatch` (incomplete) — Elements must have their visible text as part of their accessible name
 

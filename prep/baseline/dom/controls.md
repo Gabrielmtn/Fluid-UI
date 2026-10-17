@@ -1,13 +1,13 @@
 # DOM dump — every interactive element of the shipping UI
 
-Generated 2026-10-17T18:21:01.111Z by `prep/scripts/dom-dump.js` (F0). Machine copy: `controls.json`; lazily built UI in `lazy-*.json`. Notes and caveats: `NOTES.md`.
+Generated 2026-10-17T19:13:12.625Z by `prep/scripts/dom-dump.js` (F0). Machine copy: `controls.json`; lazily built UI in `lazy-*.json`. Notes and caveats: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T18:21:01.111Z |
-| headCommit | 4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7 |
+| date | 2026-10-17T19:13:12.625Z |
+| headCommit | fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3 |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -18,7 +18,7 @@ Generated 2026-10-17T18:21:01.111Z by `prep/scripts/dom-dump.js` (F0). Machine c
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:55906/index.html |
+| url | http://127.0.0.1:56816/index.html |
 | layoutChoice | null |
 | uiVisibilityState | null |
 | hiddenUiKeys | [] |
@@ -248,21 +248,21 @@ Columns: order; surface; section; element (tag[type]); id; classes (first three)
 | 35 | mixer-strip | Color | input[checkbox] | #stepPalette |  | checkbox | Palette mode (new colour each stroke) (f) | hidden=true | unchecked | -1 | Y |
 | 36 | mixer-strip | Color | input[checkbox] | #colorGate |  | checkbox | Limit (f) | hidden=true | checked | -1 | Y |
 | 37 | mixer-strip | Color | div |  | ch-seg-switch | group | Color of each stroke (c) | label=Color of each stroke |  |  | Y |
-| 38 | mixer-strip | Color | button |  | ch-text-toggle | button | One (c) | pressed=false |  |  | Y |
-| 39 | mixer-strip | Color | button |  | ch-text-toggle active | button | Random (c) | pressed=true |  |  | Y |
-| 40 | mixer-strip | Color | button |  | ch-text-toggle | button | Palette (c) | pressed=false |  |  | Y |
-| 41 | mixer-strip | Color | button |  | ch-text-toggle ch-gate-toggle | button | Limit  On (c) |  |  |  | Y |
+| 38 | mixer-strip | Color | button |  | ch-text-toggle | button | ONE (c) | pressed=false |  |  | Y |
+| 39 | mixer-strip | Color | button |  | ch-text-toggle active | button | RANDOM (c) | pressed=true |  |  | Y |
+| 40 | mixer-strip | Color | button |  | ch-text-toggle | button | PALETTE (c) | pressed=false |  |  | Y |
+| 41 | mixer-strip | Color | button |  | ch-text-toggle ch-gate-toggle | button | LIMIT (c) | pressed=true |  |  | Y |
 | 42 | mixer-strip | Color | input[color] | #colorPicker | ch-color-input | ColorWell |  (c) |  | #ff0000 |  | Y |
-| 43 | mixer-strip | Color | button |  | ch-text-toggle ch-nudge-btn | button | Ignite (c) |  |  |  | Y |
+| 43 | mixer-strip | Color | button |  | ch-text-toggle ch-nudge-btn | button | IGNITE (c) |  |  |  | Y |
 | 44 | mixer-strip | Color | div |  | ch-ignite-lock btn btn--icon | button | Lock Ignite on (c) | label=Lock Ignite on pressed=false |  | 0 | Y |
-| 45 | mixer-strip |  | button | #mixerPresetsTrigger | mixer-presets-trigger | button | Presets ▾ (c) | haspopup=true expanded=false |  |  | Y |
-| 46 | mixer-strip |  | button |  | btn--destructive | button | Clear (c) |  |  |  | Y |
+| 45 | mixer-strip |  | button | #mixerPresetsTrigger | mixer-presets-trigger | button | PRESETS (c) | haspopup=true expanded=false |  |  | Y |
+| 46 | mixer-strip |  | button |  | btn--destructive | button | CLEAR (c) |  |  |  | Y |
 | 47 | mixer-strip |  | button | #pauseBtn |  | button | ⏸ (c) | pressed=false |  |  | Y |
-| 48 | mixer-strip |  | button | #freezeBtn |  | button | Stop (c) | pressed=false |  |  | Y |
+| 48 | mixer-strip |  | button | #freezeBtn |  | button | STOP (c) | pressed=false |  |  | Y |
 | 49 | sidebar-left |  | div | #sidebar-left |  | region | Brush (c) | label=Brush |  |  | Y |
 | 50 | sidebar-left | Brush Size | div |  | mixer-channel | generic |  (c) |  |  |  | Y |
 | 51 | sidebar-left | Brush Size | input[range] | #brushSize |  | slider | Brush Size (f) |  | 1 |  | N |
-| 52 | sidebar-left | Brush Size | input[range] | #brushSizePerceptual | ch-perceptual | slider | Brush Size (c) | label=Brush Size valuetext=37 px | 0.653 |  | Y |
+| 52 | sidebar-left | Brush Size | input[range] | #brushSizePerceptual | ch-perceptual | slider | Brush Size (c) | label=Brush Size valuetext=31 px | 0.653 |  | Y |
 | 53 | sidebar-left |  | label |  |  | LabelText |  (c) |  |  |  | Y |
 | 54 | sidebar-left |  | input[range] | #brushSteady |  | slider | STABILIZATION 0% (c) |  | 0 |  | Y |
 | 55 | sidebar-left |  | input[checkbox] | #brushSteadyHideGuide |  | checkbox | Hide guide (f) |  | unchecked |  | N |

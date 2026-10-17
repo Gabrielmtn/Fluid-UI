@@ -1,9 +1,9 @@
 {
  "name": "presets-popup",
- "generated": "2026-10-17T18:21:01.111Z",
+ "generated": "2026-10-17T19:13:12.625Z",
  "env": {
-  "date": "2026-10-17T18:21:01.111Z",
-  "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+  "date": "2026-10-17T19:13:12.625Z",
+  "headCommit": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -14,7 +14,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:55906/index.html",
+  "url": "http://127.0.0.1:56816/index.html",
   "layoutChoice": null,
   "uiVisibilityState": null,
   "hiddenUiKeys": [],
@@ -62,9 +62,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 201,
-    "w": 214,
+    "x": 685,
+    "y": 297,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -110,9 +110,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 239,
-    "w": 214,
+    "x": 685,
+    "y": 335,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -158,9 +158,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 277,
-    "w": 214,
+    "x": 685,
+    "y": 373,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -206,9 +206,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 315,
-    "w": 214,
+    "x": 685,
+    "y": 411,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -254,9 +254,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 353,
-    "w": 214,
+    "x": 685,
+    "y": 449,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -302,9 +302,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 391,
-    "w": 214,
+    "x": 685,
+    "y": 487,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -350,9 +350,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 429,
-    "w": 214,
+    "x": 685,
+    "y": 525,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -398,9 +398,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 467,
-    "w": 214,
+    "x": 685,
+    "y": 563,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -446,9 +446,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 505,
-    "w": 214,
+    "x": 685,
+    "y": 601,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -494,9 +494,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 543,
-    "w": 214,
+    "x": 685,
+    "y": 639,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -542,9 +542,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 581,
-    "w": 214,
+    "x": 685,
+    "y": 677,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -590,9 +590,9 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 619,
-    "w": 214,
+    "x": 685,
+    "y": 715,
+    "w": 210,
     "h": 36
    },
    "parentChain": [
@@ -773,8 +773,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1355,
-    "y": 674,
+    "x": 685,
+    "y": 719,
     "w": 144,
     "h": 26
    },
@@ -818,8 +818,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1505,
-    "y": 674,
+    "x": 835,
+    "y": 719,
     "w": 64,
     "h": 26
    },
@@ -863,8 +863,8 @@
    "hiddenAttr": false,
    "inAriaHidden": false,
    "rect": {
-    "x": 1363,
-    "y": 707,
+    "x": 693,
+    "y": 752,
     "w": 198,
     "h": 26
    },

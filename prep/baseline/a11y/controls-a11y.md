@@ -1,13 +1,13 @@
 # Controls — role, name, state and keyboard pattern of every control
 
-Generated 2026-10-17T18:21:20.155Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `controls-a11y.json` (what `--check` diffs). Derived from `prep/baseline/dom/controls.json` (F0: 2026-10-17T18:21:01.111Z, 847 controls) and its `lazy-*.json`; selectors come from the live boot of this run, which was cross-checked against the F0 record (900 compared, 0 differences). Role and name are the CDP accessibility tree's (`nameSource` c) or the page-side fallback for nodes the tree ignores or does not build (f: `display:none` content, labels folded into their control, containers). The keyboard pattern is a hand-written table keyed on element / role / class with the handler's file:line; it says what the code does today, not what it should do. Notes: `NOTES.md`.
+Generated 2026-10-17T19:13:31.919Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `controls-a11y.json` (what `--check` diffs). Derived from `prep/baseline/dom/controls.json` (F0: 2026-10-17T19:13:12.625Z, 847 controls) and its `lazy-*.json`; selectors come from the live boot of this run, which was cross-checked against the F0 record (900 compared, 0 differences). Role and name are the CDP accessibility tree's (`nameSource` c) or the page-side fallback for nodes the tree ignores or does not build (f: `display:none` content, labels folded into their control, containers). The keyboard pattern is a hand-written table keyed on element / role / class with the handler's file:line; it says what the code does today, not what it should do. Notes: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T18:21:20.155Z |
-| headCommit | 4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7 |
+| date | 2026-10-17T19:13:31.919Z |
+| headCommit | fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3 |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -18,7 +18,7 @@ Generated 2026-10-17T18:21:20.155Z by `prep/baseline/scripts/a11y.js` (F3). Mach
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:57436/index.html |
+| url | http://127.0.0.1:58598/index.html |
 | bodyClasses | web-mode photosafe-on |
 | leftFolded | false |
 | rightFolded | false |
@@ -31,7 +31,7 @@ Generated 2026-10-17T18:21:20.155Z by `prep/baseline/scripts/a11y.js` (F3). Mach
 - rendered with everything open (`visibleNow`): 369; not rendered (conditional sub-blocks, hidden overlays, orphans): 478
 - focusable (computed tabIndex ≥ 0, not disabled): 540; with an explicit tabindex attribute: 43
 - with an explicit `role=`: 66 (dialog 2, group 6, button 23, region 2, radiogroup 2, radio 7, checkbox 1, alert 1, status 3, combobox 1, img 9, application 1, switch 2, listbox 3, menu 1, menuitemcheckbox 1, menuitem 1)
-- with a state attribute: aria-pressed 19, aria-checked 9, aria-expanded 33, aria-disabled 0, aria-haspopup 9, aria-hidden 7, native checked 99, native disabled 9
+- with a state attribute: aria-pressed 20, aria-checked 9, aria-expanded 33, aria-disabled 0, aria-haspopup 9, aria-hidden 7, native checked 99, native disabled 9
 - empty accessible name: 36 focusable controls (listed under Open questions in NOTES.md)
 
 ### Per role
@@ -74,8 +74,8 @@ Generated 2026-10-17T18:21:20.155Z by `prep/baseline/scripts/a11y.js` (F3). Mach
 | K01 | container | 37 |
 | K02 | live region / message | 4 |
 | K03 | label | 213 |
-| K10 | native button | 202 |
-| K11 | native toggle button | 18 |
+| K10 | native button | 201 |
+| K11 | native toggle button | 19 |
 | K12 | button that opens a popup | 4 |
 | K13 | quality-bar list button | 3 |
 | K14 | skip-menu button | 4 |
@@ -206,17 +206,17 @@ Columns: order (F0 index); surface; section; selector (live, state classes dropp
 | 35 | mixer-strip | Color | #stepPalette | checkbox | Palette mode (new colour each stroke) (f) | hidden=true checked=false tabindex=-1 | K22 | Y |
 | 36 | mixer-strip | Color | #colorGate | checkbox | Limit (f) | hidden=true checked=true tabindex=-1 | K22 | Y |
 | 37 | mixer-strip | Color | div.ch-wide > div.ch-toggle-row:nth-of-type(1) > div.ch-seg-switch | group [r] | Color of each stroke (c) |  | K01 | Y |
-| 38 | mixer-strip | Color | div.ch-wide > div.ch-toggle-row:nth-of-type(1) > div.ch-seg-switch > … | button | One (c) | pressed=false [focusable] | K11 | Y |
-| 39 | mixer-strip | Color | div.ch-wide > div.ch-toggle-row:nth-of-type(1) > div.ch-seg-switch > … | button | Random (c) | pressed=true [focusable] | K11 | Y |
-| 40 | mixer-strip | Color | div.ch-wide > div.ch-toggle-row:nth-of-type(1) > div.ch-seg-switch > … | button | Palette (c) | pressed=false [focusable] | K11 | Y |
-| 41 | mixer-strip | Color | button.ch-gate-toggle | button | Limit  On (c) |  [focusable] | K10 | Y |
+| 38 | mixer-strip | Color | div.ch-wide > div.ch-toggle-row:nth-of-type(1) > div.ch-seg-switch > … | button | ONE (c) | pressed=false [focusable] | K11 | Y |
+| 39 | mixer-strip | Color | div.ch-wide > div.ch-toggle-row:nth-of-type(1) > div.ch-seg-switch > … | button | RANDOM (c) | pressed=true [focusable] | K11 | Y |
+| 40 | mixer-strip | Color | div.ch-wide > div.ch-toggle-row:nth-of-type(1) > div.ch-seg-switch > … | button | PALETTE (c) | pressed=false [focusable] | K11 | Y |
+| 41 | mixer-strip | Color | button.ch-gate-toggle | button | LIMIT (c) | pressed=true [focusable] | K11 | Y |
 | 42 | mixer-strip | Color | #colorPicker | ColorWell |  (c) |  [focusable] | K26 | Y |
-| 43 | mixer-strip | Color | button.ch-nudge-btn | button | Ignite (c) |  [focusable] | K10 | Y |
+| 43 | mixer-strip | Color | button.ch-nudge-btn | button | IGNITE (c) |  [focusable] | K10 | Y |
 | 44 | mixer-strip | Color | div.ch-ignite-lock | button [r] | Lock Ignite on (c) | pressed=false tabindex=0 [focusable] | K31 | Y |
-| 45 | mixer-strip |  | #mixerPresetsTrigger | button | Presets ▾ (c) | expanded=false haspopup=true [focusable] | K12 | Y |
-| 46 | mixer-strip |  | div.mixer-actions > button.btn--destructive | button | Clear (c) |  [focusable] | K10 | Y |
+| 45 | mixer-strip |  | #mixerPresetsTrigger | button | PRESETS (c) | expanded=false haspopup=true [focusable] | K12 | Y |
+| 46 | mixer-strip |  | div.mixer-actions > button.btn--destructive | button | CLEAR (c) |  [focusable] | K10 | Y |
 | 47 | mixer-strip |  | #pauseBtn | button | ⏸ (c) | pressed=false [focusable] | K11 | Y |
-| 48 | mixer-strip |  | #freezeBtn | button | Stop (c) | pressed=false [focusable] | K11 | Y |
+| 48 | mixer-strip |  | #freezeBtn | button | STOP (c) | pressed=false [focusable] | K11 | Y |
 | 49 | sidebar-left |  | #sidebar-left | region [r] | Brush (c) |  | K01 | Y |
 | 50 | sidebar-left | Brush Size | div.lsb-head > div.mixer-channel:nth-of-type(1) | generic |  (c) |  | K01 | Y |
 | 51 | sidebar-left | Brush Size | #brushSize | slider | Brush Size (f) |  [focusable] | K20 | N |
@@ -1023,7 +1023,7 @@ Columns: order (F0 index); surface; section; selector (live, state classes dropp
 | # | Surface | Section | Selector | Role | Name | State | Keys | R |
 |---|---|---|---|---|---|---|---|---|
 | 0 | overlay:radialMenu |  | #radialMenu | menu [r] | Radial menu (c) |  | K50 | Y |
-| 1 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(2) | menuitem [r] | Brush Size 37 px (c) |  | K51 | Y |
+| 1 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(2) | menuitem [r] | Brush Size 31 px (c) |  | K51 | Y |
 | 2 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(3) | menuitem [r] | Material Type - Fluid 0 (c) |  | K51 | Y |
 | 3 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(4) | menuitem [r] | Viscosity 0.30 (c) |  | K51 | Y |
 | 4 | overlay:radialMenu |  | div.radial-wheel > div.radial-label:nth-of-type(5) | menuitem [r] | Isolation 2.000 (c) |  | K51 | Y |

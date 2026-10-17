@@ -1,8 +1,8 @@
 {
- "generated": "2026-10-17T18:22:04.944Z",
+ "generated": "2026-10-17T19:13:54.745Z",
  "env": {
-  "date": "2026-10-17T18:22:04.944Z",
-  "headCommit": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+  "date": "2026-10-17T19:13:54.745Z",
+  "headCommit": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -14,7 +14,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:56108/index.html",
+  "url": "http://127.0.0.1:57719/index.html",
   "titlebarVisible": false,
   "leftFolded": false,
   "rightFolded": false,
@@ -335,10 +335,10 @@
  "scrollReset": {
   "before": {
    "#sidebar-left": [
-    "#sidebar-left=703"
+    "#sidebar-left=799"
    ],
    "#sidebar-right": [
-    "#sidebar-right=4750"
+    "#sidebar-right=4846"
    ]
   },
   "after": {
@@ -363,7 +363,7 @@
  "settle": {
   "canvas": {
    "x": 776,
-   "y": 443,
+   "y": 491,
    "tabIndex": -1,
    "id": "canvas"
   },
@@ -521,7 +521,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=4166"
+      "#sidebar-right=4165"
      ]
     },
     "menuOpen": true,
@@ -564,7 +564,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=4625"
+      "#sidebar-right=4677"
      ]
     },
     "menuOpen": true,
@@ -607,7 +607,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=4883"
+      "#sidebar-right=4940"
      ]
     },
     "menuOpen": true,
@@ -650,7 +650,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5012"
+      "#sidebar-right=5058"
      ]
     },
     "menuOpen": true,
@@ -690,7 +690,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -731,7 +731,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -764,7 +764,7 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 225,
+     "x": 221,
      "y": 21,
      "w": 76,
      "h": 76
@@ -772,7 +772,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -805,7 +805,7 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 375,
+     "x": 365,
      "y": 21,
      "w": 76,
      "h": 76
@@ -813,7 +813,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -848,7 +848,7 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 525,
+     "x": 511,
      "y": 18,
      "w": 104,
      "h": 104
@@ -856,7 +856,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -891,7 +891,7 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 689,
+     "x": 671,
      "y": 18,
      "w": 104,
      "h": 104
@@ -899,7 +899,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -934,7 +934,7 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 853,
+     "x": 829,
      "y": 21,
      "w": 76,
      "h": 76
@@ -942,7 +942,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -975,7 +975,7 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1004,
+     "x": 972,
      "y": 21,
      "w": 76,
      "h": 76
@@ -983,7 +983,7 @@
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1003,7 +1003,7 @@
      "ch-text-toggle"
     ],
     "role": "button",
-    "name": "One",
+    "name": "ONE",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -1017,15 +1017,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1138,
-     "y": 41,
-     "w": 38,
-     "h": 20
+     "x": 1103,
+     "y": 20,
+     "w": 120,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1045,7 +1045,7 @@
      "ch-text-toggle"
     ],
     "role": "button",
-    "name": "Random",
+    "name": "RANDOM",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -1059,15 +1059,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1179,
-     "y": 41,
-     "w": 63,
-     "h": 20
+     "x": 1231,
+     "y": 20,
+     "w": 120,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1087,7 +1087,7 @@
      "ch-text-toggle"
     ],
     "role": "button",
-    "name": "Palette",
+    "name": "PALETTE",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -1101,15 +1101,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1245,
-     "y": 41,
-     "w": 57,
-     "h": 20
+     "x": 1359,
+     "y": 20,
+     "w": 120,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1130,27 +1130,29 @@
      "ch-gate-toggle"
     ],
     "role": "button",
-    "name": "Limit  On",
+    "name": "LIMIT",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
     "region": "top",
     "tabIndexAttr": null,
-    "aria": {},
+    "aria": {
+     "aria-pressed": "true"
+    },
     "text": "Limit",
     "f0Order": 41,
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1310,
-     "y": 41,
-     "w": 66,
-     "h": 20
+     "x": 1487,
+     "y": 20,
+     "w": 72,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1182,15 +1184,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1138,
-     "y": 67,
-     "w": 20,
-     "h": 20
+     "x": 1103,
+     "y": 76,
+     "w": 24,
+     "h": 24
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1211,7 +1213,7 @@
      "ch-nudge-btn"
     ],
     "role": "button",
-    "name": "Ignite",
+    "name": "IGNITE",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -1223,15 +1225,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1163,
-     "y": 67,
-     "w": 180,
-     "h": 20
+     "x": 1135,
+     "y": 68,
+     "w": 368,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1268,15 +1270,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1348,
-     "y": 67,
-     "w": 28,
-     "h": 20
+     "x": 1511,
+     "y": 68,
+     "w": 48,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1296,7 +1298,7 @@
      "mixer-presets-trigger"
     ],
     "role": "button",
-    "name": "Presets ▾",
+    "name": "PRESETS",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": null,
@@ -1311,15 +1313,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1406,
-     "y": 41,
-     "w": 166,
-     "h": 20
+     "x": 676,
+     "y": 134,
+     "w": 232,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1339,7 +1341,7 @@
      "btn--destructive"
     ],
     "role": "button",
-    "name": "Clear",
+    "name": "CLEAR",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": null,
@@ -1351,15 +1353,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1406,
-     "y": 67,
-     "w": 64,
-     "h": 20
+     "x": 676,
+     "y": 182,
+     "w": 96,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1391,15 +1393,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1475,
-     "y": 67,
-     "w": 28,
-     "h": 20
+     "x": 780,
+     "y": 182,
+     "w": 48,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1417,7 +1419,7 @@
     "id": "freezeBtn",
     "classes": [],
     "role": "button",
-    "name": "Stop",
+    "name": "STOP",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": null,
@@ -1431,15 +1433,15 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1508,
-     "y": 67,
-     "w": 64,
-     "h": 20
+     "x": 836,
+     "y": 182,
+     "w": 72,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1467,7 +1469,7 @@
     "tabIndexAttr": null,
     "aria": {
      "aria-label": "Brush Size",
-     "aria-valuetext": "37 px"
+     "aria-valuetext": "31 px"
     },
     "text": "",
     "f0Order": 52,
@@ -1475,14 +1477,14 @@
     "inViewport": true,
     "rect": {
      "x": 12,
-     "y": 157,
+     "y": 253,
      "w": 248,
      "h": 30
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1513,14 +1515,14 @@
     "inViewport": true,
     "rect": {
      "x": 12,
-     "y": 210,
+     "y": 306,
      "w": 248,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1555,14 +1557,14 @@
     "inViewport": true,
     "rect": {
      "x": 14,
-     "y": 269,
+     "y": 365,
      "w": 90,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1595,14 +1597,14 @@
     "inViewport": true,
     "rect": {
      "x": 82,
-     "y": 349,
+     "y": 445,
      "w": 173,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1637,14 +1639,14 @@
     "inViewport": true,
     "rect": {
      "x": 20,
-     "y": 414,
+     "y": 510,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1679,14 +1681,14 @@
     "inViewport": true,
     "rect": {
      "x": 95,
-     "y": 414,
+     "y": 510,
      "w": 109,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1721,14 +1723,14 @@
     "inViewport": true,
     "rect": {
      "x": 206,
-     "y": 414,
+     "y": 510,
      "w": 101,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1759,14 +1761,14 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 465,
+     "y": 561,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1797,14 +1799,14 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 486,
+     "y": 582,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1837,14 +1839,14 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 502,
+     "y": 598,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1881,14 +1883,14 @@
     "inViewport": true,
     "rect": {
      "x": 13,
-     "y": 540,
+     "y": 636,
      "w": 246,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1921,14 +1923,14 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 565,
+     "y": 661,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -1961,14 +1963,14 @@
     "inViewport": true,
     "rect": {
      "x": 65,
-     "y": 565,
+     "y": 661,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2001,14 +2003,14 @@
     "inViewport": true,
     "rect": {
      "x": 114,
-     "y": 565,
+     "y": 661,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2041,14 +2043,14 @@
     "inViewport": true,
     "rect": {
      "x": 162,
-     "y": 565,
+     "y": 661,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2081,14 +2083,14 @@
     "inViewport": true,
     "rect": {
      "x": 211,
-     "y": 565,
+     "y": 661,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2122,14 +2124,14 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 599,
+     "y": 695,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2163,14 +2165,14 @@
     "inViewport": true,
     "rect": {
      "x": 47,
-     "y": 599,
+     "y": 695,
      "w": 67,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2201,14 +2203,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 703,
+     "y": 773,
      "w": 238,
      "h": 32
     },
     "barScroll": {
-     "#sidebar-left": [],
+     "#sidebar-left": [
+      "#sidebar-left=26"
+     ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2241,14 +2245,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 761,
+     "y": 497,
      "w": 117,
      "h": 36
     },
     "barScroll": {
-     "#sidebar-left": [],
+     "#sidebar-left": [
+      "#sidebar-left=360"
+     ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2281,14 +2287,16 @@
     "inViewport": true,
     "rect": {
      "x": 138,
-     "y": 761,
+     "y": 497,
      "w": 117,
      "h": 36
     },
     "barScroll": {
-     "#sidebar-left": [],
+     "#sidebar-left": [
+      "#sidebar-left=360"
+     ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2319,16 +2327,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 451,
+     "y": 559,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=372"
+      "#sidebar-left=360"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2359,16 +2367,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 505,
+     "y": 613,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=372"
+      "#sidebar-left=360"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2399,16 +2407,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 559,
+     "y": 667,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=372"
+      "#sidebar-left=360"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2443,16 +2451,16 @@
     "inViewport": true,
     "rect": {
      "x": 14,
-     "y": 621,
+     "y": 729,
      "w": 156,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=372"
+      "#sidebar-left=360"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2486,16 +2494,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 707,
+     "y": 500,
      "w": 238,
      "h": 30
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=372"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2526,16 +2534,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 761,
+     "y": 554,
      "w": 238,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=372"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2566,16 +2574,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 460,
+     "y": 601,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2606,16 +2614,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 500,
+     "y": 641,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2646,16 +2654,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 549,
+     "y": 690,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2690,16 +2698,16 @@
     "inViewport": true,
     "rect": {
      "x": 31,
-     "y": 618,
+     "y": 759,
      "w": 30,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2735,16 +2743,16 @@
     "inViewport": true,
     "rect": {
      "x": 68,
-     "y": 611,
+     "y": 752,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2780,16 +2788,16 @@
     "inViewport": true,
     "rect": {
      "x": 142,
-     "y": 611,
+     "y": 752,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=675"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2825,16 +2833,16 @@
     "inViewport": true,
     "rect": {
      "x": 68,
-     "y": 648,
+     "y": 770,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=694"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2870,16 +2878,16 @@
     "inViewport": true,
     "rect": {
      "x": 142,
-     "y": 648,
+     "y": 770,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=694"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2914,16 +2922,16 @@
     "inViewport": true,
     "rect": {
      "x": 67,
-     "y": 688,
+     "y": 497,
      "w": 107,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=1007"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -2959,16 +2967,16 @@
     "inViewport": true,
     "rect": {
      "x": 221,
-     "y": 612,
+     "y": 421,
      "w": 34,
      "h": 34
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=1007"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3003,16 +3011,16 @@
     "inViewport": true,
     "rect": {
      "x": 14,
-     "y": 756,
+     "y": 565,
      "w": 230,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=720"
+      "#sidebar-left=1007"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3043,16 +3051,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 453,
+     "y": 661,
      "w": 238,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1119"
+      "#sidebar-left=1007"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3083,16 +3091,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 513,
+     "y": 721,
      "w": 238,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1119"
+      "#sidebar-left=1007"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3123,16 +3131,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 573,
+     "y": 777,
      "w": 238,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1119"
+      "#sidebar-left=1011"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3165,16 +3173,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 607,
+     "y": 497,
      "w": 238,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1119"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3209,16 +3217,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 672,
+     "y": 562,
      "w": 104,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1119"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3253,16 +3261,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 714,
+     "y": 604,
      "w": 104,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1119"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3293,16 +3301,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 753,
+     "y": 643,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1119"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3335,16 +3343,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 769,
+     "y": 683,
      "w": 117,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1143"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3377,16 +3385,16 @@
     "inViewport": true,
     "rect": {
      "x": 138,
-     "y": 769,
+     "y": 683,
      "w": 117,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1143"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3417,16 +3425,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 637,
+     "y": 745,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3457,16 +3465,16 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 675,
+     "y": 783,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1325"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3503,10 +3511,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3543,10 +3551,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3583,16 +3591,16 @@
     "inViewport": true,
     "rect": {
      "x": 288,
-     "y": 445,
+     "y": 493,
      "w": 14,
      "h": 44
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5048"
+      "#sidebar-right=5096"
      ]
     },
     "menuOpen": false,
@@ -3627,16 +3635,16 @@
     "inViewport": false,
     "rect": {
      "x": 1287,
-     "y": -4646,
+     "y": -4599,
      "w": 195,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4799"
+      "#sidebar-right=4848"
      ]
     },
     "menuOpen": false,
@@ -3670,16 +3678,16 @@
     "inViewport": false,
     "rect": {
      "x": 1303,
-     "y": -2717,
+     "y": -2557,
      "w": 110,
      "h": 45
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2947"
+      "#sidebar-right=2883"
      ]
     },
     "menuOpen": false,
@@ -3713,16 +3721,16 @@
     "inViewport": false,
     "rect": {
      "x": 1421,
-     "y": -985,
+     "y": -995,
      "w": 110,
      "h": 45
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1215"
+      "#sidebar-right=1321"
      ]
     },
     "menuOpen": false,
@@ -3755,16 +3763,16 @@
     "inViewport": false,
     "rect": {
      "x": 1303,
-     "y": -255,
+     "y": -273,
      "w": 170,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=540"
+      "#sidebar-right=654"
      ]
     },
     "menuOpen": false,
@@ -3795,16 +3803,16 @@
     "inViewport": true,
     "rect": {
      "x": 1481,
-     "y": 48,
+     "y": 93,
      "w": 50,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=237"
+      "#sidebar-right=288"
      ]
     },
     "menuOpen": false,
@@ -3837,16 +3845,16 @@
     "inViewport": true,
     "rect": {
      "x": 1303,
-     "y": 129,
+     "y": 323,
      "w": 228,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=102"
      ]
     },
     "menuOpen": false,
@@ -3879,16 +3887,16 @@
     "inViewport": true,
     "rect": {
      "x": 1303,
-     "y": 173,
+     "y": 373,
      "w": 228,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=96"
      ]
     },
     "menuOpen": false,
@@ -3923,16 +3931,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 256,
+     "y": 456,
      "w": 143,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=96"
      ]
     },
     "menuOpen": false,
@@ -3963,16 +3971,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 336,
+     "y": 536,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=96"
      ]
     },
     "menuOpen": false,
@@ -4003,16 +4011,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 386,
+     "y": 586,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=96"
      ]
     },
     "menuOpen": false,
@@ -4043,16 +4051,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 440,
+     "y": 640,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=96"
      ]
     },
     "menuOpen": false,
@@ -4083,16 +4091,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 494,
+     "y": 694,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=96"
      ]
     },
     "menuOpen": false,
@@ -4123,16 +4131,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 548,
+     "y": 748,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=96"
      ]
     },
     "menuOpen": false,
@@ -4163,16 +4171,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 602,
+     "y": 773,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=125"
      ]
     },
     "menuOpen": false,
@@ -4203,16 +4211,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 640,
+     "y": 544,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=392"
      ]
     },
     "menuOpen": false,
@@ -4243,16 +4251,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 660,
+     "y": 559,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=397"
      ]
     },
     "menuOpen": false,
@@ -4283,16 +4291,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 696,
+     "y": 595,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=397"
      ]
     },
     "menuOpen": false,
@@ -4323,16 +4331,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 750,
+     "y": 649,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=200"
+      "#sidebar-right=397"
      ]
     },
     "menuOpen": false,
@@ -4363,16 +4371,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 773,
+     "y": 703,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=231"
+      "#sidebar-right=397"
      ]
     },
     "menuOpen": false,
@@ -4403,16 +4411,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 499,
+     "y": 757,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=559"
+      "#sidebar-right=397"
      ]
     },
     "menuOpen": false,
@@ -4443,16 +4451,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 542,
+     "y": 543,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=570"
+      "#sidebar-right=665"
      ]
     },
     "menuOpen": false,
@@ -4487,16 +4495,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 604,
+     "y": 595,
      "w": 254,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=570"
+      "#sidebar-right=675"
      ]
     },
     "menuOpen": false,
@@ -4533,16 +4541,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 691,
+     "y": 682,
      "w": 254,
      "h": 34
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=570"
+      "#sidebar-right=675"
      ]
     },
     "menuOpen": false,
@@ -4577,16 +4585,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 735,
+     "y": 726,
      "w": 28,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=570"
+      "#sidebar-right=675"
      ]
     },
     "menuOpen": false,
@@ -4621,16 +4629,16 @@
     "inViewport": true,
     "rect": {
      "x": 1465,
-     "y": 735,
+     "y": 726,
      "w": 28,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=570"
+      "#sidebar-right=675"
      ]
     },
     "menuOpen": false,
@@ -4663,16 +4671,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 532,
+     "y": 551,
      "w": 82,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=870"
+      "#sidebar-right=947"
      ]
     },
     "menuOpen": false,
@@ -4705,16 +4713,16 @@
     "inViewport": true,
     "rect": {
      "x": 1376,
-     "y": 516,
+     "y": 540,
      "w": 82,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -4747,16 +4755,16 @@
     "inViewport": true,
     "rect": {
      "x": 1462,
-     "y": 516,
+     "y": 540,
      "w": 82,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -4791,16 +4799,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 567,
+     "y": 591,
      "w": 100,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -4831,16 +4839,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 631,
+     "y": 655,
      "w": 125,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -4871,16 +4879,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 631,
+     "y": 655,
      "w": 125,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -4911,16 +4919,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 674,
+     "y": 698,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -4951,16 +4959,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 674,
+     "y": 698,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -4993,16 +5001,16 @@
     "inViewport": true,
     "rect": {
      "x": 1353,
-     "y": 763,
+     "y": 787,
      "w": 122,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -5035,16 +5043,16 @@
     "inViewport": true,
     "rect": {
      "x": 1503,
-     "y": 774,
+     "y": 798,
      "w": 0,
      "h": 0
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=886"
+      "#sidebar-right=958"
      ]
     },
     "menuOpen": false,
@@ -5077,16 +5085,16 @@
     "inViewport": true,
     "rect": {
      "x": 1441,
-     "y": 531,
+     "y": 554,
      "w": 103,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1214"
+      "#sidebar-right=1287"
      ]
     },
     "menuOpen": false,
@@ -5119,16 +5127,16 @@
     "inViewport": true,
     "rect": {
      "x": 1330,
-     "y": 622,
+     "y": 649,
      "w": 174,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1230"
+      "#sidebar-right=1299"
      ]
     },
     "menuOpen": false,
@@ -5159,16 +5167,16 @@
     "inViewport": true,
     "rect": {
      "x": 1302,
-     "y": 728,
+     "y": 755,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1230"
+      "#sidebar-right=1299"
      ]
     },
     "menuOpen": false,
@@ -5199,16 +5207,16 @@
     "inViewport": true,
     "rect": {
      "x": 1302,
-     "y": 768,
+     "y": 791,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1230"
+      "#sidebar-right=1303"
      ]
     },
     "menuOpen": false,
@@ -5239,16 +5247,16 @@
     "inViewport": true,
     "rect": {
      "x": 1302,
-     "y": 791,
+     "y": 548,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1240"
+      "#sidebar-right=1579"
      ]
     },
     "menuOpen": false,
@@ -5283,16 +5291,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 535,
+     "y": 605,
      "w": 188,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1558"
+      "#sidebar-right=1584"
      ]
     },
     "menuOpen": false,
@@ -5325,16 +5333,16 @@
     "inViewport": true,
     "rect": {
      "x": 1368,
-     "y": 600,
+     "y": 679,
      "w": 87,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1567"
+      "#sidebar-right=1584"
      ]
     },
     "menuOpen": false,
@@ -5367,16 +5375,16 @@
     "inViewport": true,
     "rect": {
      "x": 1458,
-     "y": 600,
+     "y": 679,
      "w": 87,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1567"
+      "#sidebar-right=1584"
      ]
     },
     "menuOpen": false,
@@ -5407,16 +5415,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 660,
+     "y": 739,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1567"
+      "#sidebar-right=1584"
      ]
     },
     "menuOpen": false,
@@ -5447,16 +5455,16 @@
     "inViewport": true,
     "rect": {
      "x": 1368,
-     "y": 710,
+     "y": 777,
      "w": 176,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1567"
+      "#sidebar-right=1596"
      ]
     },
     "menuOpen": false,
@@ -5490,16 +5498,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 748,
+     "y": 538,
      "w": 146,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1567"
+      "#sidebar-right=1873"
      ]
     },
     "menuOpen": false,
@@ -5532,16 +5540,16 @@
     "inViewport": true,
     "rect": {
      "x": 1422,
-     "y": 769,
+     "y": 573,
      "w": 122,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1586"
+      "#sidebar-right=1878"
      ]
     },
     "menuOpen": false,
@@ -5574,16 +5582,16 @@
     "inViewport": true,
     "rect": {
      "x": 1333,
-     "y": 532,
+     "y": 632,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1882"
+      "#sidebar-right=1878"
      ]
     },
     "menuOpen": false,
@@ -5616,16 +5624,16 @@
     "inViewport": true,
     "rect": {
      "x": 1403,
-     "y": 516,
+     "y": 632,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=1878"
      ]
     },
     "menuOpen": false,
@@ -5658,16 +5666,16 @@
     "inViewport": true,
     "rect": {
      "x": 1478,
-     "y": 516,
+     "y": 632,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=1878"
      ]
     },
     "menuOpen": false,
@@ -5700,16 +5708,16 @@
     "inViewport": true,
     "rect": {
      "x": 1296,
-     "y": 546,
+     "y": 662,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=1878"
      ]
     },
     "menuOpen": false,
@@ -5742,16 +5750,16 @@
     "inViewport": true,
     "rect": {
      "x": 1370,
-     "y": 546,
+     "y": 662,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=1878"
      ]
     },
     "menuOpen": false,
@@ -5786,16 +5794,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 623,
+     "y": 739,
      "w": 109,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=1878"
      ]
     },
     "menuOpen": false,
@@ -5830,16 +5838,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 687,
+     "y": 780,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=1901"
      ]
     },
     "menuOpen": false,
@@ -5870,16 +5878,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 693,
+     "y": 786,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=1901"
      ]
     },
     "menuOpen": false,
@@ -5914,16 +5922,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 717,
+     "y": 545,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=2166"
      ]
     },
     "menuOpen": false,
@@ -5954,16 +5962,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 723,
+     "y": 541,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -5998,16 +6006,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 747,
+     "y": 565,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6038,16 +6046,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 753,
+     "y": 571,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1898"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6082,16 +6090,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 780,
+     "y": 614,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1914"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6122,16 +6130,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 786,
+     "y": 620,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1914"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6166,16 +6174,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 516,
+     "y": 650,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2214"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6206,16 +6214,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 509,
+     "y": 656,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6250,16 +6258,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 535,
+     "y": 682,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6290,16 +6298,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 541,
+     "y": 688,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6334,16 +6342,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 567,
+     "y": 714,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6374,16 +6382,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 573,
+     "y": 720,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6418,16 +6426,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 599,
+     "y": 746,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6458,16 +6466,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 605,
+     "y": 752,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2176"
      ]
     },
     "menuOpen": false,
@@ -6502,16 +6510,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 661,
+     "y": 548,
      "w": 147,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2436"
      ]
     },
     "menuOpen": false,
@@ -6544,16 +6552,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 725,
+     "y": 607,
      "w": 99,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2441"
      ]
     },
     "menuOpen": false,
@@ -6586,16 +6594,16 @@
     "inViewport": true,
     "rect": {
      "x": 1359,
-     "y": 767,
+     "y": 649,
      "w": 40,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2441"
      ]
     },
     "menuOpen": false,
@@ -6628,16 +6636,16 @@
     "inViewport": true,
     "rect": {
      "x": 1402,
-     "y": 767,
+     "y": 649,
      "w": 39,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2441"
      ]
     },
     "menuOpen": false,
@@ -6670,16 +6678,16 @@
     "inViewport": true,
     "rect": {
      "x": 1444,
-     "y": 767,
+     "y": 649,
      "w": 48,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2441"
      ]
     },
     "menuOpen": false,
@@ -6712,16 +6720,16 @@
     "inViewport": true,
     "rect": {
      "x": 1496,
-     "y": 767,
+     "y": 649,
      "w": 48,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2227"
+      "#sidebar-right=2441"
      ]
     },
     "menuOpen": false,
@@ -6754,16 +6762,16 @@
     "inViewport": true,
     "rect": {
      "x": 1341,
-     "y": 511,
+     "y": 691,
      "w": 93,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2525"
+      "#sidebar-right=2441"
      ]
     },
     "menuOpen": false,
@@ -6796,16 +6804,16 @@
     "inViewport": true,
     "rect": {
      "x": 1437,
-     "y": 498,
+     "y": 691,
      "w": 107,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2538"
+      "#sidebar-right=2441"
      ]
     },
     "menuOpen": false,
@@ -6840,16 +6848,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 700,
+     "y": 540,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2538"
+      "#sidebar-right=2794"
      ]
     },
     "menuOpen": false,
@@ -6884,16 +6892,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 766,
+     "y": 596,
      "w": 83,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2538"
+      "#sidebar-right=2804"
      ]
     },
     "menuOpen": false,
@@ -6924,16 +6932,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 513,
+     "y": 676,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2871"
+      "#sidebar-right=2804"
      ]
     },
     "menuOpen": false,
@@ -6964,16 +6972,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 535,
+     "y": 711,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2884"
+      "#sidebar-right=2804"
      ]
     },
     "menuOpen": false,
@@ -7008,16 +7016,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 585,
+     "y": 761,
      "w": 171,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2884"
+      "#sidebar-right=2804"
      ]
     },
     "menuOpen": false,
@@ -7048,16 +7056,16 @@
     "inViewport": true,
     "rect": {
      "x": 1503,
-     "y": 658,
+     "y": 563,
      "w": 30,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2884"
+      "#sidebar-right=3075"
      ]
     },
     "menuOpen": false,
@@ -7088,16 +7096,16 @@
     "inViewport": true,
     "rect": {
      "x": 1503,
-     "y": 700,
+     "y": 593,
      "w": 30,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2884"
+      "#sidebar-right=3087"
      ]
     },
     "menuOpen": false,
@@ -7132,16 +7140,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 763,
+     "y": 656,
      "w": 73,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2884"
+      "#sidebar-right=3087"
      ]
     },
     "menuOpen": false,
@@ -7174,16 +7182,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 504,
+     "y": 720,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3207"
+      "#sidebar-right=3087"
      ]
     },
     "menuOpen": false,
@@ -7214,16 +7222,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 532,
+     "y": 760,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3219"
+      "#sidebar-right=3087"
      ]
     },
     "menuOpen": false,
@@ -7259,16 +7267,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 670,
+     "y": 576,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3219"
+      "#sidebar-right=3409"
      ]
     },
     "menuOpen": false,
@@ -7303,16 +7311,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 736,
+     "y": 633,
      "w": 88,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3219"
+      "#sidebar-right=3418"
      ]
     },
     "menuOpen": false,
@@ -7343,16 +7351,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 791,
+     "y": 699,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3230"
+      "#sidebar-right=3418"
      ]
     },
     "menuOpen": false,
@@ -7383,16 +7391,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 519,
+     "y": 738,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3541"
+      "#sidebar-right=3418"
      ]
     },
     "menuOpen": false,
@@ -7423,16 +7431,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 504,
+     "y": 738,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3556"
+      "#sidebar-right=3418"
      ]
     },
     "menuOpen": false,
@@ -7463,16 +7471,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 544,
+     "y": 769,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3556"
+      "#sidebar-right=3427"
      ]
     },
     "menuOpen": false,
@@ -7503,16 +7511,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 544,
+     "y": 769,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3556"
+      "#sidebar-right=3427"
      ]
     },
     "menuOpen": false,
@@ -7543,16 +7551,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 605,
+     "y": 556,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3556"
+      "#sidebar-right=3701"
      ]
     },
     "menuOpen": false,
@@ -7587,16 +7595,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 655,
+     "y": 595,
      "w": 107,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3556"
+      "#sidebar-right=3712"
      ]
     },
     "menuOpen": false,
@@ -7627,16 +7635,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 726,
+     "y": 666,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3556"
+      "#sidebar-right=3712"
      ]
     },
     "menuOpen": false,
@@ -7667,16 +7675,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 753,
+     "y": 693,
      "w": 254,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3556"
+      "#sidebar-right=3712"
      ]
     },
     "menuOpen": false,
@@ -7709,16 +7717,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 776,
+     "y": 739,
      "w": 254,
      "h": 29
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3579"
+      "#sidebar-right=3712"
      ]
     },
     "menuOpen": false,
@@ -7749,16 +7757,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 530,
+     "y": 777,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3879"
+      "#sidebar-right=3728"
      ]
     },
     "menuOpen": false,
@@ -7789,16 +7797,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 564,
+     "y": 548,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3895"
+      "#sidebar-right=4007"
      ]
     },
     "menuOpen": false,
@@ -7829,16 +7837,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 643,
+     "y": 615,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3895"
+      "#sidebar-right=4019"
      ]
     },
     "menuOpen": false,
@@ -7869,16 +7877,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 695,
+     "y": 667,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3895"
+      "#sidebar-right=4019"
      ]
     },
     "menuOpen": false,
@@ -7909,16 +7917,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 767,
+     "y": 764,
      "w": 38,
      "h": 38
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3920"
+      "#sidebar-right=4019"
      ]
     },
     "menuOpen": false,
@@ -7949,16 +7957,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 508,
+     "y": 550,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4228"
+      "#sidebar-right=4282"
      ]
     },
     "menuOpen": false,
@@ -7989,16 +7997,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 552,
+     "y": 595,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4234"
+      "#sidebar-right=4287"
      ]
     },
     "menuOpen": false,
@@ -8029,16 +8037,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 590,
+     "y": 633,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4234"
+      "#sidebar-right=4287"
      ]
     },
     "menuOpen": false,
@@ -8069,16 +8077,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 617,
+     "y": 660,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4234"
+      "#sidebar-right=4287"
      ]
     },
     "menuOpen": false,
@@ -8109,16 +8117,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 645,
+     "y": 688,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4234"
+      "#sidebar-right=4287"
      ]
     },
     "menuOpen": false,
@@ -8149,16 +8157,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 667,
+     "y": 710,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4234"
+      "#sidebar-right=4287"
      ]
     },
     "menuOpen": false,
@@ -8193,16 +8201,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 717,
+     "y": 760,
      "w": 100,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4234"
+      "#sidebar-right=4287"
      ]
     },
     "menuOpen": false,
@@ -8233,16 +8241,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 769,
+     "y": 552,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4262"
+      "#sidebar-right=4575"
      ]
     },
     "menuOpen": false,
@@ -8273,16 +8281,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 769,
+     "y": 546,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4262"
+      "#sidebar-right=4581"
      ]
     },
     "menuOpen": false,
@@ -8313,16 +8321,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 521,
+     "y": 610,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4574"
+      "#sidebar-right=4581"
      ]
     },
     "menuOpen": false,
@@ -8353,16 +8361,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 506,
+     "y": 610,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4589"
+      "#sidebar-right=4581"
      ]
     },
     "menuOpen": false,
@@ -8393,16 +8401,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 548,
+     "y": 652,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4589"
+      "#sidebar-right=4581"
      ]
     },
     "menuOpen": false,
@@ -8433,16 +8441,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 548,
+     "y": 652,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4589"
+      "#sidebar-right=4581"
      ]
     },
     "menuOpen": false,
@@ -8473,16 +8481,16 @@
     "inViewport": true,
     "rect": {
      "x": 1361,
-     "y": 610,
+     "y": 714,
      "w": 183,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4589"
+      "#sidebar-right=4581"
      ]
     },
     "menuOpen": false,
@@ -8513,16 +8521,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 685,
+     "y": 789,
      "w": 254,
      "h": 25
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4589"
+      "#sidebar-right=4581"
      ]
     },
     "menuOpen": false,
@@ -8553,16 +8561,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 735,
+     "y": 554,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4589"
+      "#sidebar-right=4866"
      ]
     },
     "menuOpen": false,
@@ -8593,16 +8601,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 515,
+     "y": 623,
      "w": 254,
      "h": 25
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4884"
+      "#sidebar-right=4872"
      ]
     },
     "menuOpen": false,
@@ -8633,16 +8641,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 558,
+     "y": 673,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4891"
+      "#sidebar-right=4872"
      ]
     },
     "menuOpen": false,
@@ -8677,16 +8685,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 616,
+     "y": 731,
      "w": 120,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4891"
+      "#sidebar-right=4872"
      ]
     },
     "menuOpen": false,
@@ -8719,16 +8727,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 696,
+     "y": 548,
      "w": 126,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4891"
+      "#sidebar-right=5135"
      ]
     },
     "menuOpen": false,
@@ -8761,16 +8769,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 696,
+     "y": 537,
      "w": 126,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4891"
+      "#sidebar-right=5146"
      ]
     },
     "menuOpen": false,
@@ -8806,16 +8814,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 740,
+     "y": 581,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4891"
+      "#sidebar-right=5146"
      ]
     },
     "menuOpen": false,
@@ -8849,16 +8857,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 513,
+     "y": 656,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5193"
+      "#sidebar-right=5146"
      ]
     },
     "menuOpen": false,
@@ -8894,16 +8902,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 541,
+     "y": 698,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5207"
+      "#sidebar-right=5146"
      ]
     },
     "menuOpen": false,
@@ -8939,16 +8947,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 673,
+     "y": 542,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5207"
+      "#sidebar-right=5434"
      ]
     },
     "menuOpen": false,
@@ -8984,16 +8992,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 705,
+     "y": 565,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5207"
+      "#sidebar-right=5443"
      ]
     },
     "menuOpen": false,
@@ -9029,16 +9037,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 737,
+     "y": 597,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5207"
+      "#sidebar-right=5443"
      ]
     },
     "menuOpen": false,
@@ -9074,16 +9082,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 769,
+     "y": 629,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5207"
+      "#sidebar-right=5443"
      ]
     },
     "menuOpen": false,
@@ -9119,16 +9127,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 783,
+     "y": 661,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5225"
+      "#sidebar-right=5443"
      ]
     },
     "menuOpen": false,
@@ -9164,16 +9172,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 517,
+     "y": 693,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5523"
+      "#sidebar-right=5443"
      ]
     },
     "menuOpen": false,
@@ -9209,16 +9217,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 542,
+     "y": 725,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5443"
      ]
     },
     "menuOpen": false,
@@ -9254,16 +9262,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 574,
+     "y": 757,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5443"
      ]
     },
     "menuOpen": false,
@@ -9299,16 +9307,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 606,
+     "y": 783,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5449"
      ]
     },
     "menuOpen": false,
@@ -9342,16 +9350,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 639,
+     "y": 544,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5721"
      ]
     },
     "menuOpen": false,
@@ -9386,16 +9394,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 681,
+     "y": 580,
      "w": 105,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5727"
      ]
     },
     "menuOpen": false,
@@ -9430,16 +9438,16 @@
     "inViewport": true,
     "rect": {
      "x": 1399,
-     "y": 681,
+     "y": 580,
      "w": 92,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5727"
      ]
     },
     "menuOpen": false,
@@ -9472,16 +9480,16 @@
     "inViewport": true,
     "rect": {
      "x": 1495,
-     "y": 681,
+     "y": 580,
      "w": 49,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5727"
      ]
     },
     "menuOpen": false,
@@ -9512,16 +9520,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 756,
+     "y": 655,
      "w": 88,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5727"
      ]
     },
     "menuOpen": false,
@@ -9552,16 +9560,16 @@
     "inViewport": true,
     "rect": {
      "x": 1382,
-     "y": 756,
+     "y": 655,
      "w": 79,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5727"
      ]
     },
     "menuOpen": false,
@@ -9594,16 +9602,16 @@
     "inViewport": true,
     "rect": {
      "x": 1465,
-     "y": 756,
+     "y": 655,
      "w": 79,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5530"
+      "#sidebar-right=5727"
      ]
     },
     "menuOpen": false,
@@ -9634,16 +9642,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 791,
+     "y": 702,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5542"
+      "#sidebar-right=5727"
      ]
     },
     "menuOpen": false,
@@ -9674,16 +9682,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 743,
+     "y": 765,
      "w": 124,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5675"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -9714,16 +9722,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 742,
+     "y": 765,
      "w": 124,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -9767,10 +9775,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -9814,10 +9822,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -9857,10 +9865,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -9922,10 +9930,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -9969,10 +9977,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10016,10 +10024,10 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10050,16 +10058,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 742,
+     "y": 765,
      "w": 124,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10090,16 +10098,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 742,
+     "y": 765,
      "w": 124,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10130,16 +10138,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 657,
+     "y": 680,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10172,16 +10180,16 @@
     "inViewport": true,
     "rect": {
      "x": 1465,
-     "y": 610,
+     "y": 633,
      "w": 79,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10212,16 +10220,16 @@
     "inViewport": true,
     "rect": {
      "x": 1382,
-     "y": 610,
+     "y": 633,
      "w": 79,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10252,16 +10260,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 610,
+     "y": 633,
      "w": 88,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10294,16 +10302,16 @@
     "inViewport": true,
     "rect": {
      "x": 1495,
-     "y": 535,
+     "y": 558,
      "w": 49,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10338,16 +10346,16 @@
     "inViewport": true,
     "rect": {
      "x": 1399,
-     "y": 535,
+     "y": 558,
      "w": 92,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10382,16 +10390,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 535,
+     "y": 558,
      "w": 105,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10425,16 +10433,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 493,
+     "y": 516,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10470,16 +10478,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 460,
+     "y": 483,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10515,16 +10523,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 428,
+     "y": 451,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10560,16 +10568,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 396,
+     "y": 419,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10605,16 +10613,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 364,
+     "y": 387,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10650,16 +10658,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 332,
+     "y": 355,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10695,16 +10703,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 300,
+     "y": 323,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10740,16 +10748,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 268,
+     "y": 291,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10785,16 +10793,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 236,
+     "y": 259,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10830,16 +10838,16 @@
     "inViewport": true,
     "rect": {
      "x": 1522,
-     "y": 204,
+     "y": 227,
      "w": 22,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5676"
+      "#sidebar-right=5749"
      ]
     },
     "menuOpen": false,
@@ -10875,16 +10883,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 380,
+     "y": 418,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5368"
+      "#sidebar-right=5426"
      ]
     },
     "menuOpen": false,
@@ -10918,16 +10926,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 346,
+     "y": 392,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5360"
+      "#sidebar-right=5410"
      ]
     },
     "menuOpen": false,
@@ -10963,16 +10971,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 271,
+     "y": 317,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5360"
+      "#sidebar-right=5410"
      ]
     },
     "menuOpen": false,
@@ -11005,16 +11013,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 227,
+     "y": 273,
      "w": 126,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5360"
+      "#sidebar-right=5410"
      ]
     },
     "menuOpen": false,
@@ -11047,16 +11055,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 227,
+     "y": 273,
      "w": 126,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5360"
+      "#sidebar-right=5410"
      ]
     },
     "menuOpen": false,
@@ -11091,16 +11099,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 147,
+     "y": 456,
      "w": 120,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5360"
+      "#sidebar-right=5147"
      ]
     },
     "menuOpen": false,
@@ -11131,16 +11139,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 390,
+     "y": 410,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5059"
+      "#sidebar-right=5135"
      ]
     },
     "menuOpen": false,
@@ -11171,16 +11179,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 347,
+     "y": 360,
      "w": 254,
      "h": 25
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5052"
+      "#sidebar-right=5135"
      ]
     },
     "menuOpen": false,
@@ -11211,16 +11219,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 272,
+     "y": 285,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5052"
+      "#sidebar-right=5135"
      ]
     },
     "menuOpen": false,
@@ -11251,16 +11259,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 222,
+     "y": 235,
      "w": 254,
      "h": 25
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5052"
+      "#sidebar-right=5135"
      ]
     },
     "menuOpen": false,
@@ -11291,16 +11299,16 @@
     "inViewport": true,
     "rect": {
      "x": 1361,
-     "y": 147,
+     "y": 459,
      "w": 183,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=5052"
+      "#sidebar-right=4836"
      ]
     },
     "menuOpen": false,
@@ -11331,16 +11339,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 386,
+     "y": 402,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4751"
+      "#sidebar-right=4831"
      ]
     },
     "menuOpen": false,
@@ -11371,16 +11379,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 399,
+     "y": 402,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4831"
      ]
     },
     "menuOpen": false,
@@ -11411,16 +11419,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 357,
+     "y": 360,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4831"
      ]
     },
     "menuOpen": false,
@@ -11451,16 +11459,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 357,
+     "y": 360,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4831"
      ]
     },
     "menuOpen": false,
@@ -11491,16 +11499,16 @@
     "inViewport": true,
     "rect": {
      "x": 1420,
-     "y": 293,
+     "y": 296,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4831"
      ]
     },
     "menuOpen": false,
@@ -11531,16 +11539,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 293,
+     "y": 296,
      "w": 124,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4831"
      ]
     },
     "menuOpen": false,
@@ -11575,16 +11583,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 213,
+     "y": 225,
      "w": 100,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4822"
      ]
     },
     "menuOpen": false,
@@ -11615,16 +11623,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 163,
+     "y": 473,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4524"
      ]
     },
     "menuOpen": false,
@@ -11655,16 +11663,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 141,
+     "y": 459,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4738"
+      "#sidebar-right=4516"
      ]
     },
     "menuOpen": false,
@@ -11695,16 +11703,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 403,
+     "y": 431,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4448"
+      "#sidebar-right=4516"
      ]
     },
     "menuOpen": false,
@@ -11735,16 +11743,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 383,
+     "y": 404,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4441"
+      "#sidebar-right=4516"
      ]
     },
     "menuOpen": false,
@@ -11775,16 +11783,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 345,
+     "y": 366,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4441"
+      "#sidebar-right=4516"
      ]
     },
     "menuOpen": false,
@@ -11815,16 +11823,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 295,
+     "y": 316,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4441"
+      "#sidebar-right=4516"
      ]
     },
     "menuOpen": false,
@@ -11855,16 +11863,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 246,
+     "y": 267,
      "w": 38,
      "h": 38
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4441"
+      "#sidebar-right=4516"
      ]
     },
     "menuOpen": false,
@@ -11895,16 +11903,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 149,
+     "y": 441,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4441"
+      "#sidebar-right=4245"
      ]
     },
     "menuOpen": false,
@@ -11935,16 +11943,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 393,
+     "y": 401,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4145"
+      "#sidebar-right=4233"
      ]
     },
     "menuOpen": false,
@@ -11975,16 +11983,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 327,
+     "y": 322,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4132"
+      "#sidebar-right=4233"
      ]
     },
     "menuOpen": false,
@@ -12015,16 +12023,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 277,
+     "y": 272,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4132"
+      "#sidebar-right=4233"
      ]
     },
     "menuOpen": false,
@@ -12057,16 +12065,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 223,
+     "y": 225,
      "w": 254,
      "h": 29
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4132"
+      "#sidebar-right=4226"
      ]
     },
     "menuOpen": false,
@@ -12097,16 +12105,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 177,
+     "y": 436,
      "w": 254,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4132"
+      "#sidebar-right=3969"
      ]
     },
     "menuOpen": false,
@@ -12137,16 +12145,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 150,
+     "y": 422,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=4132"
+      "#sidebar-right=3956"
      ]
     },
     "menuOpen": false,
@@ -12181,16 +12189,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 389,
+     "y": 351,
      "w": 107,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3822"
+      "#sidebar-right=3956"
      ]
     },
     "menuOpen": false,
@@ -12221,16 +12229,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 354,
+     "y": 301,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3807"
+      "#sidebar-right=3956"
      ]
     },
     "menuOpen": false,
@@ -12261,16 +12269,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 293,
+     "y": 240,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3807"
+      "#sidebar-right=3956"
      ]
     },
     "menuOpen": false,
@@ -12301,16 +12309,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 293,
+     "y": 240,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3807"
+      "#sidebar-right=3956"
      ]
     },
     "menuOpen": false,
@@ -12341,16 +12349,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 253,
+     "y": 225,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3807"
+      "#sidebar-right=3931"
      ]
     },
     "menuOpen": false,
@@ -12381,16 +12389,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 253,
+     "y": 225,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3807"
+      "#sidebar-right=3931"
      ]
     },
     "menuOpen": false,
@@ -12421,16 +12429,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 214,
+     "y": 454,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3807"
+      "#sidebar-right=3663"
      ]
     },
     "menuOpen": false,
@@ -12465,16 +12473,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 148,
+     "y": 400,
      "w": 88,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3807"
+      "#sidebar-right=3651"
      ]
     },
     "menuOpen": false,
@@ -12510,16 +12518,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 384,
+     "y": 334,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3505"
+      "#sidebar-right=3651"
      ]
     },
     "menuOpen": false,
@@ -12550,16 +12558,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 254,
+     "y": 225,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3497"
+      "#sidebar-right=3622"
      ]
     },
     "menuOpen": false,
@@ -12592,16 +12600,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 214,
+     "y": 471,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3497"
+      "#sidebar-right=3336"
      ]
     },
     "menuOpen": false,
@@ -12636,16 +12644,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 150,
+     "y": 419,
      "w": 73,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3497"
+      "#sidebar-right=3324"
      ]
     },
     "menuOpen": false,
@@ -12676,16 +12684,16 @@
     "inViewport": true,
     "rect": {
      "x": 1503,
-     "y": 400,
+     "y": 356,
      "w": 30,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3184"
+      "#sidebar-right=3324"
      ]
     },
     "menuOpen": false,
@@ -12716,16 +12724,16 @@
     "inViewport": true,
     "rect": {
      "x": 1503,
-     "y": 365,
+     "y": 314,
      "w": 30,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3177"
+      "#sidebar-right=3324"
      ]
     },
     "menuOpen": false,
@@ -12760,16 +12768,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 292,
+     "y": 241,
      "w": 171,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3177"
+      "#sidebar-right=3324"
      ]
     },
     "menuOpen": false,
@@ -12800,16 +12808,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 242,
+     "y": 462,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3177"
+      "#sidebar-right=3053"
      ]
     },
     "menuOpen": false,
@@ -12840,16 +12848,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 207,
+     "y": 433,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3177"
+      "#sidebar-right=3047"
      ]
     },
     "menuOpen": false,
@@ -12884,16 +12892,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 129,
+     "y": 353,
      "w": 83,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=3175"
+      "#sidebar-right=3047"
      ]
     },
     "menuOpen": false,
@@ -12928,16 +12936,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 377,
+     "y": 287,
      "w": 254,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2861"
+      "#sidebar-right=3047"
      ]
     },
     "menuOpen": false,
@@ -12970,16 +12978,16 @@
     "inViewport": true,
     "rect": {
      "x": 1437,
-     "y": 183,
+     "y": 414,
      "w": 107,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2853"
+      "#sidebar-right=2718"
      ]
     },
     "menuOpen": false,
@@ -13012,16 +13020,16 @@
     "inViewport": true,
     "rect": {
      "x": 1341,
-     "y": 183,
+     "y": 430,
      "w": 93,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2853"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13054,16 +13062,16 @@
     "inViewport": true,
     "rect": {
      "x": 1496,
-     "y": 141,
+     "y": 388,
      "w": 48,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2853"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13096,16 +13104,16 @@
     "inViewport": true,
     "rect": {
      "x": 1444,
-     "y": 141,
+     "y": 388,
      "w": 48,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2853"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13138,16 +13146,16 @@
     "inViewport": true,
     "rect": {
      "x": 1402,
-     "y": 141,
+     "y": 388,
      "w": 39,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2853"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13180,16 +13188,16 @@
     "inViewport": true,
     "rect": {
      "x": 1359,
-     "y": 141,
+     "y": 388,
      "w": 40,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2853"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13222,16 +13230,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 129,
+     "y": 346,
      "w": 99,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2823"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13266,16 +13274,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 392,
+     "y": 282,
      "w": 147,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2496"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13306,16 +13314,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 343,
+     "y": 226,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2702"
      ]
     },
     "menuOpen": false,
@@ -13350,16 +13358,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 337,
+     "y": 224,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2698"
      ]
     },
     "menuOpen": false,
@@ -13390,16 +13398,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 311,
+     "y": 465,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2431"
      ]
     },
     "menuOpen": false,
@@ -13434,16 +13442,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 305,
+     "y": 465,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13474,16 +13482,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 279,
+     "y": 439,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13518,16 +13526,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 273,
+     "y": 433,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13558,16 +13566,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 247,
+     "y": 407,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13602,16 +13610,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 241,
+     "y": 401,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13642,16 +13650,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 211,
+     "y": 371,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13686,16 +13694,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 205,
+     "y": 365,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13726,16 +13734,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 162,
+     "y": 322,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13770,16 +13778,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 156,
+     "y": 316,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13810,16 +13818,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 132,
+     "y": 292,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2489"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13854,16 +13862,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 128,
+     "y": 286,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2487"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13894,16 +13902,16 @@
     "inViewport": true,
     "rect": {
      "x": 1323,
-     "y": 400,
+     "y": 262,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2191"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13938,16 +13946,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 401,
+     "y": 256,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2425"
      ]
     },
     "menuOpen": false,
@@ -13982,16 +13990,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 337,
+     "y": 463,
      "w": 109,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2154"
      ]
     },
     "menuOpen": false,
@@ -14024,16 +14032,16 @@
     "inViewport": true,
     "rect": {
      "x": 1370,
-     "y": 260,
+     "y": 396,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14066,16 +14074,16 @@
     "inViewport": true,
     "rect": {
      "x": 1296,
-     "y": 260,
+     "y": 396,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14108,16 +14116,16 @@
     "inViewport": true,
     "rect": {
      "x": 1478,
-     "y": 230,
+     "y": 366,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14150,16 +14158,16 @@
     "inViewport": true,
     "rect": {
      "x": 1403,
-     "y": 230,
+     "y": 366,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14192,16 +14200,16 @@
     "inViewport": true,
     "rect": {
      "x": 1333,
-     "y": 230,
+     "y": 366,
      "w": 18,
      "h": 18
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14234,16 +14242,16 @@
     "inViewport": true,
     "rect": {
      "x": 1422,
-     "y": 171,
+     "y": 307,
      "w": 122,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14277,16 +14285,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 131,
+     "y": 267,
      "w": 146,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=2184"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14317,16 +14325,16 @@
     "inViewport": true,
     "rect": {
      "x": 1368,
-     "y": 391,
+     "y": 229,
      "w": 176,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1886"
+      "#sidebar-right=2144"
      ]
     },
     "menuOpen": false,
@@ -14357,16 +14365,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 354,
+     "y": 453,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1873"
+      "#sidebar-right=1870"
      ]
     },
     "menuOpen": false,
@@ -14399,16 +14407,16 @@
     "inViewport": true,
     "rect": {
      "x": 1458,
-     "y": 294,
+     "y": 398,
      "w": 87,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1873"
+      "#sidebar-right=1865"
      ]
     },
     "menuOpen": false,
@@ -14441,16 +14449,16 @@
     "inViewport": true,
     "rect": {
      "x": 1368,
-     "y": 294,
+     "y": 398,
      "w": 87,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1873"
+      "#sidebar-right=1865"
      ]
     },
     "menuOpen": false,
@@ -14485,16 +14493,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 220,
+     "y": 324,
      "w": 188,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1873"
+      "#sidebar-right=1865"
      ]
     },
     "menuOpen": false,
@@ -14525,16 +14533,16 @@
     "inViewport": true,
     "rect": {
      "x": 1302,
-     "y": 158,
+     "y": 262,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1873"
+      "#sidebar-right=1865"
      ]
     },
     "menuOpen": false,
@@ -14565,16 +14573,16 @@
     "inViewport": true,
     "rect": {
      "x": 1302,
-     "y": 129,
+     "y": 229,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1869"
+      "#sidebar-right=1865"
      ]
     },
     "menuOpen": false,
@@ -14605,16 +14613,16 @@
     "inViewport": true,
     "rect": {
      "x": 1302,
-     "y": 394,
+     "y": 462,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1564"
+      "#sidebar-right=1592"
      ]
     },
     "menuOpen": false,
@@ -14647,16 +14655,16 @@
     "inViewport": true,
     "rect": {
      "x": 1330,
-     "y": 302,
+     "y": 362,
      "w": 174,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1550"
+      "#sidebar-right=1586"
      ]
     },
     "menuOpen": false,
@@ -14689,16 +14697,16 @@
     "inViewport": true,
     "rect": {
      "x": 1441,
-     "y": 195,
+     "y": 255,
      "w": 103,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1550"
+      "#sidebar-right=1586"
      ]
     },
     "menuOpen": false,
@@ -14731,16 +14739,16 @@
     "inViewport": true,
     "rect": {
      "x": 1503,
-     "y": 413,
+     "y": 459,
      "w": 0,
      "h": 0
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1247"
+      "#sidebar-right=1297"
      ]
     },
     "menuOpen": false,
@@ -14773,16 +14781,16 @@
     "inViewport": true,
     "rect": {
      "x": 1353,
-     "y": 408,
+     "y": 460,
      "w": 122,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1285"
      ]
     },
     "menuOpen": false,
@@ -14813,16 +14821,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 319,
+     "y": 371,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1285"
      ]
     },
     "menuOpen": false,
@@ -14853,16 +14861,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 319,
+     "y": 371,
      "w": 125,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1285"
      ]
     },
     "menuOpen": false,
@@ -14893,16 +14901,16 @@
     "inViewport": true,
     "rect": {
      "x": 1419,
-     "y": 276,
+     "y": 328,
      "w": 125,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1285"
      ]
     },
     "menuOpen": false,
@@ -14933,16 +14941,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 276,
+     "y": 328,
      "w": 125,
      "h": 39
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1285"
      ]
     },
     "menuOpen": false,
@@ -14977,16 +14985,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 212,
+     "y": 264,
      "w": 100,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1285"
      ]
     },
     "menuOpen": false,
@@ -15019,16 +15027,16 @@
     "inViewport": true,
     "rect": {
      "x": 1462,
-     "y": 161,
+     "y": 225,
      "w": 82,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1273"
      ]
     },
     "menuOpen": false,
@@ -15061,16 +15069,16 @@
     "inViewport": true,
     "rect": {
      "x": 1376,
-     "y": 161,
+     "y": 225,
      "w": 82,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1273"
      ]
     },
     "menuOpen": false,
@@ -15103,16 +15111,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 161,
+     "y": 225,
      "w": 82,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=1241"
+      "#sidebar-right=1273"
      ]
     },
     "menuOpen": false,
@@ -15147,16 +15155,16 @@
     "inViewport": true,
     "rect": {
      "x": 1465,
-     "y": 369,
+     "y": 446,
      "w": 28,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=936"
+      "#sidebar-right=955"
      ]
     },
     "menuOpen": false,
@@ -15191,16 +15199,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 385,
+     "y": 458,
      "w": 28,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=920"
+      "#sidebar-right=943"
      ]
     },
     "menuOpen": false,
@@ -15237,16 +15245,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 341,
+     "y": 414,
      "w": 254,
      "h": 34
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=920"
+      "#sidebar-right=943"
      ]
     },
     "menuOpen": false,
@@ -15281,16 +15289,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 254,
+     "y": 327,
      "w": 254,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=920"
+      "#sidebar-right=943"
      ]
     },
     "menuOpen": false,
@@ -15321,16 +15329,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 192,
+     "y": 265,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=920"
+      "#sidebar-right=943"
      ]
     },
     "menuOpen": false,
@@ -15361,16 +15369,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 138,
+     "y": 225,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=920"
+      "#sidebar-right=929"
      ]
     },
     "menuOpen": false,
@@ -15401,16 +15409,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 394,
+     "y": 443,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=610"
+      "#sidebar-right=657"
      ]
     },
     "menuOpen": false,
@@ -15441,16 +15449,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 346,
+     "y": 402,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=604"
+      "#sidebar-right=644"
      ]
     },
     "menuOpen": false,
@@ -15481,16 +15489,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 292,
+     "y": 348,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=604"
+      "#sidebar-right=644"
      ]
     },
     "menuOpen": false,
@@ -15521,16 +15529,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 256,
+     "y": 312,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=604"
+      "#sidebar-right=644"
      ]
     },
     "menuOpen": false,
@@ -15561,16 +15569,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 236,
+     "y": 292,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=604"
+      "#sidebar-right=644"
      ]
     },
     "menuOpen": false,
@@ -15601,16 +15609,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 198,
+     "y": 254,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=604"
+      "#sidebar-right=644"
      ]
     },
     "menuOpen": false,
@@ -15641,16 +15649,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 144,
+     "y": 225,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=604"
+      "#sidebar-right=619"
      ]
     },
     "menuOpen": false,
@@ -15681,16 +15689,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 389,
+     "y": 443,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=305"
+      "#sidebar-right=347"
      ]
     },
     "menuOpen": false,
@@ -15721,16 +15729,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 348,
+     "y": 396,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=292"
+      "#sidebar-right=340"
      ]
     },
     "menuOpen": false,
@@ -15761,16 +15769,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 294,
+     "y": 342,
      "w": 254,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=292"
+      "#sidebar-right=340"
      ]
     },
     "menuOpen": false,
@@ -15801,16 +15809,16 @@
     "inViewport": true,
     "rect": {
      "x": 1290,
-     "y": 244,
+     "y": 292,
      "w": 254,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=292"
+      "#sidebar-right=340"
      ]
     },
     "menuOpen": false,
@@ -15845,16 +15853,16 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 164,
+     "y": 225,
      "w": 143,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=292"
+      "#sidebar-right=327"
      ]
     },
     "menuOpen": false,
@@ -15887,16 +15895,16 @@
     "inViewport": true,
     "rect": {
      "x": 1303,
-     "y": 335,
+     "y": 426,
      "w": 228,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
-      "#sidebar-right=38"
+      "#sidebar-right=43"
      ]
     },
     "menuOpen": false,
@@ -15929,13 +15937,13 @@
     "inViewport": true,
     "rect": {
      "x": 1303,
-     "y": 296,
+     "y": 392,
      "w": 228,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=33"
@@ -15969,13 +15977,13 @@
     "inViewport": true,
     "rect": {
      "x": 1481,
-     "y": 252,
+     "y": 348,
      "w": 50,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=33"
@@ -16011,13 +16019,13 @@
     "inViewport": true,
     "rect": {
      "x": 1303,
-     "y": 252,
+     "y": 348,
      "w": 170,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=33"
@@ -16054,13 +16062,13 @@
     "inViewport": true,
     "rect": {
      "x": 1421,
-     "y": 197,
+     "y": 293,
      "w": 110,
      "h": 45
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=33"
@@ -16097,13 +16105,13 @@
     "inViewport": true,
     "rect": {
      "x": 1303,
-     "y": 197,
+     "y": 293,
      "w": 110,
      "h": 45
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=33"
@@ -16141,13 +16149,13 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 129,
+     "y": 225,
      "w": 195,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16187,13 +16195,13 @@
     "inViewport": true,
     "rect": {
      "x": 288,
-     "y": 445,
+     "y": 493,
      "w": 14,
      "h": 44
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16233,7 +16241,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16273,7 +16281,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16313,7 +16321,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16353,7 +16361,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16395,7 +16403,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16437,7 +16445,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16477,7 +16485,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16521,7 +16529,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16565,7 +16573,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16607,7 +16615,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16647,7 +16655,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16687,7 +16695,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16727,7 +16735,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1433"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16765,13 +16773,13 @@
     "inViewport": true,
     "rect": {
      "x": 14,
-     "y": 139,
+     "y": 507,
      "w": 230,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=1337"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16810,13 +16818,13 @@
     "inViewport": true,
     "rect": {
      "x": 221,
-     "y": 450,
+     "y": 363,
      "w": 34,
      "h": 34
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16854,13 +16862,13 @@
     "inViewport": true,
     "rect": {
      "x": 67,
-     "y": 526,
+     "y": 439,
      "w": 107,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16899,13 +16907,13 @@
     "inViewport": true,
     "rect": {
      "x": 142,
-     "y": 486,
+     "y": 399,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16944,13 +16952,13 @@
     "inViewport": true,
     "rect": {
      "x": 68,
-     "y": 486,
+     "y": 399,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -16989,13 +16997,13 @@
     "inViewport": true,
     "rect": {
      "x": 142,
-     "y": 449,
+     "y": 362,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17034,13 +17042,13 @@
     "inViewport": true,
     "rect": {
      "x": 68,
-     "y": 449,
+     "y": 362,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17078,13 +17086,13 @@
     "inViewport": true,
     "rect": {
      "x": 31,
-     "y": 456,
+     "y": 369,
      "w": 30,
      "h": 22
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17118,13 +17126,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 387,
+     "y": 300,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17158,13 +17166,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 338,
+     "y": 251,
      "w": 13,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=1065"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17198,13 +17206,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 298,
+     "y": 508,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=768"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17238,13 +17246,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 251,
+     "y": 461,
      "w": 238,
      "h": 28
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=768"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17281,13 +17289,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 197,
+     "y": 407,
      "w": 238,
      "h": 30
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=882"
+      "#sidebar-left=768"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17325,13 +17333,13 @@
     "inViewport": true,
     "rect": {
      "x": 14,
-     "y": 459,
+     "y": 321,
      "w": 156,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=534"
+      "#sidebar-left=768"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17365,13 +17373,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 397,
+     "y": 259,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=534"
+      "#sidebar-left=768"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17405,13 +17413,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 343,
+     "y": 225,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=534"
+      "#sidebar-left=748"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17445,13 +17453,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 289,
+     "y": 499,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=534"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17487,13 +17495,13 @@
     "inViewport": true,
     "rect": {
      "x": 138,
-     "y": 227,
+     "y": 437,
      "w": 117,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=534"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17529,13 +17537,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 227,
+     "y": 437,
      "w": 117,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=534"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17569,13 +17577,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 169,
+     "y": 379,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=534"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17612,13 +17620,13 @@
     "inViewport": true,
     "rect": {
      "x": 47,
-     "y": 454,
+     "y": 275,
      "w": 67,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17655,13 +17663,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 454,
+     "y": 275,
      "w": 26,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17697,13 +17705,13 @@
     "inViewport": true,
     "rect": {
      "x": 211,
-     "y": 420,
+     "y": 241,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17739,13 +17747,13 @@
     "inViewport": true,
     "rect": {
      "x": 162,
-     "y": 420,
+     "y": 241,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17781,13 +17789,13 @@
     "inViewport": true,
     "rect": {
      "x": 114,
-     "y": 420,
+     "y": 241,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17823,13 +17831,13 @@
     "inViewport": true,
     "rect": {
      "x": 65,
-     "y": 420,
+     "y": 241,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17865,13 +17873,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 420,
+     "y": 241,
      "w": 44,
      "h": 26
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=420"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17911,13 +17919,13 @@
     "inViewport": true,
     "rect": {
      "x": 13,
-     "y": 395,
+     "y": 225,
      "w": 246,
      "h": 21
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=411"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17953,13 +17961,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 357,
+     "y": 499,
      "w": 238,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -17993,13 +18001,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 341,
+     "y": 483,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18033,13 +18041,13 @@
     "inViewport": true,
     "rect": {
      "x": 17,
-     "y": 320,
+     "y": 462,
      "w": 14,
      "h": 14
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18077,13 +18085,13 @@
     "inViewport": true,
     "rect": {
      "x": 206,
-     "y": 269,
+     "y": 411,
      "w": 101,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18121,13 +18129,13 @@
     "inViewport": true,
     "rect": {
      "x": 95,
-     "y": 269,
+     "y": 411,
      "w": 109,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18165,13 +18173,13 @@
     "inViewport": true,
     "rect": {
      "x": 20,
-     "y": 269,
+     "y": 411,
      "w": 73,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18207,13 +18215,13 @@
     "inViewport": true,
     "rect": {
      "x": 82,
-     "y": 204,
+     "y": 346,
      "w": 173,
      "h": 36
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=145"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18251,13 +18259,13 @@
     "inViewport": true,
     "rect": {
      "x": 14,
-     "y": 129,
+     "y": 266,
      "w": 90,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18291,13 +18299,13 @@
     "inViewport": true,
     "rect": {
      "x": 12,
-     "y": 210,
+     "y": 306,
      "w": 248,
      "h": 32
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18328,7 +18336,7 @@
     "tabIndexAttr": null,
     "aria": {
      "aria-label": "Brush Size",
-     "aria-valuetext": "37 px"
+     "aria-valuetext": "31 px"
     },
     "text": "",
     "f0Order": 52,
@@ -18336,13 +18344,13 @@
     "inViewport": true,
     "rect": {
      "x": 12,
-     "y": 157,
+     "y": 253,
      "w": 248,
      "h": 30
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18363,7 +18371,7 @@
     "id": "freezeBtn",
     "classes": [],
     "role": "button",
-    "name": "Stop",
+    "name": "STOP",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": null,
@@ -18377,14 +18385,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1508,
-     "y": 67,
-     "w": 64,
-     "h": 20
+     "x": 836,
+     "y": 182,
+     "w": 72,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18419,14 +18427,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1475,
-     "y": 67,
-     "w": 28,
-     "h": 20
+     "x": 780,
+     "y": 182,
+     "w": 48,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18449,7 +18457,7 @@
      "btn--destructive"
     ],
     "role": "button",
-    "name": "Clear",
+    "name": "CLEAR",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": null,
@@ -18461,14 +18469,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1406,
-     "y": 67,
-     "w": 64,
-     "h": 20
+     "x": 676,
+     "y": 182,
+     "w": 96,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18491,7 +18499,7 @@
      "mixer-presets-trigger"
     ],
     "role": "button",
-    "name": "Presets ▾",
+    "name": "PRESETS",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": null,
@@ -18506,14 +18514,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1406,
-     "y": 41,
-     "w": 166,
-     "h": 20
+     "x": 676,
+     "y": 134,
+     "w": 232,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18553,14 +18561,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1348,
-     "y": 67,
-     "w": 28,
-     "h": 20
+     "x": 1511,
+     "y": 68,
+     "w": 48,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18584,7 +18592,7 @@
      "ch-nudge-btn"
     ],
     "role": "button",
-    "name": "Ignite",
+    "name": "IGNITE",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -18596,14 +18604,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1163,
-     "y": 67,
-     "w": 180,
-     "h": 20
+     "x": 1135,
+     "y": 68,
+     "w": 368,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18638,14 +18646,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1138,
-     "y": 67,
-     "w": 20,
-     "h": 20
+     "x": 1103,
+     "y": 76,
+     "w": 24,
+     "h": 24
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18669,26 +18677,28 @@
      "ch-gate-toggle"
     ],
     "role": "button",
-    "name": "Limit  On",
+    "name": "LIMIT",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
     "region": "top",
     "tabIndexAttr": null,
-    "aria": {},
+    "aria": {
+     "aria-pressed": "true"
+    },
     "text": "Limit",
     "f0Order": 41,
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1310,
-     "y": 41,
-     "w": 66,
-     "h": 20
+     "x": 1487,
+     "y": 20,
+     "w": 72,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18711,7 +18721,7 @@
      "ch-text-toggle"
     ],
     "role": "button",
-    "name": "Palette",
+    "name": "PALETTE",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -18725,14 +18735,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1245,
-     "y": 41,
-     "w": 57,
-     "h": 20
+     "x": 1359,
+     "y": 20,
+     "w": 120,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18755,7 +18765,7 @@
      "ch-text-toggle"
     ],
     "role": "button",
-    "name": "Random",
+    "name": "RANDOM",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -18769,14 +18779,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1179,
-     "y": 41,
-     "w": 63,
-     "h": 20
+     "x": 1231,
+     "y": 20,
+     "w": 120,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18799,7 +18809,7 @@
      "ch-text-toggle"
     ],
     "role": "button",
-    "name": "One",
+    "name": "ONE",
     "nameSource": "cdp",
     "surface": "mixer-strip",
     "section": "Color",
@@ -18813,14 +18823,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1138,
-     "y": 41,
-     "w": 38,
-     "h": 20
+     "x": 1103,
+     "y": 20,
+     "w": 120,
+     "h": 40
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18856,14 +18866,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 1004,
+     "x": 972,
      "y": 21,
      "w": 76,
      "h": 76
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18901,14 +18911,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 853,
+     "x": 829,
      "y": 21,
      "w": 76,
      "h": 76
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18946,14 +18956,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 689,
+     "x": 671,
      "y": 18,
      "w": 104,
      "h": 104
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -18991,14 +19001,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 525,
+     "x": 511,
      "y": 18,
      "w": 104,
      "h": 104
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19034,14 +19044,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 375,
+     "x": 365,
      "y": 21,
      "w": 76,
      "h": 76
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19077,14 +19087,14 @@
     "focusVisible": true,
     "inViewport": true,
     "rect": {
-     "x": 225,
+     "x": 221,
      "y": 21,
      "w": 76,
      "h": 76
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19127,7 +19137,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19169,7 +19179,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19214,7 +19224,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19259,7 +19269,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19305,7 +19315,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19350,7 +19360,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19433,7 +19443,7 @@
     "tabIndexAttr": null,
     "aria": {
      "aria-label": "Brush Size",
-     "aria-valuetext": "37 px"
+     "aria-valuetext": "31 px"
     },
     "text": "",
     "f0Order": 52,
@@ -19441,13 +19451,13 @@
     "inViewport": true,
     "rect": {
      "x": 12,
-     "y": 157,
+     "y": 253,
      "w": 248,
      "h": 30
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19496,7 +19506,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19541,13 +19551,13 @@
     "inViewport": true,
     "rect": {
      "x": 1287,
-     "y": 129,
+     "y": 225,
      "w": 195,
      "h": 16
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19601,7 +19611,7 @@
     },
     "barScroll": {
      "#sidebar-left": [
-      "#sidebar-left=140"
+      "#sidebar-left=99"
      ],
      "#sidebar-right": [
       "#sidebar-right=24"
@@ -19617,7 +19627,7 @@
  "f0": {
   "file": "prep\\baseline\\dom\\controls.json",
   "f0Controls": 847,
-  "f0Head": "4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7",
+  "f0Head": "fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3",
   "mismatches": [],
   "unreached": [],
   "notInF0": [],

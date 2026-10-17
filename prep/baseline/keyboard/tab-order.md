@@ -1,13 +1,13 @@
 # Keyboard focus order — Tab and Shift+Tab through the whole UI
 
-Generated 2026-10-17T18:22:04.944Z by `prep/baseline/scripts/tab-order.js` (F4). Machine copy: `tab-order.json`. Notes, caveats and the `--check` result: `NOTES.md`.
+Generated 2026-10-17T19:13:54.745Z by `prep/baseline/scripts/tab-order.js` (F4). Machine copy: `tab-order.json`. Notes, caveats and the `--check` result: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T18:22:04.944Z |
-| headCommit | 4789bb14ef0dcb9f6b1ea4fe16406c4ac3750da7 |
+| date | 2026-10-17T19:13:54.745Z |
+| headCommit | fa8701aef64a6a4084c2b7b1c2fe9639dcefd3c3 |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -19,7 +19,7 @@ Generated 2026-10-17T18:22:04.944Z by `prep/baseline/scripts/tab-order.js` (F4).
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:56108/index.html |
+| url | http://127.0.0.1:57719/index.html |
 | titlebarVisible | false |
 | leftFolded | false |
 | rightFolded | false |
@@ -146,17 +146,17 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 9 | mixer-strip | Time | top | input[range] | #timeScalePerceptual | slider | Time (c) | 26 | Y |
 | 10 | mixer-strip | Density | top | input[range] | #densityDissipationPerceptual | slider | Density (c) | 29 | Y |
 | 11 | mixer-strip | Velocity | top | input[range] | #velocityDissipation | slider | Velocity (c) | 31 | Y |
-| 12 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | One (c) | 38 | Y |
-| 13 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Random (c) | 39 | Y |
-| 14 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Palette (c) | 40 | Y |
-| 15 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Limit  On (c) | 41 | Y |
+| 12 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | ONE (c) | 38 | Y |
+| 13 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | RANDOM (c) | 39 | Y |
+| 14 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | PALETTE (c) | 40 | Y |
+| 15 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | LIMIT (c) | 41 | Y |
 | 16 | mixer-strip | Color | top | input[color] | #colorPicker | ColorWell |  (c) | 42 | Y |
-| 17 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Ignite (c) | 43 | Y |
+| 17 | mixer-strip | Color | top | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | IGNITE (c) | 43 | Y |
 | 18 | mixer-strip | Color | top | div | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Lock Ignite on (c) | 44 | Y |
-| 19 | mixer-strip |  | top | button | #mixerPresetsTrigger | button | Presets ▾ (c) | 45 | Y |
-| 20 | mixer-strip |  | top | button | #mixer-strip > div.mixer-stack:nth-of-type(12) > div.mixer-actions:nt… | button | Clear (c) | 46 | Y |
+| 19 | mixer-strip |  | top | button | #mixerPresetsTrigger | button | PRESETS (c) | 45 | Y |
+| 20 | mixer-strip |  | top | button | #mixer-strip > div.mixer-stack:nth-of-type(12) > div.mixer-actions:nt… | button | CLEAR (c) | 46 | Y |
 | 21 | mixer-strip |  | top | button | #pauseBtn | button | ⏸ (c) | 47 | Y |
-| 22 | mixer-strip |  | top | button | #freezeBtn | button | Stop (c) | 48 | Y |
+| 22 | mixer-strip |  | top | button | #freezeBtn | button | STOP (c) | 48 | Y |
 | 23 | sidebar-left | Brush Size | left | input[range] | #brushSizePerceptual | slider | Brush Size (c) | 52 | Y |
 | 24 | sidebar-left |  | left | input[range] | #brushSteady | slider | STABILIZATION 0% (c) | 54 | Y |
 | 25 | sidebar-left | Brush | left | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | BRUSH (c) | 58 | Y |
@@ -567,17 +567,17 @@ Columns: #; surface; section (`.sidebar-section` title or `.mixer-channel` label
 | 199 | sidebar-left | Brush | span | #sidebar-left > div.lsb-body:nth-of-type(2) > div.sidebar-section:nth… | button | BRUSH |
 | 200 | sidebar-left |  | input[range] | #brushSteady | slider | STABILIZATION 0% |
 | 201 | sidebar-left | Brush Size | input[range] | #brushSizePerceptual | slider | Brush Size |
-| 202 | mixer-strip |  | button | #freezeBtn | button | Stop |
+| 202 | mixer-strip |  | button | #freezeBtn | button | STOP |
 | 203 | mixer-strip |  | button | #pauseBtn | button | ⏸ |
-| 204 | mixer-strip |  | button | #mixer-strip > div.mixer-stack:nth-of-type(12) > div.mixer-actions:nt… | button | Clear |
-| 205 | mixer-strip |  | button | #mixerPresetsTrigger | button | Presets ▾ |
+| 204 | mixer-strip |  | button | #mixer-strip > div.mixer-stack:nth-of-type(12) > div.mixer-actions:nt… | button | CLEAR |
+| 205 | mixer-strip |  | button | #mixerPresetsTrigger | button | PRESETS |
 | 206 | mixer-strip | Color | div | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Lock Ignite on |
-| 207 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Ignite |
+| 207 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | IGNITE |
 | 208 | mixer-strip | Color | input[color] | #colorPicker | ColorWell |  |
-| 209 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Limit  On |
-| 210 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Palette |
-| 211 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | Random |
-| 212 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | One |
+| 209 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | LIMIT |
+| 210 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | PALETTE |
+| 211 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | RANDOM |
+| 212 | mixer-strip | Color | button | #mixer-strip > div.mixer-channel.ch-wide:nth-of-type(10) > div.ch-tog… | button | ONE |
 | 213 | mixer-strip | Velocity | input[range] | #velocityDissipation | slider | Velocity |
 | 214 | mixer-strip | Density | input[range] | #densityDissipationPerceptual | slider | Density |
 | 215 | mixer-strip | Time | input[range] | #timeScalePerceptual | slider | Time |

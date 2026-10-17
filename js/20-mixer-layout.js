@@ -1330,6 +1330,10 @@
             var syncGate = function () {
                 var off = !gateEl.checked;
                 gateBtn.classList.toggle('active', off);
+                // The state as ARIA too: pressed while the limit is on. (The
+                // classic look keeps its On/Off words; a theme can show the
+                // state as a lit pane instead.)
+                gateBtn.setAttribute('aria-pressed', off ? 'false' : 'true');
                 gateBtn.title = off
                     ? 'Limit Off: paint keeps additively building, so repeated strokes build toward white. Click to turn the limit back on.'
                     : 'Limit caps the color at its original value. Turn off to allow additive colors to trend towards #FFF (white). ';

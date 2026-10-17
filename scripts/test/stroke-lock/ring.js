@@ -55,6 +55,11 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail }); con
         const g = await d.ev(`(function(){ var c = document.getElementById('canvas'), r = c.getBoundingClientRect();
             return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, R: Math.round(Math.min(r.width, r.height) * 0.3), k: c.width / r.width }; })()`);
         const R = g.R * g.k;   // the circle, canvas px
+        // Turns a second: three, or faster on a short canvas so the hand still
+        // outruns Steady 0.3's top speed (250 / 0.09 CSS px/s) by 1.4x. The
+        // ring is 0.3 of the canvas's short side, so a taller top bar (Walnut &
+        // Copper) shrinks it; the check is about the head's pace, not the size.
+        const RPS = Math.max(3, 1.4 * (250 / 0.09) / (2 * Math.PI * g.R));
 
         // Hold the key, press, spin round the circle at three turns a second
         // for `ms`, then hold still for `stillMs` with the button down. Gives
@@ -73,7 +78,7 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail }); con
             await sleep(50);
             await d.ev(`window.__slow = ${o.slowMs || 0}, window.__dabs = [], window.__heads = [], 1`);
             await d.down(g.cx + g.R, g.cy);
-            const t0 = Date.now(), rps = 3;
+            const t0 = Date.now(), rps = RPS;
             let a = 0;
             while (Date.now() - t0 < (o.ms || 2000)) {
                 a = (Date.now() - t0) / 1000 * rps * Math.PI * 2;
@@ -114,7 +119,7 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail }); con
         // Steady, divided by Steady squared. The hand here goes round at
         // 2·pi·R·3, about 3,660 px a second, faster than both settings below.
         const vmax = steady => 250 / (steady * steady) * g.k;
-        const handPace = 2 * Math.PI * R * 3;
+        const handPace = 2 * Math.PI * R * RPS;
         const atPace = (s, steady) => !!(s.head && s.head.pace) && Math.abs(s.head.pace - vmax(steady)) <= 0.1 * vmax(steady);
 
         let s = await spin({});
@@ -123,7 +128,7 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail }); con
         check('R2 ...on slow frames too (one long step a frame)', onRing(s, 0.5), s);
         s = await spin({ steady: 0.3, stillMs: 1500 });
         check('R3 Steady 30%: every dab on the circle', onRing(s, 0.5), s);
-        check('R3 ...the head goes round at Steady\'s top speed, not the hand\'s', atPace(s, 0.3) && handPace > vmax(0.3) * 1.1,   // 1.1: the Walnut & Copper bar is taller, so the canvas and ring are smaller (hand ~3,280 vs cap ~2,780 at 1584x805)
+        check('R3 ...the head goes round at Steady\'s top speed, not the hand\'s', atPace(s, 0.3) && handPace > vmax(0.3) * 1.2,
             { pace: s.head && s.head.pace, vmax: Math.round(vmax(0.3)), hand: Math.round(handPace) });
         check('R3 ...never turning back, and caught up once the hand stopped', s.head && s.head.back === 0 && s.head.gapEnd <= 0.09 * 24 * g.k + 1.5, s.head);
         s = await spin({ steady: 1 });
