@@ -42,14 +42,25 @@
         { sel: '.mask-editor-overlay', open: function (el) { return el.style.display === 'flex'; } },
         // The radial menu is a quick gesture: it strikes on like a cathode
         // (45 ms rise) rather than gliding on the drawer spring.
-        { sel: '#radialMenu', open: function (el) { return !el.hidden; }, rise: 0.045 }
+        { sel: '#radialMenu', open: function (el) { return !el.hidden; }, rise: 0.045 },
+        // Popup menus: the room's two (shown by hidden), and the ones built
+        // per opening and removed on close (the preset, palette and shape
+        // menus), which are open as long as they are in the page.
+        { sel: '.brush-shape-menu:not(.arm-tip-menu)', open: function (el) { return !el.hidden && el.style.display !== 'none'; } },
+        { sel: '.palette-list, .cp-pop', open: function (el) { return el.isConnected; } },
+        // Inline display: the Presets and More panels (js/20, js/46) and the
+        // collider source menu (js/20, inside the Layers drawer).
+        { sel: '.mixer-presets-panel, #mixer-more-panel, .collision-source-menu', open: function (el) { return !!el.style.display && el.style.display !== 'none'; } },
+        // The quality bar's lists open with .open on their pill (js/20).
+        { sel: '#quality-underbar .qub-dd', open: function (el) { return el.classList.contains('open'); } }
     ];
     var ROOT_SEL = ROOTS.map(function (r) { return r.sel; }).join(', ');
     // Where this file strikes and surges panes (js/71 does the rest).
-    var HOSTS = '.delete-modal, #hotkeyOverlay, .mask-editor-overlay, #skipMenu, #radialMenu';
+    var HOSTS = '.delete-modal, #hotkeyOverlay, .mask-editor-overlay, #skipMenu, #radialMenu, ' +
+        '.brush-shape-menu:not(.arm-tip-menu), .palette-list, #mixer-more-panel, #quality-underbar';
     // The radial menu's wedges and their words are panes too: lit while the
     // pointer is over them, with the cathode's afterglow when it moves on.
-    var PANE = 'button, .btn, [data-wc-pane], .radial-wedge, .radial-label';
+    var PANE = 'button, .btn, [data-wc-pane], .radial-wedge, .radial-label, .palette-option, .qub-dd-opt';
     var NO_FLICKER = '.radial-wedge, .radial-label';
 
     function kindOf(el) {
@@ -71,7 +82,7 @@
         return el.getAttribute('aria-pressed') === 'true' || el.getAttribute('aria-checked') === 'true' ||
             el.getAttribute('aria-selected') === 'true' || el.classList.contains('active') ||
             el.classList.contains('locked') || el.classList.contains('btn--emphasis') ||
-            el.classList.contains('is-hot');
+            el.classList.contains('is-hot') || el.classList.contains('sel');
     }
     // A pointer sweeping a wheel is not a switch being thrown: its wedges
     // rise and fade on the cathode's timing without the strike flicker.
@@ -198,7 +209,7 @@
         });
         el._ovlWatch.observe(el, { attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
         // Pane states inside it (no 'style': --ci writes would echo back).
-        if (el.matches(HOSTS)) {
+        if (el.closest(HOSTS)) {
             new MutationObserver(function (list) {
                 for (var i = 0; i < list.length; i++) {
                     var t = list[i].target;
@@ -212,6 +223,8 @@
     function scan(node) {
         if (node.nodeType !== 1) return;
         if (node.matches(ROOT_SEL)) watch(node);
+        // A container added whole (the quality bar) brings its roots with it.
+        else if (node.firstElementChild) Array.prototype.forEach.call(node.querySelectorAll(ROOT_SEL), watch);
     }
     new MutationObserver(function (list) {
         for (var i = 0; i < list.length; i++) {
@@ -219,7 +232,15 @@
             for (var j = 0; j < added.length; j++) scan(added[j]);
         }
     }).observe(document.body, { childList: true });
-    Array.prototype.forEach.call(document.querySelectorAll(ROOT_SEL), watch);
+    // The layout is built after this file runs (js/20, after DOMContentLoaded):
+    // one sweep once it stands, for the roots it made in place.
+    function sweep() { Array.prototype.forEach.call(document.querySelectorAll(ROOT_SEL), watch); }
+    sweep();
+    var tries = 0;
+    (function later() {
+        if (document.getElementById('sidebar-right') && document.getElementById('quality-underbar')) { sweep(); return; }
+        if (tries++ < 80) setTimeout(later, 250);
+    })();
 
     // The skip menu opens by focus alone (css :focus-within): it eases in
     // when focus arrives from outside it.

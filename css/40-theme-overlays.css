@@ -241,6 +241,783 @@ html[data-theme="walnut-copper"] .phone-pad-note {
     color: #ffcf8a;
 }
 
+/* ── Popup menus and listboxes ───────────────────────────────────────
+   The study's inline listbox (.lbx 213-216, options as .cp.sm.ir panes
+   186-197, wiring 2000-2077), lifted off the drawer: a small cabinet
+   (walnut, the copper line, a shadow) holding a column of compact panes
+   that light on hover (a third, as js/69's options) and when chosen.
+   A choice carries the round cathode indicator; a menu item that is a
+   switch the square one with its check. The Multi-brush tip menu
+   (.arm-tip-menu) is the brush screens workstream's and is left out. */
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .palette-list, .collision-source-menu, #quality-underbar .qub-dd-list) {
+    padding: 6px;
+    background-color: #2a170c;
+    background-image: var(--ovl-wood);
+    background-size: auto, auto, 566px 566px;
+    background-position: 0 0, -26.55px 0, 0 0;
+    border-color: transparent;
+    border-radius: 9px;
+    box-shadow: var(--ovl-pop-shadow);
+    color: var(--ui-text);
+    font-family: var(--ui-font-body);
+    scrollbar-color: var(--cu) transparent;
+    scrollbar-width: thin;
+}
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .palette-list, .collision-source-menu)[style*="--ov"],
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd[style*="--ov"] > .qub-dd-list {
+    opacity: min(1, var(--ov));
+    translate: 0 calc((1 - min(1, var(--ov))) * -8px);
+}
+/* The upward list opens toward the bar it came from. */
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd[style*="--ov"] > .qub-dd-list {
+    translate: 0 calc((1 - min(1, var(--ov))) * 8px);
+}
+/* A menu's head: what it is about, engraved over a bead row. */
+html[data-theme="walnut-copper"] :is(.brush-shape-menu-head, #quality-underbar .qub-dd-hdr, .palette-new-cap) {
+    margin: 0 0 6px;
+    padding: 6px 6px 8px;
+    border-bottom: var(--ovl-beads);
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9px / 0.7);
+    line-height: 1.2;
+    letter-spacing: calc(0.16em * 0.7);
+    font-variant-caps: all-small-caps;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd-hdr:has(+ .qub-dd-sub) { border-bottom: 0; margin-bottom: 0; padding-bottom: 2px; }
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd-sub {
+    margin-bottom: 6px;
+    border-bottom: var(--ovl-beads);
+    font-family: var(--ui-font-body);
+    font-size: 11px;
+    color: #cdb79f;
+    text-shadow: var(--ovl-engrave-shadow);
+}
+/* The items: compact panes (.cp.sm 183), engraved. Buttons get their glass
+   and copper from css/31; the listbox rows (divs) get the same here. */
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt) {
+    --ci: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 32px;
+    padding: 4px 12px;
+    border-radius: 5px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9px / 0.7);
+    line-height: 1.2;
+    letter-spacing: calc(0.12em * 0.7);
+    font-variant-caps: all-small-caps;
+    text-align: left;
+    white-space: nowrap;
+}
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt) + :is(.brush-shape-menu-item, .mp-menu-item, button, .qub-dd-opt) {
+    margin-top: 4px;
+}
+/* The menu ghost buttons (css/31 ghosts: no plate) become real panes here.
+   One :is() list with an id member, so the rule ties css/31's ghost rule
+   (whose own :is() carries #quality-underbar) and wins by coming later. */
+html[data-theme="walnut-copper"] :is(.mp-menu-item, .collision-source-menu button, .palette-list .palette-new-btns button, #quality-underbar .qub-dd-opt) {
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    text-shadow: 0 0 calc(1px + var(--ci) * 5px) rgb(255 110 30 / calc(var(--ci) * 0.95)), 0 0 calc(var(--ci) * 16px) rgb(255 110 30 / calc(var(--ci) * 0.6));
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(255 110 30 / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-dim) center / 3.5px 6.06px,
+        linear-gradient(170deg, #1a1210, #090605);
+    border: 0;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(255 110 30 / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(255 110 30 / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, .palette-list .palette-new-btns button, #quality-underbar .qub-dd-opt):hover { --ci: 0.35; }
+/* An item a script hides with the hidden attribute stays hidden under the
+   display these rules give. */
+html[data-theme="walnut-copper"] :is(.brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt)[hidden] { display: none; }
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd-opt.sel,
+html[data-theme="walnut-copper"] .mp-menu-item[aria-checked="true"] { --ci: 1; }
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd-opt:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -1px; }
+html[data-theme="walnut-copper"] :is(.brush-shape-menu-item, .mp-menu-item, .collision-source-menu button):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+/* A choice's round indicator (.cp.ir .ind 188-193) on the listbox rows. */
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd-opt { padding-left: 25px; font-family: var(--ui-font-mono); font-size: 12.5px; font-variant-caps: normal; letter-spacing: 0.04em; }
+html[data-theme="walnut-copper"] :is(#quality-underbar .qub-dd-opt, .palette-option)::before {
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgb(255 176 110 / var(--ci)) 0 2px, transparent 2.5px);
+    box-shadow: 0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546), 0 0 calc(var(--ci) * 8px) rgb(255 110 30 / calc(var(--ci) * 0.7));
+}
+/* A switch in a menu (Lock room, role=menuitemcheckbox): the square
+   indicator with its check (.cp.ic 194-197). */
+html[data-theme="walnut-copper"] .mp-menu-item[role="menuitemcheckbox"] { padding-left: 25px; }
+html[data-theme="walnut-copper"] .mp-menu-item[role="menuitemcheckbox"]::before {
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546), 0 0 calc(var(--ci) * 8px) rgb(255 110 30 / calc(var(--ci) * 0.7));
+}
+html[data-theme="walnut-copper"] .mp-menu-item[role="menuitemcheckbox"]::after {
+    content: "";
+    position: absolute;
+    left: 11.6px;
+    top: 50%;
+    width: 2.6px;
+    height: 5px;
+    margin-top: -4.2px;
+    border: solid rgb(255 196 140 / var(--ci));
+    border-width: 0 1.4px 1.4px 0;
+    transform: rotate(45deg);
+}
+/* The destructive item (Delete, Remove): the red pane. */
+html[data-theme="walnut-copper"] .brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item.danger {
+    --gc: 255 80 50;
+    color: color-mix(in oklab, #ffd2c4 calc(var(--ci) * 100%), #e08a76);
+    background-image:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(0.12 + var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-dim),
+        linear-gradient(170deg, #241008, #0b0503);
+    background-size: auto, 3.5px 6.06px, auto;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px #b8432c,
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.12),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3));
+}
+/* The collider source menu lives inside the Layers drawer, where css/34
+   already letters every button in capitals: no small caps on top. And the
+   drawer's tray gives each of its rows a transform (css/30, the tray's
+   ride), which traps the menu's z-index in its row: the row holding the
+   open menu is lifted over its later siblings. */
+html[data-theme="walnut-copper"] #sidebar-right .collision-source-menu button {
+    font-variant-caps: normal;
+    white-space: nowrap !important;   /* css/34's sidebar pane rule wraps labels; a menu row must not */
+}
+html[data-theme="walnut-copper"] .sidebar-section .section-body > :has(.collision-source-menu:not([style*="none"])) {
+    position: relative;
+    z-index: 3;
+}
+/* The palette list: a column of option rows, each the palette's name over
+   its colours; the one in use is lit with its indicator struck. Names are
+   the user's own, so they keep their case in the body face. */
+html[data-theme="walnut-copper"] .palette-list { padding: 6px 6px 8px; }
+html[data-theme="walnut-copper"] .palette-new-row {
+    margin: 0 0 6px;
+    padding: 2px 2px 8px;
+    border-bottom: var(--ovl-beads);
+    background: transparent;
+}
+html[data-theme="walnut-copper"] .palette-new-cap { border-bottom: 0; margin-bottom: 2px; padding: 4px 4px 6px; }
+html[data-theme="walnut-copper"] .palette-new-btns button {
+    min-height: 32px;
+    border-radius: 5px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9px / 0.7);
+    letter-spacing: calc(0.12em * 0.7);
+    font-variant-caps: all-small-caps;
+}
+html[data-theme="walnut-copper"] .palette-option {
+    --ci: 0;
+    margin: 0;
+    padding: 8px 12px 9px 26px;
+    border-radius: 5px;
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(255 110 30 / calc(var(--ci) * 0.3)), transparent 75%),
+        var(--mesh-dim) center / 3.5px 6.06px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(255 110 30 / calc(var(--ci) * 0.3));
+}
+html[data-theme="walnut-copper"] .palette-option + .palette-option { margin-top: 4px; border-top: 0; }
+html[data-theme="walnut-copper"] .palette-option:hover { --ci: 0.35; background-color: transparent; outline: 0; }
+html[data-theme="walnut-copper"] .palette-option:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -1px; }
+html[data-theme="walnut-copper"] .palette-option.active { --ci: 1; }
+html[data-theme="walnut-copper"] .palette-option.active::before { width: 9px; top: 50%; bottom: auto; background: radial-gradient(circle, rgb(255 176 110) 0 2px, transparent 2.5px); }
+html[data-theme="walnut-copper"] .palette-option-name {
+    font-family: var(--ui-font-body);
+    font-size: 12.5px;
+    color: color-mix(in oklab, #fff6e6 calc(var(--ci) * 100%), var(--engrave));
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 calc(var(--ci) * 8px) rgb(255 110 30 / calc(var(--ci) * 0.6));
+}
+html[data-theme="walnut-copper"] .palette-option-strip {
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(196, 122, 75, 0.45);
+}
+html[data-theme="walnut-copper"] .palette-option.drop-before { box-shadow: inset 0 2px 0 var(--cu-hi); }
+html[data-theme="walnut-copper"] .palette-option.drop-after { box-shadow: inset 0 -2px 0 var(--cu-hi); }
+
+/* ── Floating panels: Presets, More, the timing chart ────────────────
+   Cabinets (.cab 427-431): walnut, the copper line, a soft shadow; the
+   heading engraved over a bead row; groups open with the study's small
+   dotted rule and their name centred (.subhd 359-360). The panes inside
+   are js/71's (Presets) and css/31's. */
+html[data-theme="walnut-copper"] :is(.mixer-presets-panel, #mixer-more-panel, .atv-panel) {
+    background-color: #2a170c;
+    background-image: var(--ovl-wood);
+    background-size: auto, auto, 566px 566px;
+    background-position: 0 0, -26.55px 0, 0 0;
+    border-color: transparent;
+    border-radius: 14px;
+    box-shadow: var(--ovl-pop-shadow);
+    color: var(--ui-text);
+    font-family: var(--ui-font-body);
+}
+html[data-theme="walnut-copper"] .mixer-presets-panel { padding: 12px; }
+html[data-theme="walnut-copper"] :is(.mixer-presets-panel, #mixer-more-panel)[style*="--ov"] {
+    opacity: min(1, var(--ov));
+    translate: 0 calc((1 - min(1, var(--ov))) * -8px);
+}
+html[data-theme="walnut-copper"] .mixer-presets-panel .arm-colors-header {
+    margin-bottom: 6px;
+    padding: 2px 4px 10px;
+    border-bottom: var(--ovl-beads);
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(10.5px / 0.7);
+    line-height: 1.2;
+    letter-spacing: calc(0.2em * 0.7);
+    font-variant-caps: all-small-caps;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] .preset-group-head {
+    gap: 8px;
+    padding: 8px 2px 6px;
+    font-family: var(--ui-font-display);
+    font-size: calc(9.5px / 0.7);
+    letter-spacing: calc(0.22em * 0.7);
+    font-variant-caps: all-small-caps;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] .preset-group-name { flex: 0 1 auto; }
+html[data-theme="walnut-copper"] .preset-group-head::after {
+    content: "";
+    flex: 1 1 auto;
+    min-width: 12px;
+    border-top: 1.5px dotted rgba(214, 140, 92, 0.45);
+}
+html[data-theme="walnut-copper"] .preset-group-chev { color: var(--cu-hi); opacity: 1; }
+html[data-theme="walnut-copper"] .preset-group-count {
+    order: 3;
+    font-family: var(--ui-font-mono);
+    font-variant-caps: normal;
+    letter-spacing: 0.04em;
+    color: var(--lit);
+    opacity: 1;
+}
+html[data-theme="walnut-copper"] .preset-group-head .preset-more { order: 4; }
+/* Preset rows: panes; the name is the user's (body face, its own case);
+   the picture sits in a copper frame (.thumb 371-373). */
+html[data-theme="walnut-copper"] .mixer-presets-panel :is(.mixer-preset-btn, .mixer-user-preset-btn) {
+    min-height: 34px;
+    padding: 5px 10px 5px 6px;
+    border-radius: 5px;
+    font-family: var(--ui-font-body);
+    font-size: 12.5px;
+    font-weight: 500;
+}
+html[data-theme="walnut-copper"] .mixer-presets-list { gap: 4px; }
+html[data-theme="walnut-copper"] .preset-group-body { gap: 4px; }
+html[data-theme="walnut-copper"] .preset-thumb {
+    border: 0;
+    border-radius: 3px;
+    background: #0b0706;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 0 1.5px rgba(196, 122, 75, 0.8);
+}
+html[data-theme="walnut-copper"] .mixer-presets-list {
+    scrollbar-color: var(--cu) transparent;
+}
+html[data-theme="walnut-copper"] .mixer-presets-list::-webkit-scrollbar-thumb { background: var(--cu); }
+html[data-theme="walnut-copper"] .mixer-presets-footer {
+    padding-top: 10px;
+    border-top: var(--ovl-beads);
+}
+html[data-theme="walnut-copper"] .mixer-presets-panel :is(.mixer-presets-footer, .look-link-foot, .preset-fork, .preset-path-back-row) button:not(.preset-path-forget) {
+    min-height: 32px;
+    border-radius: 5px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9px / 0.7);
+    line-height: 1.2;
+    letter-spacing: calc(0.12em * 0.7);
+    font-variant-caps: all-small-caps;
+}
+/* "+ New Preset" and "+ Group" share one row in the 236 px panel: tighter
+   tracking than the drawers' panes (the app's own 0.06 em, css/34). */
+html[data-theme="walnut-copper"] .mixer-presets-panel .mixer-presets-footer button:not(.preset-path-forget) {
+    padding: 0 8px;
+    font-size: calc(8.5px / 0.7);
+    letter-spacing: calc(0.06em * 0.7);
+}
+html[data-theme="walnut-copper"] .mixer-presets-panel .preset-fork-btn { text-align: left; }
+html[data-theme="walnut-copper"] :is(.preset-fork-say, .preset-empty) {
+    font-family: var(--ui-font-body);
+    font-size: 12px;
+    line-height: 1.45;
+    color: #cdb79f;
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] .mixer-presets-panel .preset-more { border-radius: 5px; color: var(--cu-hi); }
+/* The More panel: parked faders stacked as rows, each opening with a bead
+   row instead of a hairline. */
+html[data-theme="walnut-copper"] #mixer-more-panel { padding: 6px 4px; }
+html[data-theme="walnut-copper"] #mixer-more-panel .mixer-channel { border-bottom: var(--ovl-beads); }
+html[data-theme="walnut-copper"] #mixer-more-panel .mixer-channel:last-child { border-bottom: 0; }
+html[data-theme="walnut-copper"] #mixer-more-panel .mixer-more-note {
+    font-family: var(--ui-font-body);
+    font-size: 11px;
+    color: #cdb79f;
+    text-shadow: var(--ovl-engrave-shadow);
+}
+/* The timing chart: its title bar is the cabinet's nameplate; the status
+   is a VFD reading; the chart itself is untouched. */
+html[data-theme="walnut-copper"] .atv-head {
+    background: transparent;
+    border-bottom: var(--ovl-beads);
+}
+html[data-theme="walnut-copper"] .atv-grip { color: var(--cu); }
+html[data-theme="walnut-copper"] .atv-title {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9.5px / 0.7);
+    letter-spacing: calc(0.2em * 0.7);
+    font-variant-caps: all-small-caps;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] .atv-status {
+    font-family: var(--ui-font-mono);
+    font-size: 11px;
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.55);
+}
+html[data-theme="walnut-copper"] .atv-rz-se::after { border-color: var(--cu); }
+
+/* ── The colour picker popover (js/64 .cp-pop) ───────────────────────
+   A small cabinet; its drag bar is the nameplate over a bead row; labels
+   engraved, numbers and the hex in the fields the fields workstream
+   gives every text field. The L / C / H tracks sit in a copper ring like
+   the tubes' glass; swatches are the study's swatch (.sw 304-306), a colour
+   behind a copper line. The inline picker in the Colors drawer is the
+   drawer's, not this. Its panes are js/71's. */
+html[data-theme="walnut-copper"] .cp-pop {
+    padding: 0 12px 12px;
+    background-color: #2a170c;
+    background-image: var(--ovl-wood);
+    background-size: auto, auto, 566px 566px;
+    background-position: 0 0, -26.55px 0, 0 0;
+    border-color: transparent;
+    border-radius: 12px;
+    box-shadow: var(--ovl-pop-shadow);
+}
+html[data-theme="walnut-copper"] .cp-pop[style*="--ov"] {
+    opacity: min(1, var(--ov));
+    translate: 0 calc((1 - min(1, var(--ov))) * -8px);
+}
+html[data-theme="walnut-copper"] .cp-pop-bar {
+    height: 34px;
+    margin: 0 -12px 10px;
+    padding: 0 6px 0 14px;
+    background: transparent;
+    border-bottom: var(--ovl-beads);
+    border-radius: 12px 12px 0 0;
+}
+html[data-theme="walnut-copper"] .cp-pop :is(.cp-pop-title, .cp-title, .cp-recent-head, .cp-pal-label, .cp-lab) {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9px / 0.7);
+    letter-spacing: calc(0.16em * 0.7);
+    font-variant-caps: all-small-caps;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] .cp-pop .cp-pop-title { font-size: calc(10.5px / 0.7); letter-spacing: calc(0.2em * 0.7); }
+html[data-theme="walnut-copper"] .cp-pop .cp-pop-close { width: 26px; height: 26px; }
+html[data-theme="walnut-copper"] .cp-pop .cp-recent-empty {
+    font-family: var(--ui-font-body);
+    font-size: 11.5px;
+    color: #cdb79f;
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] .cp-pop .cp-track {
+    border-radius: 2px;
+    box-shadow: 0 0 0 1.5px var(--cu), 0 0 0 2.5px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] .cp-pop .cp-track:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 4px; }
+html[data-theme="walnut-copper"] .cp-pop .cp-thumb {
+    border-color: #fff6e6;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.75), 0 0 6px rgba(255, 140, 60, 0.6);
+}
+html[data-theme="walnut-copper"] .cp-pop :is(.cp-swatch, .cp-chip) {
+    border-color: transparent;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu);
+}
+html[data-theme="walnut-copper"] .cp-pop .cp-chip:is(:hover, :focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+html[data-theme="walnut-copper"] .cp-pop .cp-chip.is-active {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu-hi), 0 0 0 3px #1a0e07, 0 0 0 4.5px var(--cu-hi), 0 0 10px rgba(255, 110, 30, 0.45);
+}
+html[data-theme="walnut-copper"] .cp-pop .cp-pal { border-top: var(--ovl-beads); padding-top: 10px; }
+html[data-theme="walnut-copper"] .cp-pop .cp-gamut { font-family: var(--ui-font-body); color: #ffcf8a; }
+/* Copy and the eyedropper are ghosts in css/31; here they are panes. The
+   :is() member that can match nothing (#ovl-none twice) lifts the rule over
+   the ghost rule's specificity (its own :is() carries #quality-underbar). */
+html[data-theme="walnut-copper"] :is(.cp-pop .cp-copy, .cp-pop .cp-drop, #ovl-none #ovl-none) {
+    padding: 3px 5px;
+    border-radius: 5px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(7.5px / 0.7);
+    letter-spacing: calc(0.04em * 0.7);
+    font-variant-caps: all-small-caps;
+    background-image: var(--mesh-dim), linear-gradient(170deg, #1a1210, #090605);
+    background-size: 3.5px 6.06px, auto;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18), inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
+}
+html[data-theme="walnut-copper"] .cp-pop :is(.cp-hex, .cp-num) {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    font-size: 12px;
+}
+/* The eyedropper's loupe: the grid in a copper bezel, the reading a VFD. */
+html[data-theme="walnut-copper"] .cp-loupe-grid {
+    border-color: #1a0e07;
+    box-shadow: 0 0 0 1.5px var(--cu), 0 0 0 2.5px rgba(0, 0, 0, 0.6), 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] .cp-loupe-pill {
+    border-color: transparent;
+    border-radius: 5px;
+    overflow: hidden;
+    background: #040b0a;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--cu), 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="walnut-copper"] .cp-loupe-hex {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.55);
+}
+html[data-theme="walnut-copper"] .cp-loupe-hint { font-family: var(--ui-font-body); color: var(--engrave); }
+
+/* ── Bars that float over the painting ───────────────────────────────
+   The hotkey bind bar (js/49), the text arrange bar (js/23), the layer
+   transform and path toolbars (js/26, js/24): small cabinets. A mode's own
+   hue (pink text, amber layers) stays on its title only; the box is the
+   copper line. Their steps are pilot lamps; keys are keycaps; the chosen
+   control a VFD reading. */
+html[data-theme="walnut-copper"] :is(#hkBindBar, #text-arrange-bar, #layerTransformOverlay .draw-toolbar, #pathDrawOverlay .draw-toolbar, #pathTransformOverlay .draw-toolbar) {
+    background-color: #2a170c;
+    background-image: var(--ovl-wood);
+    background-size: auto, auto, 566px 566px;
+    background-position: 0 0, -26.55px 0, 0 0;
+    border-color: transparent;
+    box-shadow: var(--ovl-pop-shadow);
+    color: #e3d3bf;
+    font-family: var(--ui-font-body);
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] :is(#hkBindBar, #text-arrange-bar, #layerTransformOverlay .draw-toolbar) { border-radius: 12px; }
+/* The path toolbars are bands across the top of their overlay. */
+html[data-theme="walnut-copper"] :is(#pathDrawOverlay, #pathTransformOverlay) .draw-toolbar {
+    border-radius: 0;
+    box-shadow: inset 0 -1.5px 0 var(--cu), 0 10px 24px -10px rgba(0, 0, 0, 0.9);
+}
+html[data-theme="walnut-copper"] :is(#hkBindBar, #text-arrange-bar, #layerTransformOverlay .draw-toolbar, #pathDrawOverlay .draw-toolbar, #pathTransformOverlay .draw-toolbar) button {
+    min-height: 32px;
+    border-radius: 5px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9px / 0.7);
+    letter-spacing: calc(0.12em * 0.7);
+    font-variant-caps: all-small-caps;
+}
+html[data-theme="walnut-copper"] :is(#text-arrange-bar .ba-title, #layerTransformOverlay .layer-transform-title) {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(10px / 0.7);
+    letter-spacing: calc(0.16em * 0.7);
+    font-variant-caps: all-small-caps;
+}
+html[data-theme="walnut-copper"] #layerTransformOverlay .layer-transform-title b { font-family: var(--ui-font-body); font-variant-caps: normal; letter-spacing: 0; color: #fff6e6; }
+html[data-theme="walnut-copper"] :is(#text-arrange-bar .ba-hint, #layerTransformOverlay .layer-transform-hint, .hk-sub) { color: #cdb79f; }
+/* Bind bar: steps as lamps (.lamp 349-353), struck for the current step,
+   teal once done. */
+html[data-theme="walnut-copper"] .hk-steps {
+    font-family: var(--ui-font-display);
+    font-size: calc(8.5px / 0.7);
+    letter-spacing: calc(0.12em * 0.7);
+    font-variant-caps: all-small-caps;
+    color: var(--unlit);
+}
+html[data-theme="walnut-copper"] .hk-step.is-now { color: var(--lit); font-weight: 400; text-shadow: 0 0 6px rgba(255, 110, 30, 0.6), var(--ovl-engrave-shadow); }
+html[data-theme="walnut-copper"] .hk-step.is-done { color: var(--vfd); }
+html[data-theme="walnut-copper"] .hk-step-sep { color: var(--cu); opacity: 1; }
+html[data-theme="walnut-copper"] .hk-step-n {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    font-variant-caps: normal;
+    color: var(--unlit);
+    border: 0;
+    background: var(--mesh-dim) center / 3.5px 6.06px, #120c0a;
+    box-shadow: inset 0 0 0 1.3px var(--cu), 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] .hk-step.is-now:not(.is-done) .hk-step-n {
+    color: #fff6e6;
+    background: radial-gradient(circle, rgb(255 110 30 / 0.95) 0 50%, rgb(255 110 30 / 0.3) 70%, transparent 72%), #120c0a;
+    box-shadow: inset 0 0 0 1.3px var(--cu), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 10px rgb(255 110 30 / 0.6);
+    text-shadow: 0 0 2px #000;
+}
+html[data-theme="walnut-copper"] .hk-step.is-done .hk-step-n {
+    color: #04130f;
+    background: radial-gradient(circle, rgb(114 242 212 / 0.85) 0 50%, rgb(114 242 212 / 0.25) 70%, transparent 72%), #120c0a;
+    box-shadow: inset 0 0 0 1.3px var(--cu), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 8px rgb(114 242 212 / 0.45);
+}
+html[data-theme="walnut-copper"] .hk-say {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(10.5px / 0.7);
+    line-height: 1.35;
+    letter-spacing: calc(0.14em * 0.7);
+    font-variant-caps: all-small-caps;
+    color: var(--engrave);
+}
+html[data-theme="walnut-copper"] .hk-keycap {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    color: var(--lit);
+    border: 0;
+    border-radius: 9px;
+    text-shadow: 0 0 6px rgba(255, 110, 30, 0.95), 0 0 16px rgba(255, 110, 30, 0.6);
+    background: radial-gradient(ellipse at center, rgb(255 110 30 / 0.3), transparent 72%), var(--mesh-dim) center / 3.5px 6.06px, linear-gradient(170deg, #1a1210, #090605);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 0 0 5px #0c0806, inset 0 0 0 6px rgba(196, 122, 75, 0.55), 0 0 14px rgb(255 110 30 / 0.22);
+}
+html[data-theme="walnut-copper"] .hk-chip {
+    border: 0;
+    border-radius: 8px;
+    background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px),
+        var(--ovl-vfd-mesh) center / 3px 5.2px,
+        #040b0a;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] #hkBindBar:is([data-step="2"], [data-step="3"]) .hk-chip { border: 0; }
+html[data-theme="walnut-copper"] .hk-chip-where { font-family: var(--ui-font-mono); color: rgba(114, 242, 212, 0.6); text-shadow: none; }
+html[data-theme="walnut-copper"] .hk-chip-name { font-family: var(--ui-font-mono); font-weight: 400; color: var(--vfd); text-shadow: 0 0 6px rgba(114, 242, 212, 0.55); }
+html[data-theme="walnut-copper"] .hk-arrow { color: var(--cu-hi); opacity: 1; }
+/* On the page: what a click would bind (copper), what was chosen (lit),
+   what it got (teal). */
+html[data-theme="walnut-copper"] .hk-outline { border-color: var(--cu-hi); }
+html[data-theme="walnut-copper"] .hk-outline.is-chosen { border-color: var(--ui-focus); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 0 12px rgba(255, 110, 30, 0.5); }
+html[data-theme="walnut-copper"] .hk-outline.is-done { border-color: var(--vfd); }
+html[data-theme="walnut-copper"] .hk-tag {
+    font-family: var(--ui-font-mono);
+    color: var(--vfd);
+    border-color: var(--cu);
+    background: #040b0a;
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.55);
+}
+html[data-theme="walnut-copper"] .hk-tag.is-chosen { border-color: var(--ui-focus); }
+html[data-theme="walnut-copper"] .hk-tag.is-done { border-color: var(--vfd); background: #04100d; }
+html[data-theme="walnut-copper"] .hk-tag-verb { color: rgba(114, 242, 212, 0.6); }
+html[data-theme="walnut-copper"] .hk-tag-key { color: var(--lit); border-color: rgba(196, 122, 75, 0.7); }
+
+/* ── Hover cards (js/20 .fx-tip, .mutation-tip) ──────────────────────
+   Small cabinets; the preview in a copper frame; title engraved. */
+html[data-theme="walnut-copper"] .fx-tip {
+    background-color: #2a170c;
+    background-image: var(--ovl-wood);
+    background-size: auto, auto, 566px 566px;
+    border-color: transparent;
+    border-radius: 12px;
+    box-shadow: var(--ovl-pop-shadow);
+    color: #e3d3bf;
+    font-family: var(--ui-font-body);
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] .fx-tip-media {
+    background-color: #050302;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 0 2.5px var(--cu);
+}
+html[data-theme="walnut-copper"] :is(.fx-tip-title, .mutation-tip-title) {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9.5px / 0.7);
+    letter-spacing: calc(0.16em * 0.7);
+    font-variant-caps: all-small-caps;
+    color: var(--engrave);
+}
+html[data-theme="walnut-copper"] .fx-tip-text { color: #cdb79f; opacity: 1; }
+html[data-theme="walnut-copper"] .mutation-tip-val { font-family: var(--ui-font-mono); color: var(--lit); }
+
+/* ── Model downloads (js/16 SAM, js/23 depth) ────────────────────────
+   Painted entirely by inline style, so the paint takes !important: the
+   scrim in the room colour (and no backdrop blur on a full-window layer),
+   the card a cabinet, the bar the tube's neon column in its glass. */
+html[data-theme="walnut-copper"] :is(#samDownloadModal, #depthDownloadModal) {
+    background: rgba(10, 6, 4, 0.9) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+html[data-theme="walnut-copper"] :is(#samDownloadModal, #depthDownloadModal) > div {
+    background-color: #2a170c !important;
+    background-image: var(--ovl-wood) !important;
+    background-size: auto, auto, 566px 566px !important;
+    border-color: transparent !important;
+    border-radius: 14px !important;
+    box-shadow: var(--ovl-cab-shadow) !important;
+    font-family: var(--ui-font-body);
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] :is(#samDownloadModal, #depthDownloadModal) h2 {
+    font-family: var(--ui-font-display);
+    font-weight: 400 !important;
+    font-size: calc(12.5px / 0.7) !important;
+    letter-spacing: calc(0.26em * 0.7);
+    font-variant-caps: all-small-caps;
+    color: var(--engrave) !important;
+}
+html[data-theme="walnut-copper"] :is(#samDownloadMessage, #depthDownloadMessage) { color: #cdb79f !important; }
+html[data-theme="walnut-copper"] :is(#samDownloadBar, #depthDownloadBar) {
+    background: radial-gradient(ellipse 100% 55% at 50% 50%, rgba(255, 236, 204, 0.95), rgba(255, 150, 70, 0.85) 45%, rgba(240, 70, 30, 0.38) 100%) !important;
+    box-shadow: 0 0 14px 2px rgba(255, 96, 24, 0.42) !important;
+}
+html[data-theme="walnut-copper"] :is(#samDownloadBar, #depthDownloadBar)::after {
+    content: "";
+    float: right;
+    width: 6px;
+    height: 100%;
+    background: radial-gradient(ellipse at 70% 50%, rgba(255, 250, 235, 0.95), transparent 70%);
+}
+html[data-theme="walnut-copper"] :is(#samDownloadModal, #depthDownloadModal) div:has(> :is(#samDownloadBar, #depthDownloadBar)) {
+    background: var(--mesh-dim) center / 3.5px 6.06px, linear-gradient(170deg, #171010, #070403) !important;
+    box-shadow: 0 0 0 1.5px var(--cu), 0 0 0 2.5px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(0, 0, 0, 0.75);
+}
+html[data-theme="walnut-copper"] :is(#samDownloadPercent, #depthDownloadPercent) {
+    font-family: var(--ui-font-mono) !important;
+    font-weight: 400 !important;
+    color: var(--lit) !important;
+    text-shadow: 0 0 6px rgba(255, 120, 40, 0.75), 0 0 14px rgba(255, 70, 10, 0.35);
+}
+html[data-theme="walnut-copper"] :is(#samDownloadModal, #depthDownloadModal) > div > div:last-child {
+    border-top: var(--ovl-beads) !important;
+    color: #cdb79f !important;
+}
+
+/* ── The debug panel (#statsPanel) ───────────────────────────────────
+   A cabinet; its header the nameplate on the wood, sections engraved,
+   every reading a VFD number. */
+html[data-theme="walnut-copper"] .stats-panel {
+    background-color: #2a170c;
+    background-image: var(--ovl-wood);
+    background-size: auto, auto, 566px 566px;
+    border-color: transparent;
+    border-radius: 12px;
+    box-shadow: var(--ovl-pop-shadow);
+    color: #e3d3bf;
+    scrollbar-color: var(--cu) transparent;
+}
+html[data-theme="walnut-copper"] .stats-header {
+    background: transparent;
+    border-bottom: var(--ovl-beads);
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(10.5px / 0.7);
+    letter-spacing: calc(0.2em * 0.7);
+    font-variant-caps: all-small-caps;
+    color: var(--engrave);
+    text-shadow: var(--ovl-engrave-shadow);
+}
+html[data-theme="walnut-copper"] .stats-section { border-color: rgba(214, 140, 92, 0.3); }
+html[data-theme="walnut-copper"] .stats-title {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(8.5px / 0.7);
+    letter-spacing: calc(0.18em * 0.7);
+    font-variant-caps: all-small-caps;
+    text-transform: none;
+    color: var(--engrave);
+}
+html[data-theme="walnut-copper"] .stat-row { font-family: var(--ui-font-mono); color: #cdb79f; }
+html[data-theme="walnut-copper"] .stat-label { color: #cdb79f; }
+html[data-theme="walnut-copper"] .stat-row > span:not(.stat-label) {
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.45);
+}
+
+/* ── The Audio drawer (#recDrawer) ───────────────────────────────────
+   A drawer that slides up from the floor: walnut, the copper line along
+   its top edge, the tab a lit pane, the close the copper ring. (The remap
+   left its light-mode gradient in place.) */
+html[data-theme="walnut-copper"] .rec-drawer {
+    background-color: #2a170c;
+    background-image: var(--ovl-wood);
+    background-size: auto, auto, 566px 566px;
+    border-top-color: transparent;
+    box-shadow: inset 0 1.5px 0 var(--cu), inset 0 2.5px 0 rgba(0, 0, 0, 0.45), inset 0 0 30px rgba(0, 0, 0, 0.45), 0 -18px 36px -14px rgba(0, 0, 0, 0.9);
+    color: #e3d3bf;
+}
+html[data-theme="walnut-copper"] .rec-resize-handle {
+    background: transparent;
+    border-bottom: var(--ovl-beads);
+}
+html[data-theme="walnut-copper"] .rec-grabber {
+    background: linear-gradient(180deg, var(--cu-hi), var(--cu) 55%, var(--cu-lo));
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] .studio-tabbar .studio-tab {
+    border-radius: 5px;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: calc(9.5px / 0.7);
+    letter-spacing: calc(0.14em * 0.7);
+    font-variant-caps: all-small-caps;
+}
+html[data-theme="walnut-copper"] .rec-drawer label { color: var(--engrave); }
+html[data-theme="walnut-copper"] .rec-drawer :is(select, .time-input) {
+    color: var(--lit);
+    border-color: var(--cu);
+    background-image: var(--mesh-dim), linear-gradient(170deg, #1a1210, #090605);
+    background-size: 3.5px 6.06px, auto;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 210, 170, 0.14);
+}
+html[data-theme="walnut-copper"] #studioCloseBtn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    color: var(--cu-hi);
+}
+
 /* ── The F1 sheet ─────────────────────────────────────────────────────
    A cabinet; the header is its nameplate and stays put while the body
    scrolls under it (same wood, same origin, so no seam); sections open
