@@ -43,10 +43,11 @@
         // The radial menu is a quick gesture: it strikes on like a cathode
         // (45 ms rise) rather than gliding on the drawer spring.
         { sel: '#radialMenu', open: function (el) { return !el.hidden; }, rise: 0.045 },
-        // Popup menus: the room's two (shown by hidden), and the ones built
-        // per opening and removed on close (the preset, palette and shape
-        // menus), which are open as long as they are in the page.
-        { sel: '.brush-shape-menu:not(.arm-tip-menu)', open: function (el) { return !el.hidden && el.style.display !== 'none'; } },
+        // Popup menus built per opening and removed on close (the preset,
+        // palette and shape menus), open as long as they are in the page.
+        // The Multi-brush tip menu (.arm-tip-menu) and the room's Invite
+        // popover and ⋯ menu (.mp-pop) are other workstreams' (W4, W5).
+        { sel: '.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop)', open: function (el) { return !el.hidden && el.style.display !== 'none'; } },
         { sel: '.palette-list, .cp-pop', open: function (el) { return el.isConnected; } },
         // Inline display: the Presets and More panels (js/20, js/46) and the
         // collider source menu (js/20, inside the Layers drawer).
@@ -57,7 +58,7 @@
     var ROOT_SEL = ROOTS.map(function (r) { return r.sel; }).join(', ');
     // Where this file strikes and surges panes (js/71 does the rest).
     var HOSTS = '.delete-modal, #hotkeyOverlay, .mask-editor-overlay, #skipMenu, #radialMenu, ' +
-        '.brush-shape-menu:not(.arm-tip-menu), .palette-list, #mixer-more-panel, #quality-underbar';
+        '.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop), .palette-list, #mixer-more-panel, #quality-underbar';
     // The radial menu's wedges and their words are panes too: lit while the
     // pointer is over them, with the cathode's afterglow when it moves on.
     var PANE = 'button, .btn, [data-wc-pane], .radial-wedge, .radial-label, .palette-option, .qub-dd-opt';

@@ -248,11 +248,13 @@ html[data-theme="walnut-copper"] .phone-pad-note {
    The study's inline listbox (.lbx 213-216, options as .cp.sm.ir panes
    186-197, wiring 2000-2077), lifted off the drawer: a small cabinet
    (walnut, the copper line, a shadow) holding a column of compact panes
-   that light on hover (a third, as js/69's options) and when chosen.
-   A choice carries the round cathode indicator; a menu item that is a
-   switch the square one with its check. The Multi-brush tip menu
-   (.arm-tip-menu) is the brush screens workstream's and is left out. */
-html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .palette-list, .collision-source-menu, #quality-underbar .qub-dd-list) {
+   that light on hover (a third, as js/69's options) and when chosen, a
+   choice with the round cathode indicator. Two members of the shared
+   .brush-shape-menu skin are other workstreams' and are left out of every
+   rule here: the Multi-brush tip menu (.arm-tip-menu, brush screens) and
+   the room's Invite popover and ⋯ menu (.mp-pop, the Swirl Together
+   drawer, css/39). */
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop), .palette-list, .collision-source-menu, #quality-underbar .qub-dd-list) {
     padding: 6px;
     background-color: #2a170c;
     background-image: var(--ovl-wood);
@@ -266,7 +268,7 @@ html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .pale
     scrollbar-color: var(--cu) transparent;
     scrollbar-width: thin;
 }
-html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu), .palette-list, .collision-source-menu)[style*="--ov"] {
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop), .palette-list, .collision-source-menu)[style*="--ov"] {
     opacity: min(1, var(--ov));
     translate: 0 calc((1 - min(1, var(--ov))) * -8px);
 }
@@ -276,7 +278,7 @@ html[data-theme="walnut-copper"] #quality-underbar .qub-dd > .qub-dd-list {
     translate: 0 calc((1 - min(1, var(--ov, 1))) * 8px);
 }
 /* A menu's head: what it is about, engraved over a bead row. */
-html[data-theme="walnut-copper"] :is(.brush-shape-menu-head, #quality-underbar .qub-dd-hdr, .palette-new-cap) {
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop) > .brush-shape-menu-head, #quality-underbar .qub-dd-hdr, .palette-new-cap) {
     margin: 0 0 6px;
     padding: 6px 6px 8px;
     border-bottom: var(--ovl-beads);
@@ -301,7 +303,7 @@ html[data-theme="walnut-copper"] #quality-underbar .qub-dd-sub {
 }
 /* The items: compact panes (.cp.sm 183), engraved. Buttons get their glass
    and copper from css/31; the listbox rows (divs) get the same here. */
-html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt) {
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop) .brush-shape-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt) {
     --ci: 0;
     position: relative;
     display: flex;
@@ -319,13 +321,14 @@ html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu) .brush
     text-align: left;
     white-space: nowrap;
 }
-html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt) + :is(.brush-shape-menu-item, .mp-menu-item, button, .qub-dd-opt) {
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop) .brush-shape-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt) + :is(.brush-shape-menu-item, button, .qub-dd-opt) {
     margin-top: 4px;
 }
-/* The menu ghost buttons (css/31 ghosts: no plate) become real panes here.
-   One :is() list with an id member, so the rule ties css/31's ghost rule
-   (whose own :is() carries #quality-underbar) and wins by coming later. */
-html[data-theme="walnut-copper"] :is(.mp-menu-item, .collision-source-menu button, .palette-list .palette-new-btns button, #quality-underbar .qub-dd-opt) {
+/* The ghost buttons in these menus (css/31 ghosts: no plate) become real
+   panes here. One :is() list with an id member, so the rule ties css/31's
+   ghost rule (whose own :is() carries #quality-underbar) and wins by coming
+   later. */
+html[data-theme="walnut-copper"] :is(.collision-source-menu button, .palette-list .palette-new-btns button, #quality-underbar .qub-dd-opt) {
     color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
     text-shadow: 0 0 calc(1px + var(--ci) * 5px) rgb(255 110 30 / calc(var(--ci) * 0.95)), 0 0 calc(var(--ci) * 16px) rgb(255 110 30 / calc(var(--ci) * 0.6));
     background:
@@ -341,14 +344,13 @@ html[data-theme="walnut-copper"] :is(.mp-menu-item, .collision-source-menu butto
         inset 0 0 calc(var(--ci) * 14px) rgb(255 110 30 / calc(var(--ci) * 0.3)),
         0 0 calc(var(--ci) * 14px) rgb(255 110 30 / calc(var(--ci) * 0.2));
 }
-html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, .palette-list .palette-new-btns button, #quality-underbar .qub-dd-opt):hover { --ci: 0.35; }
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop) .brush-shape-menu-item, .collision-source-menu button, .palette-list .palette-new-btns button, #quality-underbar .qub-dd-opt):hover { --ci: 0.35; }
 /* An item a script hides with the hidden attribute stays hidden under the
    display these rules give. */
-html[data-theme="walnut-copper"] :is(.brush-shape-menu-item, .mp-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt)[hidden] { display: none; }
-html[data-theme="walnut-copper"] #quality-underbar .qub-dd-opt.sel,
-html[data-theme="walnut-copper"] .mp-menu-item[aria-checked="true"] { --ci: 1; }
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop) .brush-shape-menu-item, .collision-source-menu button, #quality-underbar .qub-dd-opt)[hidden] { display: none; }
+html[data-theme="walnut-copper"] #quality-underbar .qub-dd-opt.sel { --ci: 1; }
 html[data-theme="walnut-copper"] #quality-underbar .qub-dd-opt:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -1px; }
-html[data-theme="walnut-copper"] :is(.brush-shape-menu-item, .mp-menu-item, .collision-source-menu button):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+html[data-theme="walnut-copper"] :is(.brush-shape-menu:not(.arm-tip-menu):not(.mp-pop) .brush-shape-menu-item, .collision-source-menu button):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
 /* A choice's round indicator (.cp.ir .ind 188-193) on the listbox rows. */
 html[data-theme="walnut-copper"] #quality-underbar .qub-dd-opt { padding-left: 25px; font-family: var(--ui-font-mono); font-size: 12.5px; font-variant-caps: normal; letter-spacing: 0.04em; }
 html[data-theme="walnut-copper"] :is(#quality-underbar .qub-dd-opt, .palette-option)::before {
@@ -363,34 +365,8 @@ html[data-theme="walnut-copper"] :is(#quality-underbar .qub-dd-opt, .palette-opt
     background: radial-gradient(circle, rgb(255 176 110 / var(--ci)) 0 2px, transparent 2.5px);
     box-shadow: 0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546), 0 0 calc(var(--ci) * 8px) rgb(255 110 30 / calc(var(--ci) * 0.7));
 }
-/* A switch in a menu (Lock room, role=menuitemcheckbox): the square
-   indicator with its check (.cp.ic 194-197). */
-html[data-theme="walnut-copper"] .mp-menu-item[role="menuitemcheckbox"] { padding-left: 25px; }
-html[data-theme="walnut-copper"] .mp-menu-item[role="menuitemcheckbox"]::before {
-    content: "";
-    position: absolute;
-    left: 9px;
-    top: 50%;
-    width: 9px;
-    height: 9px;
-    margin-top: -4.5px;
-    border-radius: 2px;
-    box-shadow: 0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546), 0 0 calc(var(--ci) * 8px) rgb(255 110 30 / calc(var(--ci) * 0.7));
-}
-html[data-theme="walnut-copper"] .mp-menu-item[role="menuitemcheckbox"]::after {
-    content: "";
-    position: absolute;
-    left: 11.6px;
-    top: 50%;
-    width: 2.6px;
-    height: 5px;
-    margin-top: -4.2px;
-    border: solid rgb(255 196 140 / var(--ci));
-    border-width: 0 1.4px 1.4px 0;
-    transform: rotate(45deg);
-}
 /* The destructive item (Delete, Remove): the red pane. */
-html[data-theme="walnut-copper"] .brush-shape-menu:not(.arm-tip-menu) .brush-shape-menu-item.danger {
+html[data-theme="walnut-copper"] .brush-shape-menu:not(.arm-tip-menu):not(.mp-pop) .brush-shape-menu-item.danger {
     --gc: 255 80 50;
     color: color-mix(in oklab, #ffd2c4 calc(var(--ci) * 100%), #e08a76);
     background-image:
@@ -1028,16 +1004,16 @@ html[data-theme="walnut-copper"] #studioCloseBtn {
    which forced colours drop: every overlay keeps a system border, and a
    chosen row or lit wedge a Highlight mark (study 318-322). */
 @media (forced-colors: active) {
-    html[data-theme="walnut-copper"] :is(.delete-modal-content, .hotkey-modal, .mask-editor-panel, .brush-shape-menu:not(.arm-tip-menu),
+    html[data-theme="walnut-copper"] :is(.delete-modal-content, .hotkey-modal, .mask-editor-panel, .brush-shape-menu:not(.arm-tip-menu):not(.mp-pop),
         .palette-list, .collision-source-menu, #quality-underbar .qub-dd-list, .mixer-presets-panel, #mixer-more-panel, .atv-panel,
         .cp-pop, .skip-menu:focus-within, #hkBindBar, #text-arrange-bar, .fx-tip, .stats-panel, .reset-app-hint, .rec-take-prompt,
         .cp-toast, #hkToast, #hkWheel, #radialNote, #presetPathToast, #focus-mode-hint, #brushTypePill, .phone-pad-status) {
         border: 1px solid CanvasText;
     }
-    html[data-theme="walnut-copper"] :is(.palette-option, #quality-underbar .qub-dd-opt, .mp-menu-item, .mask-mode-toggle label) {
+    html[data-theme="walnut-copper"] :is(.palette-option, #quality-underbar .qub-dd-opt, .mask-mode-toggle label) {
         border: 1px solid ButtonText;
     }
-    html[data-theme="walnut-copper"] :is(.palette-option.active, #quality-underbar .qub-dd-opt.sel, .mp-menu-item[aria-checked="true"],
+    html[data-theme="walnut-copper"] :is(.palette-option.active, #quality-underbar .qub-dd-opt.sel,
         .mask-mode-toggle label:has(input:checked), .mask-tool-tab.active, .mask-wizard-step.active, .hk-step.is-now) {
         outline: 3px solid Highlight;
     }
@@ -1320,8 +1296,8 @@ html[data-theme="walnut-copper"] #radialMenu .radial-wheel { opacity: min(1, var
    teal phosphor in Share Tech Mono on dark glass with the anode mesh,
    scanlines and the copper bezel. Sentence case is kept: these are live
    regions, and a capitalised string can be spelled out letter by letter.
-   Place, size, show and hide stay each toast's own. (#mpRoomToast is
-   already one, css/30.) */
+   Place, size, show and hide stay each toast's own. (The room's toast,
+   #mpRoomToast, is the Swirl Together drawer's, css/39.) */
 html[data-theme="walnut-copper"] :is(.cp-toast, #hkToast, #hkWheel, #radialNote, #presetPathToast, #focus-mode-hint, #brushTypePill) {
     font-family: var(--ui-font-mono);
     font-weight: 400;
