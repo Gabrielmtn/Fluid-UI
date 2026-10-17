@@ -305,6 +305,8 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
         linear-gradient(transparent calc(50% - 1.5px), rgb(150 120 104 / 0.45) 50%, transparent calc(50% + 1.5px)),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.4'/%3E%3C/svg%3E") center / 3px 5.2px,
         linear-gradient(rgb(52 40 33), rgb(48 40 36) 1px, rgb(58 50 45) 3px, rgb(56 47 42) 6px, rgb(44 36 32) 7.5px, rgb(26 20 18) 9px, rgb(26 20 18) 11px, rgb(18 14 12));
+    background-clip: content-box;
+    background-origin: content-box;
     /* the wire, 1.6 px out from the glass: inward from 3 px out, a soft
        edge, the pale wire, copper, dark against the glass */
     box-shadow: inset 0 0 0 1px rgb(112 66 42), inset 0 0 0 2px rgb(156 108 100), inset 0 0 0 2.5px rgb(140 76 50), inset 0 0 0 3px rgb(92 46 24);
@@ -323,6 +325,38 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
 }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]:disabled {
     box-shadow: inset 0 0 0 1px rgb(96 60 42), inset 0 0 0 2px rgb(118 86 78), inset 0 0 0 3px rgb(70 38 22);
+}
+
+/* ── 6. Forced colours (High Contrast): the tube in system colours ────────
+   Forcing would turn the transparent hit borders into heavy lines and drop
+   the column; instead the glass is Canvas in a ButtonText line, the column
+   Highlight (GrayText when disabled), the value a ButtonText mark. */
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)),
+    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range] {
+        forced-color-adjust: none;
+        background: Canvas;
+        background-clip: content-box;
+        box-shadow: inset 0 0 0 1px ButtonText, inset 0 0 0 3px Canvas;
+    }
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-container,
+    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-container {
+        background: Highlight;
+        box-shadow: none;
+    }
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):disabled::-webkit-slider-container {
+        background: GrayText;
+    }
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-runnable-track,
+    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-runnable-track {
+        background: none;
+    }
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-thumb {
+        background: linear-gradient(ButtonText, ButtonText) center / 3px 100% no-repeat;
+    }
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):focus-visible::-webkit-slider-runnable-track {
+        outline-color: Highlight;
+    }
 }
 
 /* Printed scale under faders (popups that still show it): engraved. */
