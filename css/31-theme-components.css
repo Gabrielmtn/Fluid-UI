@@ -226,4 +226,39 @@ html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) .control-gro
     color: var(--engrave);
 }
 
+/* ── Keycaps (hotkey binding fields) and the copper clear ring ─────────
+   A cathode window with a second copper line inside, like a keycap face;
+   the bound key in Share Tech Mono; breathing while it listens. */
+html[data-theme="walnut-copper"] .hk-picker-key {
+    font-family: var(--ui-font-mono);
+    font-weight: 400;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 3px #0c0806,
+        inset 0 0 0 4px rgba(196, 122, 75, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.35));
+}
+html[data-theme="walnut-copper"] .hk-picker.is-listening .hk-picker-key {
+    animation: wc-listen 1.6s ease-in-out infinite;
+}
+@keyframes wc-listen {
+    0%, 100% { --ci: 0.25; }
+    50% { --ci: 0.85; }
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] .hk-picker.is-listening .hk-picker-key { animation: none; --ci: 0.7; }
+}
+html[data-theme="walnut-copper"] .hk-picker-clear {
+    border-radius: 50%;
+    border-color: var(--cu);
+    background: radial-gradient(circle, rgba(255, 130, 50, 0), transparent) !important;
+    color: var(--cu-hi);
+    text-shadow: none;
+}
+html[data-theme="walnut-copper"] .hk-picker-clear:hover {
+    border-color: var(--cu-hi);
+    background: radial-gradient(circle, rgba(255, 130, 50, 0.22), transparent 70%) !important;
+    box-shadow: 0 0 10px rgba(255, 120, 40, 0.35);
+}
+
 } /* @layer theme */
