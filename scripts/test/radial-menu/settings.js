@@ -76,7 +76,10 @@ const E = ['e', 'KeyE', 69];
         check('A1 bind mode opens with the menu as its destination: two steps', b1 && b1.step === '1' && b1.steps.join('|') === 'Choose a control|Done' && /on the radial menu/.test(b1.say), b1);
 
         // More only shows on a narrower window since those two moved out of the top bar.
-        await d.send('Emulation.setDeviceMetricsOverride', { width: 1300, height: 900, deviceScaleFactor: 1, mobile: false }); await sleep(800);
+        // 1200, not 1300: the Walnut & Copper dials are narrower than the old
+        // faders, so at 1300 every cell fits and More has nothing to hold.
+        // At 1200 it shows under both themes.
+        await d.send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false }); await sleep(800);
         const more = await rect('.mixer-more-btn');
         if (more && more.hit) {
             await d.click(more.x, more.y); await sleep(300);

@@ -1,8 +1,8 @@
 {
- "generated": "2026-10-17T08:17:14.896Z",
+ "generated": "2026-10-17T16:10:15.811Z",
  "env": {
-  "date": "2026-10-17T08:17:14.896Z",
-  "headCommit": "c4796dac21008b26528e57f813425ffb7bd58490",
+  "date": "2026-10-17T16:10:15.811Z",
+  "headCommit": "cd3a6598e9bfde67efa1859a96458ba17aac2098",
   "chrome": "Chrome/155.0.8059.80",
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "protocol": "1.3",
@@ -13,7 +13,7 @@
   "innerHeight": 805,
   "dpr": 1,
   "uiScale": "1",
-  "url": "http://127.0.0.1:54158/index.html",
+  "url": "http://127.0.0.1:63248/index.html",
   "bodyClasses": "web-mode photosafe-on",
   "leftFolded": false,
   "rightFolded": false,
@@ -28,7 +28,9 @@
  },
  "crossCheck": {
   "compared": 898,
-  "differences": []
+  "differences": [
+   "lazy:radial-menu[1] div.radial-wheel > div.radial-label:nth-of-type(2): name F0 \"Brush Size 41 px\" vs live \"Brush Size 37 px\""
+  ]
  },
  "controls": [
   {
@@ -18348,7 +18350,9 @@
    ]
   }
  },
- "problems": [],
+ "problems": [
+  "live boot vs F0 record: 1 difference(s); first: lazy:radial-menu[1] div.radial-wheel > div.radial-label:nth-of-type(2): name F0 \"Brush Size 41 px\" vs live \"Brush Size 37 px\""
+ ],
  "keyboardPatterns": {
   "K00": {
    "kind": "orphan markup",

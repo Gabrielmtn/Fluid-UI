@@ -1,0 +1,193 @@
+/* ================================================================
+   33 — WALNUT & COPPER top bar: cathode dials
+   @layer theme, scoped to html[data-theme="walnut-copper"].
+
+   Viscosity, Isolation, Density and Velocity become cathode dials. The
+   control is still the same <input type=range> (same id, value, step,
+   keys, events, and the same horizontal drag); only its well is painted as
+   a round face. Everything reads --val / --min / --max, which
+   js/06-slider-updater.js already writes on the input, so the dial needs no
+   script. The value readout moves under the dial by absolute positioning
+   inside its own cell (the header keeps its box: js/17 measures it).
+
+   The console-glass WebGL pass (study 2903–3332) is a separate, later step;
+   this is the CSS skin it will sit on.
+   ================================================================ */
+
+@layer theme {
+
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) {
+    --dial: 72px;
+    position: relative;
+    min-width: 96px;
+    padding-bottom: 22px;           /* room for the value under the dial */
+    background: transparent;
+    border-right-color: transparent;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) .ch-header {
+    justify-content: center;
+}
+/* The value sits under the dial in nixie orange. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) .ch-value {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 3px;
+    text-align: center;
+    font-size: 14px;
+}
+/* The printed 0 / 0.5 / 1 scale belongs to a linear fader, not a dial. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) .fader-scale {
+    display: none;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) .ch-fader {
+    justify-content: center;
+}
+
+/* The input becomes a square the size of the dial. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range] {
+    --t: calc((var(--val) - var(--min)) / (var(--max) - var(--min)));
+    --a: calc(-135deg + var(--t) * 270deg);
+    --track-h: var(--dial);
+    --input-py: 0px;
+    --input-px: 0px;
+    --thumb-h: var(--dial);
+    --thumb-w: 2px;
+    width: var(--dial);
+    height: var(--dial);
+    margin: 0 auto;
+    cursor: ew-resize;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range]::-webkit-slider-container {
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 1.5px var(--cu),
+        0 0 0 3px rgba(0, 0, 0, 0.55),
+        0 0 0 4.5px rgba(196, 122, 75, 0.35),
+        0 6px 12px rgba(0, 0, 0, 0.55),
+        inset 0 0 14px rgba(0, 0, 0, 0.8);
+    background:
+        /* hub: a copper boss */
+        radial-gradient(circle at 50% 50%, #ffe2c6 0 1.5px, var(--cu-hi) 2px 3.5px, var(--cu) 4px 5.5px, var(--cu-lo) 6px 7px, transparent 7.5px),
+        /* hand: a thin copper needle at the value's angle */
+        conic-gradient(from calc(var(--a) - 1.6deg) at 50% 50%, var(--cu-hi) 0 3.2deg, transparent 3.2deg),
+        /* inner glass disc with the hex anode mesh */
+        radial-gradient(circle closest-side, #120b08 0 71%, transparent 72%),
+        /* outer rim of the face, outside the cathode ring */
+        radial-gradient(circle closest-side, transparent 0 88%, #0d0806 89%),
+        /* 21 cathodes: gaps cut the arc into segments */
+        repeating-conic-gradient(from -135deg at 50% 50%, transparent 0 10.857deg, #0d0806 10.857deg 12.857deg),
+        /* the arc: lit up to the value, unlit after, nothing in the 90 deg gap */
+        conic-gradient(from -135deg at 50% 50%,
+            rgb(255 176 110) 0 calc(var(--t) * 270deg),
+            rgba(160, 120, 92, 0.32) calc(var(--t) * 270deg) 270deg,
+            transparent 270deg),
+        var(--mesh-dim) center / 6px 10.4px,
+        linear-gradient(170deg, #1a1210, #070403);
+}
+/* The thumb is the needle's hit point only; the face draws everything. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range]::-webkit-slider-thumb {
+    width: 2px;
+    height: var(--dial);
+    background: transparent;
+    filter: none;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+    [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range]:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 5px;
+    border-radius: 50%;
+}
+
+@media (max-width: 1700px) {
+    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
+        [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) { --dial: 64px; }
+}
+
+/* ── Engine order telegraphs: Laminar / Blend and Time ───────────────
+   Same principle as the dials: the input's own well, painted. A 240 deg
+   sweep with a wider copper lever. Laminar / Blend lights from the centre
+   (0) toward the value, as its fader did; Time lights from STOP and its
+   sweep is cut into six orders. Range, step and keys are the app's. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) {
+    --dial: 84px;
+    position: relative;
+    min-width: 108px;
+    padding-bottom: 22px;
+    background: transparent;
+    border-right-color: transparent;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) .ch-header { justify-content: center; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) .ch-value {
+    position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font-size: 14px;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) .fader-scale { display: none; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) .ch-fader { justify-content: center; }
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) input[type=range] {
+    --t: calc((var(--val) - var(--min)) / (var(--max) - var(--min)));
+    --a: calc(-120deg + var(--t) * 240deg);
+    --track-h: var(--dial);
+    --input-py: 0px;
+    --input-px: 0px;
+    --thumb-h: var(--dial);
+    --thumb-w: 2px;
+    width: var(--dial);
+    height: var(--dial);
+    margin: 0 auto;
+    cursor: ew-resize;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) input[type=range]::-webkit-slider-container {
+    --lit-from: 0deg;
+    --lit-to: calc(var(--t) * 240deg);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 2px var(--cu),
+        0 0 0 3.5px rgba(0, 0, 0, 0.55),
+        0 0 0 5px rgba(196, 122, 75, 0.4),
+        0 8px 14px rgba(0, 0, 0, 0.6),
+        inset 0 0 16px rgba(0, 0, 0, 0.85);
+    background:
+        radial-gradient(circle at 50% 50%, #ffe2c6 0 2px, var(--cu-hi) 2.5px 4px, var(--cu) 4.5px 7px, var(--cu-lo) 7.5px 8.5px, transparent 9px),
+        /* the lever: an A-frame read as a wide copper wedge */
+        conic-gradient(from calc(var(--a) - 3deg) at 50% 50%, var(--cu-hi) 0 1.2deg, var(--cu) 1.2deg 4.8deg, var(--cu-hi) 4.8deg 6deg, transparent 6deg),
+        radial-gradient(circle closest-side, #120b08 0 56%, transparent 57%),
+        radial-gradient(circle closest-side, transparent 0 90%, #0d0806 91%),
+        var(--orders, linear-gradient(transparent, transparent)),
+        conic-gradient(from -120deg at 50% 50%,
+            rgba(160, 120, 92, 0.3) 0 var(--lit-from),
+            rgba(255, 150, 70, 0.62) var(--lit-from) var(--lit-to),
+            rgba(160, 120, 92, 0.3) var(--lit-to) 240deg,
+            transparent 240deg),
+        var(--mesh-dim) center / 6px 10.4px,
+        linear-gradient(170deg, #1a1210, #070403);
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Color Blend"] { min-width: 132px; }
+/* Laminar / Blend: lit between the centre and the value. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Color Blend"] input[type=range]::-webkit-slider-container {
+    --lit-from: calc(min(var(--t), 0.5) * 240deg);
+    --lit-to: calc(max(var(--t), 0.5) * 240deg);
+    --orders: conic-gradient(from -120deg at 50% 50%, transparent 0 119deg, #0d0806 119deg 121deg, transparent 121deg);
+}
+/* Time: six orders (STOP .. FLANK) as sector rules across the sweep. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Time"] input[type=range]::-webkit-slider-container {
+    --orders: repeating-conic-gradient(from -120deg at 50% 50%, transparent 0 38.5deg, #0d0806 38.5deg 40deg);
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) input[type=range]::-webkit-slider-thumb {
+    width: 2px; height: var(--dial); background: transparent; filter: none;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) input[type=range]:focus-visible {
+    outline: 2px solid var(--ui-focus); outline-offset: 6px; border-radius: 50%;
+}
+@media (max-width: 1700px) {
+    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Color Blend"], [data-ui-key="Time"]) { --dial: 76px; }
+}
+
+} /* @layer theme */

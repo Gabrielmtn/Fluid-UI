@@ -1,13 +1,13 @@
 # Controls — role, name, state and keyboard pattern of every control
 
-Generated 2026-10-17T08:17:14.896Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `controls-a11y.json` (what `--check` diffs). Derived from `prep/baseline/dom/controls.json` (F0: 2026-10-17T07:41:00.663Z, 845 controls) and its `lazy-*.json`; selectors come from the live boot of this run, which was cross-checked against the F0 record (898 compared, 0 differences). Role and name are the CDP accessibility tree's (`nameSource` c) or the page-side fallback for nodes the tree ignores or does not build (f: `display:none` content, labels folded into their control, containers). The keyboard pattern is a hand-written table keyed on element / role / class with the handler's file:line; it says what the code does today, not what it should do. Notes: `NOTES.md`.
+Generated 2026-10-17T16:10:15.811Z by `prep/baseline/scripts/a11y.js` (F3). Machine copy: `controls-a11y.json` (what `--check` diffs). Derived from `prep/baseline/dom/controls.json` (F0: 2026-10-17T07:41:00.663Z, 845 controls) and its `lazy-*.json`; selectors come from the live boot of this run, which was cross-checked against the F0 record (898 compared, 1 differences, listed at the end). Role and name are the CDP accessibility tree's (`nameSource` c) or the page-side fallback for nodes the tree ignores or does not build (f: `display:none` content, labels folded into their control, containers). The keyboard pattern is a hand-written table keyed on element / role / class with the handler's file:line; it says what the code does today, not what it should do. Notes: `NOTES.md`.
 
 ## Environment
 
 | Fact | Value |
 |---|---|
-| date | 2026-10-17T08:17:14.896Z |
-| headCommit | c4796dac21008b26528e57f813425ffb7bd58490 |
+| date | 2026-10-17T16:10:15.811Z |
+| headCommit | cd3a6598e9bfde67efa1859a96458ba17aac2098 |
 | chrome | Chrome/155.0.8059.80 |
 | userAgent | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 |
 | protocol | 1.3 |
@@ -18,7 +18,7 @@ Generated 2026-10-17T08:17:14.896Z by `prep/baseline/scripts/a11y.js` (F3). Mach
 | innerHeight | 805 |
 | dpr | 1 |
 | uiScale | 1 |
-| url | http://127.0.0.1:54158/index.html |
+| url | http://127.0.0.1:63248/index.html |
 | bodyClasses | web-mode photosafe-on |
 | leftFolded | false |
 | rightFolded | false |
@@ -1087,3 +1087,13 @@ Columns: order (F0 index); surface; section; selector (live, state classes dropp
 | 4 | overlay:.brush-shape-menu |  | div.arm-tip-grid > button.arm-tip-opt:nth-of-type(3) | button | ■ Chisel (c) |  [focusable] | K10 | Y |
 | 5 | overlay:.brush-shape-menu |  | div.arm-tip-grid > button.arm-tip-opt:nth-of-type(4) | button | ▬ Streak (c) |  [focusable] | K10 | Y |
 | 6 | overlay:.brush-shape-menu |  | div.arm-tip-grid > button.arm-tip-opt:nth-of-type(5) | button | ◯ Ring (c) |  [focusable] | K10 | Y |
+
+## Live boot vs the F0 record
+
+The live enumeration of this run disagreed with `prep/baseline/dom/controls.json` here (the saved list keeps the F0 values; `--check` will report these until one of the two is re-captured):
+
+- lazy:radial-menu[1] div.radial-wheel > div.radial-label:nth-of-type(2): name F0 "Brush Size 41 px" vs live "Brush Size 37 px"
+
+## Problems during the run
+
+- live boot vs F0 record: 1 difference(s); first: lazy:radial-menu[1] div.radial-wheel > div.radial-label:nth-of-type(2): name F0 "Brush Size 41 px" vs live "Brush Size 37 px"
