@@ -1019,6 +1019,29 @@ html[data-theme="walnut-copper"] #studioCloseBtn {
     color: var(--cu-hi);
 }
 
+/* ── Forced colours ──────────────────────────────────────────────────
+   The copper line and the cathode glow are box shadows and gradients,
+   which forced colours drop: every overlay keeps a system border, and a
+   chosen row or lit wedge a Highlight mark (study 318-322). */
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] :is(.delete-modal-content, .hotkey-modal, .mask-editor-panel, .brush-shape-menu:not(.arm-tip-menu),
+        .palette-list, .collision-source-menu, #quality-underbar .qub-dd-list, .mixer-presets-panel, #mixer-more-panel, .atv-panel,
+        .cp-pop, .skip-menu:focus-within, #hkBindBar, #text-arrange-bar, .fx-tip, .stats-panel, .reset-app-hint, .rec-take-prompt,
+        .cp-toast, #hkToast, #hkWheel, #radialNote, #presetPathToast, #focus-mode-hint, #brushTypePill, .phone-pad-status) {
+        border: 1px solid CanvasText;
+    }
+    html[data-theme="walnut-copper"] :is(.palette-option, #quality-underbar .qub-dd-opt, .mp-menu-item, .mask-mode-toggle label) {
+        border: 1px solid ButtonText;
+    }
+    html[data-theme="walnut-copper"] :is(.palette-option.active, #quality-underbar .qub-dd-opt.sel, .mp-menu-item[aria-checked="true"],
+        .mask-mode-toggle label:has(input:checked), .mask-tool-tab.active, .mask-wizard-step.active, .hk-step.is-now) {
+        outline: 3px solid Highlight;
+    }
+    html[data-theme="walnut-copper"] .radial-wedge { stroke: CanvasText; }
+    html[data-theme="walnut-copper"] .radial-wedge.is-hot { fill: Highlight; }
+    html[data-theme="walnut-copper"] .radial-hub { stroke: CanvasText; }
+}
+
 /* ── The F1 sheet ─────────────────────────────────────────────────────
    A cabinet; the header is its nameplate and stays put while the body
    scrolls under it (same wood, same origin, so no seam); sections open
