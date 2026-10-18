@@ -65,6 +65,10 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
        floor to device pixels the way it floors borders */
     --wc-bv: max(0px, calc((var(--input-h) - 14px) / 2));
     --wc-p: clamp(0, var(--sp, calc((var(--val) - var(--min)) / (var(--max) - var(--min)))), 1.02);
+    /* the halo burns only while the column holds light: at exactly 0 the
+       column is empty, and a box-shadow round its empty box would still
+       glow */
+    --wc-on: clamp(0, var(--wc-p) * 1000, 1);
     /* along the glass, in its own px, for the column (100cqw there = the
        input's width = the glass's) */
     --wc-t: calc(100cqw - 2 * var(--wc-h));                                   /* the travel's length */
@@ -136,7 +140,7 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
         var(--wc-sheen) calc(-1 * var(--wc-l)) 0 / 100cqw 100% no-repeat,                   /* .glass, over the column */
         var(--wc-head) calc(var(--wc-e) - var(--wc-l) - 10px) 0 / 13px 100% no-repeat,     /* .col::after, on the thumb's centre */
         var(--wc-col);                                                                       /* .col (+ ::before) */
-    box-shadow: 0 0 14px 2px rgba(255, 96, 24, 0.42), 0 0 4px rgba(255, 140, 60, 0.5);       /* .halo */
+    box-shadow: 0 0 14px 2px rgb(255 96 24 / calc(0.42 * var(--wc-on))), 0 0 4px rgb(255 140 60 / calc(0.5 * var(--wc-on)));   /* .halo */
 }
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-runnable-track {
     position: absolute;             /* out of the column's flow, over the input's band */
@@ -181,6 +185,7 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
    (the centre is 50cqw; past either end's half thumb the column fills that
    end, as above) */
 html[data-theme="walnut-copper"] input[type=range]:is(#colorBlend, #colorBlendPerceptual):not(:where(#mixer-strip > .mixer-channel[data-ui-key="Color Blend"] input)) {
+    --wc-on: clamp(0, max(var(--wc-p) - 0.5, 0.5 - var(--wc-p)) * 1000, 1);   /* dark at the centre */
     --wc-l: max(0px, min(var(--wc-e), 50cqw) - max(0px, var(--wc-h) - var(--wc-p) * var(--wc-t)));
     --wc-r: min(100cqw, max(var(--wc-e), 50cqw) + max(0px, var(--wc-h) - (1 - var(--wc-p)) * var(--wc-t)));
 }

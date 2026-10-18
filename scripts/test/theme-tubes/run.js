@@ -103,8 +103,12 @@ async function measure(d, id, dpr) {
     const row = (cy) => { let t = 0, n = 0; for (let cx = gR - 40; cx < gR - 6; cx += 1 / S) { const c = px(cx, cy); t += lum(c[0], c[1], c[2]); n++; } return t / n; };
     let peak = 0; for (let cy = mid - 1.2; cy <= mid + 1.2; cy += 0.5 / S) peak = Math.max(peak, row(cy));
     const fil = [peak, row(mid - 2.5), row(mid + 2.5)];
+    // a glow round the thumb's centre: how much more orange (red - blue) the
+    // glass is in the 10 px from it than in the same rows mid-glass
+    const warm = (x0, x1) => { let t = 0, n = 0; for (let cy = mid - 5; cy <= mid + 5; cy += 1 / S) for (let cx = x0; cx < x1; cx += 1 / S) { const c = px(cx, cy); t += c[0] - c[2]; n++; } return t / n; };
+    const glow = warm(xt, xt + 10) - warm(g.W / 2 - 5, g.W / 2 + 5);
     // within 1.25 CSS px plus a device pixel of rasterisation
-    return { g, p, xt, gL, gR, marks, litEnd, litOut, maxLitIn, colEnd, head, fil, buf, tol: 1.25 + 1 / S };
+    return { g, p, xt, gL, gR, marks, litEnd, litOut, maxLitIn, colEnd, head, fil, glow, buf, tol: 1.25 + 1 / S };
 }
 
 (async () => {
@@ -155,7 +159,7 @@ async function measure(d, id, dpr) {
                     check(tag + ' ' + id + ' ' + which + ': nothing lit past the glass ends', m.litOut === 0, { litOut: m.litOut });
                     if (which !== 'mid') check(tag + ' ' + id + ' ' + which + ': the thumb centre and both diamonds on the straight part of the glass', straight(m.xt) && near(m.marks[0], m.xt, m.tol) && near(m.marks[1], m.xt, m.tol), det);
                     if (which === 'min') {
-                        check(tag + ' ' + id + ' min: empty glass, no glow in it', m.maxLitIn < 100, { maxLitIn: Math.round(m.maxLitIn) });
+                        check(tag + ' ' + id + ' min: empty glass, no glow in it', m.maxLitIn < 100 && m.glow < 3, { maxLitIn: Math.round(m.maxLitIn), glow: +m.glow.toFixed(1) });
                         check(tag + ' ' + id + ' min: the filament shows', m.fil[0] > m.fil[1] + 6 && m.fil[0] > m.fil[2] + 6, { rows: m.fil.map(Math.round) });
                     } else if (which === 'max') {
                         check(tag + ' ' + id + ' max: the column fills the glass', near(m.colEnd, m.gR, 2), det);
