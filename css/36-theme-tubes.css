@@ -5,11 +5,11 @@
    app's own <input type=range>, with no extra DOM.
 
    The input keeps the app's own box and the app's native mapping exactly:
-   as wide as its row, with the app's thumb (16 px; css/slider-styles.css)
-   whose centre runs from half a thumb in at one end to half a thumb in at
-   the other, the travel js/06's applyFraction also uses. So a press or a
-   drag anywhere on the row sets what it always set, and the outer strips
-   are still the slider's. The tube is drawn around that travel:
+   as wide as its row, with the app's thumb (16 px, 28 px on coarse
+   pointers; css/slider-styles.css) whose centre runs from half a thumb in
+   at one end to half a thumb in at the other, the travel js/06's
+   applyFraction also uses. So a press or a drag anywhere on the row sets
+   what it always set, and the outer strips are still the slider's. The tube is drawn around that travel:
 
      ::-webkit-slider-runnable-track
                          the glass (.tg): 14 px tall, radius 7, as wide as the
@@ -58,7 +58,8 @@
 /* ── 1. Every tube ─────────────────────────────────────────────────────
    (:where() keeps the dial / telegraph exclusion out of the specificity.) */
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)) {
-    --thumb-w: 16px;
+    /* --thumb-w stays the app's: 16 px, 28 px on coarse pointers, where
+       iOS only starts a drag on the thumb (css/slider-styles.css) */
     --wc-h: calc(var(--thumb-w) / 2);                 /* half the thumb: the travel runs --wc-h .. width - --wc-h */
     /* the box above and below the glass: padding, which Chrome does not
        floor to device pixels the way it floors borders */

@@ -23,8 +23,11 @@
 // Then a press on the track beside the value moves it to where the native
 // slider maps that press, which is where the tube draws it (the diamonds
 // and the thumb share one travel). Stepped sliders carry js/72's --steps.
-// Two passes: 1440 px at DPR 2 (the bar's 1.15 zoom) and 1920 at DPR 1
-// (1.12). Reduced motion is emulated so js/71's spring settles at once.
+// Three passes: 1440 px at DPR 2 (the bar's 1.15 zoom), 1920 at DPR 1
+// (1.12), and 1440 at DPR 2 on a coarse pointer (touch emulation), where
+// the app's thumb is 28 px (css/slider-styles.css) and the travel and the
+// tube follow it. Reduced motion is emulated so js/71's spring settles at
+// once.
 // Exit 1 if any check fails. Uses the radial menu's driver (own server,
 // scratch profile; values are set through the real inputs).
 'use strict';
@@ -45,7 +48,7 @@ const TUBES = [
     ['pressureDissipation', 'Simulation'], ['mgCycles', 'Simulation', 3], ['mgRelax', 'Simulation'],
     ['canvasOpacity', 'Display'],
 ];
-const PASSES = [{ w: 1440, h: 900, dpr: 2 }, { w: 1920, h: 1080, dpr: 1 }];
+const PASSES = [{ w: 1440, h: 900, dpr: 2 }, { w: 1920, h: 1080, dpr: 1 }, { w: 1440, h: 900, dpr: 2, coarse: true }];
 
 const copper = (r, g, b) => r > 140 && b > 70 && r - b > 45 && g > b - 5 && g < r - 15;   // cu-hi diamonds, the bar's wire
 const lum = (r, g, b) => (r + g + b) / 3;
@@ -110,9 +113,15 @@ async function measure(d, id, dpr) {
         try {
             await d.send('Emulation.setDeviceMetricsOverride', { width: pass.w, height: pass.h, deviceScaleFactor: pass.dpr, mobile: false });
             await d.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+            // (pointer: coarse); the test's own events stay mouse events
+            if (pass.coarse) await d.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
             await d.load(); await sleep(900);
-            const tag = pass.w + '@' + pass.dpr + 'x';
+            const tag = pass.w + '@' + pass.dpr + 'x' + (pass.coarse ? '-coarse' : '');
             check(tag + ' theme is walnut-copper', (await d.ev('document.documentElement.dataset.theme')) === 'walnut-copper');
+            if (pass.coarse) {
+                const tw = await d.ev(`matchMedia('(pointer: coarse)').matches && getComputedStyle(document.getElementById('brushFlow')).getPropertyValue('--thumb-w').trim()`);
+                check(tag + ' a coarse pointer keeps the 28 px thumb of the app', tw === '28px', { thumbW: tw });
+            }
             for (const [id, re, stepped] of TUBES) {
                 if (re) {
                     await d.ev(`(async function(){ var re = new RegExp(${JSON.stringify(re)});
@@ -160,13 +169,14 @@ async function measure(d, id, dpr) {
             for (const id of ['symmetryHold', 'pressureDissipation', 'brushFlow']) {
                 const r = await d.ev(`(function(){ var e = document.getElementById(${JSON.stringify(id)}); e.value = e.max; e.dispatchEvent(new Event('input', { bubbles: true }));
                     e.scrollIntoView({ block: 'center' }); var b = e.getBoundingClientRect(); var z = b.width / e.offsetWidth;
-                    var x = b.left + (8 + 0.3 * (e.offsetWidth - 16)) * z;
+                    var h = (parseFloat(getComputedStyle(e).getPropertyValue('--thumb-w')) || 16) / 2;
+                    var x = b.left + (h + 0.3 * (e.offsetWidth - 2 * h)) * z;
                     return { x: x, y: b.top + b.height / 2, min: +e.min, max: +e.max, step: parseFloat(e.step) || 0 }; })()`);
                 await sleep(200);
                 await d.click(r.x, r.y); await sleep(200);
                 const v = await d.ev(`+document.getElementById(${JSON.stringify(id)}).value`);
                 const want = r.min + 0.3 * (r.max - r.min);
-                check(tag + ' ' + id + ': a press at 30% of the glass sets 30%', Math.abs(v - want) <= Math.max(r.step, (r.max - r.min) * 0.006) + 1e-9, { got: v, want: +want.toFixed(4) });
+                check(tag + ' ' + id + ': a press at 30% of the travel sets 30%', Math.abs(v - want) <= Math.max(r.step, (r.max - r.min) * 0.006) + 1e-9, { got: v, want: +want.toFixed(4) });
             }
         } catch (e) {
             check('harness', false, String(e && e.stack || e));
