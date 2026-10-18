@@ -24,6 +24,9 @@ const k = [mix(0.9, 0.36, 0.72) * LIGHT[0], mix(0.86, 0.27, 0.72) * LIGHT[1], mi
 // Contrast 1.3 around the lit mean (the study's grain reads deeper and its
 // highlights brighter than a flat multiply gives); the mean stays put.
 const C = 1.3, MEAN = [98.7, 57.1, 30.3];
-sharp(src).removeAlpha().linear(k.map(x => x * C), MEAN.map(m => -(C - 1) * m)).jpeg({ quality: 90, mozjpeg: true }).toFile(out)
+// 2026-10-18: the whole wood 25% darker so text on it (modals, sidebars, the
+// top bar) reads; scales the final value, grain contrast unchanged.
+const DARKEN = 0.75;
+sharp(src).removeAlpha().linear(k.map(x => x * C * DARKEN), MEAN.map(m => -(C - 1) * m * DARKEN)).jpeg({ quality: 90, mozjpeg: true }).toFile(out)
     .then(i => console.log('wrote ' + path.relative(ROOT, out) + ' ' + i.width + 'x' + i.height + ' ' + i.size + ' bytes; multiplier ' + k.map(x => (x * 255).toFixed(1)).join(', ')))
     .catch(e => { console.error(e); process.exit(1); });

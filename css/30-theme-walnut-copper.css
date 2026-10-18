@@ -69,7 +69,8 @@ html[data-theme="walnut-copper"] {
     --vfd: #72f2d4;
     --neon: rgb(255 110 30);
     /* Walnut: the study's stain is baked into the texture
-       (scripts/theme/bake-walnut.js: oak x rgb(130,111,97)); no overlay. */
+       (scripts/theme/bake-walnut.js: oak x rgb(130,111,97), then x0.75 so text on it
+       reads); no overlay. */
     --wood-herringbone: url(../assets/textures/herringbone-walnut-2048.jpg);
     /* Art-deco column sheen (study shader: cos(2pi*8u + .789)): each tile
        holds 16 half-columns leaning opposite ways; alternate ones catch the
