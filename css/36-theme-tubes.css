@@ -2,36 +2,47 @@
    css/36-theme-tubes.css - Walnut & Copper: bargraph tubes, every range
    input except the top bar's dials and telegraphs (css/33 paints those as
    faces). The study's .lad (study-lite 231-257, peer tint 338-340) on the
-   app's own <input type=range>, with no extra DOM:
+   app's own <input type=range>, with no extra DOM.
 
-     the input           the hit area (the study's .lad): 38 px tall in the
-                         sidebars (44 px for Replay speed and on coarse
-                         pointers), 40 px in the top bar (.mslide .track).
-                         Transparent borders shrink its padding box to the
-                         glass plus its 2.5 px ring, 5.5 px in from each end,
-                         so its background is the glass (.tg) and its inset
-                         shadows are the copper ring and .tg's own shadow.
-     ::-webkit-slider-container
-                         the column (.col): a box from the glass's start to
-                         the value, radius 7, with the white-hot head
-                         (::after), the peer tint (::before) and the glass
-                         sheen over it, and .halo's box-shadow, literally.
+   The input keeps the app's own box and the app's native mapping exactly:
+   as wide as its row, with the app's thumb (16 px; css/slider-styles.css)
+   whose centre runs from half a thumb in at one end to half a thumb in at
+   the other, the travel js/06's applyFraction also uses. So a press or a
+   drag anywhere on the row sets what it always set, and the outer strips
+   are still the slider's. The tube is drawn around that travel:
+
      ::-webkit-slider-runnable-track
-                         taken out of the flow over the whole input, so the
-                         native thumb still runs 8 px .. width - 8 px whatever
-                         the column's width: the copper diamonds (.mk) and
-                         the detent ticks (.ticks) are its layers, the focus
-                         ring its outline.
+                         the glass (.tg): 14 px tall, radius 7, as wide as the
+                         input (the native travel is measured on it, so it
+                         stays the input's width), with .tg's copper ring 2.5
+                         px outside it and its inset shadow. A thumb's centre
+                         is never nearer an end than 8 px, past the 7 px
+                         rounded end, so the head and both diamonds sit on
+                         the glass's straight part at 0 and at max. It is
+                         drawn under the column (z-index -1 in the input's
+                         own stacking context).
+     ::-webkit-slider-container
+                         the column (.col), with the white-hot head (::after),
+                         the peer tint (::before), the glass sheen over it and
+                         .halo's box-shadow. It ends on the thumb's centre;
+                         over the first and the last half thumb of travel it
+                         also fills the glass's rounded end (growing both ways
+                         from the travel's start), so 0 is an empty glass and
+                         max a full one. pointer-events: none, so a press on
+                         the thumb still lands on the thumb.
+     the input           the hit area (the study's .lad): its background is
+                         the copper diamonds (.mk) and the detent ticks
+                         (.ticks), its outline the focus ring.
      ::-webkit-slider-thumb
-                         the hit point only, transparent.
+                         the hit point only, transparent, the input's height.
 
    One number places everything: --wc-p (0 .. 1.02), js/71's spring (--sp)
    while the value glides, else the live --val / --min / --max that js/06
-   writes. The glass runs 8 px .. width - 8 px of the input, which is the
-   native 16 px thumb's travel (and js/06 applyFraction's): the column's end,
-   its head and both diamonds sit on the thumb's centre at every value and
-   width. In the sidebars the input sits 8 px in from its row, so the glass
-   is 16 px in, as in the study.
+   writes. The thumb's centre, the column's end, the head and both diamonds
+   are at --wc-h + p * (width - 2 * --wc-h), --wc-h being half the thumb.
+   The column reads the input's width as 100cqw (the input is an
+   inline-size container); the diamonds and ticks are the input's own
+   background, so they read it as 100%.
 
    Owner: the tubes workstream (W2); js/72 writes --steps on stepped
    sliders. @layer theme, scoped to html[data-theme="walnut-copper"]. No
@@ -48,9 +59,17 @@
    (:where() keeps the dial / telegraph exclusion out of the specificity.) */
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)) {
     --thumb-w: 16px;
-    /* the box above and below the ring; whole px, as Chrome floors borders */
-    --wc-bv: max(0px, round(down, calc((var(--input-h) - 20px) / 2), 1px));
+    --wc-h: calc(var(--thumb-w) / 2);                 /* half the thumb: the travel runs --wc-h .. width - --wc-h */
+    /* the box above and below the glass: padding, which Chrome does not
+       floor to device pixels the way it floors borders */
+    --wc-bv: max(0px, calc((var(--input-h) - 14px) / 2));
     --wc-p: clamp(0, var(--sp, calc((var(--val) - var(--min)) / (var(--max) - var(--min)))), 1.02);
+    /* along the glass, in its own px, for the column (100cqw there = the
+       input's width = the glass's) */
+    --wc-t: calc(100cqw - 2 * var(--wc-h));                                   /* the travel's length */
+    --wc-e: calc(var(--wc-h) + var(--wc-p) * var(--wc-t));                    /* the thumb's centre: the head */
+    --wc-l: max(0px, var(--wc-h) - var(--wc-p) * var(--wc-t));                /* the column's start */
+    --wc-r: min(100cqw, var(--wc-e) + max(0px, var(--wc-h) - (1 - var(--wc-p)) * var(--wc-t)));   /* its end */
     --wc-dy: clamp(9.5px, calc((var(--input-h) - 15px) / 2), 13.5px);   /* .mk: 11.5 at 38 px, 13.5 at 44 */
     --wc-tint: color-mix(in srgb, var(--pc) calc(var(--ga) * 85%), transparent);
     /* the study's own --mesh-dim (0.7 stroke, 10 % white), as on .lad .tg */
@@ -64,16 +83,24 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
         color-mix(in oklab, rgba(255, 236, 204, 0.95), oklch(from var(--pc) 0.916 calc(c * 0.45) h / 0.99) calc(var(--ga) * 100%)),
         color-mix(in oklab, rgba(255, 150, 70, 0.85), oklch(from var(--pc) 0.689 calc(c * 0.85) h / 0.98) calc(var(--ga) * 100%)) 45%,
         color-mix(in oklab, rgba(240, 70, 30, 0.35), oklch(from var(--pc) 0.336 c h / 0.9) calc(var(--ga) * 100%)) 100%);
-    --wc-head: radial-gradient(ellipse at 70% 50%, rgba(255, 250, 235, 0.95), transparent 70%);
+    /* .col::after: a 10 x 14 box ending on the value, radial-gradient(ellipse
+       at 70% 50%, ...) = an ellipse 7.62 x 17.77 px round its 7 px point
+       (farthest-corner, closest-side's aspect), here in a 13 px tile from
+       10 px before the value so it fades out past it, where the column goes
+       on into the glass's rounded end; elsewhere the column's own rounded
+       end cuts it, as the study's does. */
+    --wc-head: radial-gradient(ellipse 7.62px 17.77px at 7px 50%, rgba(255, 250, 235, 0.95), transparent 70%);
 
     /* .mk.up / .mk.dn: a 7 px square with a 1.4 px border turned 45 deg, one
        10 px tile each (one tile stays crisp at any zoom; split tiles snap
-       apart), centred on the thumb's travel 8px + p * (width - 16px). The
-       study tints them toward another player's colour (--ga * 85 %): js/72
-       writes that colour's twin as --wc-mk-tint on the touched row. */
+       apart), centred on the thumb's centre. The study tints them toward
+       another player's colour (--ga * 85 %): js/72 writes that colour's twin
+       as --wc-mk-tint on the touched row. */
     --wc-mk-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 1.04L8.96 5L5 8.96L1.04 5Z' fill='none' stroke='%23f2b38a' stroke-width='1.4'/%3E%3C/svg%3E");
     --wc-mk-img: -webkit-cross-fade(var(--wc-mk-svg), var(--wc-mk-tint, var(--wc-mk-svg)), calc(var(--ga) * 85%));
-    --wc-mkx: calc(3px + var(--wc-p) * (100% - 6px));             /* the tile's left: centre - 5 */
+    /* the tile's left, centre - 5: a background-position percentage counts
+       (100% - the tile), so the travel 100% - 2 * --wc-h is written + 10px */
+    --wc-mkx: calc(var(--wc-h) - 5px + var(--wc-p) * (100% - 2 * var(--wc-h) + 10px));
     --wc-marks:
         var(--wc-mk-img) var(--wc-mkx) calc(50% - var(--wc-dy)) / 10px 10px no-repeat,
         var(--wc-mk-img) var(--wc-mkx) calc(50% + var(--wc-dy)) / 10px 10px no-repeat;
@@ -81,86 +108,87 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
        glass (top 50% + 9px). Only where js/72 wrote --steps. */
     --wc-ticks:
         repeating-linear-gradient(90deg, transparent 0, rgba(214, 140, 92, 0.8) 0.15px 1.05px, transparent 1.2px calc((100% - 1.2px) / var(--steps, 1)))
-        8px calc(50% + 11px) / calc(100% - 16px) calc(4px * min(1, var(--steps, 0))) no-repeat;
+        var(--wc-h) calc(50% + 11px) / calc(100% - 2 * var(--wc-h)) calc(4px * min(1, var(--steps, 0))) no-repeat;
 
-    /* The glass and its ring. Borders (transparent, part of the hit area)
-       and a 3 px padding bring the content box to the glass itself: 8 px in
-       from the ends, 14 px tall, corners 7. The ring is drawn inward from
-       the padding edge: copper next to the glass, dark outside it. */
-    position: relative;             /* the track's containing block */
+    /* The input keeps its box (the hit area) square and borderless; its
+       padding brings the content box to the glass's 14 px band, where the
+       column lies. */
+    position: relative;             /* the glass's containing block */
+    isolation: isolate;             /* the glass's z-index -1 stays inside the input */
+    container-type: inline-size;    /* 100cqw in the column = the input's width */
     box-sizing: border-box;
-    border: solid transparent;
-    border-width: var(--wc-bv) 5px;
-    padding: 3px;
-    border-radius: 15px / calc(var(--wc-bv) + 10px);    /* 7 + 3 + the border */
-    background:
-        var(--wc-sheen),
-        linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 10px) 1px no-repeat,   /* .fila */
-        var(--wc-mesh) center / 6px 10.4px,
-        linear-gradient(170deg, #171010, #070403);
-    background-clip: content-box;
-    background-origin: content-box;
-    box-shadow:
-        inset 0 0 0 1.5px rgb(34 19 10),             /* .tg: 0 0 0 2.5px rgba(0,0,0,.6), over the wood */
-        inset 0 0 0 3px var(--cu),                   /* .tg: 0 0 0 1.5px var(--cu) */
-        inset 0 2px 4px 3px rgba(0, 0, 0, 0.75);     /* .tg: inset 0 2px 4px rgba(0,0,0,.75), from the glass's edge */
+    border: 0;
+    padding: var(--wc-bv) 0;
+    border-radius: 0;
+    background: var(--wc-ticks), var(--wc-marks);
+    box-shadow: none;
     cursor: ew-resize;
 }
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-container {
     flex: none;
     height: 14px;
-    margin: 0;
-    width: calc(min(var(--wc-p), 1) * 100%);             /* 100% = the glass */
+    margin: 0 0 0 var(--wc-l);
+    width: calc(var(--wc-r) - var(--wc-l));
     border-radius: 7px;
+    pointer-events: none;           /* a press reaches the thumb or the input, as before */
     background:
-        var(--wc-sheen) 0 0 / calc(100% / max(min(var(--wc-p), 1), 0.001)) 100% no-repeat,   /* .glass, over the column */
-        var(--wc-head) 100% 0 / 10px 100% no-repeat,                                          /* .col::after */
-        var(--wc-col);                                                                        /* .col (+ ::before) */
+        var(--wc-sheen) calc(-1 * var(--wc-l)) 0 / 100cqw 100% no-repeat,                   /* .glass, over the column */
+        var(--wc-head) calc(var(--wc-e) - var(--wc-l) - 10px) 0 / 13px 100% no-repeat,     /* .col::after, on the thumb's centre */
+        var(--wc-col);                                                                       /* .col (+ ::before) */
     box-shadow: 0 0 14px 2px rgba(255, 96, 24, 0.42), 0 0 4px rgba(255, 140, 60, 0.5);       /* .halo */
 }
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-runnable-track {
-    position: absolute;             /* in the input's padding box: back out to its border box */
-    left: -5px;
-    top: calc(-1 * var(--wc-bv));
-    width: calc(100% + 10px);
-    height: var(--input-h);
+    position: absolute;             /* out of the column's flow, over the input's band */
+    z-index: -1;                    /* under the column */
+    left: 0;
+    top: var(--wc-bv);
+    width: 100%;                    /* the input's: the native travel is unchanged */
+    height: 14px;
     margin: 0;
-    background: var(--wc-ticks), var(--wc-marks);
+    border-radius: 7px;
+    pointer-events: auto;
+    background:
+        var(--wc-sheen),                                                                                                     /* .glass */
+        linear-gradient(rgba(170, 128, 100, 0.38), rgba(170, 128, 100, 0.38)) 50% 50% / calc(100% - 10px) 1px no-repeat,   /* .fila */
+        var(--wc-mesh) center / 6px 10.4px,
+        linear-gradient(170deg, #171010, #070403);
+    box-shadow:
+        0 0 0 1.5px var(--cu),
+        0 0 0 2.5px rgba(0, 0, 0, 0.6),
+        inset 0 2px 4px rgba(0, 0, 0, 0.75);    /* .tg, literally */
 }
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-thumb {
     width: var(--thumb-w);
     height: var(--input-h);
+    margin-top: calc(-1 * var(--wc-bv));         /* the input's whole height, centred on the glass */
     border: 0;
     border-radius: 0;
     background: none;
     box-shadow: none;
     filter: none;
+    pointer-events: auto;
     cursor: ew-resize;
 }
 /* Focus: the study's .lad:has(input:focus-visible) ring, square, 3 px out
-   (on the track, which covers the input's box; the input's own outline
-   would follow its rounded corners). */
+   from the input (the hit area), clear of the glass's ring. */
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):focus-visible {
-    outline: none;
-}
-html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):focus-visible::-webkit-slider-runnable-track {
     outline: 2px solid var(--ui-focus);
     outline-offset: 3px;
 }
 
-/* ── 2. Laminar / Blend: the column runs from the centre to the value ──── */
+/* ── 2. Laminar / Blend: the column runs from the centre to the value ────
+   (the centre is 50cqw; past either end's half thumb the column fills that
+   end, as above) */
 html[data-theme="walnut-copper"] input[type=range]:is(#colorBlend, #colorBlendPerceptual):not(:where(#mixer-strip > .mixer-channel[data-ui-key="Color Blend"] input)) {
-    --wc-s: min(var(--wc-p), 0.5);
-    --wc-e: min(max(var(--wc-p), 0.5), 1);
+    --wc-l: max(0px, min(var(--wc-e), 50cqw) - max(0px, var(--wc-h) - var(--wc-p) * var(--wc-t)));
+    --wc-r: min(100cqw, max(var(--wc-e), 50cqw) + max(0px, var(--wc-h) - (1 - var(--wc-p)) * var(--wc-t)));
 }
 html[data-theme="walnut-copper"] input[type=range]:is(#colorBlend, #colorBlendPerceptual):not(:where(#mixer-strip > .mixer-channel[data-ui-key="Color Blend"] input))::-webkit-slider-container {
-    margin-left: calc(var(--wc-s) * 100%);
-    width: calc((var(--wc-e) - var(--wc-s)) * 100%);
     background:
-        var(--wc-sheen),
+        var(--wc-sheen) calc(-1 * var(--wc-l)) 0 / 100cqw 100% no-repeat,
         /* the head rides the value's end: right of the centre, or left */
-        var(--wc-head) 100% 0 / calc(10px * clamp(0, (var(--wc-p) - 0.5) * 1000, 1)) 100% no-repeat,
-        radial-gradient(ellipse at 30% 50%, rgba(255, 250, 235, 0.95), transparent 70%) 0 0 / calc(10px * clamp(0, (0.5 - var(--wc-p)) * 1000, 1)) 100% no-repeat,
+        var(--wc-head) calc(var(--wc-e) - var(--wc-l) - 10px) 0 / calc(13px * clamp(0, (var(--wc-p) - 0.5) * 1000, 1)) 100% no-repeat,
+        radial-gradient(ellipse 7.62px 17.77px at 6px 50%, rgba(255, 250, 235, 0.95), transparent 70%) calc(var(--wc-e) - var(--wc-l) - 3px) 0 / calc(13px * clamp(0, (0.5 - var(--wc-p)) * 1000, 1)) 100% no-repeat,
         var(--wc-col);
 }
 
@@ -170,7 +198,9 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
     --wc-mk-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 1.04L8.96 5L5 8.96L1.04 5Z' fill='none' stroke='%23f2b38a' stroke-opacity='.4' stroke-width='1.4'/%3E%3C/svg%3E");
     --wc-mk-img: var(--wc-mk-svg);
     cursor: default;
-    box-shadow: inset 0 0 0 1.5px rgb(34 19 10), inset 0 0 0 3px rgb(130 84 56), inset 0 2px 4px 3px rgba(0, 0, 0, 0.75);
+}
+html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):disabled::-webkit-slider-runnable-track {
+    box-shadow: 0 0 0 1.5px rgb(130 84 56), 0 0 0 2.5px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(0, 0, 0, 0.75);
 }
 html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):disabled::-webkit-slider-container {
     background: linear-gradient(rgba(160, 138, 118, 0.16), rgba(160, 138, 118, 0.16));
@@ -186,12 +216,11 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
    Head 13.6 px (label 10.5/1.2 Michroma, value 13/1 Share Tech Mono, on
    one baseline, 4 px in), the tube box 38 px overlapping it by 1 px (the
    study's 8 px gap and -9 px margin), 8 px to the next row: a 58.6 px
-   pitch from one label to the next, as in the study. The input sits 8 px
-   in from the row, so its glass is 16 px in. */
+   pitch from one label to the next, as in the study. The input keeps the
+   row's whole width (the app's hit area and travel), so the glass runs
+   the row's width and the label sits 4 px in from its end. */
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader) input[type=range] {
     --input-py: 8px;                /* 22 + 2 x 8 = 38 px */
-    width: calc(100% - 16px);
-    margin-inline: 8px;
 }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]) {
     margin-bottom: 8px;
@@ -263,8 +292,9 @@ html[data-theme="walnut-copper"] #sidebar-left #replaySpeed { --input-py: 11px; 
    15.5 px above and below the value, no halo. The shader's colours are
    measured from the study at 1440 (prep/work/W2), so the stand-in matches
    until the console-glass pass lands. The study runs the travel 14 px in
-   and lights 6 px of glass at 0; here the travel is the glass, as in the
-   sidebars, so 0 is empty and max is full.
+   and lights 6 px of glass at 0; here, as in the sidebars, the travel is
+   the app's (half a thumb in from the input's ends), the glass the
+   input's width round it, 0 empty and max full.
 
    The head row lives in the header, under the field, as a grid row: the
    slider's name (named for the material, as css/33's printed scale did)
@@ -303,25 +333,27 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
     /* the wire rhombus: half width 2.88, half height 3.6, a 1.2 px copper
        wire on its outline, in a tile with room for the wire's tips */
     --wc-mk-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='10' viewBox='0 0 8 10'%3E%3Cpath d='M4 1.4L6.88 5L4 8.6L1.12 5Z' fill='none' stroke='%23b07a64' stroke-width='1.2'/%3E%3C/svg%3E");
-    --wc-mkx: calc(4px + var(--wc-p) * (100% - 8px));             /* the tile's left: centre - 4 */
+    --wc-mkx: calc(var(--wc-h) - 4px + var(--wc-p) * (100% - 2 * var(--wc-h) + 8px));   /* the tile's left: centre - 4 */
     --wc-marks:
         var(--wc-mk-img) var(--wc-mkx) calc(50% - var(--wc-dy)) / 8px 10px no-repeat,
         var(--wc-mk-img) var(--wc-mkx) calc(50% + var(--wc-dy)) / 8px 10px no-repeat;
+}
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-runnable-track {
     /* the smoked glass, lighter over its upper half, and its filament glow */
     background:
         linear-gradient(transparent calc(50% - 1.5px), rgb(150 120 104 / 0.45) 50%, transparent calc(50% + 1.5px)),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='17.32' viewBox='0 0 10 17.32'%3E%3Cpath d='M5 0L10 2.887V8.66L5 11.547L0 8.66V2.887ZM5 11.547V17.32' fill='none' stroke='%23ffdcbe' stroke-opacity='.16' stroke-width='1.4'/%3E%3C/svg%3E") center / 3px 5.2px,
         linear-gradient(rgb(52 40 33), rgb(48 40 36) 1px, rgb(58 50 45) 3px, rgb(56 47 42) 6px, rgb(44 36 32) 7.5px, rgb(26 20 18) 9px, rgb(26 20 18) 11px, rgb(18 14 12));
-    background-clip: content-box;
-    background-origin: content-box;
-    /* the wire, 1.6 px out from the glass: inward from 3 px out, a soft
-       edge, the pale wire, copper, dark against the glass */
-    box-shadow: inset 0 0 0 1px rgb(112 66 42), inset 0 0 0 2px rgb(156 108 100), inset 0 0 0 2.5px rgb(140 76 50), inset 0 0 0 3px rgb(92 46 24);
+    /* the wire, 1.6 px out from the glass: outward from the glass, dark
+       against it, copper, the pale wire, a soft edge to 3 px out */
+    box-shadow: 0 0 0 0.5px rgb(92 46 24), 0 0 0 1px rgb(140 76 50), 0 0 0 2px rgb(156 108 100), 0 0 0 3px rgb(112 66 42);
 }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-container {
     background:
-        /* the last stretch burns brighter (shader: head over 3.5 % of the travel) */
-        linear-gradient(90deg, rgb(255 236 196 / 0), rgb(255 236 196 / 0.32)) 100% 0 / 5px 100% no-repeat,
+        /* the last stretch burns brighter (shader: head over 3.5 % of the
+           travel), up to the thumb's centre; past it (the column filling the
+           glass's rounded end at max) it fades out over 2 px */
+        linear-gradient(90deg, rgb(255 236 196 / 0), rgb(255 236 196 / 0.32) 5px, rgb(255 236 196 / 0) 7px) calc(var(--wc-e) - var(--wc-l) - 5px) 0 / 7px 100% no-repeat,
         linear-gradient(var(--wc-tint), var(--wc-tint)),
         /* the gold column, opaque, as measured across the glass */
         linear-gradient(rgb(77 44 28), rgb(99 57 37) 1.5px, rgb(141 86 54) 2.5px, rgb(185 126 78) 3.5px, rgb(216 162 98) 4.5px, rgb(234 193 123) 5.5px,
@@ -330,21 +362,24 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
     background-blend-mode: normal, color, normal;
     box-shadow: none;
 }
-html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]:disabled {
-    box-shadow: inset 0 0 0 1px rgb(96 60 42), inset 0 0 0 2px rgb(118 86 78), inset 0 0 0 3px rgb(70 38 22);
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]:disabled::-webkit-slider-runnable-track {
+    box-shadow: 0 0 0 1px rgb(70 38 22), 0 0 0 2px rgb(118 86 78), 0 0 0 3px rgb(96 60 42);
 }
 
 /* ── 6. Forced colours (High Contrast): the tube in system colours ────────
-   Forcing would turn the transparent hit borders into heavy lines and drop
-   the column; instead the glass is Canvas in a ButtonText line, the column
-   Highlight (GrayText when disabled), the value a ButtonText mark. */
+   The glass is Canvas in a ButtonText line, the column Highlight (GrayText
+   when disabled), the value a ButtonText mark (the thumb); the diamonds
+   and ticks go. */
 @media (forced-colors: active) {
     html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)),
     html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range] {
         forced-color-adjust: none;
+        background: none;
+    }
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-runnable-track,
+    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-runnable-track {
         background: Canvas;
-        background-clip: content-box;
-        box-shadow: inset 0 0 0 1px ButtonText, inset 0 0 0 3px Canvas;
+        box-shadow: 0 0 0 1px ButtonText;
     }
     html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-container,
     html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-container {
@@ -354,14 +389,10 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Flui
     html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):disabled::-webkit-slider-container {
         background: GrayText;
     }
-    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-runnable-track,
-    html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] input[type=range]::-webkit-slider-runnable-track {
-        background: none;
-    }
     html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input))::-webkit-slider-thumb {
         background: linear-gradient(ButtonText, ButtonText) center / 3px 100% no-repeat;
     }
-    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):focus-visible::-webkit-slider-runnable-track {
+    html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mixer-channel:is([data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"], [data-ui-key="Color Blend"], [data-ui-key="Time"]) input)):focus-visible {
         outline-color: Highlight;
     }
 }

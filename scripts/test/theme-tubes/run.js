@@ -7,15 +7,18 @@
 //
 // For each tube it finds, in a screenshot of the input's box, the two copper
 // diamonds (their centre column) and the end of the lit column, and checks
-// them against the native thumb's centre, 8px + p * (width - 16px) of the
-// input (the travel js/06's applyFraction also uses), and against the glass,
-// which spans exactly that travel:
+// them against the native thumb's centre, h + p * (width - 2h) of the input
+// (h = half the thumb, 8 px; the app's own travel, which js/06's
+// applyFraction also uses), and against the glass, which spans the input's
+// width round that travel (its 7 px rounded ends outside it):
 //   - at the minimum the glass is empty (no lit pixel in it, the filament
-//     shows) and both diamonds sit on the glass's left end;
+//     shows) and both diamonds sit on the thumb's centre, on the glass's
+//     straight part;
 //   - in the middle the column ends, and both diamonds sit, on the thumb's
 //     centre;
-//   - at the maximum the column fills the glass and the diamonds sit on its
-//     right end;
+//   - at the maximum the column fills the glass to its end, and the head
+//     (the column's brightest point near its end) and both diamonds sit on
+//     the thumb's centre, on the glass's straight part;
 //   - nothing lit or copper pokes out past the glass's ends.
 // Then a press on the track beside the value moves it to where the native
 // slider maps that press, which is where the tube draws it (the diamonds
@@ -52,6 +55,7 @@ async function measure(d, id, dpr) {
     const g = await d.ev(`(function(){ var e = document.getElementById(${JSON.stringify(id)}); var r = e.getBoundingClientRect();
         var z = r.width / e.offsetWidth; var cs = getComputedStyle(e);
         return { x: r.left, y: r.top, w: r.width, h: r.height, z: z, W: e.offsetWidth, v: +e.value, min: +e.min, max: +e.max, steps: cs.getPropertyValue('--steps').trim(),
+            hh: (parseFloat(cs.getPropertyValue('--thumb-w')) || 16) / 2,
             dy: parseFloat(cs.getPropertyValue('--wc-dy')) || Math.min(13.5, Math.max(9.5, (e.offsetHeight - 15) / 2)) }; })()`);
     const pad = 6;
     const clip = { x: g.x - pad * g.z, y: g.y, width: g.w + 2 * pad * g.z, height: g.h, scale: 1 };
@@ -62,14 +66,17 @@ async function measure(d, id, dpr) {
     const px = (cx, cy) => { const X = Math.round((cx + pad) * S), Y = Math.round(cy * S); const i = (Y * info.width + X) * info.channels; return [data[i], data[i + 1], data[i + 2]]; };
     const H = g.h / g.z, mid = H / 2;           // CSS px, input coords
     const p = (g.v - g.min) / (g.max - g.min);
-    const xt = 8 + p * (g.W - 16), gL = 8, gR = g.W - 8;
+    const xt = g.hh + p * (g.W - 2 * g.hh), gL = 0, gR = g.W;
     // diamonds: copper pixels in the band above (and below) the glass, within
     // 12 px of the thumb's centre (the wood's light grain and the detent ticks
-    // elsewhere along the row are copper-ish too); none there is a failure
+    // elsewhere along the row are copper-ish too); none there is a failure.
+    // The band starts 2 px inside the diamond's centre, clear of the glass's
+    // copper ring (2.5 px round the 14 px glass, 3 px in the top bar), whose
+    // edge pixels would pull the centre toward whichever side is unlit.
     const marks = [];
     for (const sign of [-1, 1]) {
         let sx = 0, n = 0;
-        for (let cy = mid + sign * (g.dy - 3); sign < 0 ? cy >= mid + sign * (g.dy + 3) : cy <= mid + sign * (g.dy + 3); cy += sign / S) {
+        for (let cy = mid + sign * (g.dy - 2); sign < 0 ? cy >= mid + sign * (g.dy + 3) : cy <= mid + sign * (g.dy + 3); cy += sign / S) {
             for (let cx = Math.max(-pad, xt - 12) + 0.5 / S; cx < Math.min(g.W + pad, xt + 12); cx += 1 / S) { const c = px(cx, cy); if (copper(c[0], c[1], c[2])) { sx += cx; n++; } }
         }
         marks.push(n > 3 ? sx / n : null);
@@ -77,19 +84,24 @@ async function measure(d, id, dpr) {
     // the lit column along a line 2 px above the glass's centre (off the
     // filament): where it ends inside the glass, and anything as bright
     // outside the glass's ends (the copper ring itself is dimmer)
-    let litEnd = null, litOut = 0, maxLitIn = 0;
+    // colEnd: the last pixel of the column's colour (orange to red, or the
+    // top bar's gold) inside the glass; head: the brightest point within
+    // 12 px of the thumb's centre (the head, or the top bar's bright stretch)
+    let litEnd = null, litOut = 0, maxLitIn = 0, colEnd = null, head = null, headL = -1;
     for (let cx = -pad + 0.5 / S; cx < g.W + pad; cx += 1 / S) {
         const c = px(cx, mid - 1); const L = lum(c[0], c[1], c[2]);
         const inside = cx > gL && cx < gR;
         if (cx > gL + 1 && cx < gR - 1) maxLitIn = Math.max(maxLitIn, L);
         if (L > 140) { if (inside) litEnd = cx; else if (cx < gL - 2 || cx > gR + 2) litOut++; }
+        if (inside && c[0] > 70 && c[0] - c[2] > 40) colEnd = cx;
+        if (inside && Math.abs(cx - xt) <= 12 && L > headL) { headL = L; head = cx; }
     }
     // the filament: the centre rows are brighter than the rows beside them
     const row = (cy) => { let t = 0, n = 0; for (let cx = gR - 40; cx < gR - 6; cx += 1 / S) { const c = px(cx, cy); t += lum(c[0], c[1], c[2]); n++; } return t / n; };
     let peak = 0; for (let cy = mid - 1.2; cy <= mid + 1.2; cy += 0.5 / S) peak = Math.max(peak, row(cy));
     const fil = [peak, row(mid - 2.5), row(mid + 2.5)];
     // within 1.25 CSS px plus a device pixel of rasterisation
-    return { g, p, xt, gL, gR, marks, litEnd, litOut, maxLitIn, fil, buf, tol: 1.25 + 1 / S };
+    return { g, p, xt, gL, gR, marks, litEnd, litOut, maxLitIn, colEnd, head, fil, buf, tol: 1.25 + 1 / S };
 }
 
 (async () => {
@@ -125,14 +137,20 @@ async function measure(d, id, dpr) {
                     const m = await measure(d, id, pass.dpr);
                     if (process.env.SHOT_DIR) { fs.mkdirSync(process.env.SHOT_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.SHOT_DIR, tag + '-' + id + '-' + which + '.png'), m.buf); }
                     const near = (a, b, t) => a !== null && Math.abs(a - b) <= t;
-                    const det = { p: +m.p.toFixed(3), thumb: +m.xt.toFixed(2), marks: m.marks.map(v => v === null ? null : +v.toFixed(2)), litEnd: m.litEnd === null ? null : +m.litEnd.toFixed(2), glass: [m.gL, m.gR] };
+                    const r2 = v => v === null ? null : +v.toFixed(2);
+                    const det = { p: +m.p.toFixed(3), thumb: +m.xt.toFixed(2), marks: m.marks.map(r2), litEnd: r2(m.litEnd), colEnd: r2(m.colEnd), head: r2(m.head), glass: [m.gL, m.gR] };
+                    // the glass's straight part: 7 px (its radius) in from each end;
+                    // the diamonds are measured onto the thumb's centre, which must lie on it
+                    const straight = (x) => x !== null && x >= m.gL + 7 && x <= m.gR - 7;
                     check(tag + ' ' + id + ' ' + which + ': both diamonds on the thumb centre', near(m.marks[0], m.xt, m.tol) && near(m.marks[1], m.xt, m.tol), det);
                     check(tag + ' ' + id + ' ' + which + ': nothing lit past the glass ends', m.litOut === 0, { litOut: m.litOut });
+                    if (which !== 'mid') check(tag + ' ' + id + ' ' + which + ': the thumb centre and both diamonds on the straight part of the glass', straight(m.xt) && near(m.marks[0], m.xt, m.tol) && near(m.marks[1], m.xt, m.tol), det);
                     if (which === 'min') {
                         check(tag + ' ' + id + ' min: empty glass, no glow in it', m.maxLitIn < 100, { maxLitIn: Math.round(m.maxLitIn) });
                         check(tag + ' ' + id + ' min: the filament shows', m.fil[0] > m.fil[1] + 6 && m.fil[0] > m.fil[2] + 6, { rows: m.fil.map(Math.round) });
                     } else if (which === 'max') {
-                        check(tag + ' ' + id + ' max: the column fills the glass', near(m.litEnd, m.gR, 2), det);
+                        check(tag + ' ' + id + ' max: the column fills the glass', near(m.colEnd, m.gR, 2), det);
+                        check(tag + ' ' + id + ' max: the head on the thumb centre', m.head !== null && m.head >= m.xt - 5 && m.head <= m.xt + m.tol, det);
                     } else {
                         check(tag + ' ' + id + ' mid: the column ends on the thumb centre', near(m.litEnd, m.xt, m.tol + 0.5), det);
                     }
