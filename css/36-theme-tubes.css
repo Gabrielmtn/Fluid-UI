@@ -228,7 +228,9 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
    None of this reaches the top bar's strip, which a small window (js/13)
    moves into the right sidebar whole: its dials, telegraphs and Material
    slider keep css/33's head rows and sizes there (the :where() adds no
-   specificity). */
+   specificity). A head that holds a checkbox (Brush ghost's switch over its
+   opacity) is W3's checkbox pane (css/37), lined up with the panes above
+   it; only its value takes the readout face here. */
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader):not(:where(#mixer-strip *)) input[type=range] {
     --input-py: 8px;                /* 22 + 2 x 8 = 38 px */
 }
@@ -238,7 +240,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-gro
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]):last-child {
     margin-bottom: 0;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]) > label,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]) > label:where(:not(:has(> input[type=checkbox]))),
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:not(:where(#mixer-strip *)):has(input[type=range]) .ch-header {
     align-items: baseline;
     gap: 8px;
