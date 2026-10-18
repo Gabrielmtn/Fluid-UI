@@ -892,15 +892,18 @@
         'Color Blend': 'Laminar prevents colors from mixing. Blend causes colors to blend where they meet (affected by dry time, density, and time)',
         'Multi-Brush': ' settings for 1 to 8 brushes',
         'Time': 'Simulation time value: left is slower 1 is real time, right is faster',
-        'Density': 'Color density, at 1.000 it never fades (and you can try above 1...)',
-        'Velocity': 'How much velocity to preserve. Can go above 1...'
+        'Density': 'How long colour lasts. At 1.00 it never fades; 1++ makes it grow',
+        'Velocity': 'How long motion lasts. At 1.00 it never slows; 1++ makes it speed up'
     };
     // What a channel is CALLED where people see it, when that differs from
     // its key. The key (data-ui-key) stays put: show/hide choices (43), the
     // More panel's parking order (46) and recipe tours (44) are stored or
     // written against it. 43, 46 and 49 print data-ui-label when it is set.
     var CHANNEL_NAMES = {
-        'Color Blend': 'Laminar / Blend'    // 2026-10-02: the fader runs both ways from 0
+        'Color Blend': 'Laminar / Blend',   // 2026-10-02: the fader runs both ways from 0
+        // 2026-10-18: the readout is sustain 0-1.00 (+ 1++), not the decay base
+        'Density': 'Density Sustain',
+        'Velocity': 'Velocity Sustain'
     };
 
     // ── Perceptual fader curves (Density, Time) ──────────────────────────
@@ -979,7 +982,10 @@
                 if (v >= 1) return (v <= 1 || max <= 1) ? a : b + (v - 1) / (max - 1) * (1 - b);
                 const tau = Math.min(hi, Math.max(lo, halfLifeOfBase(v)));
                 return a * Math.log(tau / lo) / Math.log(hi / lo);
-            }
+            },
+            // The detent's two edges: the first and last fader positions at 1.0.
+            oneBottom: function () { return curveCfg('DENSITY_FADER_HOLD_A', 0.86); },
+            oneTop: function () { return curveCfg('DENSITY_FADER_HOLD_B', 0.92); }
         },
         timeScale: {
             toCanonical: function (p, el) {
@@ -1047,7 +1053,7 @@
         if (!valEl) return;
         const sync = function () {
             const t = valEl.textContent.trim();
-            if (t) input.setAttribute('aria-valuetext', t);
+            if (t) input.setAttribute('aria-valuetext', t === '1++' ? 'above 1' : t);
         };
         sync();
         new MutationObserver(sync).observe(valEl, { childList: true, characterData: true, subtree: true });
@@ -1127,6 +1133,76 @@
         return _faderProxies.length + ' fader(s) re-seated';
     };
 
+    // Density and Velocity (2026-10-18): two decimals like the other dials,
+    // and a catch at 1.0, where fading turns into growing. A hand pushing up
+    // from below stops at 1.00 and has to let go and push again to pass;
+    // past it the readout says "1++" so the cell keeps its width. Only the
+    // user's own drags and keys are held (trusted input inside a press or
+    // key-down that began below 1): presets, rooms, the radial menu and
+    // hotkeys write straight through, and the real maxima are unchanged.
+    const HOLD_AT_ONE = { densityDissipation: true, velocityDissipation: true };
+
+    function holdAtOne(fader, canonical, proxy, valEl) {
+        const step = parseFloat(canonical.step) || 0.0001;
+        const curve = FADER_CURVES[canonical.id];
+        let held = false;
+        const begin = function () { held = parseFloat(canonical.value) < 1 - step / 2; };
+        const end = function () { held = false; };
+        fader.addEventListener('pointerdown', begin, true);
+        fader.addEventListener('keydown', function (e) { if (!e.repeat) begin(); }, true);
+        fader.addEventListener('keyup', end, true);
+        fader.addEventListener('focusout', end, true);
+        window.addEventListener('pointerup', end, true);
+        window.addEventListener('pointercancel', end, true);
+        // Capture on the fader runs before the inputs' own listeners (the
+        // proxy's, 05h's), so they only ever see the held value.
+        fader.addEventListener('input', function (e) {
+            // js/76's dial drag writes with a marked event inside the same
+            // trusted press, so it is held like the native drag it replaces.
+            if (!held || !(e.isTrusted || e.wcDial)) return;
+            if (proxy && e.target === proxy) {
+                if (quantizeTo(canonical, curve.toCanonical(parseFloat(proxy.value), canonical)) > 1) {
+                    proxy.value = curve.oneTop();
+                    proxy.style.setProperty('--val', proxy.value);
+                }
+            } else if (e.target === canonical && parseFloat(canonical.value) > 1) {
+                canonical.value = 1;
+                canonical.style.setProperty('--val', 1);
+            }
+        }, true);
+
+        // The readout is "sustain" (2026-10-18), not the shader's per-frame
+        // decay base: 0 at the bottom of the dial, 1.00 at the catch, 1++
+        // past it. The base itself read as nonsense (0.91 empty, 1.00 half
+        // way). Sustain is the dial's own travel below the catch, so the
+        // number follows the arc: Density's half-life curve below its detent,
+        // Velocity's linear min..1. Display only; the stored value is still
+        // the base.
+        //
+        // The span is the settings span moved up here, and several writers
+        // (05h's bindings and wheel, 29's material sync) print the base into
+        // it. Reprinting on change keeps one format without touching them;
+        // the observer runs before the next paint, so the base never shows.
+        // It reads the input, never the text, which after a reprint is
+        // sustain.
+        if (!valEl) return;
+        const sustain = function (v) {
+            if (curve) return curve.fromCanonical(v, canonical) / curve.oneBottom();
+            const min = parseFloat(canonical.min);
+            return (v - min) / (1 - min);
+        };
+        const fmt = function () {
+            const v = parseFloat(canonical.value);
+            if (!isFinite(v)) return;
+            const want = v > 1 + step / 2 ? '1++' : Math.min(1, Math.max(0, sustain(v))).toFixed(2);
+            if (valEl.textContent.trim() !== want) valEl.textContent = want;
+        };
+        fmt();
+        new MutationObserver(fmt).observe(valEl, { childList: true, characterData: true, subtree: true });
+        canonical.addEventListener('input', fmt);
+        canonical.addEventListener('change', fmt);
+    }
+
     function faderChannel(label, accent, sliderId, existingValueId, newValueId) {
         const ch = document.createElement('div');
         ch.className = 'mixer-channel';
@@ -1188,15 +1264,17 @@
         if (slider) {
             const fader = document.createElement('div');
             fader.className = 'ch-fader';
+            let proxy = null;
             if (FADER_CURVES[sliderId]) {
                 // Hides the canonical inside the channel and mounts the
                 // perceptual proxy in its place.
-                attachPerceptualProxy(fader, slider, CHANNEL_NAMES[label] || label, val);
+                proxy = attachPerceptualProxy(fader, slider, CHANNEL_NAMES[label] || label, val);
                 startPerceptualFaderPoll();
             } else {
                 fader.appendChild(slider);
                 nameFader(slider, CHANNEL_NAMES[label] || label, val);
             }
+            if (HOLD_AT_ONE[sliderId]) holdAtOne(fader, slider, proxy, val);
             ch.appendChild(fader);
         }
 
