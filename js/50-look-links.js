@@ -175,7 +175,9 @@
         'mgCycles', 'mgPre', 'mgPost', 'mgCoarse', 'mgRelax', 'captureDimming', 'version',
         'cosOscillator', 'hue', 'saturation', 'lightness', 'gap',
         // 2026-10-07: the brush's On Move / Constant mode (brushState)
-        'splatMode'
+        'splatMode',
+        // 2026-10-18: a Multi-Brush arm's step through the palette
+        'stepOffset'
     ];
     var STRS = [
         'instant', 'linear', 'easing', 'time', 'stroke', 'main', 'random', 'step', 'fixed',
@@ -740,6 +742,8 @@
                         stepIndex: (typeof a.stepIndex === 'number') ? Math.max(0, Math.min(64, a.stepIndex | 0)) : 0,
                         push: !!a.push
                     };
+                    // How many colours this arm stands ahead on the palette.
+                    if (typeof a.stepOffset === 'number' && a.stepOffset > 0) o.stepOffset = Math.min(64, a.stepOffset | 0);
                     // The arm's own tip (05g): a built-in 0-4 or a shape id,
                     // which only means something on a machine that has the
                     // shape (elsewhere that arm prints Soft).

@@ -137,7 +137,7 @@
         if (!i || !cfg || cfg.mode === 'main') return paintColorHex();
         if (cfg.mode === 'fixed') return HEX_RE.test(cfg.color || '') ? cfg.color : '#ffffff';
         if (cfg.mode === 'step' && typeof window.nextStepHex === 'function') {
-            var h = window.nextStepHex();   // the one palette counter (05g)
+            var h = window.nextStepHex(i);   // the palette counter + this arm's step (05g)
             if (HEX_RE.test(h || '')) return h;
         }
         if (cfg.cachedColor && cfg.cachedColor.length >= 3) return rgbHex(cfg.cachedColor);

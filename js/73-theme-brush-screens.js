@@ -184,7 +184,7 @@
         var mode = (cfg && MODE_LETTER[cfg.mode]) ? cfg.mode : 'main';
         var rgb = null;
         if (mode === 'fixed') rgb = rgbOf(cfg.color);
-        else if (mode === 'step') rgb = rgbOf(typeof window.nextStepHex === 'function' ? window.nextStepHex() : null);
+        else if (mode === 'step') rgb = rgbOf(typeof window.nextStepHex === 'function' ? window.nextStepHex(i) : null);
         else if (mode === 'random') {
             var c = cfg && cfg.cachedColor;
             if (c && c.length >= 3) rgb = [0, 1, 2].map(function (k) { return Math.round(Math.max(0, Math.min(1, c[k])) * 255); }).join(' ');

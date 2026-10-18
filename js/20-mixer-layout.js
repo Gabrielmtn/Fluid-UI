@@ -8805,6 +8805,7 @@
             window.settingsManager.set('brush.armColors', arr.map(function(c) {
                 var o = { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0, push: !!c.push };
                 // Only when set: a plain arm saves exactly as it always did.
+                if (c.stepOffset) o.stepOffset = c.stepOffset | 0;
                 var t = armTipOf(c.tip);
                 if (t !== null) o.tip = t;
                 return o;
@@ -8833,7 +8834,7 @@
                     // mode, arm painted fallback).
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
                     arr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
-                               push: !!c.push, tip: armTipOf(c.tip) });
+                               stepOffset: c.stepOffset | 0, push: !!c.push, tip: armTipOf(c.tip) });
                 });
                 // Decode any shape an arm prints now, not on its first dab.
                 if (typeof window.warmArmTips === 'function') window.warmArmTips();
@@ -8907,8 +8908,9 @@
                         // 'rainbow' removed 2026-08-15 (photosensitivity)
                         { key: 'random',  text: 'Random',  title: 'Random: new color each stroke' },
                         // The next palette colour each stroke, in step with
-                        // every other Palette arm.
-                        { key: 'step',    text: 'Palette', title: 'Palette: set to follow palette, in line with every other Palette arm' }
+                        // every other Palette arm; clicked again, this arm
+                        // moves one colour on (05g stepArmPalette).
+                        { key: 'step',    text: 'Palette', title: 'Palette: follow the palette. Click again to move this brush one colour on, so brushes can sit on different colours of the same palette' }
                     ];
 
                     // The Paint Into radio track (01-buttons.css
@@ -9006,7 +9008,7 @@
                         if (cfg.mode === 'main' || (idx === 0 && (cfg.mode === 'step' || cfg.mode === 'random'))) {
                             shown = mainPk && mainPk.value;
                         } else if (cfg.mode === 'step') {
-                            shown = (typeof window.nextStepHex === 'function') ? window.nextStepHex() : null;
+                            shown = (typeof window.nextStepHex === 'function') ? window.nextStepHex(idx) : null;
                         } else if (cfg.mode === 'random' && cfg.cachedColor && cfg.cachedColor.length >= 3) {
                             shown = '#' + cfg.cachedColor.slice(0, 3).map(function (v) {
                                 var h = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16);
@@ -9040,6 +9042,17 @@
                         btn.title = m.title;
                         btn.dataset.mode = m.key;
                         btn.addEventListener('click', function() {
+                            // Palette clicked while on Palette: step this arm
+                            // through the palette instead of re-picking it.
+                            if (m.key === 'step' && cfg.mode === 'step') {
+                                if (typeof window.stepArmPalette === 'function') window.stepArmPalette(idx);
+                                persistArmColors();
+                                if (typeof window.refreshArmColorRows === 'function') window.refreshArmColorRows();
+                                else paintRow();
+                                return;
+                            }
+                            // Joining Palette starts in line with the others.
+                            if (m.key === 'step') cfg.stepOffset = 0;
                             cfg.mode = m.key;
                             cfg.cachedColor = null;
                             if (m.key === 'fixed' && cfg.color === '#ffffff') {
@@ -9126,7 +9139,7 @@
             for (var i = 0; i < n && i < arr.length; i++) {
                 var a = arr[i];
                 if (!a) { s += '|-'; continue; }
-                s += '|' + a.mode + ',' + a.color + ',' + (a.push ? 1 : 0)
+                s += '|' + a.mode + ',' + a.color + ',' + (a.push ? 1 : 0) + ',' + (a.stepOffset | 0)
                     + ',' + (a.tip === null || a.tip === undefined ? '' : a.tip);
                 if (a.cachedColor) s += ',' + a.cachedColor[0] + ',' + a.cachedColor[1] + ',' + a.cachedColor[2];
                 if (a.mode === 'step' && i > 0) steps = true;

@@ -133,7 +133,7 @@
                 if (arm === 0 || !cfg || cfg.mode === 'main') return picker;
                 if (cfg.mode === 'fixed') return hexOk(cfg.color) ? cfg.color : '#ffffff';
                 if (cfg.mode === 'random') return vibrant(hue0 + GOLDEN * arm);
-                if (cfg.mode === 'step' && list.length) return list[(cfg.stepIndex | 0) % list.length];
+                if (cfg.mode === 'step' && list.length) return list[(cfg.stepOffset | 0) % list.length];
                 return picker;
             }
         };

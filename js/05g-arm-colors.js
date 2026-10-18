@@ -86,30 +86,68 @@
                 // cached colour, and switching palettes reset neither (user
                 // test 3: "step palette should've been red white blue but they
                 // got off sync").
-                if (!armStepColor) pinArmSteps();
-                return armStepColor || fallbackColor;
+                // An arm stands stepOffset colours ahead of that counter
+                // (2026-10-18, stepArmPalette): one palette, each arm on the
+                // step it was clicked to, all moving on together.
+                if (armStepBase === null) pinArmSteps();
+                var h = stepHexAt(armStepBase, cfg.stepOffset);
+                return h ? hexRgb(h) : fallbackColor;
             }
             return fallbackColor;
         }
-        // The step colour, pinned at each stroke's start (05d pointerdown /
+        // The step counter, pinned at each stroke's start (05d pointerdown /
         // touchstart) and held to its end, tail included: arm 0 advances the
         // counter at mouseup, while the tail and the stabilizer's catch-up
         // dabs still paint this stroke.
-        var armStepColor = null;
-        function nextStepHex() {
+        var armStepBase = null;
+        function stepHexAt(base, offset) {
             var list = (typeof getStepColorList === 'function') ? getStepColorList() : [];
             if (!list.length) return null;
             var len = list.length;
-            return list[((paletteStepIndex % len) + len) % len];
+            var i = (base | 0) + (offset | 0);
+            return list[((i % len) + len) % len];
         }
-        function pinArmSteps() {
-            var h = nextStepHex();
-            armStepColor = h ? [
+        function hexRgb(h) {
+            return [
                 parseInt(h.slice(1, 3), 16) / 255,
                 parseInt(h.slice(3, 5), 16) / 255,
                 parseInt(h.slice(5, 7), 16) / 255
-            ] : null;
+            ];
         }
+        // The colour a Palette arm paints next: the counter's, plus the arm's
+        // own offset when an arm is named (arm 0 has none, it IS the counter).
+        function nextStepHex(armIndex) {
+            var cfg = (armIndex > 0 && multiArmColors) ? multiArmColors[armIndex] : null;
+            return stepHexAt(paletteStepIndex, cfg ? cfg.stepOffset : 0);
+        }
+        function pinArmSteps() {
+            armStepBase = paletteStepIndex;
+        }
+        // A repeat click on an arm's Palette button (20): that arm moves one
+        // colour on through the palette, the others stay where they are. Arm 0
+        // is the counter itself, so it moves the counter (and the picker, as a
+        // stroke would) and every other Palette arm steps back one to hold its
+        // colour.
+        function stepArmPalette(armIndex) {
+            var list = (typeof getStepColorList === 'function') ? getStepColorList() : [];
+            var len = list.length;
+            var arr = multiArmColors;
+            if (!len || !arr || !arr[armIndex]) return;
+            if (armIndex > 0) {
+                arr[armIndex].stepOffset = ((arr[armIndex].stepOffset | 0) + 1) % len;
+                return;
+            }
+            var stepEl = document.getElementById('stepPalette');
+            if (stepEl && stepEl.checked) advanceColor();
+            else {
+                paletteStepIndex = (paletteStepIndex + 1) % len;
+                if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
+            }
+            for (var i = 1; i < arr.length; i++) {
+                if (arr[i] && arr[i].mode === 'step') arr[i].stepOffset = (((arr[i].stepOffset | 0) - 1) % len + len) % len;
+            }
+        }
+        window.stepArmPalette = stepArmPalette;
         window.pinArmSteps = pinArmSteps;
         window.nextStepHex = nextStepHex;
         // Called once a stroke has fully settled — rolls each Random arm's next

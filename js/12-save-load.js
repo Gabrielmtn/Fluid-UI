@@ -406,7 +406,7 @@
                     // push: the arm is a Pressure arm (moves paint, lays none).
                     // tip: the arm's own tip, null = the brush's.
                     arm.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
-                               push: !!c.push, tip: armTipOf(c.tip) });
+                               stepOffset: c.stepOffset | 0, push: !!c.push, tip: armTipOf(c.tip) });
                 });
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             } else {
@@ -968,6 +968,8 @@
                 armColorsData = window.multiArmColors.map(function(c) {
                     var o = { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0,
                               push: !!c.push };
+                    // The arm's step through the palette (05g), only when set.
+                    if (c.stepOffset) o.stepOffset = c.stepOffset | 0;
                     // Only when set, so a snapshot of a plain brush is the
                     // shape it always was (look links diff against it).
                     var t = armTipOf(c.tip);
@@ -1150,7 +1152,7 @@
                     // presets and stale peers' snapshots coerce to 'fixed'.
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
                     armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
-                                  push: !!c.push, tip: armTipOf(c.tip) });
+                                  stepOffset: c.stepOffset | 0, push: !!c.push, tip: armTipOf(c.tip) });
                 });
                 // A look opened from a link (js/50-look-links.js) is applied
                 // live and never written into the recipient's saved session.
@@ -1160,6 +1162,7 @@
                     // localStorage and resurrect on the next launch.
                     window.settingsManager.set('brush.armColors', armArr.map(function (a) {
                         var o = { mode: a.mode, color: a.color, stepIndex: a.stepIndex, push: !!a.push };
+                        if (a.stepOffset) o.stepOffset = a.stepOffset;
                         if (a.tip !== null) o.tip = a.tip;
                         return o;
                     }));
