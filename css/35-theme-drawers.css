@@ -27,6 +27,12 @@
 /* Written per frame on the element that uses it, so a change restyles that
    element only (an inherited property would restyle its subtree). */
 @property --wc-rot { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+/* The drawer spring, written on the section every frame of a slide. Left
+   inheriting, that restyled the whole drawer each frame (~490 elements;
+   the tubes' var() chains made Brush the worst: 1.8 s of style and ~1,000
+   ms of dropped frames per 3 toggles, measured 2026-10-18). Its two readers,
+   the front and the tray, take it by name; nothing under them restyles. */
+@property --dp { syntax: "<number>"; inherits: false; initial-value: 0; }
 
 @layer theme {
 
@@ -40,6 +46,10 @@ html[data-theme="walnut-copper"] {
 html[data-theme="walnut-copper"] .sidebar-section {
     border-bottom: 0;
     margin-bottom: 6px;
+}
+/* The drawer spring's two readers (@property --dp above). */
+html[data-theme="walnut-copper"] .sidebar-section > :is(.section-header, .section-body) {
+    --dp: inherit;
 }
 
 /* ── Drawer front (study .dfront 434-441) ────────────────────────────
