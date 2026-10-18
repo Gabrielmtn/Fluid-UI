@@ -224,18 +224,22 @@ html[data-theme="walnut-copper"] input[type=range]:not(:where(#mixer-strip > .mi
    study's 8 px gap and -9 px margin), 8 px to the next row: a 58.6 px
    pitch from one label to the next, as in the study. The input keeps the
    row's whole width (the app's hit area and travel), so the glass runs
-   the row's width and the label sits 4 px in from its end. */
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader) input[type=range] {
+   the row's width and the label sits 4 px in from its end.
+   None of this reaches the top bar's strip, which a small window (js/13)
+   moves into the right sidebar whole: its dials, telegraphs and Material
+   slider keep css/33's head rows and sizes there (the :where() adds no
+   specificity). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader):not(:where(#mixer-strip *)) input[type=range] {
     --input-py: 8px;                /* 22 + 2 x 8 = 38 px */
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]) {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]) {
     margin-bottom: 8px;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]):last-child {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]):last-child {
     margin-bottom: 0;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]) > label,
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-header {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]) > label,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:not(:where(#mixer-strip *)):has(input[type=range]) .ch-header {
     align-items: baseline;
     gap: 8px;
     padding: 0 4px;
@@ -246,13 +250,13 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-chann
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-label {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:not(:where(#mixer-strip *)):has(input[type=range]) .ch-label {
     font: inherit;
     letter-spacing: inherit;
     color: inherit;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]) > label .value-display,
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-value {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]) > label .value-display,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:not(:where(#mixer-strip *)):has(input[type=range]) .ch-value {
     font: 400 13px/1 var(--ui-font-mono);
     letter-spacing: 0.06em;
     font-variant-numeric: tabular-nums;
@@ -271,21 +275,21 @@ html[data-theme="walnut-copper"] #sidebar-left #mixer-brushValue { min-width: ca
 /* A strip channel in a sidebar (Brush Size, the Multi-Brush count): its
    header is the head row; the head's -1 px, the channel's 4 px gap and
    -4 px here = the same 1 px overlap. */
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:has(input[type=range]) .ch-fader {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .mixer-channel:not(:where(#mixer-strip *)):has(input[type=range]) .ch-fader {
     margin-top: -4px;
 }
 /* A disabled row (js/20 greys it with an inline opacity): unlit instead, so
    the glass stays dark glass. */
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]:disabled) {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]:disabled) {
     opacity: 1 !important;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]:disabled) > label,
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:has(input[type=range]:disabled) > label .value-display {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]:disabled) > label,
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]:disabled) > label .value-display {
     color: rgba(160, 138, 118, 0.55);
     text-shadow: none;
 }
 @media (pointer: coarse) {
-    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader) input[type=range] { --input-py: 11px; }
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader):not(:where(#mixer-strip *)) input[type=range] { --input-py: 11px; }
 }
 /* Replay speed is the study's full-height .lad (44 px). */
 html[data-theme="walnut-copper"] #sidebar-left #replaySpeed { --input-py: 11px; }
