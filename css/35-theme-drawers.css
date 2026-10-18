@@ -179,7 +179,17 @@ html[data-theme="walnut-copper"] .sidebar-section.collapsed > .section-body {
    14 px down from under its front (study .dtray), and js/71 sets each
    section's own `translate`, so the drawers below glide instead of
    jumping. */
+/* will-change: its own layer while it slides, so the compositor applies the
+   clip. Drawn clipped in the sidebar's layer instead, every frame landed on
+   a new fractional edge and Skia built clipped variants of the tray's
+   programs: ~40 shader compiles (~7 ms each on D3D11) per few Multi-Brush
+   toggles, on the GPU thread the fluid sim shares. Electron keeps no Skia
+   program cache on disk, so that came back every launch. Measured
+   2026-10-18: 40 -> 22 compiles; the settled tray renders pixel-identical
+   on its own layer. (Only while sliding: it already carries a transform
+   then, so no new containing block for fixed descendants.) */
 html[data-theme="walnut-copper"] .sidebar-section.wc-mv > .section-body {
+    will-change: transform;
     transform: translateY(calc((1 - min(var(--dp), 1)) * -14px));
     clip-path: inset(
         calc((1 - min(var(--dp), 1)) * 14px) 0

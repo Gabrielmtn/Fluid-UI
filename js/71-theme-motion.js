@@ -282,6 +282,29 @@
     // Safari), the tray carries the inert attribute while it slides shut.
     var CSS_INERT = !!(window.CSS && CSS.supports && CSS.supports('interactivity', 'inert'));
     function inertWhileClosing(r, on) { if (!CSS_INERT && r.body) r.body.inert = on; }
+    // A tray whose content changes size while it moves (Multi-Brush rebuilds
+    // its rows as it opens, js/20 __onOpen, and js/73 dresses them after the
+    // toggle was measured): its H follows, before that frame paints, or the
+    // drawers below start ~116 px off and the clip cuts the tray short.
+    var trayRO = typeof ResizeObserver === 'function' ? new ResizeObserver(function (ents) {
+        var cols = new Set();
+        ents.forEach(function (e) {
+            var sec = e.target.parentElement, r = sec && sec._wcd;
+            if (!r || !r.moving || r.body !== e.target) return;
+            var b = e.borderBoxSize && e.borderBoxSize[0];
+            var h = b ? b.blockSize : e.target.getBoundingClientRect().height;
+            if (Math.abs(h - r.H) < 0.01) return;
+            r.H = h;
+            r.el.style.setProperty('--wc-H', h + 'px');
+            if (r.c) cols.add(r.c);
+        });
+        cols.forEach(function (c) { stepColumn(c, 0); });
+    }) : null;
+    function follow(r, on) {
+        if (!trayRO || !r.body || !!r.ro === on) return;
+        r.ro = on;
+        if (on) trayRO.observe(r.body); else trayRO.unobserve(r.body);
+    }
     function toggleDrawers(list) {
         var cols = new Map();
         list.forEach(function (r) {
@@ -297,6 +320,7 @@
             inertWhileClosing(r, !open);
             r.sp.to(open ? 1 : 0, PROF.drawer);
             r.moving = true; r.c = c; r.t0 = performance.now();
+            follow(r, true);
             wake(r);
             if (!cols.has(c)) cols.set(c, []);
             cols.get(c).push(r);
@@ -315,7 +339,9 @@
         c.on = true; c.tail = 0;
         // The one measurement: the toggled trays at their open height, and
         // the scroll, after the toggle's layout.
-        rs.forEach(function (r) { r.H = r.body.offsetHeight; r.el.style.setProperty('--wc-H', r.H + 'px'); });
+        // Fractional: offsetHeight rounds, and the half pixel it drops came
+        // back as a nudge of every drawer below when the layout collapsed.
+        rs.forEach(function (r) { r.H = r.body.getBoundingClientRect().height; r.el.style.setProperty('--wc-H', r.H + 'px'); });
         var s = c.scroller.scrollTop, sh = c.scroller.scrollHeight, ch = c.scroller.clientHeight;
         var before = c.pre != null ? c.pre : c.cache;
         c.pre = null; c.cache = s;
@@ -327,7 +353,8 @@
         var shk = sh, sk = s;
         Array.from(c.moving).sort(function (a, b) { return a.t0 - b.t0; }).forEach(function (r) {
             var x = Math.min(1, Math.max(0, r.sp.x)), v0 = clampTerm(r), T1 = 0;
-            if (!r.open) { shk -= r.H; T1 = Math.max(0, sk - Math.max(0, shk - ch)); sk -= T1; }
+            // The scroll height the collapse leaves is whole pixels.
+            if (!r.open) { shk -= Math.round(r.H); T1 = Math.max(0, sk - Math.max(0, shk - ch)); sk -= T1; }
             r.cl = { v0: v0, T: T1, x0: x, open: r.open };
         });
         wake(c);
@@ -345,6 +372,7 @@
         r.sp.x = r.sp.t = r.open ? 1 : 0; r.sp.v = 0;
         r.el.style.setProperty('--dp', r.open ? '1' : '0'); r.last = '';
         r.moving = false;
+        follow(r, false);
         r.el.classList.remove('wc-closing', 'wc-mv');
         inertWhileClosing(r, false);
         if (!stepDrawer(r, 0)) wake(r);        // the lamp lands now; a tint still fading keeps it awake
@@ -363,10 +391,15 @@
     function stepDrawer(r, dt) {
         if (r.moving) {
             r.sp.step(dt);
-            if (still(r.sp, Math.max(r.H, 60))) { r.sp.x = r.sp.t; r.sp.v = 0; }
-            var d = Math.max(0, Math.min(1.2, r.sp.x)).toFixed(3);
+            // Lands where it crosses its rest. Past 0 a closing tray shows
+            // nothing more (everything clamps there), so the spring's dip sat
+            // still for ~350 ms before the layout collapsed, and that late
+            // collapse read as a separate nudge. Past 1 an opening tray pushed
+            // the drawers below ~2.5 px too far and crept them back as long.
+            if (still(r.sp, Math.max(r.H, 60)) || (r.sp.x - r.sp.t) * (r.open ? 1 : -1) >= 0) { r.sp.x = r.sp.t; r.sp.v = 0; }
+            var d = Math.max(0, Math.min(1, r.sp.x)).toFixed(3);
             if (d !== r.last) { r.el.style.setProperty('--dp', d); r.last = d; }
-            if (r.sp.settled()) { r.moving = false; r.el.classList.remove('wc-closing', 'wc-mv'); inertWhileClosing(r, false); }
+            if (r.sp.settled()) { r.moving = false; follow(r, false); r.el.classList.remove('wc-closing', 'wc-mv'); inertWhileClosing(r, false); }
         }
         // The lamp (study 2751-2752): the spring, or a tint while it lasts.
         var t = r.tint;
@@ -390,7 +423,8 @@
     }
     function stepColumn(c, dt) {
         c.w.step(dt);
-        if (still(c.w, Math.max(Math.abs(c.za), 1))) { c.w.x = c.w.t; c.w.v = 0; }
+        // The scroll lead lands at 0 as the trays do (it clamps there too).
+        if (still(c.w, Math.max(Math.abs(c.za), 1)) || c.w.x <= 0) { c.w.x = c.w.t; c.w.v = 0; }
         var z = c.za * Math.max(0, c.w.x);
         c.moving.forEach(function (r) { if (r.moving) z += clampTerm(r); else { r.cl = null; c.moving.delete(r); } });
         // Straight onto each section's own translate: style and composite

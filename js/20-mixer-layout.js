@@ -9168,11 +9168,14 @@
             if (!watchRaf && isShown()) watchRaf = requestAnimationFrame(watchTick);
         }
 
-        // The section opens and closes like any section, and rebuilds its
-        // rows when it opens; it then stays live (watchPanel).
+        // The section opens and closes like any section, and catches its rows
+        // up when it opens; it then stays live (watchPanel). Repainted in
+        // place unless stale: a rebuild on every open tore the rows (and
+        // js/73's screen dressed onto them) out mid-slide, so the tray grew
+        // ~116 px after js/71 had measured it.
         var hostSec = host.closest ? host.closest('.sidebar-section') : null;
         if (hostSec) {
-            hostSec.__onOpen = function () { rebuildRows(); watchPanel(); };
+            hostSec.__onOpen = function () { refreshPanel(); watchPanel(); };
             // A section also opens without its header click (the saved
             // open/closed state, a How-do-I tour), which skips __onOpen.
             if (typeof MutationObserver === 'function') {

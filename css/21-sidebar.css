@@ -2430,7 +2430,11 @@ select option {
     line-height: 1;
 }
 body.focus-mode .lsb-edge { display: none; }
-.lsb-body { display: flex; flex-direction: column; min-height: 0; }
+/* As tall as its sections (#sidebar-left scrolls, not this). Shrunk to the
+   column, it left the sections overflowing it, so the scroll range followed
+   their translate while a drawer glided (js/71) and clamped mid-close: the
+   drawers then jumped by the scroll at the end. */
+.lsb-body { display: flex; flex-direction: column; flex: none; }
 .lsb-rail,
 .rsb-rail {
     flex-direction: column;
