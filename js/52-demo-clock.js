@@ -410,6 +410,9 @@
     // goes out (the itch zip is named after it; scripts/dist-playtest.js
     // keeps a matching app version).
     var PLAYTEST_LABEL = '0.05 Demo';
+    // The full game (Steam app 5068940) says its version in the same spot.
+    // Keep it in step with package.json's version (0.1 -> 0.1.0).
+    var FULL_LABEL = '0.1 Full Release';
     var playtest = null;
 
     // Floating on a desktop layout (Simple hides the bar), the canvas runs
@@ -444,6 +447,7 @@
         if (el.style.bottom !== bottom) el.style.bottom = bottom;
     }
 
+    function isFull() { return !!window.IS_ELECTRON && window.SWIRL_EDITION !== 'demo' && window.SWIRL_EDITION !== 'playtest'; }
     function initPlaytest() {
         if (window.SWIRL_EDITION === 'playtest') {
             // The desktop playtest names itself, like the demo does; the web
@@ -455,7 +459,7 @@
         playtest = document.createElement('div');
         playtest.id = 'playtestLabel';
         playtest.className = 'playtest-label';
-        playtest.textContent = PLAYTEST_LABEL;
+        playtest.textContent = isFull() ? FULL_LABEL : PLAYTEST_LABEL;
         var sync = function () {
             if (api.active) return;
             if (place(playtest)) tuck(playtest);
@@ -492,7 +496,7 @@
 
     var boot = window.SWIRL_EDITION === 'demo' ? init
              : window.SWIRL_EDITION === 'playtest' ? initPlaytest   // itch
-             : window.IS_ELECTRON ? null                            // the full game
+             : window.IS_ELECTRON ? initPlaytest                    // the full game: its version
              : initPlaytest;                                        // the web build
     if (!boot) return;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

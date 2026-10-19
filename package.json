@@ -1,6 +1,6 @@
 {
   "name": "fluid-ui-multiplayer",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Fluid simulation with multiplayer support via PartyKit",
   "author": "Gabrielmtn",
   "main": "electron-main.js",
