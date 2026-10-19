@@ -23,6 +23,7 @@
 //
 //   node scripts/theme/bake-deco-sunburst.js
 //   node scripts/theme/bake-deco-sunburst.js --scale 1.6 --out <file.jpg>
+//   node scripts/theme/bake-deco-sunburst.js --square 1200 --out <file.jpg>
 //
 // --scale bakes the same picture bigger (every length scales, so it is the
 // 2560 ground with more detail, not a wider fan); the Steam capsules use it
@@ -36,8 +37,11 @@ const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.a
 const S = +(arg('--scale') || 1);
 const OUT = arg('--out') ? path.resolve(arg('--out')) : path.join(ROOT, 'assets/textures/deco-sunburst-2560.jpg');
 
-const W = Math.round(2560 * S), H = Math.round(1600 * S), SS = 2;   // output size, supersampling
-const CX = W / 2, CY = H + 60 * S;           // the sun, just under the edge
+// --square N: an N x N tile with the sun in the middle (the app icon's
+// medallion) instead of the boot screens' sunrise.
+const SQ = +(arg('--square') || 0);
+const W = SQ || Math.round(2560 * S), H = SQ || Math.round(1600 * S), SS = 2;   // output size, supersampling
+const CX = W / 2, CY = SQ ? H / 2 : H + 60 * S;   // the sun, just under the edge (or centred)
 const N = 28;                                // rays across the full circle
 const DA = 2 * Math.PI / N;
 const R0 = 150 * S, G = 1.55;                // sun radius, ring growth

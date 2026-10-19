@@ -11,6 +11,7 @@
 //   store     header 920x430   small 462x174   main 1232x706   vertical 748x896
 //   library   capsule 600x900  header 920x430 (= the store header)
 //             hero 3840x1240   logo 1280 wide, transparent
+//   icon      shortcut 512x512 PNG, app icon 184x184 JPG, build/icon.ico
 //
 // THE PICTURE is the splash as the app draws it (css/44-theme-boot.css,
 // css/init-responsive.css): the app is booted in a throwaway-profile
@@ -46,6 +47,9 @@ const PORT = 9339;
 const STORE_DIR = path.join(REPO, 'steam', 'store-assets');
 const LIB_DIR = path.join(REPO, 'steam', 'library-assets');
 const GROUND = path.join(os.tmpdir(), 'swirl-deco-ground-1.6.jpg');
+// The icon's ground: the same veneer as a square medallion, sun centred.
+const GROUND_ICON = path.join(os.tmpdir(), 'swirl-deco-medallion-1200.jpg');
+const BUILD_DIR = path.join(REPO, 'build');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // textW: how much of the slot's width the title's longest line spans.
@@ -61,7 +65,19 @@ const SLOTS = {
     capsule:  { dir: LIB_DIR, file: 'library_capsule_600x900.png', slot: [600, 900], textW: 0.74, sub: 0.24, wrap: true,
                 swirlScale: 0.62, swirlY: 0.45 },
     hero:     { dir: LIB_DIR, file: 'library_hero_3840x1240.png', slot: [3840, 1240], k: 1, noText: true, swirlScale: 0.7 },
-    logo:     { dir: LIB_DIR, file: 'library_logo_1280x{h}.png', slot: [1280, 400], textW: 0.92, logo: true }
+    logo:     { dir: LIB_DIR, file: 'library_logo_1280x{h}.png', slot: [1280, 400], textW: 0.92, logo: true },
+    // The app icon: the double swirl on the medallion, no type. The 512 PNG
+    // is Steam's Shortcut Icon, the 184 JPG its App Icon (no alpha), and the
+    // .ico is the exe's own icon at every size Windows asks for.
+    icon:     { dir: STORE_DIR, file: 'shortcut_icon_512x512.png', slot: [512, 512], noText: true, medallion: true,
+                swirlScale: 0.72, swirlOpacity: 1, look: { turns: 3, stir: 90, dab: 0.0013 },
+                monogram: [{ ch: 'S', x: 0.33, y: 0.42, size: 0.62 }, { ch: 'T', size: 0.46, y: 0.64, gap: 0.06 }],
+                jpg: [STORE_DIR, 'app_icon_184x184.jpg', 184],
+                ico: [BUILD_DIR, 'icon.ico', [256, 128, 64, 48, 32, 24, 16]],
+                // The demo and playtest builds wear the same mark.
+                copies: [[path.join(REPO, 'steam', 'demo-store-assets'), 'shortcut_icon_512x512.png']],
+                jpgCopies: [path.join(REPO, 'steam', 'demo-store-assets')],
+                icoCopies: [[BUILD_DIR, 'icon-demo.ico']] }
 };
 
 // The swirl's two tones (copper off the inlay, a cool teal against it) and
@@ -88,6 +104,11 @@ const SWIRL = String(async function (o) {
         st.textContent = '.resize-handle, .corner-lock, #canvas-size-display { display: none !important; }';
         document.head.appendChild(st);
     }
+    // Undo the logo slot's see-through page, or the canvas is hidden too.
+    const hid = document.getElementById('capsule-hide');
+    if (hid) hid.remove();
+    document.documentElement.style.background = '';
+    document.body.style.background = '';
     try { if (window.QualityGovernor && window.QualityGovernor.setEnabled) window.QualityGovernor.setEnabled(false); } catch (_) {}
     set('visualResolution', '4096');
     window.__exporting = true;
@@ -196,6 +217,9 @@ const SHOW = function (o) {
         [t, sub].forEach((el) => { el.style.position = 'relative'; el.style.zIndex = '1'; });
     }
     [t, sub].forEach((el) => { el.style.opacity = '1'; el.style.animation = 'none'; el.style.transform = 'none'; el.style.transition = 'none'; });
+    // The medallion under a dark plate, as the splash puts one under its
+    // title, so the dye reads at 16 px instead of fighting the veneer.
+    if (o.medallion) s.style.background = 'radial-gradient(circle at 50% 50%, rgba(4,7,12,0.82), rgba(4,7,12,0.55) 62%, rgba(4,7,12,0.25)), #05080d url(/__ground-icon.jpg) center / cover no-repeat';
     if (o.logo) {
         s.style.background = 'none';
         document.documentElement.style.background = 'transparent';
@@ -204,6 +228,37 @@ const SHOW = function (o) {
         hide.id = 'capsule-hide';
         hide.textContent = 'body > *:not(#splash-screen) { visibility: hidden !important; }';
         document.head.appendChild(hide);
+    }
+    if (o.monogram) {
+        // The icon's ST: a big S and a smaller T set lower and to the right,
+        // in the splash title's cream and the label face's ExtraBold, with a
+        // dark edge so each letter holds over copper and teal alike.
+        // A letter with a gap is placed by INK, that far right of the last
+        // letter's ink, so the two never touch.
+        let lastRight = 0;
+        o.monogram.forEach((m) => {
+            const L = document.createElement('div');
+            L.textContent = m.ch;
+            L.style.cssText = 'position:absolute;z-index:1;left:' + (m.x * 100) + '%;top:' + (m.y * 100) + '%;' +
+                'transform:translate(-50%,-50%);line-height:1;font-family:var(--ui-font-display);font-weight:800;' +
+                'font-size:' + (m.size * innerHeight) + 'px;color:rgb(251,236,217);' +
+                'text-shadow:0 0 ' + (innerHeight * 0.012) + 'px rgba(4,7,12,0.95),0 0 ' + (innerHeight * 0.035) + 'px rgba(4,7,12,0.8),0 0 ' + (innerHeight * 0.06) + 'px rgba(242,179,138,0.35)';
+            s.appendChild(L);
+            const ink = (el) => {
+                const c = document.createElement('canvas').getContext('2d');
+                const cs = getComputedStyle(el);
+                c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+                const t = c.measureText(m.ch);
+                const r = el.getBoundingClientRect();
+                const x0 = r.left + r.width / 2 - t.width / 2;    // the glyph's origin, centred in its box
+                return { left: x0 - t.actualBoundingBoxLeft, right: x0 + t.actualBoundingBoxRight };
+            };
+            if (m.gap != null) {
+                const k = ink(L);
+                L.style.left = (parseFloat(getComputedStyle(L).left) + lastRight + m.gap * innerWidth - k.left) + 'px';
+            }
+            lastRight = ink(L).right;
+        });
     }
     if (o.noText) { t.remove(); sub.remove(); return 0; }
     if (!o.sub) sub.remove();
@@ -242,8 +297,8 @@ function serve() {
         const srv = http.createServer((req, rsp) => {
             let p = decodeURIComponent(req.url.split('?')[0]);
             if (p.endsWith('/')) p += 'index.html';
-            const f = p === '/__ground.jpg' ? GROUND : path.join(REPO, p);
-            if (f !== GROUND && !f.startsWith(REPO)) { rsp.writeHead(403); rsp.end(); return; }
+            const f = p === '/__ground.jpg' ? GROUND : p === '/__ground-icon.jpg' ? GROUND_ICON : path.join(REPO, p);
+            if (f !== GROUND && f !== GROUND_ICON && !f.startsWith(REPO)) { rsp.writeHead(403); rsp.end(); return; }
             fs.readFile(f, (err, buf) => {
                 if (err) { rsp.writeHead(404); rsp.end(); return; }
                 rsp.writeHead(200, { 'Content-Type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
@@ -272,14 +327,14 @@ async function bake(page, name, outDir) {
     if (!s.logo) {
         await page.send('Emulation.clearDeviceMetricsOverride', {});
         await page.eval("(function(){ var x=document.getElementById('splash-screen'); if(x) x.remove(); return 1; })()");
-        const r = await page.eval('(' + SWIRL + ')(' + JSON.stringify(Object.assign({ box: BOX, slot: s.slot, swirlScale: s.swirlScale, swirlY: s.swirlY }, SWIRL_LOOK)) + ')', { timeoutMs: 120000 });
+        const r = await page.eval('(' + SWIRL + ')(' + JSON.stringify(Object.assign({ box: BOX, slot: s.slot, swirlScale: s.swirlScale, swirlY: s.swirlY }, SWIRL_LOOK, s.look)) + ')', { timeoutMs: 120000 });
         const shot = await page.send('Page.captureScreenshot', { format: 'png', clip: { x: r.x, y: r.y, width: r.width, height: r.height, scale: 1 } });
         swirl = 'data:image/png;base64,' + shot.data;
         if (outDir) write(outDir, 'swirl_' + name + '.png', Buffer.from(shot.data, 'base64'));
     }
     await page.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: k, mobile: false });
     await page.send('Emulation.setDefaultBackgroundColorOverride', s.logo ? { color: { r: 0, g: 0, b: 0, a: 0 } } : {});
-    const fsPx = await page.eval('(' + SHOW + ')(' + JSON.stringify(Object.assign({ swirl: swirl, swirlOpacity: SWIRL_LOOK.opacity }, s)) + ')');
+    const fsPx = await page.eval('(' + SHOW + ')(' + JSON.stringify(Object.assign({ swirl: swirl, swirlOpacity: s.swirlOpacity || SWIRL_LOOK.opacity }, s)) + ')');
     await page.eval('document.fonts.ready.then(() => 1)');
     await sleep(1200);                                   // ground decoded, glow settled
     const shot = await page.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -296,19 +351,52 @@ async function bake(page, name, outDir) {
     }
     const dirs = [[outDir || s.dir, file]].concat(outDir ? [] : (s.copies || []));
     dirs.forEach(([d, f]) => console.log('wrote', path.relative(REPO, write(d, f, buf)), buf.length, 'bytes', fsPx ? '(title ' + Math.round(fsPx) + 'px)' : ''));
+    if (s.jpg) {
+        const j = await sharp(buf).resize(s.jpg[2], s.jpg[2], { kernel: 'lanczos3' }).jpeg({ quality: 92, chromaSubsampling: '4:4:4' }).toBuffer();
+        console.log('wrote', path.relative(REPO, write(outDir || s.jpg[0], s.jpg[1], j)), j.length, 'bytes');
+        if (!outDir) (s.jpgCopies || []).forEach((d) => console.log('wrote', path.relative(REPO, write(d, s.jpg[1], j)), '(same picture)'));
+    }
+    if (s.ico) {
+        const sizes = s.ico[2];
+        const pngs = await Promise.all(sizes.map((z) => sharp(buf).resize(z, z, { kernel: 'lanczos3' }).png().toBuffer()));
+        const i = ico(sizes, pngs);
+        console.log('wrote', path.relative(REPO, write(outDir || s.ico[0], s.ico[1], i)), i.length, 'bytes (' + sizes.join('/') + ')');
+        if (!outDir) (s.icoCopies || []).forEach(([d, f]) => console.log('wrote', path.relative(REPO, write(d, f, i)), '(same picture)'));
+        if (outDir) pngs.forEach((b, n) => write(outDir, 'icon_' + sizes[n] + '.png', b));
+    }
+}
+
+// Vista-style .ico: a directory of embedded PNGs, which every Windows
+// since reads for exe and shortcut icons alike.
+function ico(sizes, pngs) {
+    const head = Buffer.alloc(6);
+    head.writeUInt16LE(0, 0); head.writeUInt16LE(1, 2); head.writeUInt16LE(sizes.length, 4);
+    const dir = Buffer.alloc(16 * sizes.length);
+    let off = 6 + 16 * sizes.length;
+    sizes.forEach((z, i) => {
+        const o = 16 * i;
+        dir.writeUInt8(z >= 256 ? 0 : z, o); dir.writeUInt8(z >= 256 ? 0 : z, o + 1);
+        dir.writeUInt16LE(1, o + 4); dir.writeUInt16LE(32, o + 6);
+        dir.writeUInt32LE(pngs[i].length, o + 8); dir.writeUInt32LE(off, o + 12);
+        off += pngs[i].length;
+    });
+    return Buffer.concat([head, dir].concat(pngs));
 }
 
 (async () => {
     const args = process.argv.slice(2);
     const oi = args.indexOf('--out');
     const outDir = oi >= 0 ? path.resolve(args[oi + 1]) : null;
-    const rest = args.filter((a, i) => i !== oi && i !== oi + 1);
+    const rest = oi < 0 ? args : args.filter((a, i) => i !== oi && i !== oi + 1);
     const unknown = rest.filter((a) => !SLOTS[a]);
     if (unknown.length) { console.error('unknown slot(s):', unknown.join(' '), '- slots are', Object.keys(SLOTS).join(', ')); process.exit(2); }
     const names = rest.length ? rest : Object.keys(SLOTS);
 
     if (!fs.existsSync(GROUND)) {
         execFileSync(process.execPath, [path.join(__dirname, 'theme', 'bake-deco-sunburst.js'), '--scale', '1.6', '--out', GROUND], { stdio: 'inherit' });
+    }
+    if (!fs.existsSync(GROUND_ICON)) {
+        execFileSync(process.execPath, [path.join(__dirname, 'theme', 'bake-deco-sunburst.js'), '--square', '1200', '--out', GROUND_ICON], { stdio: 'inherit' });
     }
     const srv = await serve();
     const url = 'http://127.0.0.1:' + srv.address().port + '/';
