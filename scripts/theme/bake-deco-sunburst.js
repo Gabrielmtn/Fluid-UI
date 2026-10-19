@@ -22,22 +22,29 @@
 // (repeating high-contrast stripes are themselves a photosensitive trigger).
 //
 //   node scripts/theme/bake-deco-sunburst.js
+//   node scripts/theme/bake-deco-sunburst.js --scale 1.6 --out <file.jpg>
+//
+// --scale bakes the same picture bigger (every length scales, so it is the
+// 2560 ground with more detail, not a wider fan); the Steam capsules use it
+// (scripts/bake-deco-capsules.js) so the 3840 hero is not an upscale.
 'use strict';
 const path = require('path');
 const sharp = require('sharp');
 const ROOT = path.resolve(__dirname, '../..');
 const SRC = path.join(ROOT, 'design/textures/painted-walnut-source.jpg');
-const OUT = path.join(ROOT, 'assets/textures/deco-sunburst-2560.jpg');
+const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
+const S = +(arg('--scale') || 1);
+const OUT = arg('--out') ? path.resolve(arg('--out')) : path.join(ROOT, 'assets/textures/deco-sunburst-2560.jpg');
 
-const W = 2560, H = 1600, SS = 2;            // output size, supersampling
-const CX = W / 2, CY = H + 60;               // the sun, just under the edge
+const W = Math.round(2560 * S), H = Math.round(1600 * S), SS = 2;   // output size, supersampling
+const CX = W / 2, CY = H + 60 * S;           // the sun, just under the edge
 const N = 28;                                // rays across the full circle
 const DA = 2 * Math.PI / N;
-const R0 = 150, G = 1.55;                    // sun radius, ring growth
+const R0 = 150 * S, G = 1.55;                // sun radius, ring growth
 const PLANK = 0.075;                         // plank width / band radius
 const PLANK_LEN = 4.5;                       // plank length / plank width
 const TEX_PER_R = 1100;                      // texels per band radius
-const SEAM_PX = 0.9, INLAY_PX = 1.6;
+const SEAM_PX = 0.9 * S, INLAY_PX = 1.6 * S;
 
 // Blue filter: grain luminance onto a slate ramp (dark navy -> steel).
 const LO = [5, 9, 16], HI = [84, 114, 152];
@@ -85,7 +92,7 @@ function hash(a, b, c) {
             const rim = R0 - r;
             if (rim < INLAY_PX * 1.5) return COPPER.map(c => c * 0.75);
             const step = R0 / 7, d = Math.min(r % step, step - (r % step));
-            if (d < 0.7 && r > step) return COPPER.map(c => c * 0.38);
+            if (d < 0.7 * S && r > step) return COPPER.map(c => c * 0.38);
             const t = r / R0;
             return LO.map((c, i) => c + (HI[i] - c) * 0.14 * (1 - t));
         }
@@ -126,10 +133,10 @@ function hash(a, b, c) {
             if (edge >= INLAY_PX) lift *= 0.7;
             const a = 0.85;
             col = col.map((c, i) => c * (1 - a) + COPPER[i] * lift * a);
-        } else if (edge < INLAY_PX + 1.2 || ring < INLAY_PX + 1.2) {
+        } else if (edge < INLAY_PX + 1.2 * S || ring < INLAY_PX + 1.2 * S) {
             col = col.map(c => c * 0.5);                 // shadow beside the inlay
         }
-        if (va < 0.6) col = col.map(c => c * 0.7);       // the fold itself
+        if (va < 0.6 * S) col = col.map(c => c * 0.7);       // the fold itself
         return col;
     }
 
