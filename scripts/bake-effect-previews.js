@@ -432,6 +432,8 @@
     };
     const PRESET_BAKE = {};
     Object.keys(LOOK_STROKES).forEach((k) => { PRESET_BAKE[k] = { color: false, size: false, pen: strokes(LOOK_STROKES[k]) }; });
+    // Marbling and Lovely Blend (2026-10-18) bring their own two colours too.
+    ['marble', 'electric'].forEach((k) => { PRESET_BAKE[k] = { color: false }; });
     const wallPhase = (secs) => { const t0 = performance.now(); return () => ((performance.now() - t0) / 1000 / secs) % 1; };
     async function runPreset(key, opts) {
         opts = Object.assign({}, PRESET_BAKE[key] || {}, opts || {});

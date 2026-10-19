@@ -79,9 +79,31 @@
 
             turbulent: { DENSITY_DISSIPATION: 0.994, VELOCITY_DISSIPATION: 0.997, PRESSURE_DISSIPATION: 0.94, PRESSURE_ITERATIONS: 30, CURL: 55, SPLAT_RADIUS: 0.013 },  // Was 60; PD was 0.88
 
-            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.97, PRESSURE_ITERATIONS: 35, CURL: 8, SPLAT_RADIUS: 0.018 },  // Was 100; PD was 0.98
+            // Marbling (Gabriel 2026-10-18): Laminar all the way, two
+            // complementary colours, one on each arm of a 2x Multi-Brush.
+            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.97, PRESSURE_ITERATIONS: 35, CURL: 8, SPLAT_RADIUS: 0.018,  // Was 100; PD was 0.98
+                      ui: { checkboxes: { colorGate: true, stepPalette: false, randomColor: false, kaleidoToggle: false },
+                            sliders: { colorBlend: -1, multiplier: 2 },
+                            selects: { symmetryMode: 'radial' },
+                            colors: { brush: '#2D6FE0' },
+                            savedColors: ['#2D6FE0', '#F08A24'],
+                            armColors: [
+                                { mode: 'fixed', color: '#2D6FE0', stepIndex: 0, push: false },
+                                { mode: 'fixed', color: '#F08A24', stepIndex: 0, push: false }
+                            ] } },
 
-            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.935, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006 },  // Was 35; PD was 0.82
+            // Lovely Blend (Gabriel 2026-10-18; was Electric threads): Blend all
+            // the way, red and blue, one on each arm of a 2x Multi-Brush.
+            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.935, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006,  // Was 35; PD was 0.82
+                        ui: { checkboxes: { colorGate: true, stepPalette: false, randomColor: false, kaleidoToggle: false },
+                              sliders: { colorBlend: 1, multiplier: 2 },
+                              selects: { symmetryMode: 'radial' },
+                              colors: { brush: '#E8263A' },
+                              savedColors: ['#E8263A', '#2B55E8'],
+                              armColors: [
+                                  { mode: 'fixed', color: '#E8263A', stepIndex: 0, push: false },
+                                  { mode: 'fixed', color: '#2B55E8', stepIndex: 0, push: false }
+                              ] } },
 
             // Gel pen (2026-09-02): a line that stays where you drew it — colour
             // never fades (density 1.0), motion dies in under a second, no
