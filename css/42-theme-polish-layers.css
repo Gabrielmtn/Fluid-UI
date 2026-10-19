@@ -1,0 +1,219 @@
+/* ================================================================
+   css/42-theme-polish-layers.css - Walnut & Copper polish pass (2026-10-18).
+   Owner: the layers and transform polish agent (layer rows, layers spacing, transform bars).
+   Loads after css/30-40, inside @layer theme; rules scoped to
+   html[data-theme="walnut-copper"]. Button colour may live here (js/38
+   sanctions the theme component sheets 40-49).
+   ================================================================ */
+@layer theme {
+
+/* ── Layer rows: one grid for every header ───────────────────────────
+   Thumbnail | name | bin | show/hide. The Sim row has no bin, and as a flex
+   row its name grew into the bin's space, so it read wider than every
+   Capture under it. Fixed columns keep the empty slot: every name field is
+   the same width and every checkbox sits in the same column. */
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item-header {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 32px var(--layer-ctl-col, 40px);
+    align-items: center;
+    column-gap: 8px;
+}
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item-header > .layer-thumbnail { grid-column: 1; width: 40px; height: 40px; }
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item-header > .layer-info { grid-column: 2; }
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item-header > .layer-head-delete { grid-column: 3; }
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item-header > .layer-controls { grid-column: 4; width: auto; }
+/* A picture's thumbnail gets the SIM tile's copper rim, so a dark or
+   still-empty capture still reads as a frame, not a hole in the panel. */
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-thumbnail:not([style*="667eea"]) {
+    border-radius: 6px;
+    background-color: #0c0705;
+    background-size: cover;
+    background-position: center;
+    box-shadow: inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* The bin: a copper glyph at full strength in a 32 px well, not a 55 %
+   ghost (it was the faintest thing on the row). Hover and focus light it
+   red-hot, since it is the one verb on the row you can't see the end of. */
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item .layer-head-delete {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 5px;
+    background: rgba(8, 4, 2, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(196, 122, 75, 0.55), inset 0 1px 2px rgba(0, 0, 0, 0.6);
+    color: var(--cu-hi);
+    opacity: 1;
+    cursor: pointer;
+}
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-head-delete svg { width: 16px; height: 16px; }
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-head-delete:hover {
+    background: rgba(70, 18, 6, 0.6);
+    box-shadow: inset 0 0 0 1px #ff8a5c, 0 0 10px rgba(255, 90, 40, 0.45);
+    color: #ffd0b8;
+}
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-head-delete:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 2px;
+    color: #ffd0b8;
+}
+
+/* ── Rhythm between rows ──────────────────────────────────────────────
+   js/71 stamps every row as its own group, so each Capture opened with a
+   full bead row and atom, 40 px of ornament per layer. The first row (Sim)
+   keeps it, as the list's opening; the rows after it are one list, split
+   by a plain dotted hairline and a modest gap. */
+html[data-theme="walnut-copper"] .section-body #layersPanel > .layer-item[data-wc-group] ~ .layer-item[data-wc-group="row"] {
+    margin-top: 4px !important;
+    padding-top: 6px !important;
+}
+html[data-theme="walnut-copper"] .section-body #layersPanel > .layer-item[data-wc-group] ~ .layer-item[data-wc-group="row"]::before {
+    top: 0;
+    left: 4px;
+    right: 4px;
+    border-top: 1px dotted rgba(214, 140, 92, 0.35);
+    -webkit-mask: none;
+    mask: none;
+}
+html[data-theme="walnut-copper"] .section-body #layersPanel > .layer-item[data-wc-group] ~ .layer-item[data-wc-group="row"]::after { content: none; }
+/* Still the drop line while a layer is dragged over it. */
+html[data-theme="walnut-copper"] .section-body #layersPanel > .layer-item[data-wc-group] ~ .layer-item.drag-over[data-wc-group="row"]::before {
+    border-top: 2px solid var(--cu-hi);
+    box-shadow: 0 0 8px rgba(255, 110, 30, 0.7);
+}
+/* The fold caret rode the top edge of the bead gap; keep it just under the
+   hairline. */
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item-collapsible .layer-item-header { padding-top: 10px; padding-bottom: 6px; }
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-collapse-caret { top: 1px; }
+/* A closed row's body is 0fr tall but kept its padding: 11 px of nothing
+   under every closed Capture. */
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item-collapsible.collapsed .layer-item-body { padding-top: 0; padding-bottom: 0; }
+
+/* ── An open row's settings: one caption column ───────────────────────
+   Opacity and Threshold sat in a caption column; Clip (and a collider's
+   Mode, a paint layer's Blend) put a larger display-face heading on a line
+   of its own above. They all take the caption column now, in one face, so
+   the controls start on the same line down the whole card. */
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-item {
+    --layer-cap-col: 72px;
+}
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-prop .layer-prop-label,
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-prop:has(> select) > .layer-prop-label {
+    flex: 0 0 var(--layer-cap-col);
+    width: var(--layer-cap-col);
+    font: 400 9px/1.2 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+    white-space: nowrap;
+}
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-prop:has(> select) {
+    flex-wrap: nowrap;
+    column-gap: 6px;
+}
+/* Readouts in the lit mono, not Courier. */
+html[data-theme="walnut-copper"] #sidebar-right #layersPanel .layer-slider-value {
+    font: 400 12px/1 var(--ui-font-mono);
+    letter-spacing: 0.02em;
+    color: var(--lit);
+}
+
+/* ── Mode bars over the painting: Moving layer (js/26), Arrange text
+   (js/23). One component: a dark glass plate with a copper rim at the top
+   centre, the mode and the item on the first line, the hint under it in
+   readable type, the buttons large at the right. They were wood plates,
+   whose herringbone sat behind 11 px grey hints. ── */
+html[data-theme="walnut-copper"] :is(#text-arrange-bar, #layerTransformOverlay .draw-toolbar) {
+    top: 18px;
+    display: grid;
+    grid-template-columns: minmax(0, auto) auto auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 4px;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 12px 14px 12px 22px;
+    border: 0;
+    border-radius: 12px;
+    background: rgba(12, 7, 4, 0.94);
+    background-image: linear-gradient(180deg, rgba(255, 200, 150, 0.07), transparent 45%);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    backdrop-filter: blur(10px) saturate(1.2);
+    box-shadow:
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 2.5px rgba(255, 210, 170, 0.12),
+        0 12px 32px rgba(0, 0, 0, 0.7),
+        0 0 22px rgba(255, 110, 30, 0.16);
+    color: #f4e6d4;
+    font-family: var(--ui-font-body);
+    text-shadow: none;
+}
+html[data-theme="walnut-copper"] :is(#text-arrange-bar .ba-title, #layerTransformOverlay .layer-transform-title) {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+    font-size: 16px;
+    letter-spacing: 0.14em;
+    font-variant-caps: all-small-caps;
+    color: var(--cu-hi);
+    white-space: nowrap;
+}
+html[data-theme="walnut-copper"] #layerTransformOverlay .layer-transform-title b {
+    margin-left: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--ui-font-body);
+    font-weight: 700;
+    font-size: 17px;
+    font-variant-caps: normal;
+    letter-spacing: 0;
+    color: #fff6e6;
+}
+html[data-theme="walnut-copper"] :is(#text-arrange-bar .ba-hint, #layerTransformOverlay .layer-transform-hint) {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    max-width: 780px;
+    text-wrap: balance;
+    font-family: var(--ui-font-body);
+    font-size: 14px;
+    line-height: 1.35;
+    color: #e8d6c0;
+    white-space: normal;
+}
+html[data-theme="walnut-copper"] :is(#text-arrange-bar, #layerTransformOverlay .draw-toolbar) button {
+    grid-row: 1 / span 2;
+    min-height: 42px;
+    min-width: 104px;
+    padding: 0 18px;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+}
+html[data-theme="walnut-copper"] #layerTransformDone,
+html[data-theme="walnut-copper"] #textArrangeDone { grid-column: 2; margin-left: 12px; }
+html[data-theme="walnut-copper"] #layerTransformCancel { grid-column: 3; }
+/* Text arrange's Done takes the emphasised face Moving layer's has. */
+html[data-theme="walnut-copper"] #textArrangeDone {
+    color: var(--lit);
+    box-shadow: inset 0 0 0 1.5px var(--cu-hi), 0 0 12px rgba(255, 120, 40, 0.35);
+}
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] :is(#text-arrange-bar, #layerTransformOverlay .draw-toolbar) {
+        background: Canvas;
+        border: 2px solid CanvasText;
+    }
+}
+
+} /* @layer theme */

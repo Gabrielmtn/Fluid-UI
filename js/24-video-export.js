@@ -39,7 +39,8 @@
         outputFolder: '',
         filenamePrefix: 'fluid_',
         compositeOverlays: true,
-        ground: 'seen'
+        ground: 'seen',
+        format: 'video'     // Export's Format field (js/20): video | gif | still | sequence
     };
     let cfg = { ...DEFAULTS };
 
@@ -1743,6 +1744,7 @@
 
             // Phase 1: capture frames (0 → 70%)
             var files = seqDir ? null : [];
+            var seqT0 = performance.now();
             for (var i = 0; i < frameCount; i++) {
                 if (_abort) { toast('Export cancelled', 'info'); return; }
 
@@ -1768,7 +1770,16 @@
                 updateUI('rendering', ((i + 1) / frameCount) * (seqDir ? 95 : 70),
                     'Sequence ' + clock((i + 1) * interval) + ' / ' + clock(duration));
 
-                if (i < frameCount - 1) await sleep(interval);
+                // Frame i+1 is due at t0 + (i+1) × interval (2026-10-18): a
+                // flat sleep(interval) came on top of the capture and PNG
+                // encode, so every frame ran long by that much. A frame that
+                // runs late goes straight on to the next; past what the
+                // display and the encode keep up with (144 needs a 144 Hz
+                // screen and a fast encode) the frames come further apart.
+                if (i < frameCount - 1) {
+                    var wait = seqT0 + (i + 1) * interval - performance.now();
+                    if (wait > 0) await sleep(wait);
+                }
             }
 
             if (_abort) { toast('Export cancelled', 'info'); return; }

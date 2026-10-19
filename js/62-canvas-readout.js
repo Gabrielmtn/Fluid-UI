@@ -54,12 +54,18 @@
         var t = sizeText(s.w, s.h);
         if (barVal) barVal.textContent = t;
         if (exportEl) {
+            // Only the chosen Format's size (2026-10-18): the GIF's when GIF
+            // is chosen, the canvas's for the rest. js/20 calls refresh()
+            // when the Format changes.
+            var fmt = document.getElementById('exportFormat');
             var out = 'Comes out ' + t;
-            var gw = s.w, gh = s.h;
-            if (gw > maxW) { gh = Math.round(gh * (maxW / gw)); gw = maxW; }
-            gw = gw & ~1; gh = gh & ~1;   // and even sides, as 24 does
-            if (gw !== s.w || gh !== s.h) out += ' (GIF ' + gw + ' × ' + gh + ')';
-            exportEl.textContent = out;
+            if (fmt && fmt.value === 'gif') {
+                var gw = s.w, gh = s.h;
+                if (gw > maxW) { gh = Math.round(gh * (maxW / gw)); gw = maxW; }
+                gw = gw & ~1; gh = gh & ~1;   // and even sides, as 24 does
+                out = 'Comes out ' + sizeText(gw, gh);
+            }
+            if (exportEl.textContent !== out) exportEl.textContent = out;
         }
     }
 

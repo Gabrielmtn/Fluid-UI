@@ -157,11 +157,12 @@
         // 'mode|arms|mirror' -> [mode, arms, mirror]: what this step's dabs
         // were painted with, and what the hold follows.
         let _symPaintNow = null, _symPaintHeld = null;
-        window.__symHoldNotePaint = function (mode, n, mir) {
-            n = Math.max(1, n | 0); mir = mir | 0;
-            const k = mode + '|' + n + '|' + mir;
+        // md: Mandala Overlay's fold (05g foldMandala), 0 = none.
+        window.__symHoldNotePaint = function (mode, n, mir, md) {
+            n = Math.max(1, n | 0); mir = mir | 0; md = md | 0;
+            const k = mode + '|' + n + '|' + mir + '|' + md;
             if (!_symPaintNow) _symPaintNow = {};
-            if (!_symPaintNow[k]) _symPaintNow[k] = [mode, n, mir];
+            if (!_symPaintNow[k]) _symPaintNow[k] = [mode, n, mir, md];
         };
         function symHoldUnit(q) { return Math.abs(q) < 1e-6 || Math.abs(Math.abs(q) - 1) < 1e-6; }
         function symmetryHoldGroup() {
@@ -171,7 +172,8 @@
                 const pm = config.SYMMETRY_MODE || 'radial';
                 const pn = (typeof animationMultiplier === 'number') ? Math.max(1, animationMultiplier | 0) : 1;
                 painted = {};
-                painted[pm + '|' + pn + '|0'] = [pm, pn, 0];
+                const pmd = (typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(window.__mandalaFold) : 0;
+                painted[pm + '|' + pn + '|0|' + pmd] = [pm, pn, 0, pmd];
             }
             const keys = Object.keys(painted).sort();
             const ax = (typeof config.AMBIENT_FORCE_X === 'number') ? config.AMBIENT_FORCE_X : 0;
@@ -190,7 +192,7 @@
             for (let i = 0; i < keys.length; i++) {
                 const p = painted[keys[i]];
                 if (p[0] === 'rake') { list = []; break; }
-                const own = window.symmetryTransforms(p[0], p[1], 0, 0, p[2]).map(function (t) {
+                const own = window.symmetryTransforms(p[0], p[1], 0, 0, p[2], p[3]).map(function (t) {
                     return [t.m[0], t.m[1], t.m[3], t.m[4]];
                 });
                 list = list === null ? own : list.filter(function (q) {

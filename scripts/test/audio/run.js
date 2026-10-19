@@ -72,10 +72,15 @@ const SUITE = {
     }
 };
 
+// Audio's Full mode is hidden until it is ready (Gabriel's tour, 2026-10-18):
+// these probes open it, so they sit out until it comes back. Run one by name
+// to try it anyway.
+const NEEDS_FULL = ['editor', 'matcher', 'setup-song'];
 (async () => {
     const only = process.argv[2];
     for (const name of Object.keys(SUITE)) {
         if (only && only !== name) continue;
+        if (!only && NEEDS_FULL.includes(name)) { console.log('SKIP ' + name + ' (Full mode is hidden)'); continue; }
         const d = await boot({ args: ['--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
         try {
             await d.ev('(function(){ if (typeof isPaused !== "undefined" && isPaused) togglePause(); if (window.config) window.config.PHOTOSAFE = false; return 1; })()');

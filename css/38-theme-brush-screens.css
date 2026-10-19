@@ -845,4 +845,91 @@ html[data-theme="walnut-copper"] .arm-tip-menu .arm-tip-shapes .brush-shape-btn.
     }
 }
 
+/* ── Mutate's variant cards (polish pass 2026-10-17) ──────────────────
+   They were the legacy purple-tint boxes: a bare black picture, white
+   Arial tags, a grey chip. Now each card is a copper-rimmed pane that
+   lights when it is the chosen variant, its picture a cathode screen
+   (bezel, scanlines and glass over the variant's own colours, which are
+   the information and stay as drawn), its tags phosphor type, its
+   "N changes" a small cathode chip. ───────────────────────────────── */
+html[data-theme="walnut-copper"] #mutation-section .mutation-card {
+    --ce: 0;
+    --gc: 255 110 30;
+    padding: 6px 6px 7px;
+    border: 0;
+    border-radius: 8px;
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ce) * 0.3)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px color-mix(in oklab, var(--cu-hi) calc(var(--ce) * 100%), var(--cu)),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.16),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        0 0 calc(var(--ce) * 16px) rgb(var(--gc) / calc(var(--ce) * 0.35));
+    transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+html[data-theme="walnut-copper"] #mutation-section .mutation-card:hover { --ce: 0.4; }
+html[data-theme="walnut-copper"] #mutation-section .mutation-card-active { --ce: 1; }
+html[data-theme="walnut-copper"] #mutation-section .mutation-thumb-wrap {
+    margin-bottom: 7px;
+    border-radius: 6px;
+    padding: 3px;
+    background: #050302;
+    box-shadow:
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.14);
+}
+html[data-theme="walnut-copper"] #mutation-section .mutation-thumb { border-radius: 3px; }
+html[data-theme="walnut-copper"] #mutation-section .mutation-thumb-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%),
+        linear-gradient(160deg, rgba(255, 240, 225, 0.1), transparent 40%);
+}
+html[data-theme="walnut-copper"] #mutation-section .mutation-thumb-tag {
+    z-index: 1;
+    left: 6px;
+    top: 6px;
+    padding: 1px 4px 0;
+    border-radius: 2px;
+    font: 400 10px/1.25 var(--ui-font-mono);
+    letter-spacing: 0.04em;
+    color: rgb(150 255 225);
+    text-shadow: 0 0 4px rgb(80 230 190 / 0.75);
+    background: rgba(2, 10, 8, 0.72);
+}
+html[data-theme="walnut-copper"] #mutation-section .mutation-thumb-tag-k { left: auto; top: auto; right: 6px; bottom: 6px; }
+html[data-theme="walnut-copper"] #mutation-section .mutation-changes {
+    padding: 3px 6px 2px;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 4px;
+    font: 400 11px/1.1 var(--ui-font-mono);
+    letter-spacing: 0;
+    color: color-mix(in oklab, var(--lit) calc(var(--ce) * 100%), var(--unlit));
+    text-shadow: 0 0 calc(1px + var(--ce) * 5px) rgb(var(--gc) / calc(var(--ce) * 0.9));
+    /* Words under the screen, not a third copper ring (card, bezel, chip). */
+    background: none;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] #mutation-section .mutation-changes:is(:hover, :focus-visible) {
+    color: var(--lit);
+    text-decoration: underline 1px var(--cu-hi);
+    text-underline-offset: 3px;
+}
+html[data-theme="walnut-copper"] #mutation-section .mutation-changes:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] #mutation-section .mutation-card { border: 1px solid ButtonText; }
+    html[data-theme="walnut-copper"] #mutation-section .mutation-card-active { border: 3px solid Highlight; }
+    html[data-theme="walnut-copper"] #mutation-section .mutation-changes { border: 1px solid ButtonText; }
+}
+
 } /* @layer theme */

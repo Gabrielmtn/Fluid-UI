@@ -495,6 +495,14 @@
         console.log('Settings loaded:', sliderCount, 'sliders restored');
     }
 
+    // Show hotkey notifications (Settings). A viewer setting like autoload:
+    // absent → ON, only an explicit false hides the pills a key press flashes
+    // (59's brush type, 49's held-slider value). A key that can't do its job
+    // still says so either way.
+    window.hotkeyNoticesOn = function () {
+        try { return window.settingsManager?.get('settings.hotkeyNotices') !== false; } catch (_) { return true; }
+    };
+
     function setupSaveLoad() {
         const saveBtn = $('saveSettingsBtn');
         const loadBtn = $('loadSettingsBtn');
@@ -519,15 +527,20 @@
             }
         });
 
+        // "Load Defaults" (Gabriel, 2026-10-18): whatever the defaults are now.
+        // The settings you saved with Save settings, or, with none saved,
+        // the ones Swirl Together starts with. The canvas is left alone.
+        const loadIdle = loadBtn.textContent;
         loadBtn.addEventListener('click', () => {
             try {
-                applyFromSettings();
+                if (window.ResetApp && !window.ResetApp.hasSaved()) window.ResetApp.reset({ settingsOnly: true });
+                else applyFromSettings();
                 loadBtn.textContent = 'Loaded';
-                setTimeout(() => loadBtn.textContent = 'Load', 1500);
+                setTimeout(() => loadBtn.textContent = loadIdle, 1500);
             } catch (err) {
                 console.error('Load error:', err);
                 loadBtn.textContent = 'Error';
-                setTimeout(() => loadBtn.textContent = 'Load', 2000);
+                setTimeout(() => loadBtn.textContent = loadIdle, 2000);
             }
         });
 
@@ -559,6 +572,14 @@
                     clearBtn.textContent = 'Error';
                     setTimeout(() => clearBtn.textContent = 'Clear', 2000);
                 }
+            });
+        }
+
+        const noticesChk = $('hotkeyNoticesToggle');
+        if (noticesChk && window.settingsManager) {
+            noticesChk.checked = window.hotkeyNoticesOn();
+            noticesChk.addEventListener('change', (e) => {
+                window.settingsManager.set('settings.hotkeyNotices', !!e.target.checked);
             });
         }
 

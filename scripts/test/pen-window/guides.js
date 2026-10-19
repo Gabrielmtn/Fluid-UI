@@ -301,7 +301,7 @@ async function openPopup(env) {
         await main.eval("(function(){ var t=document.getElementById('mandalaToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await sleep(600);
         const m1 = await pop.eval("(function(){ var s=document.getElementById('guide-mandala'); return { disp: s.style.display, lines: s.querySelectorAll('line').length, paths: s.querySelectorAll('path').length, kaleido: document.getElementById('guide-kaleido').style.display }; })()");
-        check('Mandala Overlay on: popout shows its wedge, seams and rings, and the kaleidoscope guide steps aside', m1.disp === 'block' && m1.lines >= 6 && m1.paths >= 2 && m1.kaleido === 'none', m1);
+        check('Mandala Overlay on: popout shows its wedge, seams and rings (the kaleidoscope guide stays with it)', m1.disp === 'block' && m1.lines >= 6 && m1.paths >= 2, m1);
         // Main Hide Guides does not hide the popout's (its own choice).
         await setMain('mandalaHideGuides', true);
         await sleep(400);

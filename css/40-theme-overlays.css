@@ -122,10 +122,11 @@ html[data-theme="walnut-copper"] .delete-modal-title {
    size. */
 html[data-theme="walnut-copper"] :is(.delete-modal-message, .ui-fork-foot, .phone-pad-alt) {
     font-family: var(--ui-font-body);
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.5;
-    color: #cdb79f;
-    text-shadow: var(--ovl-engrave-shadow);
+    /* Light on the walnut (Gabriel 2026-10-18: #cdb79f read low). */
+    color: #f3e6d4;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.6);
     opacity: 1;
 }
 html[data-theme="walnut-copper"] .ui-fork-foot { font-size: 12px; color: var(--ui-text-muted); }
@@ -146,6 +147,9 @@ html[data-theme="walnut-copper"] :is(.delete-modal-actions, .phone-pad-ways, .ph
     line-height: 1.15;
     letter-spacing: calc(0.12em * 0.7);
     font-variant-caps: all-small-caps;
+    /* Small caps stand on the baseline, so a centred line box left them low;
+       trimmed to the x-height, the button centres the letters themselves. */
+    text-box: trim-both ex alphabetic;
 }
 html[data-theme="walnut-copper"] :is(.delete-modal-actions, .phone-pad-ways, .phone-pad-side, .reset-app-hint-actions) > button:focus-visible {
     outline: 2px solid var(--ui-focus);
@@ -162,9 +166,9 @@ html[data-theme="walnut-copper"] .phone-pad-ways > button:last-child { border-ra
    fields workstream's component. */
 html[data-theme="walnut-copper"] :is(.reset-app-modal .reset-app-defaults, .open-desktop-remember) {
     font-family: var(--ui-font-body);
-    font-size: 12px;
-    color: #cdb79f;
-    text-shadow: var(--ovl-engrave-shadow);
+    font-size: 13px;
+    color: #ecdcc6;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.6);
     opacity: 1;
 }
 
@@ -416,6 +420,39 @@ html[data-theme="walnut-copper"] .palette-new-btns button {
     letter-spacing: calc(0.12em * 0.7);
     font-variant-caps: all-small-caps;
 }
+/* + New palette is a field: a pane with a chevron that opens the three
+   sources as a column under it. The :is() id pair outranks the menu-head
+   rule above that it used to be styled by. */
+html[data-theme="walnut-copper"] :is(.palette-list .palette-new-cap, #ovl-none #ovl-none) {
+    --ci: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 36px;
+    margin: 0;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: calc(10px / 0.7);
+    text-box: trim-both ex alphabetic;
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    background: var(--mesh-dim) center / 3.5px 6.06px, linear-gradient(170deg, #1a1210, #090605);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18), inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
+}
+html[data-theme="walnut-copper"] :is(.palette-list .palette-new-cap, #ovl-none #ovl-none):is(:hover, [aria-expanded="true"]) { --ci: 0.35; }
+html[data-theme="walnut-copper"] :is(.palette-list .palette-new-cap, #ovl-none #ovl-none):focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+html[data-theme="walnut-copper"] .palette-new-chev { font-size: 14px; transition: rotate 0.15s; }
+html[data-theme="walnut-copper"] .palette-new-row.is-open .palette-new-chev { rotate: 180deg; }
+html[data-theme="walnut-copper"] .palette-list .palette-new-btns:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 6px 0 0 12px;
+}
+html[data-theme="walnut-copper"] .palette-list .palette-new-btns[hidden] { display: none; }
+html[data-theme="walnut-copper"] .palette-list .palette-new-btns button { justify-content: flex-start; text-align: left; padding-left: 14px; }
 html[data-theme="walnut-copper"] .palette-option {
     --ci: 0;
     margin: 0;
@@ -634,18 +671,18 @@ html[data-theme="walnut-copper"] .cp-pop-bar {
 html[data-theme="walnut-copper"] .cp-pop :is(.cp-pop-title, .cp-title, .cp-recent-head, .cp-pal-label, .cp-lab) {
     font-family: var(--ui-font-display);
     font-weight: 400;
-    font-size: calc(9px / 0.7);
+    font-size: calc(11px / 0.7);
     letter-spacing: calc(0.16em * 0.7);
     font-variant-caps: all-small-caps;
     text-transform: none;
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5);
 }
-html[data-theme="walnut-copper"] .cp-pop .cp-pop-title { font-size: calc(10.5px / 0.7); letter-spacing: calc(0.2em * 0.7); }
+html[data-theme="walnut-copper"] .cp-pop .cp-pop-title { font-size: calc(12px / 0.7); letter-spacing: calc(0.2em * 0.7); }
 html[data-theme="walnut-copper"] .cp-pop .cp-pop-close { width: 26px; height: 26px; }
 html[data-theme="walnut-copper"] .cp-pop .cp-recent-empty {
     font-family: var(--ui-font-body);
-    font-size: 11.5px;
+    font-size: 13.5px;
     color: #cdb79f;
     text-shadow: var(--ovl-engrave-shadow);
 }
@@ -668,8 +705,34 @@ html[data-theme="walnut-copper"] .cp-pop .cp-chip:is(:hover, :focus-visible) { o
 html[data-theme="walnut-copper"] .cp-pop .cp-chip.is-active {
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu-hi), 0 0 0 3px #1a0e07, 0 0 0 4.5px var(--cu-hi), 0 0 10px rgba(255, 110, 30, 0.45);
 }
+/* The palette row's [+]: an empty well with a copper cross, not a colour. */
+html[data-theme="walnut-copper"] .cp-pop .cp-chip-add {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: #160c06;
+    --plus: var(--cu-hi);
+    background-image: linear-gradient(var(--plus), var(--plus)), linear-gradient(var(--plus), var(--plus));
+    background-size: 12px 2px, 2px 12px;
+    background-position: center;
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+html[data-theme="walnut-copper"] .cp-pop .cp-chip-add:hover { --plus: #fff1dc; background-color: #2a160b; }
+/* A name, not a code: the palette list's face, not the hex readout's. */
+html[data-theme="walnut-copper"] .cp-pop .cp-pal-name:not(#ovl-none) {
+    flex: 1 1 auto;
+    font-family: var(--ui-font-body);
+    font-size: 15px;
+    letter-spacing: normal;
+    text-align: left;
+}
 html[data-theme="walnut-copper"] .cp-pop .cp-pal { border-top: var(--ovl-beads); padding-top: 10px; }
-html[data-theme="walnut-copper"] .cp-pop .cp-gamut { font-family: var(--ui-font-body); color: #ffcf8a; }
+html[data-theme="walnut-copper"] .cp-pop .cp-gamut { font-family: var(--ui-font-body); font-size: 13px; color: #ffcf8a; }
+/* Gabriel 2026-10-18: the picker's type read small; the fields come up too. */
+html[data-theme="walnut-copper"] .cp-pop .cp-pal-select:not(#ovl-none) { font-size: 15px; }
+html[data-theme="walnut-copper"] .cp-pop .cp-space:not(#ovl-none) { font-size: 13px; flex: 0 1 auto; width: 78px; }
+html[data-theme="walnut-copper"] .cp-pop .cp-hex:not(#ovl-none) { min-width: calc(7.6ch + 12px); letter-spacing: 0; }
 /* Copy and the eyedropper are ghosts in css/31; here they are panes. The
    :is() member that can match nothing (#ovl-none twice) lifts the rule over
    the ghost rule's specificity (its own :is() carries #quality-underbar). */
@@ -678,17 +741,23 @@ html[data-theme="walnut-copper"] :is(.cp-pop .cp-copy, .cp-pop .cp-drop, #ovl-no
     border-radius: 5px;
     font-family: var(--ui-font-display);
     font-weight: 400;
-    font-size: calc(7.5px / 0.7);
+    font-size: calc(9.5px / 0.7);
     letter-spacing: calc(0.04em * 0.7);
     font-variant-caps: all-small-caps;
     background-image: var(--mesh-dim), linear-gradient(170deg, #1a1210, #090605);
     background-size: 3.5px 6.06px, auto;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18), inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
 }
-html[data-theme="walnut-copper"] .cp-pop :is(.cp-hex, .cp-num) {
+html[data-theme="walnut-copper"] .cp-pop :is(.cp-hex, .cp-num, .cp-pal-name) {
     font-family: var(--ui-font-mono);
     font-weight: 400;
-    font-size: 12px;
+    font-size: 14px;
+}
+/* Copy confirms with a green pane for a moment. */
+html[data-theme="walnut-copper"] :is(.cp-pop .cp-copy.is-copied, #ovl-none #ovl-none #ovl-none) {
+    background-image: linear-gradient(170deg, #2f8a3c, #145a22);
+    color: #eaffea;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px #7fe08f, 0 0 10px rgba(80, 220, 110, 0.5);
 }
 /* The eyedropper's loupe: the grid in a copper bezel, the reading a VFD. */
 html[data-theme="walnut-copper"] .cp-loupe-grid {
@@ -1018,37 +1087,44 @@ html[data-theme="walnut-copper"] #studioCloseBtn {
         outline: 3px solid Highlight;
     }
     html[data-theme="walnut-copper"] .radial-wedge { stroke: CanvasText; }
-    html[data-theme="walnut-copper"] .radial-wedge.is-hot { fill: Highlight; }
+    html[data-theme="walnut-copper"] .radial-wedge.is-hot { fill: Highlight; fill-opacity: 1; }
     html[data-theme="walnut-copper"] .radial-hub { stroke: CanvasText; }
 }
 
 /* ── The F1 sheet ─────────────────────────────────────────────────────
-   A cabinet; the header is its nameplate and stays put while the body
-   scrolls under it (same wood, same origin, so no seam); sections open
-   with the study's dotted copper rule; keys are keycaps. */
+   A cabinet on the boot screens' blued herringbone (css/44's sunburst,
+   darker than the sidebars' walnut so the cream text and lit caps read).
+   The sun sits under the bottom edge as on the splash; a plate darkens the
+   middle where the rows are. Only the body scrolls (styles.css), so the
+   ground stays still and the header and footer need no wood of their own;
+   sections open with the study's dotted copper rule; keys are keycaps. */
 html[data-theme="walnut-copper"] .hotkey-modal {
-    scrollbar-color: var(--cu) transparent;
-}
-html[data-theme="walnut-copper"] .hotkey-modal::-webkit-scrollbar-track { background: transparent; }
-html[data-theme="walnut-copper"] .hotkey-modal::-webkit-scrollbar-thumb { background: var(--cu); border-radius: 3px; }
-html[data-theme="walnut-copper"] .hotkey-header {
-    padding: 16px 18px 14px 22px;
-    background-color: #2a170c;
-    background-image: var(--ovl-wood);
-    background-size: auto, auto, 566px 566px;
-    background-position: 0 0, -26.55px 0, 0 0;
-    border-bottom: var(--ovl-beads);
-    border-radius: 14px 14px 0 0;
-    box-shadow: inset 1.5px 1.5px 0 0 var(--cu), inset -1.5px 0 0 0 var(--cu), 0 10px 14px -12px rgba(0, 0, 0, 0.9);
+    background-color: #05080d;
+    background-image:
+        radial-gradient(ellipse 70% 60% at 50% 45%, rgba(4, 7, 12, 0.62), rgba(4, 7, 12, 0.4) 70%, rgba(4, 7, 12, 0.18) 100%),
+        var(--boot-ground);
+    background-size: auto, cover;
+    background-position: center, 50% 100%;
+    background-repeat: no-repeat;
 }
 html[data-theme="walnut-copper"] .hotkey-body {
-    padding: 18px 22px 20px;
-    gap: 18px 22px;
+    scrollbar-color: var(--cu) transparent;
+}
+html[data-theme="walnut-copper"] .hotkey-body::-webkit-scrollbar-track { background: transparent; }
+html[data-theme="walnut-copper"] .hotkey-body::-webkit-scrollbar-thumb { background: var(--cu); border-radius: 3px; }
+html[data-theme="walnut-copper"] .hotkey-header {
+    padding: 16px 18px 14px 22px;
+    background: linear-gradient(rgba(4, 7, 12, 0.55), rgba(4, 7, 12, 0.25));
+    border-bottom: var(--ovl-beads);
+}
+html[data-theme="walnut-copper"] .hotkey-body {
+    padding: 20px 26px 4px;
+    column-gap: 34px;
     font-family: var(--ui-font-body);
     font-size: 13px;
     color: var(--ui-text);
 }
-/* Section names: the study's .sect (158). */
+html[data-theme="walnut-copper"] .hotkey-body > div { margin-bottom: 22px; }
 html[data-theme="walnut-copper"] .hotkey-body h3 {
     margin: 0 0 10px;
     font-family: var(--ui-font-display);
@@ -1060,8 +1136,13 @@ html[data-theme="walnut-copper"] .hotkey-body h3 {
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5);
 }
+html[data-theme="walnut-copper"] .hotkey-body li .hk-or {
+    font-size: 11px;
+    color: var(--ui-text-muted);
+    opacity: 1;
+}
 html[data-theme="walnut-copper"] .hotkey-body li {
-    padding: 3px 0;
+    padding: 3px 0 3px 16px;
     line-height: 1.45;
     color: #e3d3bf;
     text-shadow: var(--ovl-engrave-shadow);
@@ -1083,6 +1164,7 @@ html[data-theme="walnut-copper"] .hotkey-body li kbd {
 }
 html[data-theme="walnut-copper"] .hotkey-footer {
     padding: 10px 22px 14px;
+    background: linear-gradient(rgba(4, 7, 12, 0.25), rgba(4, 7, 12, 0.6));
     border-top: var(--ovl-beads);
     font-family: var(--ui-font-body);
     font-size: 11px;
@@ -1144,7 +1226,8 @@ html[data-theme="walnut-copper"] :is(#hotkeyClose, .cp-pop-close, .mask-close-bt
    Its hidden state (1 px, clipped, still in the Tab order) is legacy's
    and untouched: only the open look is themed here. */
 html[data-theme="walnut-copper"] .skip-menu:focus-within {
-    padding: 14px 14px 12px;
+    width: 440px;
+    padding: 16px 16px 14px;
     background-color: #2a170c;
     background-image: var(--ovl-wood);
     background-size: auto, auto, 566px 566px;
@@ -1159,15 +1242,21 @@ html[data-theme="walnut-copper"] .skip-menu:focus-within[style*="--ov"] {
     transform: translateY(calc((1 - min(1, var(--ov))) * -8px));
 }
 html[data-theme="walnut-copper"] .skip-menu-title {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     font-family: var(--ui-font-display);
     font-weight: 400;
-    font-size: calc(10.5px / 0.7);
+    font-size: calc(13px / 0.7);
     line-height: 1.2;
     letter-spacing: calc(0.2em * 0.7);
     font-variant-caps: all-small-caps;
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+/* Gabriel 2026-10-18: bigger type, so a bigger map to hold it. */
+html[data-theme="walnut-copper"] .skip-menu-map {
+    grid-template-columns: 112px 1fr 112px;
+    grid-template-rows: 40px 92px 40px;
+    gap: 8px;
 }
 html[data-theme="walnut-copper"] .skip-menu-canvas {
     border: 0;
@@ -1176,12 +1265,12 @@ html[data-theme="walnut-copper"] .skip-menu-canvas {
     box-shadow: var(--ovl-tray-shadow), inset 0 -1px 0 rgba(214, 140, 92, 0.3);
 }
 html[data-theme="walnut-copper"] .skip-menu-option {
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 5px;
     font-family: var(--ui-font-display);
     font-weight: 400;
-    font-size: calc(9px / 0.7);
-    line-height: 1.25;
+    font-size: calc(11.5px / 0.7);
+    line-height: 1.2;
     letter-spacing: calc(0.12em * 0.7);
     font-variant-caps: all-small-caps;
 }
@@ -1190,9 +1279,9 @@ html[data-theme="walnut-copper"] .skip-menu-option:focus-visible {
     outline-offset: 3px;
 }
 html[data-theme="walnut-copper"] .skip-menu-foot {
-    margin-top: 12px;
+    margin-top: 14px;
     font-family: var(--ui-font-body);
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.4;
     color: #cdb79f;
     text-shadow: var(--ovl-engrave-shadow);
@@ -1216,31 +1305,54 @@ html[data-theme="walnut-copper"] .skip-landed { animation-name: ovl-skip-landed;
    tube's neon column from the hub outward with a white-hot edge (.lad .col
    234-239), the hub the copper ring that cancels (.clr 224-228). Labels
    stay in the body face: Michroma's width would not fit a wedge's two
-   lines. Values in Share Tech Mono, lit (.val 88, .ch-value). */
+   lines. Values in Share Tech Mono, lit (.val 88, .ch-value).
+   2026-10-18 (Gabriel: "use our blue herringbone here as the active part,
+   over the dark brown herringbone"): the disc is the bar's walnut,
+   darkened (on .radial-hit, the pointer's disc, which sits under the
+   SVG: a CSS image, decoded once with the sidebars'). What is live wears
+   the drawer fronts' blue herringbone (SVG patterns, js/75): a slider's
+   value from the hub out, and a key or control wedge under the pointer,
+   fading in on --ci. Both edged in copper. Each label sits on a small
+   dark plate, so a value's edge line passing through never runs across
+   the words. */
+html[data-theme="walnut-copper"] #radialMenu .radial-hit {
+    background-color: #1e1009;
+    background-image: linear-gradient(rgba(10, 5, 2, 0.4), rgba(10, 5, 2, 0.4)), var(--sheen-l), var(--wood-herringbone);
+    background-size: auto, 70.75px 100%, 566px 566px;
+    background-position: center;
+    box-shadow: 0 0 0 1.5px var(--cu), 0 0 0 3px rgba(0, 0, 0, 0.55), 0 10px 30px rgba(0, 0, 0, 0.6);
+}
 html[data-theme="walnut-copper"] .radial-wedge {
-    fill: color-mix(in srgb, #5a2a12 calc(var(--ci) * 100%), rgba(18, 11, 8, 0.95));
+    fill: url(#wcRadialBlueLit);
+    fill-opacity: var(--ci, 0);
     stroke: color-mix(in srgb, var(--cu-hi) calc(var(--ci) * 100%), rgba(196, 122, 75, 0.85));
     stroke-width: 1.2;
 }
 html[data-theme="walnut-copper"] .radial-wedge.is-hot { --ci: 1; }
+/* A slider's ground stays wood: its value is the blue. */
+html[data-theme="walnut-copper"] .radial-wedge.is-slider { fill: none; }
 html[data-theme="walnut-copper"] .radial-wedge.is-slider.is-hot,
 html[data-theme="walnut-copper"] .radial-wedge.is-slider.is-dragging {
-    fill: color-mix(in srgb, #2a150b calc(var(--ci) * 100%), rgba(18, 11, 8, 0.95));
     stroke: var(--cu-hi);
 }
 html[data-theme="walnut-copper"] .radial-wedge.is-off {
-    fill: rgba(14, 9, 7, 0.85);
+    fill: rgba(8, 4, 2, 0.5);
+    fill-opacity: 1;
     stroke: rgba(196, 122, 75, 0.35);
 }
-html[data-theme="walnut-copper"] .radial-fill { fill: rgba(255, 150, 70, 0.28); }
-html[data-theme="walnut-copper"] .radial-wedge.is-hot + .radial-fill { fill: rgba(255, 150, 70, 0.45); }
-html[data-theme="walnut-copper"] .radial-wedge.is-off + .radial-fill { fill: rgba(255, 150, 70, 0.08); }
+html[data-theme="walnut-copper"] .radial-fill {
+    fill: url(#wcRadialBlue);
+    stroke: rgba(196, 122, 75, 0.9);
+    stroke-width: 1.2;
+}
+html[data-theme="walnut-copper"] .radial-wedge.is-hot + .radial-fill { fill: url(#wcRadialBlueLit); stroke: var(--cu-hi); }
+html[data-theme="walnut-copper"] .radial-wedge.is-off + .radial-fill { fill-opacity: 0.3; stroke: rgba(196, 122, 75, 0.3); }
 html[data-theme="walnut-copper"] .radial-thumb {
-    stroke: rgba(255, 236, 204, 0.75);
+    stroke: var(--cu-hi);
     stroke-width: 2;
 }
-html[data-theme="walnut-copper"] .radial-wedge.is-hot + .radial-fill + .radial-thumb { stroke: rgba(255, 250, 235, 0.95); }
-html[data-theme="walnut-copper"] .radial-wedge.is-off + .radial-fill + .radial-thumb { stroke: rgba(255, 236, 204, 0.18); }
+html[data-theme="walnut-copper"] .radial-wedge.is-hot + .radial-fill + .radial-thumb { stroke: var(--lit); stroke-width: 2.5; }
+html[data-theme="walnut-copper"] .radial-wedge.is-off + .radial-fill + .radial-thumb { stroke: rgba(196, 122, 75, 0.3); }
 html[data-theme="walnut-copper"] .radial-hub {
     fill: rgba(14, 9, 7, 0.96);
     stroke: var(--cu);
@@ -1255,7 +1367,14 @@ html[data-theme="walnut-copper"] .radial-label {
     font-family: var(--ui-font-body);
     font-weight: 600;
     color: color-mix(in oklab, #fff6e6 calc(var(--ci) * 100%), var(--engrave));
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9), 0 0 calc(var(--ci) * 10px) rgb(255 110 30 / calc(var(--ci) * 0.6));
+    /* No plate (Gabriel 2026-10-18: "the added contrast is enough"): a
+       dark halo instead, a stroke under the glyphs (paint-order) and soft
+       shadows round it, so the wood, the blue tile and a value's edge
+       line passing behind all drop away from the words. */
+    -webkit-text-stroke: 3px rgba(10, 5, 2, 0.9);
+    paint-order: stroke fill;
+    text-shadow: 0 0 2px rgba(8, 4, 2, 0.95), 0 0 5px rgba(8, 4, 2, 0.9), 0 1px 9px rgba(0, 0, 0, 0.8),
+        0 0 calc(var(--ci) * 12px) rgb(255 110 30 / calc(var(--ci) * 0.6));
 }
 html[data-theme="walnut-copper"] .radial-label.is-hot { --ci: 1; }
 html[data-theme="walnut-copper"] .radial-label-text { font-weight: 600; }
@@ -1264,7 +1383,8 @@ html[data-theme="walnut-copper"] .radial-label-val {
     font-weight: 400;
     letter-spacing: 0.04em;
     color: var(--lit);
-    text-shadow: 0 0 6px rgba(255, 120, 40, 0.75), 0 0 14px rgba(255, 70, 10, 0.35);
+    text-shadow: 0 0 2px rgba(8, 4, 2, 0.95), 0 0 5px rgba(8, 4, 2, 0.9),
+        0 0 6px rgba(255, 120, 40, 0.75), 0 0 14px rgba(255, 70, 10, 0.35);
 }
 html[data-theme="walnut-copper"] .radial-label-key {
     font-family: var(--ui-font-mono);
@@ -1289,6 +1409,17 @@ html[data-theme="walnut-copper"] .radial-empty {
 }
 /* It strikes on (js/75 writes --ov with a cathode's 45 ms rise). */
 html[data-theme="walnut-copper"] #radialMenu .radial-wheel { opacity: min(1, var(--ov, 1)); }
+/* Forced colours keep images (the wood, the blue tile): system colours in
+   their place, after the rules above so they win (the block further up
+   only adds lines and the lit wedge). */
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] #radialMenu .radial-hit { background: Canvas; box-shadow: 0 0 0 1px CanvasText; }
+    html[data-theme="walnut-copper"] .radial-wedge { stroke: CanvasText; }
+    html[data-theme="walnut-copper"] .radial-fill { fill: GrayText; fill-opacity: 1; stroke: CanvasText; }
+    html[data-theme="walnut-copper"] .radial-wedge.is-hot + .radial-fill { fill: Highlight; }
+    html[data-theme="walnut-copper"] .radial-thumb { stroke: CanvasText; }
+    html[data-theme="walnut-copper"] .radial-label { -webkit-text-stroke: 3px Canvas; }
+}
 
 /* ── Toasts: VFD screens ─────────────────────────────────────────────
    Every transient word the app puts over the painting reads as the
@@ -1325,6 +1456,14 @@ html[data-theme="walnut-copper"] :is(#hkWheel, #brushTypePill, .skip-menu-foot) 
     border-color: rgba(196, 122, 75, 0.7);
     text-shadow: 0 0 5px rgba(255, 120, 40, 0.55);
 }
+/* The skip menu explains its key: a cap you can read, and labels lit. */
+html[data-theme="walnut-copper"] .skip-menu-foot .hk-cap:not(#ovl-none) {
+    padding: 3px 7px;
+    font-size: 13px;
+    line-height: 1.2;
+}
+html[data-theme="walnut-copper"] .skip-menu-foot { color: #e3cdb3; }
+html[data-theme="walnut-copper"] .skip-menu-option:not([aria-disabled="true"]):not(#ovl-none) { --unlit: #e8d3b8; }
 html[data-theme="walnut-copper"] #hkWheel .hk-wheel-val {
     font-weight: 400;
     color: #a9fff0;
@@ -1660,9 +1799,6 @@ html[data-theme="walnut-copper"] :is(.mask-hint, .mask-filter-hint) strong[style
     color: var(--lit) !important;
     text-shadow: 0 0 6px rgba(255, 110, 30, 0.6), var(--ovl-engrave-shadow);
 }
-html[data-theme="walnut-copper"] #maskRotationControl { background: var(--ovl-tray) !important; box-shadow: var(--ovl-tray-shadow); }
-html[data-theme="walnut-copper"] #maskRotationControl label { color: var(--engrave) !important; }
-html[data-theme="walnut-copper"] #maskRotationValue { font-family: var(--ui-font-mono); color: var(--lit) !important; }
 html[data-theme="walnut-copper"] :is(.mask-filter-label, .mask-feather-label, .collider-size-label, .mask-filter-check, .mask-collider-opt) {
     font-family: var(--ui-font-display);
     font-weight: 400;
@@ -1689,6 +1825,142 @@ html[data-theme="walnut-copper"] .mask-roto-status.is-error { color: #ff8a73; te
 html[data-theme="walnut-copper"] .mask-filter-row.mask-filter-cut {
     background: rgba(255, 110, 30, 0.06);
     box-shadow: 0 0 0 1.5px var(--cu-hi), 0 0 16px rgba(255, 110, 30, 0.3);
+}
+/* Background Color (Gabriel's tour, 2026-10-18): css/37's pane, sized to
+   its words here so Auto and Invert keep the rest of the row. */
+html[data-theme="walnut-copper"] #filterPanel .mask-filter-row .bg-color-btn {
+    flex: 0 1 260px;
+    width: auto;
+    height: 34px;
+    min-height: 0;
+}
+html[data-theme="walnut-copper"] #filterPanel .mask-filter-row #filterAutoBtn { height: 34px; }
+/* Rotation, the touch-up Size and Soften edge are the sidebars' slider
+   rows (css/36 section 4): the name and its number on one line over the
+   38 px tube, kept to a slider's width rather than the editor's. */
+html[data-theme="walnut-copper"] .mask-slider {
+    flex: 0 1 300px;
+    min-width: 180px;
+    max-width: 360px;
+    margin: 0;
+}
+html[data-theme="walnut-copper"] .mask-slider input[type=range] {
+    --input-py: 8px;
+    display: block;
+    width: 100%;
+    margin: 0;
+}
+html[data-theme="walnut-copper"] .mask-slider > label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    padding: 0 4px;
+    margin: 0 0 -1px;
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] .mask-slider > label .value-display {
+    font: 400 13px/1 var(--ui-font-mono);
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    opacity: 1;
+    min-width: calc(5ch + 0.3em);
+    text-align: right;
+}
+html[data-theme="walnut-copper"] #maskRotationControl { margin-top: 10px; }
+/* Touch up's row: buttons sit on the tube's line, under the Size head. */
+html[data-theme="walnut-copper"] #touchUpTools .mask-collider-row { align-items: flex-end; }
+html[data-theme="walnut-copper"] #touchUpTools .mask-collider-row > button { flex: none; min-height: 38px; padding: 0 16px; }
+/* Erase | Add: one pick-one choice, so the joined strip of the Show / Hide
+   pair above (no gap, square inner corners, the chosen one lit). */
+html[data-theme="walnut-copper"] .mask-seg { display: flex; gap: 0; flex: none; }
+html[data-theme="walnut-copper"] .mask-seg > button {
+    flex: none;
+    min-height: 38px;
+    padding: 0 16px;
+    margin: 0;
+    border-radius: 0 !important;
+}
+html[data-theme="walnut-copper"] .mask-seg > button:first-child { border-radius: 5px 0 0 5px !important; }
+html[data-theme="walnut-copper"] .mask-seg > button:last-child { border-radius: 0 5px 5px 0 !important; }
+html[data-theme="walnut-copper"] .mask-seg > button.active { --ci: 1; }
+/* Duplicate Mask as a collider layer: the sidebars' checkbox pane (css/37
+   section 3, the label-wraps-input form), its cathode at the first module. */
+html[data-theme="walnut-copper"] .mask-check-pane {
+    --ci: 0;
+    --gc: 255 110 30;
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 32px;
+    margin-top: 10px;
+    padding: 6px 12px 6px 25px;
+    border-radius: 5px;
+    font: 400 9px/1.3 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    text-shadow:
+        0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95)),
+        0 0 calc(var(--ci) * 16px) rgb(var(--gc) / calc(var(--ci) * 0.6));
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+        inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
+        0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
+}
+html[data-theme="walnut-copper"] .mask-check-pane:has(> input:checked) { --ci: 1; }
+html[data-theme="walnut-copper"] .mask-check-pane:has(> input:focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 3px; }
+html[data-theme="walnut-copper"] .mask-check-pane > input[type="checkbox"] {
+    --ci: inherit;
+    -webkit-appearance: none;
+    appearance: none;
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    box-sizing: border-box;
+    width: 9px;
+    height: 9px;
+    margin: -3.5px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+    box-shadow:
+        0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ci) * 100%), #6b5546),
+        0 0 calc(var(--ci) * 8px) rgb(var(--gc) / calc(var(--ci) * 0.7));
+}
+html[data-theme="walnut-copper"] .mask-check-pane > input[type="checkbox"]::after {
+    --ci: inherit;
+    content: "";
+    position: absolute;
+    left: 3.2px;
+    top: 1.5px;
+    width: 2.6px;
+    height: 5px;
+    box-sizing: border-box;
+    border: solid rgb(255 196 140 / var(--ci));
+    border-width: 0 1.4px 1.4px 0;
+    transform: rotate(45deg);
+    filter: drop-shadow(0 0 3px rgb(var(--gc) / var(--ci)));
 }
 /* The bar on the image's corner: a small cabinet. */
 html[data-theme="walnut-copper"] .mask-canvas-bar {

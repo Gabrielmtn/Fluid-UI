@@ -70,7 +70,12 @@
         var root = regionEl(r);
         if (!root) return null;
         var list = root.querySelectorAll(FOCUSABLE);
-        for (var i = 0; i < list.length; i++) if (shown(list[i], root)) return list[i];
+        for (var i = 0; i < list.length; i++) {
+            // When the top bar docks into the right sidebar (js/13) it is
+            // still "Top nav": the right sidebar starts at its drawers.
+            if (r.key === 'right' && list[i].closest('#mixer-strip')) continue;
+            if (shown(list[i], root)) return list[i];
+        }
         return null;
     }
 

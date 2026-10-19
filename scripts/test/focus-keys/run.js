@@ -30,6 +30,9 @@ const K = {
             reset: !!document.querySelector('.reset-app-modal.show') })`);
         const centre = (id) => d.ev(`(function(){ var e = document.getElementById(${JSON.stringify(id)}); e.scrollIntoView({ block: 'center' }); var r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
 
+        // The Brush drawer starts folded (2026-10-18); open it for its checkbox.
+        await d.ev(`window.Sidebars.open('Brush'), 1`); await sleep(900);
+
         // ── Keyboard focus: Space presses ──
         let s0 = await st();
         await d.ev(`document.getElementById('cursorToggle').focus(), 1`);   // focus with no pointer press = the keyboard's
@@ -159,6 +162,7 @@ const K = {
 
         // ── The left rail hands focus on as the bar opens ──
         await d.ev(`(function(){ var b = document.getElementById('sidebar-left'); if (!b.classList.contains('collapsed')) document.querySelector('.lsb-edge button, .lsb-toggle').click(); return b.classList.contains('collapsed'); })()`);
+        await sleep(400);   // a fold by hand eases closed (220 ms, js/20 setEased)
         const folded = await d.ev(`document.getElementById('sidebar-left').classList.contains('collapsed')`);
         await d.ev(`document.querySelector('#sidebar-left .lsb-rail-label').focus(), 1`);
         await key('space'); await sleep(200);
@@ -166,6 +170,7 @@ const K = {
         check('F16 Space on the folded rail\'s Brush opens the bar and focus moves on to Brush Size', folded && rail.open && rail.active === 'brushSizePerceptual' && !rail.frozen, { folded, rail });
         await d.ev('document.activeElement.blur(), 1');
         await d.ev(`(function(){ document.querySelector('.lsb-edge button, .lsb-toggle').click(); return 1; })()`);
+        await sleep(400);
         const sec = await d.ev(`(function(){ var r = Array.prototype.find.call(document.querySelectorAll('#sidebar-left .lsb-rail-section'), function (b) { return b.getClientRects().length; }); if (!r) return null; r.scrollIntoView({ block: 'center' }); var b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, name: r.textContent }; })()`);
         if (sec) {
             await d.click(sec.x, sec.y); await sleep(200);

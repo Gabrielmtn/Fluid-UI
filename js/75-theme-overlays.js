@@ -257,4 +257,41 @@
         if (!m || !m.contains(e.target) || (e.relatedTarget && m.contains(e.relatedTarget))) return;
         skipUp = false; closed(m);
     }, true);
+
+    // The radial menu's live parts wear the drawer fronts' blue herringbone
+    // (css/40 fills them with url(#wcRadialBlue) / url(#wcRadialBlueLit)).
+    // An SVG fill can't take a CSS image, so the two patterns live here,
+    // built once in a hidden SVG that outlives the wheel (js/58 rebuilds its
+    // own SVG per opening). Same tile as css/35: 168x240 drawn at half size,
+    // already in the image cache from the drawer fronts.
+    (function radialPatterns() {
+        var NS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(NS, 'svg');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+        var defs = document.createElementNS(NS, 'defs');
+        // [id, tint over the tile]: the fill dims a little, the lit one lifts.
+        [['wcRadialBlue', 'rgba(3, 6, 11, 0.12)'], ['wcRadialBlueLit', 'rgba(150, 190, 255, 0.16)']].forEach(function (p) {
+            var pat = document.createElementNS(NS, 'pattern');
+            pat.setAttribute('id', p[0]);
+            pat.setAttribute('patternUnits', 'userSpaceOnUse');
+            pat.setAttribute('width', '84');
+            pat.setAttribute('height', '120');
+            var img = document.createElementNS(NS, 'image');
+            img.setAttribute('href', 'assets/textures/deco-herringbone-tile.jpg');
+            img.setAttribute('width', '84');
+            img.setAttribute('height', '120');
+            img.setAttribute('preserveAspectRatio', 'none');
+            var tint = document.createElementNS(NS, 'rect');
+            tint.setAttribute('width', '84');
+            tint.setAttribute('height', '120');
+            tint.setAttribute('fill', p[1]);
+            pat.appendChild(img);
+            pat.appendChild(tint);
+            defs.appendChild(pat);
+        });
+        svg.appendChild(defs);
+        document.body.appendChild(svg);
+    })();
 })();

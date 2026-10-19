@@ -561,6 +561,9 @@
         }
         try { if (S && S.el && S.el.panel) S.el.panel.focus({ preventScroll: true }); } catch (_) {}
         try { hostEl.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+        // Again once it has its full height: the picture and the drawer's
+        // slide both land after this, and left the panel's foot off screen.
+        setTimeout(function () { try { hostEl.scrollIntoView({ block: 'nearest' }); } catch (_) {} }, 400);
     }
 
     function setCount(n) {

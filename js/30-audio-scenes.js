@@ -816,8 +816,9 @@
                 ctx.closePath();
                 ctx.fill();
             } else {
-                ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                ctx.font = Math.round(h * 0.14) + 'px sans-serif';
+                // The theme's screen type (phosphor, mono) where it is loaded.
+                ctx.fillStyle = 'rgba(150,255,225,0.55)';
+                ctx.font = Math.round(h * 0.13) + 'px "Share Tech Mono", ui-monospace, monospace';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText('enable audio to see the spectrum', w / 2, h / 2);
             }

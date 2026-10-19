@@ -50,23 +50,29 @@
     // card does not lose to it cleanly — it ghosts through the scrim as a
     // grey smudge behind the dialog, which is worse than not showing it at
     // all. So the card stands down for that run and plays clean on every
-    // one after. Same key the dialog reads (index.html); this file runs
-    // first, so the decision can be made here before anything paints.
+    // one after.
     //
-    // RESOLVED LAZILY, and that is not a micro-optimisation. This is the
-    // first localStorage read of the process, and the first one costs ~714ms
-    // — measured, on this machine: the storage service starting, with the
-    // main thread gone for all of it. Reading it here, eagerly, meant the
-    // boot veil did not exist until 811ms into a ~2s boot, so the OS busy
-    // cursor owned the first third of every launch. Nothing needs this answer
-    // until the reveal, so nothing asks for it until then.
+    // ASKED OF THE DIALOG ITSELF, never of storage. The dialog's own script
+    // (index.html) has already decided by the time anyone asks here, and it
+    // decides from main's argv mirror first, localStorage second. This used
+    // to re-read the ack from localStorage alone, and the two disagree
+    // whenever the mirror has an ack that localStorage lost (a crash or kill
+    // within seconds of the first Continue: localStorage commits late, the
+    // mirror at once). Measured: the next launch then showed no dialog AND
+    // no card, the bare app fading up. Reading the dialog also keeps the
+    // first localStorage touch (~714 ms, the storage service starting) off
+    // the reveal entirely.
+    //
+    // RESOLVED LAZILY: the dialog sits below this script in the document, so
+    // nothing may ask before the layout pass (the one caller,
+    // 20-mixer-layout.js, runs long after the dialog's script).
     var TITLE_CARD = null;
     function titleCard() {
         if (TITLE_CARD !== null) return TITLE_CARD;
-        TITLE_CARD = true;
-        try {
-            if (localStorage.getItem('fluidui.photoWarn.ack.v1') !== '1') TITLE_CARD = false;
-        } catch (_) { /* no storage — leave the card on */ }
+        var warn = document.getElementById('photoWarn');
+        // A warning still waiting for the intro (pw-wait, index.html) is
+        // not on screen yet: since 2026-10-18 it comes up after the card.
+        TITLE_CARD = !(warn && !warn.hidden && !warn.classList.contains('pw-wait'));
         return TITLE_CARD;
     }
     var TITLE_HOLD_MS = 420;   // title-card dwell after the window has landed
@@ -108,12 +114,58 @@
         // A late-loading font would reflow the UI after everything else is
         // "done". No webfonts ship today, but this costs nothing and means a
         // future one cannot punch a hole through the fade.
-        var fired = false;
+        //
+        // The boot screens' ground image (warmGround, below) is the other
+        // late arrival: the title card and the photosensitivity warning both
+        // stand on it, and one that decodes after the reveal pops in under a
+        // window that is already fading up. So both waits have to clear,
+        // each on its own cap, before the quiet watch starts.
+        var fired = false, waits = 2;
         var go = function () { if (!fired) { fired = true; watchQuiet(); } };
+        var one = function () { if (--waits <= 0) go(); };
+        var fontsDone = false;
+        var fontsOnce = function () { if (!fontsDone) { fontsDone = true; one(); } };
         if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
-            document.fonts.ready.then(go, go);
-            setTimeout(go, 800);
-        } else { go(); }
+            document.fonts.ready.then(fontsOnce, fontsOnce);
+            setTimeout(fontsOnce, 800);
+        } else { fontsOnce(); }
+        var groundDone = false;
+        var groundOnce = function () { if (!groundDone) { groundDone = true; one(); } };
+        if (groundReady) {
+            groundReady.then(groundOnce, groundOnce);
+            setTimeout(groundOnce, GROUND_MAX_MS);
+        } else { groundOnce(); }
+    }
+
+    // ══ Boot ground ═══════════════════════════════════════════════════
+    // Walnut & Copper's deco sunrise (assets/textures/deco-sunburst-2560.jpg)
+    // is the background of the title card (css/44) and of the
+    // photosensitivity warning (index.html). Both are on screen at the
+    // reveal, so the picture must be fetched and decoded before it. Same
+    // URL the CSS asks for, so this is one fetch and the CSS reuses it; the
+    // quiet-frame watch that follows gives the compositor its frames to
+    // raster it. Started at arming, long before the gates clear.
+    var GROUND_SRC = 'assets/textures/deco-sunburst-2560.jpg';
+    var GROUND_MAX_MS = 1500;
+    var groundReady = null;
+    function warmGround() {
+        if (root.getAttribute('data-theme') !== 'walnut-copper') return;
+        try {
+            var img = new Image();
+            img.decoding = 'async';
+            img.src = GROUND_SRC;
+            groundReady = (img.decode ? img.decode() : Promise.reject()).then(function () {
+                log('boot ground decoded');
+            }, function () {
+                // decode() rejects for a broken image AND for one that was
+                // already complete in some engines; either way, waiting on
+                // load is the honest fallback.
+                return new Promise(function (res) {
+                    if (img.complete) return res();
+                    img.onload = img.onerror = function () { res(); };
+                });
+            });
+        } catch (_) { groundReady = null; }
     }
 
     function signature() {
@@ -465,6 +517,7 @@
         // dragged that ~714ms read onto the critical path. No stylesheet has
         // ever had a rule for it, so it was removed rather than deferred.)
         startCursor();
+        warmGround();
         log('window-fade launch armed');
     }
 })();

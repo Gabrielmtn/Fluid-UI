@@ -211,7 +211,7 @@
     outline-offset: -2px;
 }
 /* Compact window (js/13): the height goes to the canvas. */
-body.compact-ui #quality-underbar { display: none; }
+body.compact-fold #quality-underbar { display: none; }
 
 /* ── BODY LAYOUT: column instead of row ── */
 body {
@@ -502,6 +502,22 @@ body > .controls {
 .ch-nudge-btn {
     touch-action: none;   /* hold-to-nudge must not turn into a scroll gesture */
 }
+/* Color: the swatch inside a button with its word (20 buildColorChannel),
+   a <label> round the colour input. The ring shows on the button. */
+.ch-color-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+.ch-color-btn:has(> input:focus-visible) {
+    outline: 2px solid var(--ui-focus, #8ab4ff);
+    outline-offset: 2px;
+}
+.ch-color-btn > input:focus-visible { outline: none; }
 
 /* The latch is a plate like its neighbours (.btn: 20 sets it), so its
    colours come from 01-buttons: the pressed plate while latched, and while

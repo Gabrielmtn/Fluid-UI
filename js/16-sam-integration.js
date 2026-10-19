@@ -289,7 +289,6 @@ class SAMSegmenter {
                     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
                     text-align: center;
                 ">
-                    <div style="font-size: 48px; margin-bottom: 16px;">🪄</div>
                     <h2 style="color: #3fb950; margin: 0 0 12px 0; font-size: 24px; font-weight: 600;">
                         Downloading Instant Roto Model
                     </h2>

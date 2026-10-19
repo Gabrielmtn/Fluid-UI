@@ -100,7 +100,7 @@ async function launch(port, url, name) {
     await page.send('Page.navigate', { url });
     await waitReady(page, { timeoutMs: 90000 });
     for (let i = 0; i < 120; i++) {
-        const ok = await page.eval("!!(window.__scriptsReady && typeof createRoom==='function' && typeof renderRoomStatus==='function' && window.PhonePads && document.getElementById('phonePadBtn') && document.getElementById('roomReportBtn') && document.getElementById('mixer-strip'))").catch(() => false);
+        const ok = await page.eval("!!(window.__scriptsReady && typeof createRoom==='function' && typeof renderRoomStatus==='function' && window.PhonePads && document.getElementById('phonePadBtn') && document.getElementById('mixer-strip'))").catch(() => false);
         if (ok) break;
         await sleep(250);
     }

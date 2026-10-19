@@ -87,7 +87,7 @@ const K = { space: [' ', 'Space', 32], enter: ['Enter', 'Enter', 13], esc: ['Esc
         await d.ev('document.activeElement.blur(), 1');
 
         // ── Room menu (⋯) and Invite, shown as if in a room ──
-        await d.ev(`(function(){ window.openSidebarSection(document.getElementById('mpConnected').closest('.sidebar-section')); document.getElementById('mpDisconnected').style.display = 'none'; document.getElementById('mpConnected').style.display = ''; return 1; })()`);
+        await d.ev(`(function(){ window.openSidebarSection(document.getElementById('mpConnected').closest('.sidebar-section')); document.getElementById('mpDisconnected').style.display = 'none'; document.getElementById('mpConnected').style.display = ''; document.getElementById('lockRoomBtn').style.display = ''; document.getElementById('mpMenuBtn').style.display = ''; return 1; })()`);   // as the host: Lock room is the menu's one item
         await sleep(900);
         const okMenu = await focusEl('mpMenuBtn');
         await key('enter');
@@ -109,18 +109,11 @@ const K = { space: [' ', 'Space', 32], enter: ['Enter', 'Enter', 13], esc: ['Esc
         await sleep(300);
         await d.ev(`(window.dispatchEvent(new Event('resize')), window.StripMore && window.StripMore.measure(), 1)`);
         await sleep(400);
-        const moreShown = await d.ev(`(function(){ var b = document.getElementById('mixerMoreBtn'); return !!(b && b.getClientRects().length); })()`);
-        if (moreShown) {
-            await focusEl('mixerMoreBtn');
-            await key('enter');
-            s = await where('#mixer-more-panel');
-            check('M1 More from the keyboard: opens with focus on a parked fader', s.shown && s.inside, s);
-            await key('esc');
-            s = await where('#mixer-more-panel');
-            check('M2 Esc closes it and focus goes back to More', !s.shown && s.active === 'mixerMoreBtn', s);
-        } else {
-            check('M1 More appears at 900 px wide', false, null);
-        }
+        // The bar docks into the right sidebar as soon as it would wrap
+        // (js/13, 2026-10-18), so More never parks a fader: at 900 px the
+        // fader cells are in the sidebar, reachable from the keyboard there.
+        const dock = await d.ev(`(function(){ var c = document.querySelector('#sidebar-right > #mixer-strip [data-ui-key="Viscosity"] input'); return { docked: document.body.classList.contains('compact-ui'), cell: !!c }; })()`);
+        check('M1 at 900 px the top bar is docked in the right sidebar', dock.docked && dock.cell, dock);
         await d.send('Emulation.clearDeviceMetricsOverride', {});
 
         const errs = d.events.filter(m => m.method === 'Runtime.exceptionThrown').map(m => m.params.exceptionDetails.exception && m.params.exceptionDetails.exception.description || m.params.exceptionDetails.text);

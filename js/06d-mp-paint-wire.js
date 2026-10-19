@@ -101,6 +101,10 @@ function brushWireFields() {
     // just ignores the field.
     var _mir = window.__strokeMirrorPin | 0;
     if (_mir) f.mir = _mir;
+    // Mandala Overlay's fold (05g foldMandala), the same class: the wedge
+    // count every dab of this stroke is folded into. Omitted while off.
+    var _md = (typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(window.__mandalaFold) : 0;
+    if (_md) f.md = _md;
     // Multi-Brush arms turn the tip with them (05g armStampTurn). Sent as
     // `at: 1` when they do, because ABSENCE has to mean "every arm kept the
     // brush's angle": that is how every build before 2026-09-25 painted.
@@ -1441,7 +1445,8 @@ function handleRemoteSplat(data, from, to) {
                          window.__armPushPin,
                          window.__strokeMirrorPin,
                          window.__armTipPin,
-                         window.__peerArmColors];
+                         window.__peerArmColors,
+                         window.__mandalaFold];
             // Per-arm tips: the sender's, cleaned (05g), and unconditional
             // like the arm mask: no `atip` means the sender's arms all
             // printed the brush's tip, never "use mine".
@@ -1459,6 +1464,9 @@ function handleRemoteSplat(data, from, to) {
             // arm-transform builder.
             var _mirIn = (typeof _rd.mir === 'number' && isFinite(_rd.mir)) ? (_rd.mir | 0) : 0;
             window.__strokeMirrorPin = (_mirIn >= 1 && _mirIn <= 3) ? _mirIn : 0;
+            // Mandala's fold, the same rule: no `md` is a sender that did
+            // not fold, never "fold it into my wedges".
+            window.__mandalaFold = (typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(_rd.md) : 0;
             // Same unconditional rule for the per-arm mask, and range-checked:
             // an arm index past the painter's count is harmless (no transform
             // carries it), but a non-integer would poison the bit test.
@@ -1665,6 +1673,7 @@ function handleRemoteSplat(data, from, to) {
                 window.__strokeMirrorPin = _pushPrev[4];
                 window.__armTipPin = _pushPrev[5];
                 window.__peerArmColors = _pushPrev[6];
+                window.__mandalaFold = _pushPrev[7];
             }
         }
     }
@@ -1766,6 +1775,7 @@ function broadcastReplayStroke(events) {
         // same class of gap the footprint fields above close. The receiver's
         // emitReplayDab range-checks the value (05d).
         if (ev.mir) o.mir = ev.mir | 0;
+        if (ev.md) o.md = ev.md | 0;          // Mandala's fold, the same
         // The Limit flow each dab painted with (05d pushStrokeEvent). Only
         // below full; an older peer ignores it and paints at full flow.
         if (typeof ev.gf === 'number' && isFinite(ev.gf) && ev.gf < 1) o.gf = +Math.max(0, ev.gf).toPrecision(4);

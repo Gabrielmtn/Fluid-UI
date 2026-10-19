@@ -1,0 +1,245 @@
+/* ================================================================
+   css/41-theme-polish-fields.css - Walnut & Copper polish pass (2026-10-18).
+   Owner: the fields and overlays polish agent (font preview, text swatches, close dialog).
+   Loads after css/30-40, inside @layer theme; rules scoped to
+   html[data-theme="walnut-copper"]. Button colour may live here (js/38
+   sanctions the theme component sheets 40-49).
+   ================================================================ */
+@layer theme {
+
+/* ── 1. Font list: each option in its own face ───────────────────────
+   js/69 copies an option's font-family onto its row and marks it
+   data-wc-face (Text's Font list). The label face's small caps and
+   tracking would hide what the face looks like, so a preview row is set in
+   its own case at reading size; the pane, cathode and states stay. */
+html[data-theme="walnut-copper"] .wc-opt[data-wc-face] {
+    font-size: 14px;
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1.25;
+    font-variant-caps: normal;
+    letter-spacing: 0;
+    text-transform: none;
+}
+/* An <optgroup> (Sans, Serif, Mono...): its heading is a drawer label. */
+html[data-theme="walnut-copper"] .wc-grp {
+    display: grid;
+    gap: 5px;
+}
+html[data-theme="walnut-copper"] .wc-grp-head {
+    padding: 7px 2px 1px;
+    font: 400 9px/1.3 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--engrave);
+}
+
+/* ── 2. Text drawer: captions, rows, colour wells ────────────────────
+   js/20's Text editor builds its small captions and rows with inline
+   styles (grey 9 px system face, bottom-aligned rows), hence !important.
+   The captions take the drawer's control names (Letter Spacing, Opacity:
+   css/34 and css/31, engraved); a row aligns its captions on one line and
+   sets every control in it at the compact field height (32 px, the
+   number fields' and a layer card's), so the bottoms stay level too. The
+   Font field, alone on its line, keeps the main 48 px. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-cap {
+    margin-bottom: 6px !important;
+    padding: 0 4px;
+    font-family: var(--ui-font-display) !important;
+    font-weight: 400 !important;
+    font-size: 10.5px !important;
+    line-height: 1.3 !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    color: var(--engrave) !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row {
+    --wc-text-ctl: 32px;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+}
+/* A control without a caption (Italic) sits on its neighbours' line. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row > div:not(:has(> .text-field-cap)) {
+    align-self: flex-end;
+}
+/* :not(#_) lifts it over css/37's per-kind button heights. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row button:not(#_) {
+    height: var(--wc-text-ctl) !important;
+    min-height: 0 !important;
+}
+/* The compact field (css/37's layer-card tier): 32 px, 24 px chevron cell. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row select:not(.material-mode-select):not([aria-hidden="true"]):not([multiple]) {
+    height: var(--wc-text-ctl) !important;
+    min-height: var(--wc-text-ctl);
+    padding: 0 30px 0 10px !important;
+    border-radius: 5px !important;
+    font-size: 9.5px !important;
+    background:
+        var(--wcf-chev) right 5.5px top calc(-8px + clamp(0, round(nearest, var(--open) * 36, 1), 36) * -48px) / 12px 1776px no-repeat,
+        linear-gradient(rgba(214, 140, 92, 0.7), rgba(214, 140, 92, 0.7)) right 23px top 5px / 1px calc(100% - 10px) no-repeat,
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        var(--wcf-mesh-lit-field) center / 100% 100% no-repeat,
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605) !important;
+}
+
+/* The Text and Background colour wells: rectangular (they are as wide as
+   their column), framed as the drawer's fields are: dark glass, a copper
+   ring inside the box, and the colour inset past a dark gap, the same ring
+   and gap the round sidebar wells wear (css/37), kept inside the box so
+   the wells line up with the fields under them. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row :is(#textOverlayColor, #textOverlayBgColor) {
+    box-sizing: border-box;
+    height: var(--wc-text-ctl) !important;
+    padding: 5px !important;
+    border: 0 !important;
+    border-radius: 5px !important;
+    background: linear-gradient(170deg, #1a1210, #090605) !important;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 3px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row :is(#textOverlayColor, #textOverlayBgColor):hover {
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu-hi),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 3px rgba(0, 0, 0, 0.6),
+        0 0 12px rgba(255, 220, 160, 0.35);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row :is(#textOverlayColor, #textOverlayBgColor):focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 2px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row :is(#textOverlayColor, #textOverlayBgColor)::-webkit-color-swatch-wrapper {
+    padding: 0;
+    border-radius: 2px;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row :is(#textOverlayColor, #textOverlayBgColor)::-webkit-color-swatch {
+    border: 0;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+/* Background: its on/off cathode sits in the well's frame, in front of
+   the colour, so switch and colour read as one control under one caption.
+   The well's own frame folds into the shared one. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row div:has(> #textOverlayBgToggle) {
+    box-sizing: border-box;
+    height: var(--wc-text-ctl);
+    gap: 9px !important;
+    padding: 0 5px 0 11px;
+    border-radius: 5px;
+    background: linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 3px rgba(0, 0, 0, 0.6);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row div:has(> #textOverlayBgToggle) > #textOverlayBgColor {
+    min-width: 0;
+    height: calc(var(--wc-text-ctl) - 10px) !important;
+    padding: 0 !important;
+    border-radius: 2px !important;
+    background: none !important;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .text-field-row div:has(> #textOverlayBgToggle) > #textOverlayBgColor:hover {
+    box-shadow: 0 0 10px rgba(255, 220, 160, 0.35);
+}
+
+/* ── 3. Close without saving (js/04f #appCloseModal) ─────────────────
+   Three answers on one row, one size each, in reading order: the safe
+   default first (Keep painting, which has focus), Save project, then the
+   destructive one set a little apart at the end. css/styles.css let the
+   row wrap, which left Close anyway alone on a second line. After a save
+   the row is two: Keep painting and the renamed Close, which is safe now,
+   so it drops the red and takes the lit pane (.app-close-safe). */
+html[data-theme="walnut-copper"] .app-close-modal .delete-modal-content {
+    max-width: 500px;
+}
+html[data-theme="walnut-copper"] .app-close-modal .delete-modal-message {
+    margin-bottom: 20px;
+}
+html[data-theme="walnut-copper"] .app-close-modal .delete-modal-actions {
+    flex-wrap: nowrap;
+    justify-content: stretch;
+    gap: 8px;
+}
+html[data-theme="walnut-copper"] .app-close-modal .delete-modal-actions > button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 36px;
+    padding: 4px 8px;
+    white-space: normal;
+    text-align: center;
+}
+html[data-theme="walnut-copper"] .app-close-modal .delete-modal-actions > #appCloseQuit {
+    margin-left: 12px;
+}
+html[data-theme="walnut-copper"] .app-close-modal .delete-modal-actions > #appCloseQuit.app-close-safe {
+    --gc: 255 110 30;
+    --ci: 1;
+    border-color: var(--cu-hi);
+    background-color: #1a1210;
+    background-image:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane),
+        linear-gradient(170deg, #1a1210, #090605);
+    color: var(--lit);
+}
+
+/* The Text drawer’s selected line was marked in the old theme’s pink,
+   written inline by js/20 refreshList; it takes the copper selection here. */
+html[data-theme="walnut-copper"] #textOverlayList > div[style*="255,130,170,0.5"] {
+    border-color: var(--cu-hi) !important;
+    background: rgba(255, 110, 30, 0.12) !important;
+    box-shadow: 0 0 10px rgba(255, 110, 30, 0.18);
+}
+
+/* ── 4. Export: Format field (js/20 #exportFormat) ───────────────────
+   Laid out inline like Background's row, so it takes the same stacked
+   field css/37 gives #exportGround: small-caps name over a 48 px field.
+   (js/20 shows and hides the rows with inline display.) */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> label[for="exportFormat"]) {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 5px !important;
+    margin: 0 0 10px !important;   /* room over the size readout below it */
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> label[for="exportFormat"]) > label {
+    margin: 0;
+    text-align: left;
+    font: 400 15px/12.6px var(--ui-font-display);
+    font-variant-caps: all-small-caps;
+    letter-spacing: 1.89px;
+    text-transform: none;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+    opacity: 1;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> label[for="exportFormat"]) > select {
+    width: 100%;
+    flex: none;
+}
+/* The chosen format's own fields (Duration, Frame Rate) name themselves
+   the same way, under Quick Export as the one heading. js/20 sizes these
+   labels inline, hence !important. 11 px is what Format and Background
+   render at (their rows' inline font-size wins over css/37's 15). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .export-format-settings .control-group > label {
+    margin: 0 0 5px !important;
+    font: 400 11px/12.6px var(--ui-font-display) !important;
+    font-variant-caps: all-small-caps !important;
+    letter-spacing: 1.89px !important;
+    text-transform: none !important;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
+}
+} /* @layer theme */

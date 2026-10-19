@@ -52,29 +52,80 @@ html[data-theme="walnut-copper"] .sidebar-section > :is(.section-header, .sectio
     --dp: inherit;
 }
 
-/* ── Drawer front (study .dfront 434-441) ────────────────────────────
-   Vertical-grain walnut, the inset copper line, a top highlight, and a drop
-   shadow that grows as the drawer pulls out (--dp, the drawer spring). The
-   front sits above its tray (study .dfront-row z-index 1) so the tray slides
-   out from under it. No pull bar (Gabriel). */
+/* ── Drawer front ─────────────────────────────────────────────────────
+   2026-10-18 (Gabriel): the boot screens' blue herringbone, small
+   (assets/textures/deco-herringbone-tile.jpg, scripts/theme/
+   bake-deco-herringbone-tile.js, 2x tile drawn at half size), in place of
+   the study's lined walnut. The copper is a faint deco inlay round the
+   edge only (::before, ::after below), so nothing sits behind the name.
+   A plate darkens the left, where the name is. The top highlight and the
+   drop shadow that grows as the drawer pulls out (--dp, the drawer spring)
+   are the study's. The front sits above its tray (study .dfront-row
+   z-index 1) so the tray slides out from under it. No pull bar (Gabriel). */
 html[data-theme="walnut-copper"] .section-header {
     position: relative;
     z-index: 1;
     min-height: 46px;
     box-sizing: border-box;
     gap: 12px;
-    padding: 0 14px;
-    border-radius: 8px;
+    /* Left room for the stepped bracket (ends 10 px in) before the lamp. */
+    padding: 0 18px 0 18px;
+    border-radius: 3px;
     cursor: pointer;
     background:
-        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 6px, rgba(255, 200, 150, 0.045) 6px 7px, transparent 7px 13px),
-        linear-gradient(180deg, #3d2313, #24130a);
+        linear-gradient(90deg, rgba(3, 6, 11, 0.50), rgba(3, 6, 11, 0.30) 55%, rgba(3, 6, 11, 0.18)),
+        url(../assets/textures/deco-herringbone-tile.jpg) 0 0 / 84px 120px,
+        #101a27;
     box-shadow:
-        inset 0 0 0 1.5px var(--cu),
-        inset 0 2px 0 rgba(255, 210, 170, 0.14),
+        inset 0 2px 0 rgba(200, 220, 255, 0.07),
         0 2px 0 rgba(0, 0, 0, 0.45),
         0 calc(var(--dp, 0) * 12px) calc(var(--dp, 0) * 16px) -6px rgba(0, 0, 0, 0.85);
     transform: translateY(calc(var(--dp, 0) * -1px));
+}
+/* The inlay (after Gabriel's art-deco frame reference): a double copper rule
+   round the front, a diamond on the top and bottom rules at the centre, and
+   a stepped bracket at each end. z-index -1 inside the front's own stacking
+   context (z-index 1 above): over the wood, under the name. Faint by
+   design (Gabriel 2026-10-18: drawn at 70 % and fainter still); open
+   drawers and hover lift it a little. */
+html[data-theme="walnut-copper"] .section-header::before,
+html[data-theme="walnut-copper"] .section-header::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+}
+html[data-theme="walnut-copper"] .section-header::before {
+    border: 1px solid rgba(196, 122, 75, 0.38);
+    outline: 1px solid rgba(196, 122, 75, 0.17);
+    outline-offset: -4px;
+    transition: border-color 0.18s, outline-color 0.18s;
+}
+html[data-theme="walnut-copper"] .section-header::after {
+    --wc-inlay-diamond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12' viewBox='0 0 20 12'%3E%3Cpath d='M10 .5L19 6L10 11.5L1 6Z' fill='%230b131e' stroke='%23d68c5c' stroke-opacity='.62'/%3E%3Cpath d='M10 3.6L14 6L10 8.4L6 6Z' fill='none' stroke='%23d68c5c' stroke-opacity='.5'/%3E%3C/svg%3E");
+    --wc-inlay-step: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='28' viewBox='0 0 16 28'%3E%3Cpath d='M4.5 2.5H9.5V25.5H4.5M9.5 7.5H13.5V20.5H9.5' fill='none' stroke='%23d68c5c' stroke-opacity='.5'/%3E%3C/svg%3E");
+    --wc-inlay-step-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='28' viewBox='0 0 16 28'%3E%3Cpath d='M11.5 2.5H6.5V25.5H11.5M6.5 7.5H2.5V20.5H6.5' fill='none' stroke='%23d68c5c' stroke-opacity='.5'/%3E%3C/svg%3E");
+    background:
+        var(--wc-inlay-diamond) 50% 0 / 14px 8.4px no-repeat,
+        var(--wc-inlay-diamond) 50% 100% / 14px 8.4px no-repeat,
+        var(--wc-inlay-step) 0 50% / 11.2px 19.6px no-repeat,
+        var(--wc-inlay-step-r) 100% 50% / 11.2px 19.6px no-repeat;
+    opacity: 0.6;
+    transition: opacity 0.18s;
+}
+html[data-theme="walnut-copper"] .sidebar-section:not(.collapsed) > .section-header::before,
+html[data-theme="walnut-copper"] .section-header:hover::before {
+    border-color: rgba(214, 140, 92, 0.55);
+    outline-color: rgba(214, 140, 92, 0.28);
+}
+html[data-theme="walnut-copper"] .sidebar-section:not(.collapsed) > .section-header::after,
+html[data-theme="walnut-copper"] .section-header:hover::after { opacity: 0.8; }
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] .section-header { background: ButtonFace; }
+    html[data-theme="walnut-copper"] .section-header::before { border-color: ButtonText; outline-color: transparent; }
+    html[data-theme="walnut-copper"] .section-header::after { display: none; }
 }
 html[data-theme="walnut-copper"] .section-header:has(> .section-title:focus-visible) {
     outline: 2px solid var(--ui-focus);
@@ -88,7 +139,7 @@ html[data-theme="walnut-copper"] .sidebar-section[data-group] .section-title {
     display: inline-flex;
     align-items: center;
     gap: 12px;
-    font-family: var(--ui-font-display);
+    font-family: var(--ui-font-title);
     font-weight: 400;
     font-size: 11px;
     line-height: 1;
@@ -422,4 +473,84 @@ html[data-theme="walnut-copper"] .section-body .anim-slot-over {
     html[data-theme="walnut-copper"] .sidebar-section.wc-mv > .section-body { transform: none; clip-path: none; }
 }
 
+/* Animation slots: the Clear cross (polish pass 2026-10-17). It took the
+   sidebar's full button (34 px, heavy rim) and sat over the slot's words
+   ("Playing - click to stop"). Now a small round cathode on the slot's
+   top-right rim, clear of the words; shown on hover and on keyboard focus. */
+html[data-theme="walnut-copper"] .section-body .anim-slot > button:not(.anim-slot-clear) { padding-left: 18px; padding-right: 18px; }
+html[data-theme="walnut-copper"] .section-body .anim-slot .anim-slot-clear {
+    top: -6px !important;
+    right: -6px !important;
+    z-index: 2;
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    font: 400 9px/18px var(--ui-font-body) !important;
+    letter-spacing: 0 !important;
+    text-align: center;
+    color: var(--lit) !important;
+    background: radial-gradient(circle at 40% 35%, #2a1b14, #0b0605) !important;
+    box-shadow: 0 0 0 1.3px var(--cu), 0 0 0 2.3px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.6) !important;
+    opacity: 0;
+}
+html[data-theme="walnut-copper"] .section-body .anim-slot:is(:hover, :focus-within) .anim-slot-clear { opacity: 1; }
+html[data-theme="walnut-copper"] .section-body .anim-slot .anim-slot-clear:hover { box-shadow: 0 0 0 1.3px var(--cu-hi), 0 0 0 2.3px rgba(0, 0, 0, 0.7), 0 0 10px rgba(255, 150, 80, 0.55) !important; }
+html[data-theme="walnut-copper"] .section-body .anim-slot .anim-slot-clear:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+
+/* The left bar folding by hand (js/20 setEased, Gabriel’s tour 2026-10-18):
+   the width changes once; the bar is revealed from / hidden into its 32 px
+   rail by clip-path and its contents slide, so each frame is paint only. */
+html[data-theme="walnut-copper"] #sidebar-left {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+html[data-theme="walnut-copper"] #sidebar-left > :is(.lsb-head, .lsb-body) {
+    transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+html[data-theme="walnut-copper"] #sidebar-left.lsb-shut { clip-path: inset(0 calc(100% - 32px) 0 0); }
+html[data-theme="walnut-copper"] #sidebar-left.lsb-shut > :is(.lsb-head, .lsb-body) { opacity: 0; transform: translateX(-18px); }
+html[data-theme="walnut-copper"] #sidebar-left.lsb-instant,
+html[data-theme="walnut-copper"] #sidebar-left.lsb-instant > :is(.lsb-head, .lsb-body) { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] #sidebar-left,
+    html[data-theme="walnut-copper"] #sidebar-left > :is(.lsb-head, .lsb-body) { transition: none; }
+}
+/* The folded rail’s size readout opens the bar (js/20) and holds one length
+   from 1 px to 999 px, so the rail below it never shifts (Gabriel’s tour). */
+html[data-theme="walnut-copper"] #sidebar-left .lsb-rail-size {
+    min-inline-size: 6.5ch;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 4px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .lsb-rail-size:hover { color: var(--lit); }
+html[data-theme="walnut-copper"] #sidebar-left .lsb-rail-size:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+/* Focus mode slides the chrome away and back (js/21 slideFocus): one-shot
+   transforms, the layout changing once around them. The docked bar rides
+   inside the right sidebar, so only the free top bar slides up. */
+html[data-theme="walnut-copper"] body:not(.compact-ui) #mixer-strip,
+html[data-theme="walnut-copper"] #sidebar-right,
+html[data-theme="walnut-copper"] #quality-underbar,
+html[data-theme="walnut-copper"] #custom-titlebar,
+html[data-theme="walnut-copper"] :is(.lsb-edge, .rsb-edge) {
+    transition: transform 0.333s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.24s ease;
+}
+/* The left bar also eases its fold (clip-path, above): both transitions. */
+html[data-theme="walnut-copper"] #sidebar-left {
+    transition: clip-path 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.333s cubic-bezier(0.4, 0, 0.2, 1);
+}
+html[data-theme="walnut-copper"] body.fm-out:not(.compact-ui) #mixer-strip,
+html[data-theme="walnut-copper"] body.fm-out #custom-titlebar { transform: translateY(-110%); }
+html[data-theme="walnut-copper"] body.fm-out #sidebar-left { transform: translateX(-105%); }
+html[data-theme="walnut-copper"] body.fm-out #sidebar-right { transform: translateX(105%); }
+html[data-theme="walnut-copper"] body.fm-out #quality-underbar { transform: translateY(110%); }
+html[data-theme="walnut-copper"] body.fm-out :is(.lsb-edge, .rsb-edge) { opacity: 0; }
+html[data-theme="walnut-copper"] body.fm-instant :is(#mixer-strip, #sidebar-left, #sidebar-right, #quality-underbar, #custom-titlebar, .lsb-edge, .rsb-edge) { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] :is(#mixer-strip, #sidebar-left, #sidebar-right, #quality-underbar, #custom-titlebar, .lsb-edge, .rsb-edge) { transition: none !important; }
+}
 } /* @layer theme */

@@ -305,14 +305,17 @@
             // Guides over the mirror (and over the blank surface with the
             // mirror off), under the cursor; clipped to the box.
             '.guide{position:absolute;left:0;top:0;width:100%;height:100%;display:none;pointer-events:none}',
-            '#guidesMenu{position:fixed;top:44px;left:12px;z-index:6;width:300px;max-width:calc(100vw - 24px);padding:6px;',
+            // The Guides and Mirror menus: one look.
+            '.menu{position:fixed;top:44px;left:12px;z-index:6;width:300px;max-width:calc(100vw - 24px);padding:6px;',
             'box-sizing:border-box;background:rgba(10,14,20,0.97);border:1px solid rgba(255,255,255,0.16);border-radius:8px;',
             'box-shadow:0 8px 24px rgba(0,0,0,0.5);cursor:default}',
-            '#guidesMenu label{display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-radius:6px;cursor:pointer}',
-            '#guidesMenu label:hover{background:rgba(255,255,255,0.07)}',
-            '#guidesMenu input{margin:2px 0 0;accent-color:#78b4ff;cursor:pointer}',
-            '#guidesMenu b{display:block;color:#e8ecf2;font-weight:600}',
-            '#guidesMenu small{display:block;color:#9aa6b8;font-size:12px;line-height:1.35;margin-top:2px}',
+            '.menu label{display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-radius:6px;cursor:pointer}',
+            '.menu label:hover{background:rgba(255,255,255,0.07)}',
+            '.menu label.on{background:rgba(120,180,255,0.12)}',
+            '.menu input{margin:2px 0 0;accent-color:#78b4ff;cursor:pointer}',
+            '.menu input:focus-visible{outline:1px solid rgba(120,180,255,0.9);outline-offset:2px}',
+            '.menu b{display:block;color:#e8ecf2;font-weight:600}',
+            '.menu small{display:block;color:#9aa6b8;font-size:12px;line-height:1.35;margin-top:2px}',
             '</style></head><body>',
             '<div id="stage"><div id="box">',
             '<canvas id="mirror" width="16" height="9"></canvas>',
@@ -327,16 +330,18 @@
             // focus (so the mouse keeps working in the app while the pen is
             // down), and a <select> needs focus to open. The Guides menu is
             // our own list of checkboxes for the same reason; a checkbox
-            // toggles on its click, focus or not.
+            // toggles on its click, focus or not. Mirror is a list of radios
+            // for the same reason: every mode and its words in one look.
             '<button id="guidesBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Guides drawn over this window. What you pick here applies to this window only.">Guides: all &#9662;</button>',
             '<label title="Keep the brush cursor in this window even when the main window hides it (C, Focus mode, Show Brush Ghost off). Untick to follow the main window.">',
             '<input type="checkbox" id="cursorBox" checked>Always show cursor</label>',
-            '<button id="mirrorBtn" type="button" title="Mirror: what this window shows under the pen. Click to cycle Light / Smooth / Off.">Mirror: Light</button>',
+            '<button id="mirrorBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Mirror: what this window shows under the pen. Same setting as Pen Window Mirror in the main window.">Mirror: Light &#9662;</button>',
             '<button id="screenBtn" type="button" title="Move this window to the next screen">Screen &#9656;</button>',
             '<button id="fsBtn" type="button" title="F11">Fullscreen</button>',
             '<button id="closeBtn" type="button">Close</button>',
             '</div>',
-            '<div id="guidesMenu" role="group" aria-label="Guides" hidden></div>',
+            '<div id="guidesMenu" class="menu" role="group" aria-label="Guides" hidden></div>',
+            '<div id="mirrorMenu" class="menu" role="radiogroup" aria-label="Mirror" hidden></div>',
             '</body></html>'
         ].join('');
     }
@@ -1029,9 +1034,9 @@
         retireStalePens(e);
         if (isStrayMouse(e)) return;
         notePen(e);
-        // A press on the surface with the Guides menu open closes it and
+        // A press on the surface with a toolbar menu open closes it and
         // paints nothing: a tap to dismiss must not leave a dab.
-        if (guidesMenuOpen()) { toggleGuidesMenu(false); e.preventDefault(); return; }
+        if (anyMenuOpen()) { closeMenus(); e.preventDefault(); return; }
         lastInputTs = performance.now();
         mirrorWake();
         fit();
@@ -1181,7 +1186,7 @@
         var tag = t && t.tagName ? t.tagName.toLowerCase() : '';
         if (tag === 'select' || tag === 'input' || tag === 'button' || tag === 'textarea') return;
         if (e.key === 'F11') { if (e.type === 'keydown') toggleFullscreen(); e.preventDefault(); return; }
-        if (e.key === 'Escape' && guidesMenuOpen()) { if (e.type === 'keydown') toggleGuidesMenu(false); e.preventDefault(); return; }
+        if (e.key === 'Escape' && anyMenuOpen()) { if (e.type === 'keydown') closeMenus(); e.preventDefault(); return; }
         if (e.key === 'Escape' && !childWin && pdoc && pdoc.fullscreenElement) return;
         var ok = true;
         try {
@@ -1332,8 +1337,8 @@
         if (!ui) return;
         ui.bar.classList.remove('idle');
         clearTimeout(barTimer);
-        // Not while the Guides menu hangs off it; closing the menu calls back here.
-        barTimer = setTimeout(function () { if (ui && !guidesMenuOpen()) ui.bar.classList.add('idle'); }, BAR_LINGER);
+        // Not while a menu hangs off it; closing the menu calls back here.
+        barTimer = setTimeout(function () { if (ui && !anyMenuOpen()) ui.bar.classList.add('idle'); }, BAR_LINGER);
     }
 
     // ── Guides over the mirror ───────────────────────────────────────
@@ -1446,15 +1451,125 @@
     function toggleGuidesMenu(open) {
         if (!ui || !ui.guidesMenu) return;
         if (typeof open !== 'boolean') open = !guidesMenuOpen();
-        if (open) {
-            // Under the button, kept on screen.
-            var r = ui.guidesBtn.getBoundingClientRect();
-            var W = (pop && pop.innerWidth) || 800;
-            ui.guidesMenu.style.left = Math.max(8, Math.min(r.left, W - 308)) + 'px';
-            ui.guidesMenu.style.top = Math.round(r.bottom + 6) + 'px';
-        }
+        if (open) { toggleMirrorMenu(false); placeMenu(ui.guidesMenu, ui.guidesBtn); }
         ui.guidesMenu.hidden = !open;
         ui.guidesBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        showBar();
+    }
+    // Under its button, kept on screen.
+    function placeMenu(m, btn) {
+        var r = btn.getBoundingClientRect();
+        var W = (pop && pop.innerWidth) || 800;
+        m.style.left = Math.max(8, Math.min(r.left, W - 308)) + 'px';
+        m.style.top = Math.round(r.bottom + 6) + 'px';
+    }
+    function anyMenuOpen() { return guidesMenuOpen() || mirrorMenuOpen(); }
+    function closeMenus() { toggleGuidesMenu(false); toggleMirrorMenu(false); }
+
+    // ── Mirror menu: every mode with its words, one pick ─────────────
+    // The main window's select is the setting; this list is a view of it.
+    // A pick sets that select and fires its change (save + restart the
+    // mirror); startMirror then re-reads it here, so a change made in the
+    // main window shows here the same way.
+    function mirrorOptions() {
+        var sel = mirrorSelect();
+        var out = [];
+        if (sel) {
+            for (var i = 0; i < sel.options.length; i++) {
+                var o = sel.options[i];
+                if (!(o.value in MIRROR_MODES)) continue;
+                // "Light - 12 fps drawing, 2 idle" -> name + words.
+                var t = (o.textContent || '').split(' - ');
+                out.push({ value: o.value, name: t[0], about: t.slice(1).join(' - ') });
+            }
+        }
+        if (!out.length) {
+            out = Object.keys(MIRROR_MODES).map(function (v) {
+                var sp = MIRROR_MODES[v];
+                return { value: v, name: v.charAt(0).toUpperCase() + v.slice(1), about: sp ? sp.label.replace(/^[^:]*:\s*/, '') : 'blank surface' };
+            });
+        }
+        return out;
+    }
+    function modeName(v) {
+        var o = mirrorOptions().filter(function (x) { return x.value === v; })[0];
+        return o ? o.name : v;
+    }
+    function buildMirrorMenu() {
+        if (!ui || !ui.mirrorMenu) return;
+        var m = ui.mirrorMenu;
+        m.textContent = '';
+        var keyed = false;   // arrows browse the modes and keep the menu open
+        m.addEventListener('keydown', function (e) {
+            if (/^Arrow/.test(e.key)) { keyed = true; return; }
+            if (e.key === 'Escape' || e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleMirrorMenu(false);
+                try { ui.mirrorBtn.focus(); } catch (_) {}
+            }
+        });
+        m.addEventListener('focusout', function (e) {
+            var to = e.relatedTarget;
+            if (ui && to && !m.contains(to) && to !== ui.mirrorBtn) toggleMirrorMenu(false);
+        });
+        mirrorOptions().forEach(function (o) {
+            var row = pdoc.createElement('label');
+            var rb = pdoc.createElement('input');
+            rb.type = 'radio';
+            rb.name = 'mirrorMode';
+            rb.value = o.value;
+            var txt = pdoc.createElement('span');
+            var name = pdoc.createElement('b');
+            name.textContent = o.name;
+            var about = pdoc.createElement('small');
+            about.textContent = o.about;
+            txt.appendChild(name);
+            txt.appendChild(about);
+            row.appendChild(rb);
+            row.appendChild(txt);
+            rb.addEventListener('change', function () {
+                if (!rb.checked) return;
+                var sel = mirrorSelect();
+                if (sel) {
+                    sel.value = o.value;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));   // saves + restarts the mirror
+                } else {
+                    startMirror();
+                }
+                if (keyed) { keyed = false; return; }
+                toggleMirrorMenu(false);
+                rb.blur();   // focused, it would keep the hotkeys (onKey skips inputs)
+            });
+            m.appendChild(row);
+        });
+        syncMirrorMenu();
+    }
+    // The button reads like a select showing its choice; the list ticks it.
+    function syncMirrorMenu() {
+        if (!ui) return;
+        var mode = mirrorMode();
+        ui.mirrorBtn.textContent = 'Mirror: ' + modeName(mode) + ' ▾';
+        if (!ui.mirrorMenu) return;
+        var rows = ui.mirrorMenu.getElementsByTagName('input');
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].checked = rows[i].value === mode;
+            rows[i].parentNode.classList.toggle('on', rows[i].checked);
+        }
+    }
+    function mirrorMenuOpen() { return !!(ui && ui.mirrorMenu && !ui.mirrorMenu.hidden); }
+    function toggleMirrorMenu(open, viaKeys) {
+        if (!ui || !ui.mirrorMenu) return;
+        if (typeof open !== 'boolean') open = !mirrorMenuOpen();
+        if (open) { toggleGuidesMenu(false); syncMirrorMenu(); placeMenu(ui.mirrorMenu, ui.mirrorBtn); }
+        ui.mirrorMenu.hidden = !open;
+        ui.mirrorBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        // Opened from the keyboard: into the list, on the current mode. A pen
+        // or mouse press leaves focus alone (the desktop window never takes it).
+        if (open && viaKeys) {
+            var on = ui.mirrorMenu.querySelector('input:checked') || ui.mirrorMenu.querySelector('input');
+            if (on) { try { on.focus(); } catch (_) {} }
+        }
         showBar();
     }
     function onBarTrack(e) {
@@ -1564,7 +1679,7 @@
         if (!ui) return;
         var mode = mirrorMode();
         var spec = MIRROR_MODES[mode];
-        ui.mirrorBtn.textContent = 'Mirror: ' + mode.charAt(0).toUpperCase() + mode.slice(1);
+        syncMirrorMenu();
         if (!spec) {
             ui.mirror.hidden = true;
             ui.blank.hidden = false;
@@ -1633,6 +1748,7 @@
             closeBtn: pdoc.getElementById('closeBtn'),
             guidesBtn: pdoc.getElementById('guidesBtn'),
             guidesMenu: pdoc.getElementById('guidesMenu'),
+            mirrorMenu: pdoc.getElementById('mirrorMenu'),
             cursorBox: pdoc.getElementById('cursorBox'),
             guides: {},
             ringParts: null
@@ -1666,16 +1782,10 @@
         ui.fsBtn.addEventListener('click', function () { toggleFullscreen(); ui.fsBtn.blur(); });
         ui.screenBtn.addEventListener('click', function () { cycleScreen(); ui.screenBtn.blur(); });
         ui.closeBtn.addEventListener('click', function () { close(); });
-        ui.mirrorBtn.addEventListener('click', function () {
-            var order = ['light', 'smooth', 'off'];
-            var next = order[(order.indexOf(mirrorMode()) + 1) % order.length];
-            var sel = mirrorSelect();
-            if (sel) {
-                sel.value = next;
-                sel.dispatchEvent(new Event('change', { bubbles: true }));   // saves + restarts the mirror
-            } else {
-                startMirror();
-            }
+        ui.mirrorBtn.addEventListener('click', function (e) {
+            var viaKeys = e.detail === 0;   // Enter / Space on the focused button
+            toggleMirrorMenu(undefined, viaKeys);
+            if (!viaKeys) ui.mirrorBtn.blur();
         });
         ui.guidesBtn.addEventListener('click', function () { toggleGuidesMenu(); ui.guidesBtn.blur(); });
         ui.cursorBox.checked = cursorForced;
@@ -1686,6 +1796,7 @@
             ui.cursorBox.blur();   // focused, it would keep the hotkeys (onKey skips inputs)
         });
         buildGuidesMenu();
+        buildMirrorMenu();
 
         if (isElectron) {
             // The BrowserWindow exists by the time window.open returns.
@@ -1833,6 +1944,7 @@
                     }).map(function (d) { return d.id; }),
                     menuOpen: guidesMenuOpen()
                 },
+                mirrorMenuOpen: mirrorMenuOpen(),
                 cursorReturn: {
                     on: cursorReturn.on, available: cursorReturn.available, reason: cursorReturn.reason,
                     penOwnsCursor: penOwnsCursor, penGone: penGone,

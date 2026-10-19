@@ -1,0 +1,77 @@
+/* ================================================================
+   css/43-theme-polish-brush.css - Walnut & Copper polish pass (2026-10-18).
+   Owner: the Multi-brush polish agent (Main brush, Brush Mode, tiles, symmetry spacing).
+   Loads after css/30-40, inside @layer theme; rules scoped to
+   html[data-theme="walnut-copper"]. Button colour may live here (js/38
+   sanctions the theme component sheets 40-49).
+   ================================================================ */
+@layer theme {
+
+/* ── Symmetry: Hold symmetry sits a little air above the divider, not a
+   drawer's worth. The divider row rule (css/35) gives every grouped row
+   18 px above its rule; with the slider's 8 px foot and the panel's 6 px gap
+   that left ~45 px of empty wood under the slider. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb > #symmetryHoldGroup { margin-bottom: 0; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb > .mixer-channel.wcb-count[data-wc-group="row"] { margin-top: 4px !important; }
+
+/* ── The tile screen: every arm in the count at full colour (a dimmed tile
+   misread its arm's colour). The chosen one keeps its copper brackets and
+   gains a soft wash of its own colour. One beyond the count is turned off:
+   its stamp dimmed (still reading as its colour), its number unlit and no
+   colour-source letter (js/73 eases --pw; Gabriel 2026-10-18 "dim inactive
+   brushes a bit more"). */
+html[data-theme="walnut-copper"] .wcb-tile > i { opacity: calc(0.5 + 0.5 * var(--pw)); }
+html[data-theme="walnut-copper"] .wcb-tile[aria-checked="true"] {
+    background: radial-gradient(ellipse 70% 65% at 50% 58%, rgb(var(--sc) / 0.16), transparent 75%);
+}
+html[data-theme="walnut-copper"] .wcb-tile.wcb-off { cursor: pointer; }
+html[data-theme="walnut-copper"] .wcb-tile > .wcb-n { opacity: calc(0.3 + 0.7 * var(--pw)); }
+html[data-theme="walnut-copper"] .wcb-tile > .wcb-l { opacity: var(--pw); }
+
+/* ── The arm editor's head: shown on Brush 1 only ("Main brush" and the
+   tip's name in VFD type, study .scr-cap). The tip square moved into it is
+   hidden: its menu was the "BLOB" dropdown, the screen picks now. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head[hidden] { display: none; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .arm-tip-btn { display: none !important; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .wcb-head > .wcb-hcap {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: 400 12px/1 var(--ui-font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--vfd);
+    text-shadow: 0 0 6px rgba(114, 242, 212, 0.8);
+}
+
+/* ── Brush Mode (arms 2-8): the joined Match | Custom strip of css/37's
+   section modes (Replay's Stroke | Time), its label tucked onto it. The
+   editor is a column with an 8 px gap; the label is a caption to the strip. */
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row-mid > .arm-tip-mode-label {
+    margin: 2px 0 -4px;
+    padding: 0 4px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row-mid > .brush-section-label + .brush-mode-row.arm-tip-mode { margin: 0; }
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row-mid > .brush-section-label + .brush-mode-row.arm-tip-mode > button {
+    height: 36px !important;
+    min-height: 36px !important;
+    font-size: 9.5px !important;
+    letter-spacing: 0.12em !important;
+}
+
+/* ── The tip screen: no stamp is dimmed for not being chosen (they were
+   hard to see to choose); the chosen one gets the brackets and a wash of
+   the arm's colour. While an arm matches the brush the whole screen is
+   dimmed, its stamps still bright enough to pick (a pick makes it Custom),
+   but the brush's own tip, which the arm prints, stays lit and chosen. */
+html[data-theme="walnut-copper"] .wcb-ms > i { opacity: 1; }
+html[data-theme="walnut-copper"] .wcb-ms[aria-checked="true"] {
+    background: radial-gradient(ellipse at center, rgb(var(--sc) / 0.22), transparent 72%);
+    box-shadow: inset 0 0 0 1px rgb(var(--sc) / 0.35);
+}
+html[data-theme="walnut-copper"] .wcb-mini.wcb-match .wcb-ms > i { opacity: 0.4; }
+html[data-theme="walnut-copper"] .wcb-mini.wcb-match .wcb-ms:hover > i { opacity: 0.85; }
+html[data-theme="walnut-copper"] .wcb-mini.wcb-match .wcb-ms[aria-checked="true"] > i { opacity: 1; }
+
+} /* @layer theme */

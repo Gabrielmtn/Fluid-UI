@@ -1,11 +1,12 @@
 /**
  * Compact window
  *
- * A small desktop window (768px wide or less, or 500px tall or less and up
- * to 1200px wide) keeps the desktop layout, folded: both sidebars fold to
- * their rails and the top bar (the mixer strip) moves into the right
- * sidebar, so the canvas gets the whole window. A compact window has room
- * for one open bar, so opening one folds the other (js/20). Folds made here
+ * When the top bar (the mixer strip) would wrap onto a second row, it moves
+ * into the right sidebar (body.compact-ui) and the two sidebars carry the
+ * whole UI. A small desktop window (768px wide or less, or 500px tall or
+ * less and up to 1200px wide) also folds both sidebars to their rails
+ * (body.compact-fold), so the canvas gets the whole window; it has room for
+ * one open bar, so opening one folds the other (js/20). Folds made here
  * are never kept: leaving puts the left bar back the way you keep it
  * (ui.leftSidebar.collapsed) and opens the right one.
  *
@@ -45,9 +46,37 @@
     var compact = false;
     var stripHome = null;   // where the strip goes back to: { parent, next }
 
-    function isCompactWindow() {
+    // Two steps (Gabriel 2026-10-18: "as soon as a single element breaks into
+    // the next row ... have the two sidebars form"):
+    //   docked  (body.compact-ui)   the top bar would wrap onto a second row,
+    //                               so it moves into the right sidebar; both
+    //                               sidebars stay as you keep them.
+    //   folded  (body.compact-fold) a small window (the old rule): docked, and
+    //                               both bars fold to rails, one open at a time.
+    // 1920 x 1080 and 2560 x 1440 fit the bar on one row; below that it docks.
+    var folded = false;
+    var dockedAt = 0;       // the window width the bar last failed to fit at
+    function isFoldWindow() {
         return window.innerWidth <= 768
             || (window.innerHeight <= 500 && window.innerWidth <= 1200);
+    }
+    // Does the strip, in its top-bar home, wrap? Its cells sit on one row
+    // when their tops are within a cell's own spread (the dividers sit a few
+    // px lower than the cells, so a small spread is still one row).
+    function stripWraps() {
+        var strip = document.getElementById('mixer-strip');
+        if (!strip || strip.closest('#sidebar-right')) return false;
+        // js/46 parks faders in More when the row overflows: that is the
+        // bar not fitting too, so it docks instead of parking.
+        var more = document.getElementById('mixer-more');
+        if (more && more.getClientRects().length && getComputedStyle(more).display !== 'none') return true;
+        var lo = Infinity, hi = -Infinity;
+        Array.prototype.forEach.call(strip.children, function (c) {
+            var r = c.getBoundingClientRect();
+            if (r.width < 2 || r.height < 2) return;
+            lo = Math.min(lo, r.top); hi = Math.max(hi, r.top);
+        });
+        return hi - lo > 40;
     }
 
     // The strip moves WHOLE (live nodes, no clones), so every id, binding,
@@ -73,47 +102,94 @@
     // built them (window.Sidebars.right is its last piece).
     function apply() {
         var S = window.Sidebars;
-        if (compact) {
-            moveStripIn();
+        if (compact) moveStripIn(); else moveStripOut();
+        if (folded) {
             if (S && S.left && S.left.fold) S.left.fold(true);
             if (S && S.right) S.right.fold(true);
         } else {
-            moveStripOut();
             if (S && S.right) S.right.fold(false);
             if (S && S.left && S.left.restore) S.left.restore();
         }
     }
 
-    function setCompact(on) {
-        compact = !!on;
+    function setMode(dock, fold) {
+        dock = !!dock || !!fold;
+        fold = !!fold;
+        if (dock === compact && fold === folded) return;
+        var wasFolded = folded;
+        compact = dock;
+        folded = fold;
         document.body.classList.toggle('compact-ui', compact);
-        apply();
+        document.body.classList.toggle('compact-fold', folded);
+        // Folds belong to the small window: entering or leaving it sets the
+        // bars; docking alone leaves them as they are.
+        if (fold !== wasFolded) apply();
+        else if (compact) moveStripIn();
+        else moveStripOut();
     }
+    function setCompact(on) { setMode(on, on && isFoldWindow()); }
+
+    // Decide after the window changed size (and after js/20 re-zoomed the
+    // bars, which it does on resize too): once per frame at most.
+    var raf = 0;
+    function decide() {
+        raf = 0;
+        if (!(window.Sidebars && window.Sidebars.right)) return;
+        if (isFoldWindow()) { setMode(true, true); return; }
+        if (!compact) {
+            if (stripWraps()) { dockedAt = window.innerWidth; setMode(true, false); }
+            else setMode(false, false);
+            return;
+        }
+        // Docked: try the top bar again only once the window is wider than
+        // where it last did not fit (in the same task, so no frame shows it).
+        if (window.innerWidth <= dockedAt && !folded) return;
+        setMode(false, false);
+        if (stripWraps()) { dockedAt = window.innerWidth; setMode(true, false); }
+    }
+    function schedule() { if (!raf) raf = requestAnimationFrame(decide); }
 
     function init() {
         // Decide before the layout is built (js/20 builds after DCL), so
         // the bars come up folded with no full-size frame first.
-        compact = isCompactWindow();
+        folded = compact = isFoldWindow();
         document.body.classList.toggle('compact-ui', compact);
+        document.body.classList.toggle('compact-fold', folded);
 
         // js/20 inserts the finished strip as a <body> child in one task;
-        // the observer fires right after it, before that frame paints.
+        // the observer fires right after it, before that frame paints, and
+        // the wrap test runs there too (a docked bar never shows a frame on
+        // two rows).
         function built() { return !!(window.Sidebars && window.Sidebars.right); }
-        if (built()) {
+        function first() {
             if (compact) apply();
+            decide();
+        }
+        if (built()) {
+            first();
         } else {
             var mo = new MutationObserver(function () {
                 if (!built()) return;
                 mo.disconnect();
-                if (compact) apply();
+                first();
             });
             mo.observe(document.body, { childList: true });
         }
 
-        window.addEventListener('resize', function () {
-            var want = isCompactWindow();
-            if (want !== compact) setCompact(want);
-        });
+        window.addEventListener('resize', schedule);
+        // The bar's own size changes after the window's does: the label face
+        // loading, the entrance settling, js/46 parking a fader. Watching it
+        // catches a wrap that appears after the first test (a 1584 px launch
+        // wrapped and never docked).
+        if (typeof ResizeObserver !== 'undefined') {
+            (function watchStrip() {
+                var strip = document.getElementById('mixer-strip');
+                if (!strip) { setTimeout(watchStrip, 250); return; }
+                new ResizeObserver(schedule).observe(strip);
+            })();
+        }
+        // The label face loads after the first layout and changes widths.
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
 
         // For test harnesses: force either layout (the next resize that
         // crosses the line decides again). No argument flips it.

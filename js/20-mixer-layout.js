@@ -819,7 +819,8 @@
         // The brush's everyday settings (presets / target / tip / feel) are
         // the Brush section at the top of the left sidebar, right under this
         // fader (2026-10-04; they were a slide-in drawer off this label).
-        var brushSec = makeSection('Brush', 'core', false);
+        // Starts folded like every other drawer (Gabriel 2026-10-18).
+        var brushSec = makeSection('Brush', 'core', true);
         buildBrushPanel(brushSec.body);
         pendingLeftSections.unshift(brushSec.sec);
         // No tip swatch on the fader row since 2026-10-09: the Brush section's
@@ -1126,6 +1127,9 @@
             for (let i = 0; i < _faderProxies.length; i++) _faderProxies[i]();
         }, 250);
     }
+
+    // js/76 maps a click on a telegraph's lever angle back to the proxy.
+    window.FaderCurves = FADER_CURVES;
 
     // Console hook: re-seat every thumb after dialling the curve constants.
     window.refreshFaderCurves = function () {
@@ -1448,7 +1452,7 @@
         var igniteBtnColor = document.createElement('button');
         igniteBtnColor.type = 'button';
         igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
-        igniteBtnColor.textContent = 'Ignite';
+        igniteBtnColor.textContent = 'Ignite colors';   // Gabriel 2026-10-18: says what it ignites
         igniteBtnColor.title = 'If your paint looks a little dull, hold ignite to add density and brightness.';
 
         // Latch cell (Task 7): permanently visible so the second mode is
@@ -1584,13 +1588,24 @@
             igniteLock.setAttribute('aria-pressed', igniteLock.classList.contains('latched') ? 'true' : 'false');
         }).observe(igniteLock, { attributes: true, attributeFilter: ['class'] });
 
-        // The swatch leads the second row: row 1 is the four colour toggles
-        // at a legible width, row 2 is swatch + Ignite + latch.
+        // The swatch leads the second row inside a "Color" button
+        // (2026-10-18): the bare dot read as a lamp, not a control. The
+        // button is a <label> round the same colour input, so a click
+        // anywhere on it reaches the input and js/64 opens its picker; the
+        // word is the input's accessible name.
         if (picker) {
             picker.className = 'ch-color-input';
             picker.style.cssText = '';
             picker.title = 'Color Picker. Opens color picker, you can also Alt+click the canvas to pick from it.';
-            nudgeRow.appendChild(picker);
+            var colorBtn = document.createElement('label');
+            colorBtn.className = 'btn ch-color-btn';
+            colorBtn.title = picker.title;
+            var colorWord = document.createElement('span');
+            colorWord.className = 'ch-color-word';
+            colorWord.textContent = 'Color';
+            colorBtn.appendChild(colorWord);
+            colorBtn.appendChild(picker);
+            nudgeRow.appendChild(colorBtn);
         }
         nudgeRow.appendChild(igniteBtnColor);
         nudgeRow.appendChild(igniteLock);
@@ -2031,8 +2046,9 @@
             say.className = 'preset-fork-say';
             say.textContent = 'In life, you can forge your own path, or build upon what others have tried. Both are valid.';
             f.appendChild(say);
-            [['ours', 'I know what I want, give me your presets'],
-             ['own', 'I don\'t want your presets, I\'m forging my own path']].forEach(function (o) {
+            // Own path first, as the line above reads (Gabriel 2026-10-18).
+            [['own', 'I don\'t want your presets, I\'m forging my own path'],
+             ['ours', 'I know what I want, give me your presets']].forEach(function (o) {
                 const b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'preset-fork-btn';
@@ -2461,7 +2477,7 @@
     var LSB_KEY = 'ui.leftSidebar.collapsed';
     // A compact window (js/13-compact-mode.js) folds both bars and has room
     // for one open at a time; folds made there are never kept.
-    function compactUI() { return document.body.classList.contains('compact-ui'); }
+    function compactUI() { return document.body.classList.contains('compact-fold'); }   // the small window (js/13): one open bar at a time
     // Sections built for the left sidebar while the right one is being built
     // (buildSidebar runs first); buildLeftSidebar moves them in, in order.
     var pendingLeftSections = [];
@@ -2522,7 +2538,18 @@
         rail.className = 'lsb-rail';
         var railSize = document.createElement('span');
         railSize.className = 'lsb-rail-size';
-        railSize.title = 'Brush Size';
+        railSize.title = 'Brush Size: open the brush bar';
+        // The size readout opens the bar too (Gabriel's tour, 2026-10-18),
+        // as the Brush label under it does.
+        railSize.setAttribute('role', 'button');
+        railSize.tabIndex = 0;
+        railSize.addEventListener('click', function (e) { setEased(false, true); keyIn(e, bar.querySelector('.lsb-head .ch-perceptual')); });
+        railSize.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            setEased(false, true);
+            var t = bar.querySelector('.lsb-head .ch-perceptual'); if (t) try { t.focus(); } catch (_) {}
+        });
         rail.appendChild(railSize);
         var railLabel = document.createElement('button');
         railLabel.type = 'button';
@@ -2541,7 +2568,7 @@
             b.textContent = t.textContent.trim();
             b.title = 'Open ' + b.textContent;
             b.addEventListener('click', function (e) {
-                set(false, true);
+                setEased(false, true);
                 if (sec.classList.contains('collapsed')) toggleSection(sec, false);
                 keyIn(e, sec.querySelector('.section-title'));
             });
@@ -2555,6 +2582,35 @@
         }
         if (sizeInput) { sizeInput.addEventListener('input', syncRail); sizeInput.addEventListener('change', syncRail); }
 
+        // A fold you make by hand eases (Gabriel's tour, 2026-10-18: it
+        // snapped). The width still changes in ONE layout, so the canvas
+        // refits once: opening snaps the width and then reveals the bar from
+        // its rail (clip-path, css/35) while its contents slide in; folding
+        // runs that backwards and snaps the width at the end. Only paint and
+        // compositing run per frame. Code-driven folds stay instant.
+        var EASE_MS = 220, easeTimer = 0;
+        var RM = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+        function setEased(collapsed, keep) {
+            clearTimeout(easeTimer);
+            if (RM.matches) { set(collapsed, keep); return; }
+            if (collapsed) {
+                bar.classList.remove('lsb-instant');
+                bar.classList.add('lsb-shut');
+                easeTimer = setTimeout(function () {
+                    bar.classList.add('lsb-instant');
+                    set(true, keep);
+                    bar.classList.remove('lsb-shut');
+                    void bar.offsetWidth;
+                    bar.classList.remove('lsb-instant');
+                }, EASE_MS);
+            } else {
+                bar.classList.add('lsb-instant', 'lsb-shut');
+                set(false, keep);
+                void bar.offsetWidth;
+                bar.classList.remove('lsb-instant');
+                requestAnimationFrame(function () { bar.classList.remove('lsb-shut'); });
+            }
+        }
         function set(collapsed, keep) {
             bar.classList.toggle('collapsed', !!collapsed);
             edge.classList.toggle('collapsed', !!collapsed);
@@ -2566,8 +2622,8 @@
             if (keep && !compactUI()) { try { if (window.settingsManager) window.settingsManager.set(LSB_KEY, !!collapsed); } catch (_) {} }
             if (!collapsed && compactUI() && window.Sidebars && window.Sidebars.right) window.Sidebars.right.fold(true);
         }
-        fold.addEventListener('click', function () { set(!bar.classList.contains('collapsed'), true); });
-        railLabel.addEventListener('click', function (e) { set(false, true); keyIn(e, bar.querySelector('.lsb-head .ch-perceptual')); });
+        fold.addEventListener('click', function () { setEased(!bar.classList.contains('collapsed'), true); });
+        railLabel.addEventListener('click', function (e) { setEased(false, true); keyIn(e, bar.querySelector('.lsb-head .ch-perceptual')); });
 
         // The rail hides as the bar opens, so a rail button pressed from the
         // keyboard (a click with detail 0: Enter or Space) hands focus on into
@@ -3022,6 +3078,9 @@
         const scopeSel = document.createElement('select');
         scopeSel.id = 'mutationScope';
         scopeSel.innerHTML = '<option value="basic">Basic</option><option value="all">All</option>';
+        // Always All; the locks are what narrow it (Gabriel's tour, 2026-10-18:
+        // one click fewer). The Scope row is no longer shown.
+        scopeSel.value = 'all';
         scopeSel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
         hideMirror(scopeSel);
         const scopeSeg = document.createElement('div');
@@ -3045,6 +3104,7 @@
         });
         scopeWrap.appendChild(scopeSeg);
         scopeWrap.appendChild(scopeSel);
+        scopeWrap.style.setProperty('display', 'none', 'important');
         controlsRow.appendChild(scopeWrap);
 
         // Strength — a standard sidebar row (.control-group: sidebar
@@ -3844,10 +3904,12 @@
         // Layer-related options, grouped instead of loose checkboxes
         var optsGroup = document.createElement('div');
         optsGroup.className = 'layers-options-group';
-        optsGroup.innerHTML = '<div class="layers-options-title">Capture & Preview</div>';
+        optsGroup.innerHTML = '<div class="layers-options-title" title="Displays a capture area which when clicked or hovered (if enabled) will capture visible as a layer.">Capture & Preview</div>';   // tooltip: Gabriel's words, 2026-10-18
         body.appendChild(optsGroup);
-        moveCheckboxGroup('hoverCaptureToggle', optsGroup);
+        // Two clear options, in this order (Gabriel's tour, 2026-10-18): show
+        // the capture area on the canvas, then capture on hover.
         moveCheckboxGroup('detachCaptureToggle', optsGroup);
+        moveCheckboxGroup('hoverCaptureToggle', optsGroup);
         moveEl('imageUpload', body);
 
         const preview = document.getElementById('previewToggle');
@@ -3856,7 +3918,8 @@
             var previewCb = document.createElement('div');
             previewCb.className = 'checkbox-group';
             previewCb.innerHTML = '<input type="checkbox" id="showPreviewLayersCb"><label for="showPreviewLayersCb">Show Preview Layers</label>';
-            optsGroup.appendChild(previewCb);
+            // Not offered any more (Gabriel's tour, 2026-10-18): the switch is
+            // built but never placed, so the preview layers stay hidden.
             body.appendChild(preview);
             var cb = previewCb.querySelector('input');
             cb.addEventListener('change', function () {
@@ -4574,7 +4637,6 @@
             lighting.appendChild(glowPanel);
             fxRow('scatterToggle', 'scatter', 'Scatter', null, glowPanel.querySelector('#scatterToggle'));
         }
-        body.appendChild(lighting);
 
         // ── Surface: shading, with everything that refines it inside ──
         // Ridges and Vibrance live in shadingIntensityGroup (index.html) next
@@ -4589,13 +4651,20 @@
         fxRow('displayShadingToggle', 'shading', 'Surface Shading', surface);
         const shadingGroup = document.getElementById('shadingIntensityGroup');
         if (shadingGroup) surface.appendChild(shadingGroup);
-        body.appendChild(surface);
 
         // ── Dither: the paint in a few shades and a pattern (js/68-dither.js) ──
         // Under Surface Shading: both are how the paint is drawn, not what it does.
-        fxRow('ditherToggle', 'dither', 'Dither', body);
+        fxRow('ditherToggle', 'dither', 'Dither', surface);
         const ditherPanel = document.getElementById('ditherPanel');
-        if (ditherPanel) body.appendChild(ditherPanel);
+        if (ditherPanel) surface.appendChild(ditherPanel);
+
+        // The drawer's order (Gabriel's tour, 2026-10-18): how the paint is
+        // drawn first (shading, dither), then the light, then what moves the
+        // fluid (gravity, border, breathing), each its own group.
+        body.appendChild(surface);
+        body.appendChild(lighting);
+        const motion = document.createElement('div');
+        motion.className = 'fx-group';
 
         // ── Gravity Direction (was Constant Pressure) ──
         // A canvas-wide push aimed with the pad. Lived in the Brush panel's
@@ -4604,20 +4673,21 @@
         // take the nodes out of the document (this section is detached until
         // the caller appends it), so a lookup afterwards finds nothing.
         const pressureCheck = document.getElementById('pressureConstant');
-        fxRow('pressureConstant', 'gravity', 'Gravity Direction', body);
+        fxRow('pressureConstant', 'gravity', 'Gravity Direction', motion);
         const pressureControls = document.getElementById('pressureFieldControls');
-        if (pressureControls) body.appendChild(pressureControls);
+        if (pressureControls) motion.appendChild(pressureControls);
         wirePressureField(pressureCheck, pressureControls);
 
         // ── Border (was Overflow): open canvas edges + the drain's width ──
-        fxRow('overflowToggle', 'border', 'Border', body);
+        fxRow('overflowToggle', 'border', 'Border', motion);
         const overflowPanel = document.getElementById('overflowPanel');
-        if (overflowPanel) body.appendChild(overflowPanel);
+        if (overflowPanel) motion.appendChild(overflowPanel);
 
         // ── Breathing: a guided breath the canvas follows (js/45-breathing.js) ──
-        fxRow('breathingToggle', 'breathing', 'Breathing', body);
+        fxRow('breathingToggle', 'breathing', 'Breathing', motion);
         const breathingPanel = document.getElementById('breathingPanel');
-        if (breathingPanel) body.appendChild(breathingPanel);
+        if (breathingPanel) motion.appendChild(breathingPanel);
+        body.appendChild(motion);
 
         return sec;
     }
@@ -6439,6 +6509,7 @@
 
         function rowEl(mb) {
             var d = document.createElement('div');
+            d.className = 'text-field-row';
             d.style.cssText = 'display:flex;align-items:flex-end;gap:5px;margin-bottom:' + (mb === undefined ? 6 : mb) + 'px;';
             return d;
         }
@@ -6450,6 +6521,7 @@
             w.style.cssText = 'flex:' + (flex || '1 1 0') + ';min-width:0;';
             if (caption) {
                 var l = document.createElement('div');
+                l.className = 'text-field-cap';   // the theme sets it as a drawer label (css/41)
                 l.style.cssText = 'font-size:9px;letter-spacing:0.05em;text-transform:uppercase;' +
                                   'color:rgba(255,255,255,0.4);margin-bottom:2px;white-space:nowrap;';
                 l.textContent = caption;
@@ -6730,6 +6802,8 @@
         fontSel.style.cssText = FIELD + 'width:100%;';
         fontSel.addEventListener('change', function () {
             fontPreview.style.fontFamily = fontSel.value;
+            // You type in the line's own face (Gabriel's tour, 2026-10-18).
+            contentInput.style.setProperty('font-family', fontSel.value, 'important');
             commit({ fontFamily: fontSel.value });
         });
         editor.appendChild(field('Font', fontSel));
@@ -7231,6 +7305,7 @@
             ensureFontOption(ov.fontFamily);
             fontSel.value = ov.fontFamily;
             fontPreview.style.fontFamily = ov.fontFamily;
+            contentInput.style.setProperty('font-family', ov.fontFamily, 'important');
             sizeInput.value = String(ov.fontSize);
             weightSel.value = String(ov.fontWeight);
             italicBtn.classList.toggle('active', ov.fontStyle === 'italic');
@@ -7320,8 +7395,7 @@
             '<option value="off" selected>Off</option>' +
             '<option value="tunnel">Tunnel</option>' +
             '<option value="timing">Timing Only</option>' +
-            '<option value="min">Minimized</option>' +
-            '<option value="full">Full</option>';
+            '<option value="min">Minimized</option>';   // Full is hidden until it is ready (2026-10-18)
         modeGroup.appendChild(modeLbl);
         modeGroup.appendChild(modeSel);
         body.appendChild(modeGroup);
@@ -7369,7 +7443,7 @@
                     '<span id="audioFileName" class="audio-filename"></span>' +
                 '</div>' +
             '</div>' +
-            '<button id="audioOpenFullBtn" class="audio-mini-full" title="Open full audio panel">\u2b06\ufe0f Full Audio</button>';
+            '<button id="audioOpenFullBtn" class="audio-mini-full" title="Open full audio panel">Full Audio</button>';
         body.appendChild(mini);
 
         // Hidden file input used by the enable/source paths
@@ -8085,7 +8159,7 @@
                     if (btn.classList.contains('active')) {
                         if (window.focusMode) window.focusMode.clearFormat();
                     } else {
-                        if (window.focusMode) window.focusMode.applyFormat(fmt);
+                        if (window.focusMode) window.focusMode.applyFormat(fmt, { ease: true });
                     }
                 });
                 fmtGrid.appendChild(btn);
@@ -8191,8 +8265,33 @@
         quickLabel.textContent = 'Quick Export';
         body.appendChild(quickLabel);
 
+        // Format, then that format's settings, then one Export button
+        // (2026-10-18). The four buttons below stay, hidden: they are what
+        // 24-video-export.js relabels while an export runs ("■ Stop and
+        // save", "Saving…"), and what a saved hotkey or radial slot clicks by
+        // id. Export clicks the chosen format's button and wears its state.
+        var EXPORT_FORMATS = [['video', 'Video'], ['gif', 'GIF'], ['still', 'Picture'], ['sequence', 'Sequence']];
+        var formatRow = document.createElement('div');
+        formatRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin:0 0 12px;';
+        var formatLabel = document.createElement('label');
+        formatLabel.htmlFor = 'exportFormat';
+        formatLabel.textContent = 'Format';
+        formatLabel.style.cssText = 'margin:0;flex:1;font-size:11px;';
+        formatRow.appendChild(formatLabel);
+        var formatSel = document.createElement('select');
+        formatSel.id = 'exportFormat';
+        formatSel.title = 'What to save: a video (MP4, WebM in the browser), a looping GIF, a picture (PNG) or a sequence of numbered PNG frames.';
+        EXPORT_FORMATS.forEach(function (o) {
+            var opt = document.createElement('option');
+            opt.value = o[0]; opt.textContent = o[1];
+            formatSel.appendChild(opt);
+        });
+        formatRow.appendChild(formatSel);
+        body.appendChild(formatRow);
+
         var quickGrid = document.createElement('div');
-        quickGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
+        quickGrid.id = 'exportQuickButtons';
+        quickGrid.style.cssText = 'display:none;';
 
         // Ids first (2026-10-04): a saved Ctrl+Shift+H key finds an id-less
         // control by its words, so these four got ids before any of their
@@ -8247,13 +8346,11 @@
         });
         quickGrid.appendChild(seqBtn);
 
-        body.appendChild(quickGrid);
-
         // Background policy (2026-09-14): what a picture carries under the
         // paint — the exporter's cfg.ground (js/24-video-export.js). GIF, JPG
         // and video have no alpha and always get the colour.
         var groundRow = document.createElement('div');
-        groundRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin:-6px 0 12px;';
+        groundRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin:0 0 12px;';
         var groundLabel = document.createElement('label');
         groundLabel.htmlFor = 'exportGround';
         groundLabel.textContent = 'Background';
@@ -8280,17 +8377,23 @@
         stopBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.stop();
         });
-        body.appendChild(stopBtn);
+
+        // Each format's settings sit in their own box; showFormat() below
+        // shows the chosen one. Picture has none of its own (Background).
+        var formatBoxes = {};
+        ['video', 'gif', 'sequence'].forEach(function (k) {
+            var box = document.createElement('div');
+            box.className = 'export-format-settings';
+            box.setAttribute('data-export-format', k);
+            formatBoxes[k] = box;
+        });
 
         // Video settings
-        var videoLabel = document.createElement('label');
-        videoLabel.className = 'brush-section-label';
-        videoLabel.textContent = 'Video Settings';
-        body.appendChild(videoLabel);
 
         var durationGroup = document.createElement('div');
         durationGroup.className = 'control-group';
         var durationLbl = document.createElement('label');
+        durationLbl.htmlFor = 'exportVideoDuration';
         durationLbl.textContent = 'Duration (seconds)';
         durationLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
         var durationInput = document.createElement('input');
@@ -8302,17 +8405,22 @@
         durationInput.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
         durationGroup.appendChild(durationLbl);
         durationGroup.appendChild(durationInput);
-        body.appendChild(durationGroup);
+        formatBoxes.video.appendChild(durationGroup);
 
         var fpsGroup = document.createElement('div');
         fpsGroup.className = 'control-group';
         var fpsLbl = document.createElement('label');
+        fpsLbl.htmlFor = 'exportVideoFPS';
         fpsLbl.textContent = 'Frame Rate';
         fpsLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
         var fpsSelect = document.createElement('select');
         fpsSelect.id = 'exportVideoFPS';
         fpsSelect.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
-        [['30','30 fps'],['60','60 fps'],['120','120 fps']].forEach(function(opt) {
+        // 144 (2026-10-18): the MP4 path puts frames on a fixed 1/fps grid
+        // and fills a slot the display didn't draw with the held picture, so
+        // 120 and 144 only carry new pictures on a monitor (and FPS Limit)
+        // that fast.
+        [['30','30 fps'],['60','60 fps'],['120','120 fps'],['144','144 fps']].forEach(function(opt) {
             var o = document.createElement('option');
             o.value = opt[0];
             o.textContent = opt[1];
@@ -8321,18 +8429,13 @@
         });
         fpsGroup.appendChild(fpsLbl);
         fpsGroup.appendChild(fpsSelect);
-        body.appendChild(fpsGroup);
+        formatBoxes.video.appendChild(fpsGroup);
 
         // GIF settings
-        var gifLabel = document.createElement('label');
-        gifLabel.className = 'brush-section-label';
-        gifLabel.textContent = 'GIF Settings';
-        gifLabel.style.marginTop = '12px';
-        body.appendChild(gifLabel);
-
         var gifDurationGroup = document.createElement('div');
         gifDurationGroup.className = 'control-group';
         var gifDurationLbl = document.createElement('label');
+        gifDurationLbl.htmlFor = 'exportGifDuration';
         gifDurationLbl.textContent = 'Duration (seconds)';
         gifDurationLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
         var gifDurationInput = document.createElement('input');
@@ -8344,11 +8447,12 @@
         gifDurationInput.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
         gifDurationGroup.appendChild(gifDurationLbl);
         gifDurationGroup.appendChild(gifDurationInput);
-        body.appendChild(gifDurationGroup);
+        formatBoxes.gif.appendChild(gifDurationGroup);
 
         var gifFpsGroup = document.createElement('div');
         gifFpsGroup.className = 'control-group';
         var gifFpsLbl = document.createElement('label');
+        gifFpsLbl.htmlFor = 'exportGifFPS';
         gifFpsLbl.textContent = 'Frame Rate';
         gifFpsLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
         var gifFpsSelect = document.createElement('select');
@@ -8363,7 +8467,92 @@
         });
         gifFpsGroup.appendChild(gifFpsLbl);
         gifFpsGroup.appendChild(gifFpsSelect);
-        body.appendChild(gifFpsGroup);
+        formatBoxes.gif.appendChild(gifFpsGroup);
+
+        // Sequence settings (2026-10-18): its frame rate was fixed at the
+        // exporter's 30 (cfg.sequenceFPS); exportSequence spaces its frames
+        // 1000 / fps apart, so this field is what it captures at.
+        var seqFpsGroup = document.createElement('div');
+        seqFpsGroup.className = 'control-group';
+        var seqFpsLbl = document.createElement('label');
+        seqFpsLbl.htmlFor = 'exportSequenceFPS';
+        seqFpsLbl.textContent = 'Frame Rate';
+        seqFpsLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
+        var seqFpsSelect = document.createElement('select');
+        seqFpsSelect.id = 'exportSequenceFPS';
+        seqFpsSelect.title = 'Frames saved per second of the sequence.';
+        seqFpsSelect.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
+        [['12','12 fps'],['24','24 fps'],['30','30 fps'],['60','60 fps'],['120','120 fps'],['144','144 fps']].forEach(function(opt) {
+            var o = document.createElement('option');
+            o.value = opt[0];
+            o.textContent = opt[1];
+            if (opt[0] === '30') o.selected = true;
+            seqFpsSelect.appendChild(o);
+        });
+        seqFpsGroup.appendChild(seqFpsLbl);
+        seqFpsGroup.appendChild(seqFpsSelect);
+        formatBoxes.sequence.appendChild(seqFpsGroup);
+
+        ['video', 'gif', 'sequence'].forEach(function (k) { body.appendChild(formatBoxes[k]); });
+
+        // Export: runs the chosen format through its own (hidden) button, so
+        // a running Video or GIF reads "■ Stop and save" here too.
+        var QUICK = { video: videoBtn, gif: gifBtn, still: stillBtn, sequence: seqBtn };
+        var quickWords = {};
+        Object.keys(QUICK).forEach(function (k) { quickWords[k] = QUICK[k].textContent; });
+        var exportBtn = document.createElement('button');
+        exportBtn.id = 'exportRunBtn';
+        exportBtn.textContent = 'Export';
+        exportBtn.style.cssText = 'display:block;width:100%;cursor:pointer;margin-bottom:12px;';
+        // js/71 lights a pane from .active / aria-pressed; this one is lit
+        // while it waits (btn--emphasis) and while it records (.active).
+        exportBtn._wcIsOn = function (el) { return el.classList.contains('btn--emphasis') || el.classList.contains('active'); };
+        function exportSource() {
+            var st = window.fluidExport && window.fluidExport.state();
+            return QUICK[(st && QUICK[st.kind]) ? st.kind : formatSel.value] || videoBtn;
+        }
+        function formatName(k) {
+            for (var i = 0; i < EXPORT_FORMATS.length; i++) if (EXPORT_FORMATS[i][0] === k) return EXPORT_FORMATS[i][1];
+            return k;
+        }
+        function syncExportBtn() {
+            var src = exportSource(), k = 'video';
+            Object.keys(QUICK).forEach(function (q) { if (QUICK[q] === src) k = q; });
+            var idle = src.textContent === quickWords[k];
+            var text = idle ? 'Export' : src.textContent;
+            var title = idle ? 'Export as ' + formatName(k) + ': ' + src.title : src.title;
+            if (exportBtn.textContent !== text) exportBtn.textContent = text;
+            if (exportBtn.title !== title) exportBtn.title = title;
+            exportBtn.disabled = src.disabled;
+            exportBtn.classList.toggle('btn--emphasis', idle);   // the drawer's main action, lit while it waits
+            exportBtn.classList.toggle('btn--record', src.classList.contains('btn--record'));
+            exportBtn.classList.toggle('active', src.classList.contains('active'));
+        }
+        exportBtn.addEventListener('click', function () { exportSource().click(); });
+        // 24 relabels the hidden buttons as an export starts, runs and ends.
+        new MutationObserver(syncExportBtn).observe(quickGrid, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['disabled', 'class', 'title'] });
+        body.appendChild(exportBtn);
+        body.appendChild(stopBtn);
+        body.appendChild(quickGrid);
+
+        // Background only changes a Picture or a Sequence (GIF and video
+        // always carry the colour). Inline !important: css/37 lays the row
+        // out as a flex column with !important.
+        function showFormat() {
+            var k = formatSel.value;
+            Object.keys(formatBoxes).forEach(function (q) {
+                formatBoxes[q].style.setProperty('display', q === k ? 'block' : 'none', 'important');
+            });
+            groundRow.style.setProperty('display', (k === 'still' || k === 'sequence') ? 'flex' : 'none', 'important');
+            syncExportBtn();
+            // The size line under Format says what this format comes out at (js/62).
+            if (window.CanvasReadout) window.CanvasReadout.refresh();
+        }
+        formatSel.addEventListener('change', function () {
+            showFormat();
+            if (window.fluidExport) window.fluidExport.setConfig('format', formatSel.value);
+        });
+        showFormat();
 
         // Output folder (Electron only)
         if (typeof require !== 'undefined') {
@@ -8418,6 +8607,8 @@
                 wholeSecondsIn(gifDurationInput, 1, 10, 3);
                 gifFpsSelect.value = String(c.gifFPS);
                 groundSel.value = (c.ground === 'transparent') ? 'transparent' : 'seen';
+                seqFpsSelect.value = String(c.sequenceFPS);
+                if (QUICK[c.format]) { formatSel.value = c.format; showFormat(); }
             }
         }, 500);
 
@@ -8455,6 +8646,12 @@
         gifFpsSelect.addEventListener('change', function() {
             if (window.fluidExport) {
                 window.fluidExport.setConfig('gifFPS', parseInt(gifFpsSelect.value));
+            }
+        });
+
+        seqFpsSelect.addEventListener('change', function() {
+            if (window.fluidExport) {
+                window.fluidExport.setConfig('sequenceFPS', parseInt(seqFpsSelect.value));
             }
         });
 
@@ -8858,6 +9055,10 @@
         // Declared up here: the restore below can rebuild before the
         // functions further down are reached.
         var rowPaints = [], rowCfgs = [], lastSig = '';
+        // An arm's last own tip, for Brush Mode's way back to Custom (below):
+        // kept per config object, beside it rather than on it, so it is never
+        // saved or synced with the arm.
+        var lastOwnTips = (typeof WeakMap === 'function') ? new WeakMap() : null;
         // The row buttons say what they are in words (2026-10-09: "icons and
         // letters won't do"), so the glyph key that used to sit under the
         // rows (user test 3) is gone with the glyphs.
@@ -9023,6 +9224,55 @@
                     // screen picks a tip the way this square's menu entries do.
                     tipBtn.__wcPickTip = function (v) { pickArmTip(cfg, v, tipPicked); };
 
+                    // ── Brush Mode (2026-10-18): Match brush | Custom brush ──
+                    // Arms 2-8 say in words whether they print the brush's
+                    // tip (cfg.tip null) or one of their own; the tip screen
+                    // under it (js/73) picks which. Arm 1 IS the main brush
+                    // and has no such choice. Custom brings back the arm's
+                    // last own tip this session, else starts from the tip
+                    // the brush has now, so the switch alone changes nothing
+                    // on the canvas until a tip is picked.
+                    var tipModeLbl = null, tipModeRow = null, tipModeBtns = [];
+                    if (idx > 0) {
+                        tipModeLbl = document.createElement('label');
+                        tipModeLbl.className = 'brush-section-label arm-tip-mode-label';
+                        tipModeLbl.textContent = 'Brush Mode';
+                        tipModeRow = document.createElement('div');
+                        tipModeRow.className = 'brush-mode-row arm-tip-mode';
+                        tipModeRow.setAttribute('role', 'radiogroup');
+                        tipModeRow.setAttribute('aria-label', 'Brush ' + (idx + 1) + ' brush mode');
+                        [{ key: 'match', text: 'Match brush', title: 'Print whatever tip the main brush has, and follow it when it changes' },
+                         { key: 'custom', text: 'Custom brush', title: 'This brush prints a tip of its own: pick it below' }].forEach(function (m) {
+                            var b = document.createElement('button');
+                            b.type = 'button';
+                            // No data-mode: 12's snapshot apply toggles every
+                            // .brush-mode-btn[data-mode] to the replay mode.
+                            b.className = 'brush-mode-btn arm-tip-mode-btn';
+                            b.setAttribute('role', 'radio');
+                            b.dataset.armTipMode = m.key;
+                            b.textContent = m.text;
+                            b.title = m.title;
+                            b.addEventListener('click', function () {
+                                var own = armTipOf(cfg.tip);
+                                if (m.key === 'match') {
+                                    if (own === null) return;
+                                    if (lastOwnTips) lastOwnTips.set(cfg, own);
+                                    pickArmTip(cfg, null, tipPicked);
+                                } else {
+                                    if (own !== null) return;
+                                    var v = lastOwnTips ? armTipOf(lastOwnTips.get(cfg)) : null;
+                                    if (v === null || v === undefined) {
+                                        var sid = window.BrushShapes && window.BrushShapes.activeId();
+                                        v = sid || ((window.config && window.config.BRUSH_TIP) | 0);
+                                    }
+                                    pickArmTip(cfg, v, tipPicked);
+                                }
+                            });
+                            tipModeBtns.push(b);
+                            tipModeRow.appendChild(b);
+                        });
+                    }
+
                     // ── Per-arm Pressure (2026-08-26) ────────────────────────
                     // Marks this arm as a PUSH arm: it moves paint already on
                     // the canvas and lays none of its own, while its siblings
@@ -9037,7 +9287,7 @@
                     pushBtn.type = 'button';
                     pushBtn.className = 'arm-push-btn';
                     pushBtn.setAttribute('role', 'checkbox');
-                    pushBtn.textContent = 'Pressure';
+                    pushBtn.textContent = 'Pressure only';   // Gabriel 2026-10-18: it pushes, no paint
 
                     // Repaints the row from cfg — the mode buttons, the Pressure
                     // toggle, the tip AND the chip, in one place, so no widget
@@ -9065,6 +9315,12 @@
                                     : 'Convert to Pressure arm that pushes paint. Uses the mode and Strength set in the brush drawer.');
 
                         paintArmTipButton(tipBtn, tipIcon, idx, cfg, push || brushPush);
+                        var ownTip = armTipOf(cfg.tip) !== null;
+                        tipModeBtns.forEach(function (b) {
+                            var on = (b.dataset.armTipMode === 'custom') === ownTip;
+                            b.classList.toggle('active', on);
+                            b.setAttribute('aria-checked', on ? 'true' : 'false');
+                        });
 
                         // 'main' arms paint the live default color (resolveArmColor
                         // defers to pointer.color), so show THAT — not the arm's
@@ -9182,6 +9438,7 @@
                     });
 
                     mid.appendChild(modeWrap);
+                    if (tipModeRow) { mid.appendChild(tipModeLbl); mid.appendChild(tipModeRow); }
                     mid.appendChild(pushBtn);
                     row.appendChild(picker);
                     row.appendChild(mid);

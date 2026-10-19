@@ -13,16 +13,22 @@
 //   The count slider sits right above a VFD screen of eight tiles, four to a
 //   row. A tile shows its arm's tip as phosphor in the arm's colour, its
 //   number and its colour source letter (M main, C custom, R random,
-//   P palette). Arms beyond the count are dimmed: js/20 builds no controls
-//   for them, so their tiles show what the app holds for them (or the
-//   default arm) and can't be picked. The tiles pick which arm's row is shown
-//   below as the editor; the other rows are hidden by a theme class. That
-//   pick is local view state: not synced, not saved.
+//   P palette). Arms beyond the count show what the app holds for them (or
+//   the default arm) as they were when turned off, the main brush changing
+//   leaves them be; their stamp half dimmed, their number unlit (css/43).
+//   Picking one turns on every
+//   arm up to it, through the count slider itself. The tiles pick which
+//   arm's row is shown below as the editor; the other rows are hidden by a
+//   theme class. That pick is local view state: not synced, not saved.
 //   The editor IS the arm's own row (js/20 rebuildRows), restyled: "Brush N"
 //   and the colour lamp (its colour well), the mode radios as one joined
-//   strip, "Custom brush" with the arm's tip square as its caption (it still
-//   opens the tip menu), the custom brush as a scrolling screen of stamps,
-//   Pressure as a checkbox pane. A stamp picks through the square's
+//   strip, js/20's Brush Mode strip (Match brush | Custom brush) on arms 2-8,
+//   the tip choices as a scrolling screen of stamps, Pressure as a checkbox
+//   pane. The tip square itself is hidden (its menu is the screen's job now).
+//   Brush 1 is the main brush: its screen is headed "Main brush" and a stamp
+//   there picks the brush's own tip, through the Brush drawer's tip and shape
+//   tiles. On arms 2-8 the screen is dimmed while the arm matches the brush,
+//   the brush's own tip lit as the chosen stamp, and a stamp makes it Custom with that tip, through the square's
 //   __wcPickTip hook: the code path the tip menu's entries run.
 //
 // Brush drawer
@@ -140,7 +146,7 @@
 
     // ── Multi-Brush ────────────────────────────────────────────────────
     var MB = { panel: null, rows: null, chan: null, scr: null, tiles: null, mini: null, grid: null,
-        sel: 0, mo: null, sig: null, choices: [], shownIdx: -1, scrollT: 0, pend: -1 };
+        sel: 0, mo: null, sig: null, choices: [], shownKey: null, scrollT: 0, pend: -1 };
 
     function armRows() {
         return MB.rows ? [].filter.call(MB.rows.children, function (r) { return r.classList.contains('arm-row'); }) : [];
@@ -194,6 +200,19 @@
         }
         return { letter: MODE_LETTER[mode], rgb: rgb || PHOSPHOR, mask: lookOf(cfg ? tipVal(cfg.tip) : null) };
     }
+    // A tile beyond the count keeps what it showed when it went off: the
+    // main brush's tip or colour moving on does not repaint it (Gabriel,
+    // 2026-10-18). Only a change to its own config (a preset, a session
+    // restore) reads it again.
+    function frozenGhost(t, i) {
+        var cfg = (window.multiArmColors || [])[i] || null;
+        var key = cfg ? [cfg.mode, cfg.color, cfg.tip, cfg.cachedColor && cfg.cachedColor.join(',')].join('|') : '-';
+        var g = t._wcbGhost;
+        if (g && g.cfg === cfg && g.key === key) return g.info;
+        var info = ghostInfo(i);
+        t._wcbGhost = { cfg: cfg, key: key, info: info };
+        return info;
+    }
 
     function makeTile(i) {
         var t = document.createElement('div');
@@ -205,8 +224,8 @@
         return t;
     }
 
-    // A tile's power (the study's --pw): on inside the count, dimmed beyond
-    // it. The class holds the rest state; a change eases on the drawer
+    // A tile's power (the study's --pw): on inside the count, its number
+    // unlit beyond it (css/43; the stamp keeps its colour). The class holds the rest state; a change eases on the drawer
     // spring, stepped on js/71's frame, the inline value dropped once
     // settled. Reduced motion: it switches.
     var powering = [];
@@ -243,20 +262,23 @@
             dropAttr(t, 'aria-disabled');
             setTab(t, on ? 0 : -1);
         } else {
-            // Beyond the count: shown, not pickable, out of the Tab order.
-            setAttr(t, 'aria-label', 'Brush ' + (i + 1) + ', off');
+            // Beyond the count: reached by the arrows, picked to turn on
+            // every arm up to it (enable below).
+            setAttr(t, 'aria-label', 'Brush ' + (i + 1) + ', off: turns on brushes 1 to ' + (i + 1));
             setAttr(t, 'aria-checked', 'false');
-            setAttr(t, 'aria-disabled', 'true');
-            dropAttr(t, 'tabindex');
+            dropAttr(t, 'aria-disabled');
+            setTab(t, -1);
         }
         power(t, live);
     }
 
-    var uid = 0;
-    // Once per row js/20 builds: the head line for the custom brush screen
-    // (the row's own tip square moves onto it as the caption), and the
-    // Pressure pane's indicator. Nothing the row's handlers hold is replaced.
-    function dressRow(row) {
+    // Once per row js/20 builds: the head line for the tip screen (shown on
+    // Brush 1 only, "Main brush" and the tip's name; arms 2-8 have Brush
+    // Mode above the screen instead), and the Pressure pane's indicator. The
+    // row's tip square moves into the head, hidden (css/43): its menu was
+    // the "BLOB" dropdown, and its __wcPickTip hook stays where js/20 put it.
+    // Nothing the row's handlers hold is replaced.
+    function dressRow(row, i) {
         if (row._wcb) return row._wcb;
         var mid = row.querySelector('.arm-row-mid');
         var push = row.querySelector('.arm-push-btn');
@@ -267,23 +289,17 @@
             head.className = 'wcb-head';
             var lbl = document.createElement('span');
             lbl.className = 'wcb-lbl';
-            lbl.textContent = 'Custom brush';
+            lbl.textContent = 'Main brush';
             head.appendChild(lbl);
-            head.appendChild(tipBtn);
             var cap = document.createElement('span');
-            cap.className = 'wcb-cap';
-            cap.setAttribute('aria-hidden', 'true');
-            tipBtn.appendChild(cap);
-            // The square's name: js/20's own label, plus the brush's tip when
-            // the arm follows it, since the caption shows that tip's name
-            // (a visible label must be part of the name).
-            var nm = document.createElement('span');
-            nm.hidden = true;
-            nm.id = 'wcb-tipname-' + (++uid);
-            head.appendChild(nm);
-            tipBtn.setAttribute('aria-labelledby', nm.id);
+            cap.className = 'wcb-cap wcb-hcap';
+            head.appendChild(cap);
+            head.appendChild(tipBtn);
+            tipBtn.tabIndex = -1;
+            tipBtn.setAttribute('aria-hidden', 'true');
+            head.hidden = i !== 0;
             mid.insertBefore(head, push);
-            d.head = head; d.cap = cap; d.nm = nm;
+            d.head = head; d.cap = cap;
         }
         if (push && !push.querySelector('.wcb-ind')) {
             var ind = document.createElement('i');
@@ -295,15 +311,16 @@
         return d;
     }
 
-    // The custom brush choices, in the order js/20's tip menu lists them: the
-    // brush's own tip, the five built-ins, then the shape library.
+    // The tip choices, in the order js/20's tip menu lists them: the five
+    // built-ins, then the shape library. Its "same as the brush" entry is
+    // Brush Mode's Match now.
     function choiceSig() {
         var s = brushKey(), l = shapes();
         for (var i = 0; i < l.length; i++) s += '|' + l[i].id + ':' + (l[i].name || '') + ':' + l[i].dataURL.length;
         return s;
     }
     function choiceList() {
-        var out = [{ v: null, name: 'Same as the brush, ' + brushName(), mask: brushMask() }];
+        var out = [];
         for (var t = 0; t < 5; t++) out.push({ v: t, name: TIP_NAMES[t], mask: tipMask(t) });
         shapes().forEach(function (s) { out.push({ v: s.id, name: s.name || 'Shape', mask: urlMask(s.dataURL) }); });
         return out;
@@ -311,6 +328,27 @@
     function armTip(i) {
         var cfg = (window.multiArmColors || [])[i];
         return tipVal(cfg ? cfg.tip : null);
+    }
+    // What Brush 1 prints: its own tip if an old save gave it one, else the
+    // brush's shape or built-in tip.
+    function mainTip() {
+        var a = armTip(0);
+        return a !== null ? a : brushTip();
+    }
+    // The brush's shape or built-in tip: what an arm on Match prints.
+    function brushTip() {
+        var BS = window.BrushShapes, id = null;
+        try { id = BS && BS.activeId(); } catch (_) {}
+        if (id && shapeById(id)) return id;
+        return Math.max(0, Math.min(4, (window.config && window.config.BRUSH_TIP) | 0));
+    }
+    // The tip the screen shows as chosen: Brush 1 the main brush's, an arm
+    // on Custom its own, an arm matching the brush none.
+    function shownTip(i) { return i === 0 ? mainTip() : armTip(i); }
+    function tipName(v) {
+        if (typeof v === 'number') return TIP_NAMES[Math.max(0, Math.min(4, v))];
+        var s = shapeById(v);
+        return s ? (s.name || 'Shape') : TIP_NAMES[0];
     }
 
     function buildMini(choices) {
@@ -338,14 +376,17 @@
         var moved = MB.mini.previousSibling !== d.head;
         if (moved) d.head.parentNode.insertBefore(MB.mini, d.head.nextSibling);
         setVar(MB.mini, '--sc', info.rgb);
-        setAttr(MB.grid, 'aria-label', 'Brush ' + (i + 1) + ' custom brush');
-        // The caption names the stamp the arm prints (study .scr-cap): for an
-        // arm on the brush's tip, the brush's. The square's own name still
-        // says "same as the brush".
-        setText(d.cap, armTip(i) === null ? brushName() : info.tipName);
+        setAttr(MB.grid, 'aria-label', i === 0 ? 'Main brush tip' : 'Brush ' + (i + 1) + ' custom brush');
+        var v = shownTip(i), hit = -1, match = v === null;
+        // Matching the brush: the screen is dimmed, its stamps still lit
+        // enough to pick one (a pick makes the arm Custom), and the stamp
+        // chosen is the brush's tip as it is now, the one the arm prints.
+        MB.mini.classList.toggle('wcb-match', match);
+        if (match) v = brushTip();
+        // The caption names the stamp Brush 1 prints (study .scr-cap).
+        if (i === 0) setText(d.cap, tipName(v));
         var sig = choiceSig();
         if (sig !== MB.sig) { MB.sig = sig; MB.choices = choiceList(); buildMini(MB.choices); }
-        var v = armTip(i), hit = -1;
         for (var k = 0; k < MB.choices.length; k++) if (MB.choices[k].v === v) { hit = k; break; }
         var cells = MB.grid.children;
         for (k = 0; k < cells.length; k++) {
@@ -357,8 +398,11 @@
         // Another arm in the editor: bring its stamp into view (study
         // syncEditor), its row found from its index; the scroll waits for
         // its own task, out of whatever frame this repaint rides.
-        if (moved || MB.shownIdx !== i) {
-            MB.shownIdx = i;
+        // Switched to Match (or the brush's tip moved under it): bring the
+        // brush's stamp into view too.
+        var shownKey = i + '|' + (match ? 'm:' + v : 'c');
+        if (moved || MB.shownKey !== shownKey) {
+            MB.shownKey = shownKey;
             var top = hit >= 0 ? Math.floor(hit / MS_COLS) * MS_PITCH : 0;
             clearTimeout(MB.scrollT);
             MB.scrollT = setTimeout(function () { MB.grid.scrollTop = top; }, 0);
@@ -382,18 +426,13 @@
                 var on = i === MB.sel;
                 row.classList.toggle('wcb-arm-on', on);
                 row.classList.toggle('wcb-arm-off', !on);
-                var d = dressRow(row);
-                if (d.nm) {
-                    var lab = d.tipBtn.getAttribute('aria-label') || '';
-                    // A comma, not brackets: label-in-name checks drop bracketed text.
-                    setText(d.nm, armTip(i) === null ? lab + ', ' + brushName() : lab);
-                }
+                dressRow(row, i);
                 var info = rowInfo(row);
                 var pk = row.querySelector('input.arm-picker');
                 if (pk) setVar(pk, '--sc', info.rgb);
-                if (tiles[i]) paintTile(tiles[i], i, info, on, true);
+                if (tiles[i]) { tiles[i]._wcbGhost = null; paintTile(tiles[i], i, info, on, true); }
                 if (on) sel = info;
-            } else paintTile(tiles[i], i, ghostInfo(i), false, false);
+            } else paintTile(tiles[i], i, frozenGhost(tiles[i], i), false, false);
         }
         placeMini(rows[MB.sel], MB.sel, sel);
     }
@@ -412,6 +451,17 @@
     }
 
     function liveCount() { return armRows().length; }
+    // A tile beyond the count: the count slider moves to it, as a drag would
+    // (its input and change events: js/05e, js/20's rows and the save follow).
+    function enable(i, focus) {
+        var m = document.getElementById('multiplier');
+        if (!m || i < liveCount()) return;
+        m.value = String(i + 1);
+        try { m.style.setProperty('--val', i + 1); } catch (_) {}
+        m.dispatchEvent(new Event('input', { bubbles: true }));
+        m.dispatchEvent(new Event('change', { bubbles: true }));
+        select(i, focus);
+    }
     function select(i, focus) {
         if (i < 0 || i >= liveCount()) return;
         var moved = i !== MB.sel;
@@ -422,14 +472,39 @@
         if (moved && TM()) TM().kick(MB.tiles);
     }
 
-    // A custom brush pick: the arm's tip square's hook (js/20), the code path
-    // its menu entries run. Returns whether anything changed.
+    // Brush 1's pick is the main brush's tip: the Brush drawer's own tip or
+    // shape tile, clicked, so it lands, saves and marks the preset as the
+    // drawer's do. An old save's own tip on arm 1 goes first, or the arm
+    // would go on printing it.
+    function pickMain(v, row) {
+        var tipBtn = row.querySelector('.arm-tip-btn');
+        if (armTip(0) !== null && tipBtn && typeof tipBtn.__wcPickTip === 'function') tipBtn.__wcPickTip(null);
+        var body = BR.area && BR.area.parentNode, b = null;
+        if (typeof v === 'number') {
+            b = body && body.querySelector(':scope > .brush-tip-row > .brush-tip-btn[data-tip="' + v + '"]');
+            if (b) b.click();
+            return;
+        }
+        var l = shapes(), btns = shapeBtns();
+        for (var j = 0; j < l.length; j++) if (l[j].id === v) { b = btns[j]; break; }
+        // Its tile toggles: a second click would put the brush back on its tip.
+        if (b && !b.classList.contains('active')) { BR.own = true; try { b.click(); } finally { BR.own = false; } }
+    }
+    // A tip pick: Brush 1's goes to the main brush; another arm's through its
+    // tip square's hook (js/20), the code path the square's menu entries ran,
+    // which makes the arm Custom. Returns whether anything changed.
     function pickCell(k) {
         var row = armRows()[MB.sel], ch = MB.choices[k];
-        if (!row || !ch || ch.v === armTip(MB.sel)) return false;
-        var tipBtn = row.querySelector('.arm-tip-btn');
-        if (!tipBtn || typeof tipBtn.__wcPickTip !== 'function') return false;
-        tipBtn.__wcPickTip(ch.v);
+        if (!row || !ch || ch.v === shownTip(MB.sel)) return false;
+        if (MB.sel === 0) pickMain(ch.v, row);
+        else {
+            var tipBtn = row.querySelector('.arm-tip-btn');
+            if (!tipBtn || typeof tipBtn.__wcPickTip !== 'function') return false;
+            tipBtn.__wcPickTip(ch.v);
+        }
+        // The brush's tip moved under rows js/20 repaints next frame: show
+        // the pick now.
+        refresh();
         if (TM()) TM().kick(MB.grid);
         return true;
     }
@@ -445,24 +520,32 @@
         // The pointer: the press focused the tile already (Space stays Freeze).
         MB.tiles.addEventListener('click', function (e) {
             var t = e.target.closest('.wcb-tile');
-            if (t && t.getAttribute('aria-disabled') !== 'true') select([].indexOf.call(MB.tiles.children, t), false);
+            if (!t) return;
+            var i = [].indexOf.call(MB.tiles.children, t);
+            if (i >= liveCount()) enable(i, false);
+            else select(i, false);
         });
         // The study's radio group (bindRadio): arrows step and wrap through
-        // the arms in the count, the selection follows.
+        // all eight, the selection following inside the count. A tile beyond
+        // it takes focus only; Space or Enter turns it on, as a click does
+        // (an arrow should not add brushes on its way past).
         MB.tiles.addEventListener('keydown', function (e) {
             if (e.altKey || e.ctrlKey || e.metaKey) return;
-            var a = document.activeElement, i = [].indexOf.call(MB.tiles.children, a), n = liveCount();
-            if (i < 0 || i >= n) return;
+            var a = document.activeElement, tiles = MB.tiles.children, i = [].indexOf.call(tiles, a), n = liveCount();
+            if (i < 0) return;
             if (e.key === ' ' || e.key === 'Enter') {
                 if (byPointer(a) || i === MB.sel) return;     // Freeze's, or nothing to press
                 e.preventDefault();
-                select(i, true);
+                if (i >= n) enable(i, true);
+                else select(i, true);
                 return;
             }
             var d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
             if (!d) return;
             e.preventDefault();
-            select((i + d + n) % n, true);
+            var j = (i + d + tiles.length) % tiles.length;
+            if (j < n) select(j, true);
+            else tiles[j].focus();
         });
     }
 
@@ -480,7 +563,7 @@
             var a = document.activeElement, k = cellIndex(a);
             if (k < 0 || !g.contains(a)) return;
             if (e.key === ' ' || e.key === 'Enter') {
-                if (byPointer(a) || MB.choices[k].v === armTip(MB.sel)) return;
+                if (byPointer(a) || MB.choices[k].v === shownTip(MB.sel)) return;
                 e.preventDefault();
                 pickCell(k);
                 return;
@@ -554,7 +637,7 @@
     }
 
     // ── Brush drawer: the shape tiles as a phosphor radio grid ─────────
-    var BR = { row: null, cap: null, mo: null, act: undefined, pend: -1, kIdx: -1, own: false };
+    var BR = { area: null, row: null, cap: null, mo: null, act: undefined, pend: -1, kIdx: -1, own: false };
 
     function shapeBtns() { return BR.row ? BR.row.querySelectorAll('.brush-shape-btn') : []; }
     function paintShapes() {
@@ -618,7 +701,7 @@
         cap.className = 'wcb-cap wcb-scap';
         cap.setAttribute('aria-hidden', 'true');
         actions.insertBefore(cap, actions.firstChild);
-        BR.row = row; BR.cap = cap;
+        BR.area = area; BR.row = row; BR.cap = cap;
         // What is chosen at boot shows lit, without a strike.
         try { BR.act = window.BrushShapes ? window.BrushShapes.activeId() : null; } catch (_) { BR.act = null; }
         BR.mo = new MutationObserver(paintShapes);

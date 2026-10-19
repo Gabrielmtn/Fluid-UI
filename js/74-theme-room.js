@@ -128,13 +128,31 @@
         wake();
     }
 
+    // Three lines for two people, and one more for each person past two
+    // (Gabriel 2026-10-18), so a full room's changes aren't pushed off at once.
+    // connectedClients is 06a's headcount.
+    function maxLines() {
+        var n = (typeof connectedClients === 'number') ? connectedClients : 2;
+        return NR.maxLines + Math.max(0, n - 2);
+    }
+    var sizedFor = 0;
+    function sizeFeed() {
+        var m = maxLines();
+        if (!feed || m === sizedFor) return;
+        sizedFor = m;
+        feed.style.minHeight = (78 + (m - NR.maxLines) * LINE_H) + 'px';   // css/39's 78 px holds three
+        if (notes) notes.style.height = (m * LINE_H) + 'px';
+        restack(PROF.remote);
+        wake();
+    }
+
     // Study restack(): newest on top; a fourth pushes the oldest off.
     function restack(prof) {
         var r = 0;
         for (var i = 0; i < lines.length; i++) {
             var L = lines[i];
             if (L.leaving) continue;
-            if (r >= NR.maxLines) { L.leaving = true; L.tau = L.who.you ? 0.3 : 0.45; continue; }
+            if (r >= maxLines()) { L.leaving = true; L.tau = L.who.you ? 0.3 : 0.45; continue; }
             L.rank = r;
             L.y.to(r, prof);
             r++;
@@ -372,7 +390,7 @@
         }).observe(conn, { attributes: true, attributeFilter: ['style'] });
         if (dot) new MutationObserver(syncEmpty).observe(dot, { attributes: true, attributeFilter: ['class'] });
         var status = document.getElementById('multiplayerStatus');
-        if (status) new MutationObserver(syncEmpty).observe(status, { childList: true, characterData: true, subtree: true });
+        if (status) new MutationObserver(function () { syncEmpty(); sizeFeed(); }).observe(status, { childList: true, characterData: true, subtree: true });
         document.addEventListener('input', onLocalChange, true);
         document.addEventListener('change', onLocalChange, true);
         buildNixies();

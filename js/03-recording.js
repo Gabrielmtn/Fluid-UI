@@ -472,6 +472,10 @@
             // Same class as `ap` — geometry, not styling — and omitted at 0.
             const mirPin = window.__strokeMirrorPin | 0;
             if (mirPin) interaction.mir = mirPin;
+            // Mandala Overlay's fold (05g foldMandala), the same class: the
+            // wedge count the dab was folded into, omitted while it is off.
+            const mdPin = (typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(window.__mandalaFold) : 0;
+            if (mdPin) interaction.md = mdPin;
             // The Flow the dab was painted at, so a take painted thin plays
             // back thin whatever the slider says now (2026-10-08: playback
             // ran every dab at full Flow). Omitted at full flow.
@@ -568,6 +572,9 @@
                 if (armPush) d.ap = armPush | 0;
                 if (armTips && Object.keys(armTips).length) d.atip = Object.assign({}, armTips);
                 if (mir) d.mir = mir | 0;
+                // Mandala's fold, live or pinned: multiSplat folds on this gate
+                const md = (!direct && typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(window.__mandalaFold) : 0;
+                if (md) d.md = md;
                 if (faceTurn) d.ft = recRound(faceTurn, 1e4);
                 if (cfg.SYM_SAME_ANGLE) d.sa = 1;
             }
@@ -608,7 +615,8 @@
                 cfg.BRUSH_VELOCITY_ONLY, cfg.BRUSH_VEL_MODE, cfg.BRUSH_VEL_STRENGTH,
                 cfg.SYMMETRY_MODE, cfg.SYM_SAME_ANGLE,
                 window.__remoteStroke, window.__armPushPin, window.__armTipPin, window.__strokeMirrorPin,
-                window.__splatVelK, window.__armColorPin, window.__faceTurnPin, window.__rakePin];
+                window.__splatVelK, window.__armColorPin, window.__faceTurnPin, window.__rakePin,
+                window.__mandalaFold];
             try {
                 // A shape we no longer have (deleted, or a peer's that left
                 // with them) prints the built-in tip, never the one selected now
@@ -631,6 +639,7 @@
                 window.__armTipPin = ((typeof window.sanitizeArmTipMap === 'function') ? window.sanitizeArmTipMap(i.atip) : null) || {};
                 const mir = (typeof i.mir === 'number' && isFinite(i.mir)) ? (i.mir | 0) : 0;
                 window.__strokeMirrorPin = (mir >= 1 && mir <= 3) ? mir : 0;
+                window.__mandalaFold = (typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(i.md) : 0;
                 let sym = (typeof i.sym === 'string') ? i.sym : 'radial';
                 try {
                     if (window.ParamRegistry && window.ParamRegistry.coerceSelect) {
@@ -668,6 +677,7 @@
                 window.__armTipPin = saved[11]; window.__strokeMirrorPin = saved[12];
                 window.__splatVelK = saved[13]; window.__armColorPin = saved[14];
                 window.__faceTurnPin = saved[15]; window.__rakePin = saved[16];
+                window.__mandalaFold = saved[17];
                 window.__splatFlow = 1;   // as after a live dab
             }
         }
@@ -824,11 +834,13 @@
                 // snapshot, and the value reaches the arm-transform builder.
                 let _rmir = (typeof i.mir === 'number' && isFinite(i.mir)) ? (i.mir | 0) : 0;
                 if (_rmir < 1 || _rmir > 3) _rmir = 0;
+                // Mandala's fold, the same way (05g mandalaFoldOf range-checks it).
+                const _rmd = (typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(i.md) : 0;
                 // Per-arm tips, cleaned like the rest (05g sanitizeArmTipMap).
                 const _ratip = (typeof window.sanitizeArmTipMap === 'function')
                     ? window.sanitizeArmTipMap(i.atip) : null;
-                const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap || !!_rmir || !!_ratip;
-                let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev, _mirPrev, _atipPrev;
+                const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap || !!_rmir || !!_rmd || !!_ratip;
+                let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev, _mirPrev, _mdPrev, _atipPrev;
                 if (_fp && window.config) {
                     _tipPrev = window.config.BRUSH_TIP;
                     _shapePrev = window.config.BRUSH_SHAPE_ID;
@@ -848,6 +860,8 @@
                     // while it played.
                     _mirPrev = window.__strokeMirrorPin;
                     window.__strokeMirrorPin = _rmir;
+                    _mdPrev = window.__mandalaFold;
+                    window.__mandalaFold = _rmd;
                     window.config.BRUSH_VELOCITY_ONLY = !!_rp;
                     if (_rp) {
                         window.config.BRUSH_VEL_MODE =
@@ -895,6 +909,7 @@
                         window.__armPushPin = _apPrev;
                         window.__armTipPin = _atipPrev;
                         window.__strokeMirrorPin = _mirPrev;
+                        window.__mandalaFold = _mdPrev;
                     }
                 }
             }

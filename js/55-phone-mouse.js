@@ -332,7 +332,7 @@
         timers.idle = 0;
         if (!greeted[tag]) {
             greeted[tag] = true;
-            announce('📱 Your phone is now your mouse. Paint on it and watch here.');
+            announce('📱 Your phone is now your brush. Paint on it and watch here.');
         }
         sendInfo(true);
         changed();

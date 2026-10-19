@@ -17,7 +17,7 @@ const E = ['e', 'KeyE', 69];
     const d = await boot();
     try {
         const rect = (sel) => d.ev(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; var r = e.getBoundingClientRect(); var x = r.left + r.width/2, y = r.top + r.height/2; var top = document.elementFromPoint(x, y); return { x: x, y: y, hit: !!top && (top === e || e.contains(top)) }; })()`);
-        const clickSel = async (sel) => { const r = await rect(sel); if (!r || !r.hit) throw new Error('not clickable: ' + sel + ' ' + JSON.stringify(r)); await d.click(r.x, r.y); };
+        const clickSel = async (sel) => { await d.ev(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); if (e) e.scrollIntoView({ block: "nearest", behavior: "instant" }); return 1; })()`); await sleep(120); const r = await rect(sel); if (!r || !r.hit) throw new Error('not clickable: ' + sel + ' ' + JSON.stringify(r)); await d.click(r.x, r.y); };
 
         // ── An ordinary picker (Stroke locks → Keep distance) ──
         await d.ev(`(function(){ var s = document.querySelector('.stroke-lock-block'); window.openSidebarSection(s.closest('.sidebar-section')); return 1; })()`);

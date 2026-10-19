@@ -459,8 +459,8 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="
     --ci: inherit;
     content: "";
     position: absolute;
-    left: 3.3px;
-    top: 0.6px;
+    left: 4px;      /* centred on the 11 px box's ink (was 3.3, 0.6) */
+    top: 2.3px;
     width: 3px;
     height: 6px;
     box-sizing: border-box;
@@ -620,8 +620,8 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
         .checkbox-group > label > input[type="checkbox"],
         .mutation-lock-chip > input[type="checkbox"], .ui-vis-row > input[type="checkbox"],
         .audio-mini-enable > input[type="checkbox"])::after {
-    left: 2.6px;
-    top: 0.2px;
+    left: 3.2px;    /* tick centred on the 9 px box's ink (was 2.6, 0.2: high and left) */
+    top: 1.5px;
     width: 2.6px;
     height: 5px;
     border-width: 0 1.4px 1.4px 0;
@@ -640,7 +640,9 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
     position: absolute;
     left: 9px;
     top: 50%;
-    margin: -4.5px 0 0 !important;
+    /* -4.5 centred the box on the line box; small caps sit low in it, so
+       the box rides 1 px lower to centre on the words' ink. */
+    margin: -3.5px 0 0 !important;
 }
 /* The focus ring is the pane's (study .cp:focus-visible), not the box's. */
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
@@ -732,8 +734,8 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-gro
     background: transparent;
 }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .feature-head > input[type="checkbox"]::after {
-    left: 2.6px;
-    top: 0.2px;
+    left: 3.2px;    /* tick centred on the 9 px box's ink (was 2.6, 0.2: high and left) */
+    top: 1.5px;
     width: 2.6px;
     height: 5px;
     border-radius: 0;
@@ -816,8 +818,8 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.layer-c
 }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.layer-check, .layer-vis) > .layer-vis-box::after {
     --ci: inherit;
-    left: 2.6px;
-    top: 0.2px;
+    left: 3.2px;    /* tick centred on the 9 px box's ink (was 2.6, 0.2: high and left) */
+    top: 1.5px;
     width: 2.6px;
     height: 5px;
     box-sizing: border-box;
@@ -1552,6 +1554,332 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-gr
     html[data-theme="walnut-copper"] .wc-opt.wc-act { outline-offset: 2px !important; }
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear::before,
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .hk-picker-clear::after { background: ButtonText; }
+}
+
+/* COLOUR WELLS AND PALETTE CHIPS (polish pass 2026-10-17). The sidebar's
+   plain wells (Display's background, text and layer swatches) still wore the
+   legacy grey ring, and no well or chip answered a hover. The plain wells
+   get the top bar lamp's copper ring; every well and chip warms on hover.
+   The Multi-brush arm lamps keep their own shape (css/38). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="color"]:not(.arm-picker) {
+    border: 0;
+    box-shadow: inset 0 0 0 1.5px var(--cu), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 8px rgba(255, 220, 160, 0.22);
+    transition: box-shadow 0.12s ease;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="color"]:not(.arm-picker):hover,
+html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] input[type="color"]:hover {
+    box-shadow: inset 0 0 0 1.5px var(--cu-hi), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 16px rgba(255, 220, 160, 0.6);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="color"]:not(.arm-picker):focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+}
+html[data-theme="walnut-copper"] #sidebar-left .wcb-mb .arm-row.wcb-arm-on > input[type="color"].arm-picker:hover {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu-hi), 0 0 18px rgb(var(--sc) / 0.6);
+}
+html[data-theme="walnut-copper"] .palette-chip { transition: border-color 0.12s ease, transform 0.12s ease; }
+html[data-theme="walnut-copper"] .palette-chip:hover {
+    border-color: var(--cu-hi);
+    transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme="walnut-copper"] .palette-chip:hover { transform: none; }
+}
+
+/* AUDIO'S QUICK ROW (polish pass 2026-10-17; Minimized, Timing only and the
+   scene modes share it). Enable, the source field and Audio file sat in one
+   flex row: the 48 px field next to 34 px panes, the field 70 px wide with
+   66 px of padding (its value never showed), "Enable" spilling out of its
+   pane. Now the source field takes the row's width and the two panes share
+   the row under it. The box around the controls was a frame inside the
+   drawer's own; it goes, the spacing stays. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .audio-mini {
+    border: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .audio-mini-row:has(> #audioReactSource) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: stretch;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .audio-mini-row > #audioReactSource {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100% !important;
+    min-width: 0;
+    margin: 0 !important;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .audio-mini-row:has(> #audioReactSource) > .audio-mini-enable {
+    grid-row: 2;
+    grid-column: 1;
+    min-width: 0;
+    margin: 0;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .audio-mini-row:has(> #audioReactSource) > #audioChooseTrack {
+    grid-row: 2;
+    grid-column: 2;
+    min-width: 0;
+    min-height: 34px;
+    margin: 0;
+}
+/* The strip beside it shares the row instead of running off its edge. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-source > .rec-strip-chips { flex: 1 1 auto; min-width: 0; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-source > .rec-strip-chips > button { padding-left: 4px !important; padding-right: 4px !important; letter-spacing: 0.06em !important; }
+/* Two leftovers the full-resolution captures showed (polish pass
+   2026-10-17): Animations' "Records" label was in the body face while its
+   neighbours are engraved labels, and the Sim layer's chip kept the old
+   blue-violet gradient (written inline by js/05k, hence !important). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-label {
+    flex: none;
+    font: 400 9px/1.2 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+html[data-theme="walnut-copper"] #sidebar-right .layer-thumbnail[style*="667eea"] {
+    background:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, rgba(40, 160, 130, 0.16), transparent 72%),
+        #040b0a !important;
+    box-shadow: inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.6), inset 0 1px 0 1.5px rgba(255, 210, 170, 0.15);
+    font: 400 11px/1 var(--ui-font-mono) !important;
+    letter-spacing: 0.08em !important;
+    color: rgb(150 255 225) !important;
+    text-shadow: 0 0 4px rgb(80 230 190 / 0.75);
+}
+/* Audio timing's lane fields (what a lane does, how often): 104 px wide, so
+   the full field's 66 px of padding left 38 px and cut every word ("BURS",
+   "EVER CUE"). The layer row's compact field (above), 40 px tall so a
+   two-word value takes two lines. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .atv-lane-act > select:not([aria-hidden="true"]):not([multiple]) {
+    height: 40px !important;
+    min-height: 40px;
+    padding: 0 30px 0 9px !important;
+    border-radius: 5px !important;
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+    background:
+        var(--wcf-chev) right 5.5px top calc(-4px + clamp(0, round(nearest, var(--open) * 36, 1), 36) * -48px) / 12px 1776px no-repeat,
+        linear-gradient(rgba(214, 140, 92, 0.7), rgba(214, 140, 92, 0.7)) right 23px top 6px / 1px calc(100% - 12px) no-repeat,
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        var(--wcf-mesh-lit-field) center / 100% 100% no-repeat,
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605) !important;
+}
+/* Brush's "Tip" fold heading read as small grey body text among engraved
+   headings (Presets, Paint into, Stroke): its label takes their face. And
+   Multi-brush's symmetry note, empty in most modes, still held ~25 px of
+   room under Hold symmetry. */
+html[data-theme="walnut-copper"] #sidebar-left .brush-fold-head > .brush-section-label {
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--engrave);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+html[data-theme="walnut-copper"] #sidebar-left .brush-fold-head > .brush-fold-chev { color: var(--cu-hi); }
+html[data-theme="walnut-copper"] #sidebar-left .arm-sym-note:empty { display: none; }
+/* Colors and palettes (polish pass 2026-10-17): the palette picker is a
+   custom combobox (js/01, a div), so the select field rule never reached it;
+   it was a flat black box in bold body type. It takes the field: 48 px
+   glass, display face, the copper chevron cell. Export this / Export all /
+   Import were bare text; they take small panes like the drawer's other
+   buttons, and the key hint the mono face. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, .cp-pop) .palette-select-trigger {
+    --ci: 0.5;
+    --gc: 255 110 30;
+    box-sizing: border-box;
+    height: 48px;
+    padding: 0 50px 0 16px;
+    border: 0;
+    border-radius: 7px;
+    font: 400 10.5px/1.25 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--lit) calc(var(--ci) * 100%), var(--unlit));
+    text-shadow: 0 0 calc(1px + var(--ci) * 5px) rgb(var(--gc) / calc(var(--ci) * 0.95));
+    background:
+        var(--wcf-chev) right 13.5px top 0 / 12px 1776px no-repeat,
+        linear-gradient(rgba(214, 140, 92, 0.7), rgba(214, 140, 92, 0.7)) right 39px top 6px / 1px calc(100% - 12px) no-repeat,
+        linear-gradient(160deg, rgba(255, 240, 225, 0.07), transparent 42%),
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ci) * 0.34)), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #1a1210, #090605);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px var(--cu),
+        inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+        inset 0 0 0 2.5px rgba(0, 0, 0, 0.55);
+    cursor: pointer;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, .cp-pop) .palette-select-trigger:hover { --ci: 0.75; }
+html[data-theme="walnut-copper"] :is(#sidebar-right, .cp-pop) .palette-select-trigger:is(:focus, [aria-expanded="true"]) { --ci: 1; outline: none; }
+html[data-theme="walnut-copper"] :is(#sidebar-right, .cp-pop) .palette-select-trigger:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+html[data-theme="walnut-copper"] :is(#sidebar-right, .cp-pop) .palette-select-trigger[aria-expanded="true"] { background-position: right 13.5px top calc(36 * -48px), right 39px top 6px, 0 0, center, center, 0 0; }
+html[data-theme="walnut-copper"] :is(#sidebar-right, .cp-pop) .palette-select-name { font: inherit; letter-spacing: inherit; }
+html[data-theme="walnut-copper"] :is(#sidebar-right, .cp-pop) .palette-select-chev { display: none; }
+html[data-theme="walnut-copper"] #sidebar-right .palette-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+html[data-theme="walnut-copper"] #sidebar-right .palette-actions > button.btn--ghost {
+    min-width: 0;
+    min-height: 30px;
+    padding: 4px 4px;
+    white-space: normal;
+    border: 0;
+    border-radius: 5px;
+    font: 400 9px/1.2 var(--ui-font-display);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--unlit);
+    background: var(--mesh-pane) center / 7px 12.12px, linear-gradient(170deg, #1a1210, #090605);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu), inset 0 1px 0 1.5px rgba(255, 210, 170, 0.16);
+}
+html[data-theme="walnut-copper"] #sidebar-right .palette-actions > button.btn--ghost:hover { color: var(--lit); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px var(--cu-hi), 0 0 10px rgba(255, 150, 80, 0.3); }
+html[data-theme="walnut-copper"] #sidebar-right .palette-keys {
+    font: 400 11px/1.4 var(--ui-font-mono);
+    color: var(--unlit);
+}
+/* The radial menu's and your hotkeys' rows (.hk-row, js/49 / js/58) were
+   body text with a bare 9 px cross: each row is now an engraved name over
+   a mono line, on a hairline, and its cross the small round cathode the
+   animation slots use. */
+html[data-theme="walnut-copper"] #sidebar-right .hk-row {
+    padding: 6px 2px;
+    border-bottom: 1px solid rgba(251, 236, 217, 0.08);
+    align-items: center;
+}
+html[data-theme="walnut-copper"] #sidebar-right .hk-row-name {
+    font: 400 9.5px/1.3 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--engrave);
+}
+html[data-theme="walnut-copper"] #sidebar-right .hk-row-sub {
+    font: 400 11px/1.3 var(--ui-font-mono);
+    color: var(--unlit);
+}
+html[data-theme="walnut-copper"] #sidebar-right .hk-row-del {
+    flex: none;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    font: 400 10px/20px var(--ui-font-body) !important;
+    text-align: center;
+    color: var(--lit) !important;
+    background: radial-gradient(circle at 40% 35%, #2a1b14, #0b0605) !important;
+    box-shadow: 0 0 0 1.3px var(--cu), 0 0 0 2.3px rgba(0, 0, 0, 0.7) !important;
+}
+html[data-theme="walnut-copper"] #sidebar-right .hk-row-del:hover { box-shadow: 0 0 0 1.3px var(--cu-hi), 0 0 0 2.3px rgba(0, 0, 0, 0.7), 0 0 10px rgba(255, 150, 80, 0.55) !important; }
+/* Colour wells: the swatch paints over an inset ring, so the copper ring
+   sits outside the well, past a dark gap (as the top bar's lamp reads). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="color"]:not(.arm-picker) {
+    box-shadow: 0 0 0 2px #090605, 0 0 0 3.5px var(--cu), 0 0 10px rgba(255, 220, 160, 0.22);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="color"]:not(.arm-picker):hover {
+    box-shadow: 0 0 0 2px #090605, 0 0 0 3.5px var(--cu-hi), 0 0 16px rgba(255, 220, 160, 0.6);
+}
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) input[type="color"]:not(.arm-picker):focus-visible { outline-offset: 6px; }
+/* Words that wrapped while their neighbours fit: Focus's "16:9 YouTube"
+   and Settings' "Visible sections" take the tighter tracking. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stream-format-grid > button { letter-spacing: 0.06em !important; }
+html[data-theme="walnut-copper"] #sidebar-right .ui-vis-trigger { letter-spacing: 0.06em; }
+/* Paint into (Fluid / Pressure / Collider) is one choice of three, but it
+   wrapped as two panes and a third under them and read as three buttons
+   (Gabriel's tour, 2026-10-18): one row of three joined panes, each keeping
+   its round cathode, like the other banks' joined strips. */
+html[data-theme="walnut-copper"] #sidebar-left .brush-radio-row:not(.arm-mode-wrap):has(> .brush-mode-btn[role="radio"]) {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 !important;
+}
+html[data-theme="walnut-copper"] #sidebar-left .brush-radio-row:not(.arm-mode-wrap):not(#wc-none):not(#wc-none) > .brush-mode-btn[role="radio"] {
+    width: auto !important;
+    min-width: 0;
+    margin: 0 !important;
+    padding-left: 22px !important;
+    padding-right: 6px !important;
+    letter-spacing: 0.06em !important;
+}
+html[data-theme="walnut-copper"] #sidebar-left .brush-radio-row:not(.arm-mode-wrap):not(#wc-none):not(#wc-none) > .brush-mode-btn[role="radio"]::before { left: 8px; }
+html[data-theme="walnut-copper"] #sidebar-left .brush-radio-row:not(.arm-mode-wrap):not(#wc-none):not(#wc-none) > .brush-mode-btn[role="radio"]:not(:first-child) { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+html[data-theme="walnut-copper"] #sidebar-left .brush-radio-row:not(.arm-mode-wrap):not(#wc-none):not(#wc-none) > .brush-mode-btn[role="radio"]:not(:last-child) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+/* Brush ghost's opacity only means something while the ghost is on: the
+   slider and its readout step aside while the box is unticked (Gabriel's
+   tour, 2026-10-18). */
+html[data-theme="walnut-copper"] #sidebar-left .brush-ghost-group:has(#brushGhostToggle:not(:checked)) > :not(label),
+html[data-theme="walnut-copper"] #sidebar-left .brush-ghost-group:has(#brushGhostToggle:not(:checked)) #brushGhostOpacityValue {
+    display: none !important;
+}
+/* Keep a take reads as the confirm it is: a green lamp, in the Animations
+   strip and on the canvas prompt (Gabriel's tour, 2026-10-18); Discard keeps
+   its destructive red. */
+html[data-theme="walnut-copper"] :is(#recKeepBtn, #recTakeKeepBtn) {
+    color: #d8ffe0 !important;
+    text-shadow: 0 0 6px rgba(80, 230, 130, 0.75) !important;
+    background:
+        radial-gradient(ellipse 80% 95% at 50% 50%, rgba(70, 210, 120, 0.32), transparent 75%),
+        var(--mesh-pane) center / 7px 12.12px,
+        linear-gradient(170deg, #0f1a12, #050a06) !important;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px #5fbf7a,
+        inset 0 1px 0 1.5px rgba(200, 255, 215, 0.18),
+        0 0 12px rgba(80, 230, 130, 0.28) !important;
+}
+html[data-theme="walnut-copper"] :is(#recKeepBtn, #recTakeKeepBtn):hover {
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1.5px #8ee6a4,
+        inset 0 1px 0 1.5px rgba(200, 255, 215, 0.24),
+        0 0 18px rgba(80, 230, 130, 0.5) !important;
+}
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] :is(#recKeepBtn, #recTakeKeepBtn) { border: 2px solid Highlight; }
+}
+/* Audio's Full mode is hidden until it is ready (Gabriel's tour, 2026-10-18):
+   its option is gone from Audio Mode, and so is the button that opened it. */
+#audioOpenFullBtn { display: none !important; }
+/* Display's Background Color button (Gabriel's tour, 2026-10-18), built like
+   the top bar's Color button: one pane, the word on the left, the colour's
+   lamp on the right; the whole pane opens the picker. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, .mask-filter-row) .bg-color-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 10px 0 14px;
+    cursor: pointer;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, .mask-filter-row) .bg-color-btn > .ch-color-word {
+    font: 400 10.5px/1.2 var(--ui-font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, .mask-filter-row) .bg-color-btn > input[type="color"] {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    box-shadow: 0 0 0 1.5px #090605, 0 0 0 2.6px var(--cu), 0 0 8px rgba(255, 220, 160, 0.3);
+}
+/* Transport glyphs as text, never the colour emoji (⏸ ⏮ 🔁 🔊). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.audio-play-btn, .audio-mini-full) {
+    font-variant-emoji: text;
 }
 
 } /* @layer theme */

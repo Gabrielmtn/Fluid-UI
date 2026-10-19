@@ -312,7 +312,7 @@
         // stranger has no room at all — the phone can be this canvas's mouse
         // through either, so the way in has to survive both.
         var parts = [];
-        if (mouseOn) parts.push('your mouse');
+        if (mouseOn) parts.push('your brush');
         if (pads.size) parts.push(pads.size + (pads.size === 1 ? ' artist' : ' artists'));
         b.textContent = PHONE_DOOR + (parts.length ? ' · ' + parts.join(', ') : '');
     }
@@ -338,7 +338,7 @@
             '<div class="delete-modal-content">' +
                 '<div class="delete-modal-title" id="phonePadTitle">Paint from your phone</div>' +
                 '<div class="phone-pad-ways" role="group" aria-label="How the phone paints">' +
-                    '<button type="button" id="phonePadWayMouse" aria-pressed="true">As your mouse</button>' +
+                    '<button type="button" id="phonePadWayMouse" aria-pressed="true">As your brush</button>' +
                     '<button type="button" id="phonePadWayArtist" aria-pressed="false">As an artist</button>' +
                 '</div>' +
                 '<div class="delete-modal-message" id="phonePadMsg"></div>' +
@@ -463,15 +463,15 @@
         if (asMouse) {
             status =
                 !ms.on ? 'Opening a link for your phone…' :
-                ms.phone ? '📱 Your phone is your mouse. Paint on it and watch here.' :
+                ms.phone ? '📱 Your phone is your brush. Paint on it and watch here.' :
                 ms.open ? 'Waiting for your phone…' :
                 ms.phase === 'retrying' ? 'Reconnecting…' :
                 'Opening a link for your phone…';
             liveStatus = ms.phone;
         } else if (stranger) {
             note = waiting
-                ? 'You’re waiting for a stranger, so there is no room for a phone to join as an artist. Your phone can be your mouse while you wait, and after they arrive.'
-                : 'A stranger swirl has two seats, and both are taken, so no phone can join it as an artist. Your phone can still be your mouse.';
+                ? 'You’re waiting for a stranger, so there is no room for a phone to join as an artist. Your phone can be your brush while you wait, and after they arrive.'
+                : 'A stranger swirl has two seats, and both are taken, so no phone can join it as an artist. Your phone can still be your brush.';
         } else {
             var live = socketOpen() && !!selfId();
             var n = pads.size;

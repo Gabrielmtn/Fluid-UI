@@ -494,7 +494,7 @@ function showMatchmaking() {
 function showConnecting() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
-    setShown('mpMenuBtn', !isStrangerRoom());
+    setShown('mpMenuBtn', false);   // updateConnectedView shows it to the host
     setShown('roomDisplay', !isStrangerRoom());
     if (!isStrangerRoom()) renderShareMode();
     syncInviteBtn();
@@ -566,13 +566,13 @@ function updateConnectedView() {
 
     // The ⋯ menu. Its switches keep one label and carry a tick when on
     // (aria-checked), so an item says what it does, not what it would undo.
-    // Nothing in it applies while a stranger pairing waits for its other
-    // half, so the button waits too.
-    setShown('mpMenuBtn', !(stranger && connectedClients < 2));
-    // Lock room: only the host of a private room sees it.
+    // Lock room is all it holds now (Copy room report went 2026-10-18), and
+    // only the host of a private room sees it, so the button is theirs alone:
+    // an empty menu for everyone else would be a dead end.
+    var canLock = !stranger && isHost;
+    setShown('mpMenuBtn', canLock);
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) {
-        var canLock = !stranger && isHost;
         lockBtn.style.display = canLock ? '' : 'none';
         lockBtn.setAttribute('aria-checked', String(!!roomLocked));
     }

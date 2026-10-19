@@ -775,7 +775,9 @@ class DepthEstimator {
             thumb: thumbDataUrl,   // 05k renders `layer.thumb || layer.data`
             originalData: thumbnailUrl || depthDataUrl,
             filmData: filmDataUrl,   // on-canvas film; see _depthToFilmUrl
-            title: '🧱 ' + (name || 'Collision'),
+            // Just 'Collider' (Gabriel's tour, 2026-10-18): no brick emoji, no
+            // source name; the thumbnail shows what it was made from.
+            title: 'Collider',
             visible: startVisible,
             active: false,
             threshold: 0,

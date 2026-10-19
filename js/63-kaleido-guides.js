@@ -26,8 +26,8 @@
 //   fold   q = R(-kAngle) · p, the shader's mat2(ca, -sa, sa, ca).
 //   screen (W/2, H/2) + diag(sx, -sy) · R(kAngle) · q, with (sx, sy) the
 //          px per unit: (S, S) isotropic (S = short side), else (W, H).
-// Mandala Overlay draws its own guides (the wedge, its seams, the rings),
-// so these step aside while it is on. Captures never include them: the
+// Mandala Overlay draws its own guides (the wedge, its seams, the rings);
+// these show alongside them when both are on (Gabriel, 2026-10-18). Captures never include them: the
 // overlay is DOM, and neither the picture nor the video path reads it.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
@@ -73,8 +73,7 @@
     function shows() {
         if (!cb.checked || !window.kaleidoEnabled) return false;
         if (num(window.kaleidoMode, 1) === 0) return false;      // Mode: Off
-        if (num(window.kBlend, 1) <= 0) return false;            // nothing mirrored on screen
-        return !(window.MandalaStudio && window.MandalaStudio.active());
+        return num(window.kBlend, 1) > 0;                        // nothing mirrored on screen otherwise
     }
 
     // Px per paint unit and the fold-frame radius past every corner.

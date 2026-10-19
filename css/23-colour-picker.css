@@ -62,7 +62,7 @@
 /* The sidebars style every input and select (full width, 28px tall);
    the :is() with an id outranks those rules wherever the picker sits,
    the popover in <body> included. */
-:is(#sidebar-right, #sidebar-left, body) .cp :is(.cp-hex, .cp-num, .cp-space, .cp-pal-select) {
+:is(#sidebar-right, #sidebar-left, body) .cp :is(.cp-hex, .cp-num, .cp-space, .cp-pal-select, .cp-pal-name) {
     box-sizing: border-box;
     width: auto;
     min-width: 0;
@@ -85,7 +85,7 @@
     font-weight: 600;
     letter-spacing: 0.03em;
 }
-:is(#sidebar-right, #sidebar-left, body) .cp :is(.cp-hex, .cp-num):focus { border-color: var(--ink-300); outline: none; }
+:is(#sidebar-right, #sidebar-left, body) .cp :is(.cp-hex, .cp-num, .cp-pal-name):focus { border-color: var(--ink-300); outline: none; }
 :is(#sidebar-right, #sidebar-left, body) .cp .cp-hex.is-bad { border-color: var(--danger); }
 .cp-copy {
     flex: 0 0 auto;
@@ -196,7 +196,7 @@
     align-items: center;
     gap: 8px;
 }
-:is(#sidebar-right, #sidebar-left, body) .cp .cp-pal-select {
+:is(#sidebar-right, #sidebar-left, body) .cp :is(.cp-pal-select, .cp-pal-name) {
     flex: 1 1 auto;
     min-width: 0;
     padding: 0 4px;
@@ -244,7 +244,9 @@ input[type="color"].cp-open { outline: 2px solid var(--accent); outline-offset: 
 /* ── Eyedropper ── */
 body.cp-sampling #canvas-area,
 body.cp-sampling #canvas-area *,
-.cp-veil { cursor: crosshair !important; }
+.cp-veil,
+.cp-surface,
+.cp-surface * { cursor: crosshair !important; }
 body.cp-sampling #brushCursor,
 body.cp-sampling #brushCursorGhost,
 body.cp-sampling #brushCursorGhostClip,

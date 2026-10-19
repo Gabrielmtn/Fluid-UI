@@ -54,6 +54,9 @@
 //     measured on a canvas in the display face against the room the element
 //     has when it first comes on screen (an IntersectionObserver hands over
 //     its width), never in a frame;
+//   • an option that carries its own font-family (Text's Font list) is set
+//     in that face, so the list previews each font; <optgroup>s keep their
+//     headings;
 //   • Brush ghost's words are wrapped in a span (.wc-cb-txt), so the pane is
 //     as wide as its words and the value stays outside it, as in the study;
 //   • a hotkey's keycap is marked with its length (data-wc-keylen) so a
@@ -186,7 +189,7 @@
     var ctx = null;
     function textWidth(text, px) {
         if (!ctx) ctx = document.createElement('canvas').getContext('2d');
-        ctx.font = '400 ' + px + 'px Michroma, Eurostile, "Arial Black", sans-serif';
+        ctx.font = '400 ' + px + 'px "WC Label", "Plus Jakarta Sans", sans-serif';
         return ctx.measureText(text).width;
     }
     // Wider than the room at .12em (letter-spacing follows every letter)?
@@ -249,8 +252,21 @@
 
     // The row the listbox goes under: the field's control group, else its
     // parent. A sibling there flows inline without joining a flex row.
+    // A field sitting in a horizontal row (the Text editor's Mode / Weight /
+    // Case rows) climbs out of it first: inside the row the list became a
+    // flex item and pushed its neighbours aside (Gabriel's tour, 2026-10-18);
+    // under the row it opens underneath, like every other field.
+    function isRow(el) {
+        if (!el) return false;
+        var cs = getComputedStyle(el);
+        if (cs.display.indexOf('flex') >= 0) return cs.flexDirection.indexOf('row') === 0;
+        if (cs.display.indexOf('grid') >= 0) return cs.gridTemplateColumns.split(' ').length > 1;
+        return false;
+    }
     function anchorOf(sel) {
-        return sel.closest('.control-group, .hk-picker, .qub-dd') || sel.parentElement;
+        var a = sel.closest('.control-group, .hk-picker, .qub-dd') || sel.parentElement;
+        for (var n = 0; n < 4 && a.parentElement && !a.parentElement.matches('.section-body, .sidebar-section, body') && isRow(a.parentElement); n++) a = a.parentElement;
+        return a;
     }
 
     function build(sel) {
@@ -265,8 +281,30 @@
         inner.setAttribute('role', 'presentation');
         list.appendChild(inner);
         var items = [];
+        // An <optgroup> (Text's Font: Sans, Serif, Mono...) becomes a group
+        // with its heading, so a long list keeps the sections the OS popup
+        // showed. The options are still the only rows the keys walk.
+        var grp = null, grpOf = null;
         Array.prototype.forEach.call(sel.options, function (opt, i) {
             if (opt.hidden) return;
+            var og = opt.parentNode && opt.parentNode.tagName === 'OPTGROUP' ? opt.parentNode : null;
+            if (og !== grpOf) {
+                grpOf = og;
+                grp = null;
+                if (og) {
+                    grp = document.createElement('div');
+                    grp.className = 'wc-grp';
+                    grp.setAttribute('role', 'group');
+                    var gh = document.createElement('div');
+                    gh.className = 'wc-grp-head';
+                    gh.id = list.id + '-g' + i;
+                    gh.setAttribute('role', 'presentation');
+                    gh.textContent = og.label || '';
+                    grp.setAttribute('aria-labelledby', gh.id);
+                    grp.appendChild(gh);
+                    inner.appendChild(grp);
+                }
+            }
             var o = document.createElement('div');
             o.className = 'wc-opt';
             o.setAttribute('role', 'option');
@@ -277,6 +315,13 @@
             o.appendChild(ind);
             o.appendChild(document.createTextNode(opt.textContent));
             o.dataset.index = String(i);
+            // An option that names its own face (Text's Font list sets
+            // option.style.fontFamily) previews it: the row is set in that
+            // face, in its own case (css/41 data-wc-face).
+            if (opt.style && opt.style.fontFamily) {
+                o.style.fontFamily = opt.style.fontFamily;
+                o.setAttribute('data-wc-face', '');
+            }
             if (opt.disabled) o.setAttribute('aria-disabled', 'true');
             if (i === sel.selectedIndex) o.setAttribute('aria-selected', 'true');
             o.addEventListener('pointerdown', function (e) { e.preventDefault(); });   // keep focus on the select
@@ -285,7 +330,7 @@
                 commit(i);
             });
             o.addEventListener('pointermove', function () { setActive(items.indexOf(o)); });
-            inner.appendChild(o);
+            (grp || inner).appendChild(o);
             items.push(o);
         });
         if (items.length > MAXV) inner.classList.add('wc-scroll');
@@ -295,7 +340,9 @@
     // against the list's width, then the list's full height from its rows.
     function measureList(b) {
         var room = b.list.clientWidth - 35 - (b.items.length > MAXV ? 4 : 0);
-        b.items.forEach(function (o) { setFit(o, tooLong(o.textContent, 9, room)); });
+        // A face preview is not in the label face, so the label face's
+        // measure says nothing about it; it wraps if it must.
+        b.items.forEach(function (o) { setFit(o, !o.hasAttribute('data-wc-face') && tooLong(o.textContent, 9, room)); });
         var full = b.inner.offsetHeight;
         if (b.items.length > MAXV) {
             var cap = MAXV * 37 + 7;

@@ -1696,13 +1696,13 @@
         var saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'atv-reread';
-        saveBtn.textContent = '';
+        saveBtn.textContent = 'Save cues';
         saveBtn.title = 'Save this track\'s lanes and what they do as a .swirlcues file';
         saveBtn.addEventListener('click', exportCues);
         var openBtn = document.createElement('button');
         openBtn.type = 'button';
         openBtn.className = 'atv-reread';
-        openBtn.textContent = '';
+        openBtn.textContent = 'Open cues';
         openBtn.title = 'Load lanes from a .swirlcues file onto this track';
         var picker = document.createElement('input');
         picker.type = 'file';

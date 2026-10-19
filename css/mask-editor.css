@@ -460,6 +460,11 @@
 
 #touchUpDespeckBtn { flex: 0 0 auto; }
 
+/* Erase | Add as one joined pair; Size's name sits over its slider. */
+.mask-seg { display: flex; gap: 0; }
+.mask-slider { flex: 0 1 300px; min-width: 180px; margin: 0; }
+.mask-slider input[type="range"] { width: 100%; }
+
 /* Step 3 — soften & finish */
 .mask-feather-step {
     background: rgba(210, 168, 255, 0.07);

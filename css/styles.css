@@ -1094,19 +1094,26 @@
         }
 
         #hotkeyOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 10000; }
-        .hotkey-modal { width: 820px; max-width: 95vw; max-height: 85vh; overflow: auto; background: linear-gradient(180deg, #0f141b, #0b0f14); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.45); color: #e6edf3; }
-        .hotkey-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); position: sticky; top: 0; background: inherit; z-index: 1; }
+        .hotkey-modal { width: 980px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, #0f141b, #0b0f14); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.45); color: #e6edf3; }
+        .hotkey-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .hotkey-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
-/* auto-fit: the old repeat(3,1fr) squeezed three ~110px columns of
-           ragged prose at narrow widths (no breakpoint at all). Now columns
-           drop to 2/1 as the modal narrows. Transition-free per the
-           compositor rule below. */
-        .hotkey-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; padding: 16px; font-size: 13px; }
+/* 2026-10-18: the header and footer stay put and only the body
+           scrolls, so the modal's own ground never moves under the text.
+           Sections flow as columns (masonry): a short section no longer
+           leaves a row-high hole beside a long one. A row is keys then
+           words; when the keys are too wide to leave the words 15ch, the
+           words drop under the keys instead of wrapping a word per line. */
+        .hotkey-body { flex: 1 1 auto; min-height: 0; overflow: auto; columns: 3 260px; column-gap: 28px; padding: 16px; font-size: 13px; }
+        .hotkey-body > div { break-inside: avoid; margin-bottom: 18px; }
         .hotkey-body h3 { margin: 0 0 8px 0; font-size: 13px; color: #9ab; }
         .hotkey-body ul { margin: 0; padding: 0; list-style: none; line-height: 1.5; }
-        /* Key-chip rows: 05n wraps each li's "Keys — Description" prose into
-           <kbd> + .hk-desc on first open. */
-        .hotkey-body li { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
+        /* Key-chip rows: 05n wraps each li's "Keys - Description" prose into
+           .hk-keys (a <kbd> per alternative) + .hk-desc on first open. */
+        /* Padding in, keys pulled back out: words that drop under the keys
+           sit indented, so each row still reads keys-first. */
+        .hotkey-body li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 2px 0 2px 16px; }
+        .hotkey-body li .hk-keys { margin-left: -16px; flex: 0 1 auto; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 5px; }
+        .hotkey-body li .hk-or { font-size: 11px; opacity: 0.6; }
         .hotkey-body li kbd {
             flex: 0 0 auto;
             font-family: inherit;
@@ -1120,7 +1127,7 @@
             padding: 1px 6px;
             white-space: nowrap;
         }
-        .hotkey-body li .hk-desc { flex: 1 1 auto; min-width: 0; }
+        .hotkey-body li .hk-desc { flex: 1 1 15ch; min-width: 15ch; }
         .hotkey-footer a {
             color: inherit;
             text-decoration: underline dotted;
@@ -1128,6 +1135,7 @@
         }
         .hotkey-footer a:hover { text-decoration-style: solid; }
         .hotkey-footer {
+            flex: 0 0 auto;
             padding: 8px 16px;
             border-top: 1px solid rgba(255,255,255,0.08);
             font-size: 11px;

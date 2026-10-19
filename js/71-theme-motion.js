@@ -17,7 +17,7 @@
 //          170 ms strike flicker on a local turn-on) plus the press surge,
 //          and while Ignite burns, the light it throws on the top-bar panes
 //          around it (falloff e^(-d / 220 px)).
-//   --dp   every drawer (.sidebar-section): the drawer spring (180 / 0.85).
+//   --dp   every drawer (.sidebar-section): the tray spring (140 / 0.85).
 //          Opening and closing glide (study setDrawer / stepDrawers) without
 //          animating layout: the layout changes once per toggle, one
 //          measurement is taken then, and the motion is transforms only
@@ -32,8 +32,9 @@
 //          so programmatic writes always fall back to the live --val.
 //   --wc-rot  the atoms: each tray's rosette, one per group that opens with
 //          its own bead row (css/35), and the hub of each top-bar dial. A
-//          flywheel: every change (a drag, a key, a click, another player's
-//          change) adds to its speed; it coasts down when you stop.
+//          flywheel: every change (a drag, a key, another player's change;
+//          never a bare press) adds to its speed, a little at first and
+//          more the longer you keep at it; it coasts down when you stop.
 //   --ga / --pc / --tgc  another player's change (06e .mp-peer-touch): glow in
 //          their colour, τ 1.4 s, and their name chip beside the control.
 //
@@ -55,7 +56,10 @@
     var T = 0;
 
     // ── Study 1207-1242 ────────────────────────────────────────────────
-    var PROF = { local: { k: 600, z: 0.7 }, drawer: { k: 180, z: 0.85 }, remote: { k: 120, z: 0.95 } };
+    // tray: the sidebar drawers and their column's glide, the drawer spring
+    // slowed ~100 ms (a 680 px tray lands in ~790 ms, was ~690). The other
+    // scripts' dropdowns and screens keep the study's drawer profile.
+    var PROF = { local: { k: 600, z: 0.7 }, drawer: { k: 180, z: 0.85 }, tray: { k: 140, z: 0.85 }, remote: { k: 120, z: 0.95 } };
     function Spring(x, p) { this.x = x; this.v = 0; this.t = x; this.p = p || PROF.local; }
     Spring.prototype.to = function (t, p) { if (p) this.p = p; this.t = t; if (RM) { this.x = t; this.v = 0; } };
     Spring.prototype.settled = function () { return this.x === this.t && this.v === 0; };
@@ -83,23 +87,28 @@
         }
         return v;
     };
-    // Atoms (study 1234-1242), with momentum. The study holds a 2.4 rad/s
-    // target for 1.1 s per kick, so steady interaction never builds and a
-    // drag just peters out. Here a kick adds an impulse to the target speed
-    // (J, scaled by the time since the last kick up to TREF, so a drag builds
-    // at the same rate whatever the frame or event rate; capped at GMAX), the
-    // target decays with the study's 0.42 s, and the speed eases toward it
-    // with the same 0.42 s. Kicks apply at most once a frame. One change:
-    // ~2.2 rad/s for about a second (the study's spin). A steady drag: ~8
-    // rad/s (3.4x) within 2 s. Let go: it coasts under 0.25 rad/s in ~2.2 s.
+    // Atoms (study 1234-1242), with momentum. A kick adds an impulse to the
+    // target speed (scaled by the time since the last kick up to TREF, so a
+    // drag builds at the same rate whatever the frame or event rate; capped
+    // at GMAX), the target decays with the study's 0.42 s, and the speed
+    // eases toward it with the same 0.42 s. Kicks apply at most once a frame.
+    // The impulse grows with heat h: seconds of sustained change (gaps under
+    // TREF count, longer ones don't) over HFULL, J = J0 + (J1 - J0) h^2. Idle
+    // time past TREF cools it (HT). So one change is a tease (~0.4 rad/s,
+    // ~25 deg), a short drag a gentle turn, and only ~5 s of keeping at it
+    // reaches full speed (~8 rad/s), the easter egg; ~3 s idle and the next
+    // nudge is a tease again. Let go: it coasts down in ~2 s.
     // Reduced motion: never spins.
-    var FLY = { J: 6, TREF: 0.3, GMAX: 9, TG: 0.42, TW: 0.42 };
-    function newAtom() { return { a: 0, w: 0, g: 0, last: -9, kick: false }; }
+    var FLY = { J0: 1, J1: 6, TREF: 0.3, GMAX: 9, TG: 0.42, TW: 0.42, HFULL: 5, HT: 1.5 };
+    function newAtom() { return { a: 0, w: 0, g: 0, h: 0, last: -9, kick: false }; }
     function kickAtom(at) { if (at && !RM) at.kick = true; }
     function stepAtom(at, dt, now) {
         if (at.kick) {
             at.kick = false;
-            at.g = Math.min(FLY.GMAX, at.g + FLY.J * Math.min(1, (now - at.last) / FLY.TREF));
+            var gap = now - at.last;
+            at.h = Math.min(1, at.h * Math.exp(-Math.max(0, gap - FLY.TREF) / FLY.HT) + Math.min(gap, FLY.TREF) / FLY.HFULL);
+            var J = FLY.J0 + (FLY.J1 - FLY.J0) * at.h * at.h;
+            at.g = Math.min(FLY.GMAX, at.g + J * Math.min(1, gap / FLY.TREF));
             at.last = now;
         }
         if (RM) { at.g = at.w = 0; return; }
@@ -239,7 +248,7 @@
         if (!create) return null;
         var open = !sec.classList.contains('collapsed');
         var r = { kind: 'drawer', el: sec, title: sec.querySelector('.section-title'), body: sec.querySelector(':scope > .section-body'),
-            sp: new Spring(open ? 1 : 0, PROF.drawer), open: open, moving: false, H: 0, c: null, t0: 0,
+            sp: new Spring(open ? 1 : 0, PROF.tray), open: open, moving: false, H: 0, c: null, t0: 0,
             cl: null, tint: null, last: '', lastL: '', lastC: '' };
         sec._wcd = r;
         sec.style.setProperty('--dp', open ? '1' : '0');
@@ -251,7 +260,7 @@
         if (!list) return null;
         if (list._wcc) return list._wcc;
         var scroller = sec.closest('#sidebar-left, #sidebar-right') || list;
-        var c = { kind: 'column', list: list, scroller: scroller, secs: [], moving: new Set(), w: new Spring(0, PROF.drawer), za: 0,
+        var c = { kind: 'column', list: list, scroller: scroller, secs: [], moving: new Set(), w: new Spring(0, PROF.tray), za: 0,
             on: false, tail: 0, pre: null, cache: null };
         list._wcc = c;
         // The scroll position before a toggle: read as a header is clicked
@@ -318,7 +327,7 @@
             r.el.classList.toggle('wc-closing', !open);
             r.el.classList.add('wc-mv');
             inertWhileClosing(r, !open);
-            r.sp.to(open ? 1 : 0, PROF.drawer);
+            r.sp.to(open ? 1 : 0, PROF.tray);
             r.moving = true; r.c = c; r.t0 = performance.now();
             follow(r, true);
             wake(r);
@@ -346,7 +355,7 @@
         var before = c.pre != null ? c.pre : c.cache;
         c.pre = null; c.cache = s;
         c.za = c.za * Math.max(0, c.w.x) + (before == null ? 0 : s - before);
-        c.w = new Spring(1, PROF.drawer); c.w.to(0, PROF.drawer);
+        c.w = new Spring(1, PROF.tray); c.w.to(0, PROF.tray);
         // Each closing drawer collapses its layout when it settles; at the end
         // of a scrolled column that pulls the scroll back. Predict it and lead
         // into it (earliest toggle settles first).
@@ -375,7 +384,7 @@
         follow(r, false);
         r.el.classList.remove('wc-closing', 'wc-mv');
         inertWhileClosing(r, false);
-        if (!stepDrawer(r, 0)) wake(r);        // the lamp lands now; a tint still fading keeps it awake
+        if (!stepDrawer(r, 0)) wake(r);       // the lamp lands now; a tint still fading keeps it awake
     }
     // No frames (the loop stalled, the page went to the background): land
     // every moving drawer at once rather than leave one half open.
@@ -446,7 +455,7 @@
     function endColumn(c) {
         c.secs.forEach(function (s) { if (s._wcy) { s.style.translate = ''; s._wcy = ''; } });
         c.scroller.classList.remove('wc-anim');
-        c.za = 0; c.w = new Spring(0, PROF.drawer); c.on = false;
+        c.za = 0; c.w = new Spring(0, PROF.tray); c.on = false;
         c.moving.forEach(function (r) { r.cl = null; });
         c.moving.clear();
     }
@@ -472,7 +481,7 @@
         '.section-body > div > .brush-section-label:first-child:not([for]):not(.brush-time-group > *)',
         '.brush-settings-panel > .brush-fold', '.brush-settings-panel > .brush-fold ~ .brush-section-label',
         '.layers-subsection', '.layers-options-group', '.mutation-locks', '#layersPanel > .layer-item',
-        '.fx-cluster + .fx-group', '.control-group:has(#saveSettingsBtn)', 'div:has(> #sidebarPresetList)',
+        '.fx-cluster + .fx-group', '.fx-group + .fx-cluster', '.control-group:has(#saveSettingsBtn)', 'div:has(> #sidebarPresetList)',
         // The Multi-brush count, moved above the brush screen (js/73): the
         // study opens a second group there (bead row and rosette).
         '.wcb-mb > .mixer-channel[data-ui-key="Multi-Brush"]'
@@ -562,33 +571,51 @@
     function seeRange(t) {
         if (!(t && t.type === 'range' && inScope(t))) return;
         var r = rangeRec(t);
+        t._wck = t.value;                       // the value a change is measured from
         // A settled spring re-seats on the live value (a preset or a remote
         // write may have moved it without an event).
         if (r.sp.settled()) { var n = norm(t); r.sp.x = r.sp.t = n; }
     }
-    var held = null;
+    var held = null, pressJump = null;
     document.addEventListener('pointerdown', function (e) {
         seeRange(e.target);
         if (e.target && e.target.type === 'range') {
             var t = e.target;
+            // The press itself (a dial or track click jumping the value)
+            // doesn't spin; the drag after it does.
+            pressJump = t;
             // The first jump (a click on the track) still springs; the drag after it rides the hand.
             setTimeout(function () { if (held === null) held = t; }, 0);
         }
     }, true);
-    ['pointerup', 'pointercancel'].forEach(function (ev) { document.addEventListener(ev, function () { held = null; }, true); });
+    ['pointerup', 'pointercancel'].forEach(function (ev) { document.addEventListener(ev, function () { held = null; pressJump = null; }, true); });
+    document.addEventListener('pointermove', function () { pressJump = null; }, true);
     document.addEventListener('focusin', function (e) { seeRange(e.target); }, true);
     document.addEventListener('input', function (e) {
         var inp = e.target;
         if (!inp || !inScope(inp)) return;
         // Every change spins its atom, a held drag included (study setLocal
-        // kicks on each one); another player's glides arrive here too.
-        kickFor(inp);
-        if (inp.type !== 'range') return;
+        // kicks on each one); another player's glides arrive here too. Not
+        // the press's own jump, and not an input that left the value as it was.
+        if (inp.type !== 'range') { kickFor(inp); return; }
+        if (inp.value !== inp._wck) { inp._wck = inp.value; if (pressJump !== inp) kickFor(inp); }
         var r = rangeRec(inp);
         // While the pointer holds this range the hand IS the value: the spring
         // sits on it (no per-frame write during a drag; the drag forced a style
         // recalc a frame). Keys, track clicks and remote changes still spring.
         if (held === inp) { r.sp.x = r.sp.t = norm(inp); r.sp.v = 0; if (r.last) { inp.style.removeProperty('--sp'); inp.style.removeProperty('--spp'); r.last = ''; } return; }
+        // A resting spring may still hold a value from before a silent write
+        // (Reset, canvas Ctrl+wheel, a preset's audio sliders): start from
+        // what is on screen. This listener captures, so the app's own handler
+        // has not rewritten --val yet; it still holds the shown value.
+        if (r.sp.settled()) {
+            var shown = parseFloat(inp.style.getPropertyValue('--val'));
+            if (isFinite(shown)) {
+                var mn = parseFloat(inp.min), mx = parseFloat(inp.max);
+                if (!isFinite(mn)) mn = 0; if (!isFinite(mx)) mx = 100;
+                if (mx > mn) { r.sp.x = r.sp.t = Math.max(0, Math.min(1, (shown - mn) / (mx - mn))); r.sp.v = 0; }
+            }
+        }
         r.sp.to(norm(inp), remoteNow() ? PROF.remote : PROF.local);
         if (r.sp.settled()) return;
         wake(r);
@@ -599,7 +626,7 @@
         // A checkbox / radio inside a registered pane: its state is a
         // property, not an attribute, so the observer can't see it.
         var p = paneOf(t); if (p && p._wc) syncPane(p);
-        kickFor(t);
+        if (t.type !== 'range') kickFor(t);           // a range's input events already spun it
     }, true);
     // Buttons, radios and option rows inside a drawer change things too.
     document.addEventListener('click', function (e) {

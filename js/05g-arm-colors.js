@@ -287,10 +287,49 @@
             return out;
         }
 
-        function symmetryTransforms(mode, n, dx, dy, mir) {
+        // ── Mandala fold (34-mandala-mode) ────────────────────────────────
+        // Mandala Overlay's own mirroring: the dihedral group D_md about the
+        // canvas centre, md turns plus md reflections across the fold line at
+        // angle 0 (the horizontal, the source wedge's lower edge). Applied
+        // AFTER Multi-Brush and the stroke mirror, so a 3-arm brush in a
+        // 6-wedge mandala is every arm folded into every wedge. It rides like
+        // the stroke mirror, as a per-stroke value (window.__mandalaFold, the
+        // wedge count, 0 = off) that replays, recordings and peer dabs pin to
+        // the painter's. It used to be the Kaleido display fold's job, which
+        // is why the mode had to switch Kaleido on.
+        var MANDALA_MAX = 24;      // the Wedges slider's max
+        function mandalaFoldOf(v) {
+            v = (typeof v === 'number' && isFinite(v)) ? (v | 0) : 0;
+            return (v >= 2 && v <= MANDALA_MAX) ? v : 0;
+        }
+        window.mandalaFoldOf = mandalaFoldOf;
+        function foldMandala(list, md) {
+            if (!md) return list;
+            var seen = Object.create(null);
+            var out = [];
+            for (var k = 0; k < md; k++) {
+                var R = symRot((Math.PI * 2 * k) / md);
+                var G = [R, symCompose(R, SYM_MIRROR_Y)];
+                for (var g = 0; g < 2; g++) {
+                    for (var i = 0; i < list.length; i++) {
+                        // Same matrix-only dedup as the stroke mirror: Multi-Brush
+                        // arms that already sit on a wedge turn would double-dose.
+                        var m = symCompose(G[g], list[i].m);
+                        var dk = m.map(function (q) { return Math.round(q * 1e6); }).join(',');
+                        if (seen[dk]) continue;
+                        seen[dk] = 1;
+                        out.push({ m: m, arm: list[i].arm });
+                    }
+                }
+            }
+            return out;
+        }
+
+        function symmetryTransforms(mode, n, dx, dy, mir, md) {
             n = Math.max(1, n | 0);
             mir = mir | 0;
             if (mir < 0 || mir > 3) mir = 0;
+            md = mandalaFoldOf(md);
             if (mode === 'rake') {
                 // Local, not centre-based: copies ride alongside the stroke like
                 // the bristles of a rake. Pure translation, so every bristle
@@ -337,9 +376,9 @@
                 // happens here rather than in the cache below. A rake bristle
                 // is a pure translation in centre-relative space, so composing
                 // the mirror after it gives a properly mirrored rake line.
-                return foldStrokeMirror(rk, mir);
+                return foldMandala(foldStrokeMirror(rk, mir), md);
             }
-            var key = mode + '|' + n + '|' + mir;
+            var key = mode + '|' + n + '|' + mir + '|' + md;
             var hit = symCache[key];
             if (hit) return hit;
 
@@ -372,7 +411,7 @@
                     out.push({ m: variants[v], arm: a });
                 }
             }
-            out = foldStrokeMirror(out, mir);
+            out = foldMandala(foldStrokeMirror(out, mir), md);
             if (symCacheN > 200) { symCache = Object.create(null); symCacheN = 0; }
             symCache[key] = out;
             symCacheN++;
@@ -661,12 +700,14 @@
             // a path layer, an animation — must keep painting where it was
             // told even while the painter holds a mirror-bound button.
             const strokeMir = window.__brushTipOn ? (window.__strokeMirrorPin | 0) : 0;
-            const transforms = symmetryTransforms(config.SYMMETRY_MODE, animationMultiplier, dx, dy, strokeMir);
+            // Mandala Overlay's fold, same gate (see foldMandala).
+            const strokeMd = window.__brushTipOn ? mandalaFoldOf(window.__mandalaFold) : 0;
+            const transforms = symmetryTransforms(config.SYMMETRY_MODE, animationMultiplier, dx, dy, strokeMir, strokeMd);
             // Hold symmetry (05j) holds the symmetry the paint is laid with,
             // which is this call's and not always the panel's: a replay
             // paints with the arm count and mirror it was recorded with.
             if (typeof window.__symHoldNotePaint === 'function') {
-                window.__symHoldNotePaint(config.SYMMETRY_MODE, animationMultiplier, strokeMir);
+                window.__symHoldNotePaint(config.SYMMETRY_MODE, animationMultiplier, strokeMir, strokeMd);
             }
             // Stay oriented to the center: the SOURCE dab's pose offset, for
             // splat() to add to BRUSH_ANGLE on every arm. User strokes only —

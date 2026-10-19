@@ -70,7 +70,10 @@ const KEYS = {
         check('S2 Tab walks its buttons clockwise: Top, Right, Bottom', round.join() === 'top,right,bottom', round);
         s = await tab();
         const gone = await d.ev(`Math.round(document.getElementById('skipMenu').getBoundingClientRect().width)`);
-        check('S2 ...then on into the page (the top bar), and the menu goes out of sight', !s.open && s.region === 'top' && gone <= 1, { s, gone });
+        // Into the page: the top bar, or, when it is docked in the right sidebar
+        // (js/13: the bar would wrap at this width), the left sidebar, first in page order.
+        const docked = await d.ev("document.body.classList.contains('compact-ui')");
+        check('S2 ...then on into the page (the top bar, or the left bar when it is docked), and the menu goes out of sight', !s.open && s.region === (docked ? 'left' : 'top') && gone <= 1, { s, gone, docked });
         const back = [];
         for (let i = 0; i < 2; i++) back.push((await tab(['shift'])).on);
         check('S3 Shift+Tab steps back into it: Bottom, Right', back.join() === 'bottom,right', back);

@@ -23,6 +23,15 @@
 @font-face { font-family: "Michroma"; font-style: normal; font-weight: 400; font-display: swap;
     src: url(../assets/fonts/michroma-latin-ext-400-normal.woff2) format("woff2");
     unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+/* The label face (Gabriel 2026-10-17: Michroma read too clean and thin for
+   labels and small buttons). Plus Jakarta Sans, heavier: every rule that
+   asks the label face for 400 gets the Bold, 700 the ExtraBold, so the ~70
+   "font: 400 …" rules need no edit. size-adjust evens its smaller look
+   against the Michroma sizes those rules were tuned for. */
+@font-face { font-family: "WC Label"; font-style: normal; font-weight: 100 500; font-display: swap; size-adjust: 112%;
+    src: url(../assets/fonts/plus-jakarta-sans-700.ttf) format("truetype"); }
+@font-face { font-family: "WC Label"; font-style: normal; font-weight: 600 900; font-display: swap; size-adjust: 112%;
+    src: url(../assets/fonts/plus-jakarta-sans-800.ttf) format("truetype"); }
 @font-face { font-family: "Share Tech Mono"; font-style: normal; font-weight: 400; font-display: swap;
     src: url(../assets/fonts/share-tech-mono-latin-400-normal.woff2) format("woff2"); }
 @font-face { font-family: "Libre Franklin"; font-style: normal; font-weight: 400; font-display: swap;
@@ -104,7 +113,9 @@ html[data-theme="walnut-copper"] {
     --ui-danger: #ff6a4d;
     --ui-focus: #ffb547;
     --ui-font-body: "Libre Franklin", "Helvetica Neue", Arial, sans-serif;
-    --ui-font-display: "Michroma", "Eurostile", "Arial Black", sans-serif;
+    --ui-font-display: "WC Label", "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    /* Titles too (Gabriel 2026-10-18: Michroma read too clean everywhere). */
+    --ui-font-title: var(--ui-font-display);
     --ui-font-mono: "Share Tech Mono", ui-monospace, "SFMono-Regular", monospace;
 
     background: var(--room);
@@ -115,44 +126,117 @@ html[data-theme="walnut-copper"] body {
     background: var(--room);
 }
 
-/* ── Wood: the two sidebars (herringbone, 566 px tile = 100 px plank) ── */
-html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) {
+/* ── Wood: one carcass, book-matched (herringbone, 566 px tile) ───────
+   2026-10-18 (Gabriel): the top bar and both sidebars are one piece of
+   furniture. The veneer is book-matched down the middle of the window, the
+   way deco cabinets are: the left half laid from the window's left edge,
+   the right half its mirror image (herringbone-walnut-2048-flop.jpg) laid
+   from the right edge, meeting at an inlay down the bar's centre (css/33).
+   So the left sidebar shares the bar's left half's grid and the right
+   sidebar the right half's, at any window width, with nothing measured:
+   each panel's wood is anchored to the window edge it touches. Vertically
+   the bar's wood is anchored to its bottom edge and the sidebars' to their
+   tops, so the grain runs on across the join (the tile repeats seamlessly).
+   (Tried first: one window grid via background-attachment: fixed, which
+   Chromium lays out locally under the panels' translateZ(0); then offsets
+   written from script, which went stale whenever a panel moved without
+   resizing. Both left the right join off.)
+   Sheen: one lit and one dark half-column per 70.75 px tile, mirrored on
+   the right. Light: the sidebars carry one even shade (--wc-col-tone) and
+   no light of their own; the bar is lit in its middle only, and its ends
+   fall to the same shade over the sidebars' widths (css/33). */
+html[data-theme="walnut-copper"] {
+    --wood-herringbone-r: url(../assets/textures/herringbone-walnut-2048-flop.jpg);
+    --sheen-l: repeating-linear-gradient(90deg, rgba(255, 168, 96, 0.09) 0 35.375px, rgba(36, 14, 4, 0.11) 35.375px 70.75px);
+    --sheen-r: repeating-linear-gradient(90deg, rgba(36, 14, 4, 0.11) 0 35.375px, rgba(255, 168, 96, 0.09) 35.375px 70.75px);
+    --wc-col-tone-a: 0.16;
+    --wc-col-tone: linear-gradient(rgba(8, 4, 2, var(--wc-col-tone-a)), rgba(8, 4, 2, var(--wc-col-tone-a)));
+}
+/* Left: from the window's left edge (the column's left edge is it). */
+html[data-theme="walnut-copper"] :is(#sidebar-left, .lsb-head) {
     background-color: #2a170c;
-    background-image: var(--key-light), var(--sheen-side), var(--wood-herringbone);
-    background-size: auto, auto, 566px 566px;
-    background-position: 0 0, -26.55px 0, 0 0;
-    /* The one copper line per column; nothing inside draws a second box. */
-    box-shadow: inset 0 0 0 1.5px var(--cu), inset 0 0 0 2.5px rgba(0, 0, 0, 0.45), inset 0 0 30px rgba(0, 0, 0, 0.45);
+    background-image: var(--wc-col-tone), var(--sheen-l), var(--wood-herringbone);
+    background-size: auto, 70.75px 100%, 566px 566px;
+    background-position: 0 0, -26.55px 0, left top;
+    background-origin: border-box;
+}
+/* Right: the mirror image, from the window's right edge. */
+html[data-theme="walnut-copper"] #sidebar-right {
+    background-color: #2a170c;
+    background-image: var(--wc-col-tone), var(--sheen-r), var(--wood-herringbone-r);
+    background-size: auto, 70.75px 100%, 566px 566px;
+    background-position: 0 0, right -26.55px top 0, right top;
+    background-origin: border-box;
+}
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) {
+    /* The one copper line per column (its canvas edge, set per column
+       below); nothing inside draws a second box. */
     border-color: transparent;
     /* Opaque wood: no blur behind it (and no blur on large panels, per spec). */
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     color: var(--ui-text);
 }
+/* Edge to edge, both columns (Gabriel 2026-10-18): the drawer fronts run
+   to the outer edge; 2.5 px is kept on the canvas side only, for the copper
+   line and its shadow. Native scrollbars are hidden: a scrollbar takes
+   width and squeezes the column. js/77 lays a copper rail OVER the column
+   instead (.wc-rail, below). Wheel, keys and touch scroll natively. */
+html[data-theme="walnut-copper"] :is(#sidebar-right, #sidebar-left) { scrollbar-width: none; }
 html[data-theme="walnut-copper"] #sidebar-right {
-    padding: 10px 8px;
-    scrollbar-color: var(--cu) transparent;
+    /* Copper on the canvas-facing (left) edge only. */
+    box-shadow: inset 1.5px 0 0 0 var(--cu), inset 2.5px 0 0 0 rgba(0, 0, 0, 0.45);
+    padding: 10px 0 10px 2.5px;
 }
-html[data-theme="walnut-copper"] #sidebar-right::-webkit-scrollbar-track { background: transparent; }
-html[data-theme="walnut-copper"] #sidebar-right::-webkit-scrollbar-thumb { background: var(--cu); border-radius: 3px; }
+/* Copper on the canvas-facing (right) edge only. */
+html[data-theme="walnut-copper"] #sidebar-left {
+    box-shadow: inset -1.5px 0 0 0 var(--cu), inset -2.5px 0 0 0 rgba(0, 0, 0, 0.45);
+    padding-right: 2.5px;
+}
+
+/* The overlay rail (js/77): a slim copper thumb laid over a column's outer
+   right edge, in window px (fixed, on <body>, so the column's zoom and
+   scroll do not move it). Faint at rest, bright while the column scrolls,
+   when hovered or dragged; gone when nothing overflows. Only the thumb
+   takes the pointer, through a wider transparent hit area. Decorative to
+   assistive tech (aria-hidden): the column scrolls natively. */
+html[data-theme="walnut-copper"] .wc-rail {
+    position: fixed;
+    z-index: 140;
+    width: 13px;
+    margin-left: -4px;
+    box-sizing: border-box;
+    border-inline: 4px solid transparent;
+    background: var(--cu) padding-box;
+    border-radius: 6px;
+    opacity: 0;
+    cursor: grab;
+    touch-action: none;
+    transition: opacity 0.25s;
+}
+html[data-theme="walnut-copper"] .wc-rail[data-on] { opacity: 0.45; }
+html[data-theme="walnut-copper"] .wc-rail[data-on][data-busy],
+html[data-theme="walnut-copper"] .wc-rail[data-on]:hover { opacity: 0.95; background-color: var(--cu-hi); }
+html[data-theme="walnut-copper"] .wc-rail[data-drag] { cursor: grabbing; }
+html[data-theme="walnut-copper"] .wc-rail:not([data-on]) { pointer-events: none; }
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] .wc-rail { background: CanvasText padding-box; }
+}
 
 /* The left bar's sticky head sits on the same wood, so it does not read as
    a separate black strip when the body scrolls under it. */
 html[data-theme="walnut-copper"] .lsb-head {
-    background-color: #2a170c;
-    background-image: var(--key-light), var(--sheen-side), var(--wood-herringbone);
-    background-size: auto, auto, 566px 566px;
-    background-position: 0 0, -26.55px 0, 0 0;
     border-bottom: 1px solid rgba(214, 140, 92, 0.35);
 }
 
-/* ── Wood: the top bar (herringbone, 679 px tile = 120 px slat) ── */
+/* ── Wood: the top bar ──────────────────────────────────────────────
+   Its wood and light are on its two book-matched halves (css/33 ::before,
+   ::after); the bar itself is the plain ground under them. No rule under
+   the bar: it is one carcass with the columns (a border there would also
+   show as a hairline under the halves, which fill the padding box). */
 html[data-theme="walnut-copper"] #mixer-strip {
-    background-color: #2a170c;
-    background-image: var(--key-light), var(--sheen-bar), var(--wood-herringbone);
-    background-size: auto, auto, 679px 679px;
-    background-position: 0 0, -31.84px 0, 0 0;
-    border-bottom-color: rgba(0, 0, 0, 0.6);
+    background: #2a170c;
+    border-bottom: 0;
     color: var(--ui-text);
 }
 
@@ -224,15 +308,20 @@ html[data-theme="walnut-copper"] .anim-toggle-row {
 html[data-theme="walnut-copper"] .sidebar-section .section-title {
     background-image: none !important;
 }
-/* The names fade in slowly and ease back out over the study's 1.6 s on a
-   gentle curve (the study's .cabR .dtitle, 564), only while the egg comes and
+/* The names fade in slowly and ease back out, only while the egg comes and
    goes: js/37 holds [data-idle-wake] for the fade-out, so a hover on a drawer
-   name stays instant the rest of the time. */
+   name stays instant the rest of the time. The fade-out is staggered: js/37
+   gives each visible name --egg-wake-delay by its place in the column (110 ms
+   apart), so the colour drains from the top drawer down, each name on a soft
+   ease-in-out over 1.8 s (js/37 WAKE_DUR_MS matches it). */
 html[data-theme="walnut-copper"] #sidebar-right[data-idle-glow] .sidebar-section[data-group] .section-title {
     transition: -webkit-text-fill-color 2.6s cubic-bezier(0.4, 0, 0.2, 1), color 2.6s cubic-bezier(0.4, 0, 0.2, 1), text-shadow 2.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 html[data-theme="walnut-copper"] #sidebar-right[data-idle-wake] .sidebar-section[data-group] .section-title {
-    transition: -webkit-text-fill-color 1.6s cubic-bezier(0.33, 0, 0.2, 1), color 1.6s cubic-bezier(0.33, 0, 0.2, 1), text-shadow 1.6s cubic-bezier(0.33, 0, 0.2, 1);
+    transition-property: -webkit-text-fill-color, color, text-shadow;
+    transition-duration: 1.8s;
+    transition-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+    transition-delay: var(--egg-wake-delay, 0ms);
 }
 @media (prefers-reduced-motion: reduce) {
     html[data-theme="walnut-copper"] #sidebar-right:is([data-idle-glow], [data-idle-wake]) .sidebar-section .section-title { transition: none; }

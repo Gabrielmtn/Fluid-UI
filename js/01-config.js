@@ -50,12 +50,12 @@
         
         const defaultPalettes = [
             { name: "Ross' Mountain ", colors: { primary: "#4A90A4", secondary: "#E8E8D0", accent1: "#5F4E3B", accent2: "#2C5F2D", highlight: "#FFFACD" } },
-            { name: "Forest Serenity", colors: { primary: "#2C5F2D", secondary: "#4A7856", accent1: "#8B4513", accent2: "#FFD700", highlight: "#F0EAD6" } },
+            { name: "Ross' Forest", colors: { primary: "#2C5F2D", secondary: "#4A7856", accent1: "#8B4513", accent2: "#FFD700", highlight: "#F0EAD6" } },
             { name: "Ross' Sunset", colors: { primary: "#FF6347", secondary: "#FFD700", accent1: "#FF8C00", accent2: "#8B4789", highlight: "#FFF5EE" } },
             { name: "Ross' Ocean", colors: { primary: "#4A90A4", secondary: "#5F9EA0", accent1: "#E8E8D0", accent2: "#2F4F4F", highlight: "#87CEEB" } }
         ];
         const curatedPalettes = [...defaultPalettes];
-        // The palette a fresh install starts on: "Forest Serenity" (index 1), the
+        // The palette a fresh install starts on: "Ross' Forest" (index 1, Forest Serenity until 2026-10-18), the
         // swatch tray of the default look (2026-09-24). 12-save-load falls back to
         // it when no palette index was ever saved, and baselines presets on it.
         const DEFAULT_PALETTE_INDEX = 1;
@@ -322,6 +322,11 @@
             if (!list.length) return -1;
             return addOwnPalette(freeName(String(name || 'From image').trim() || 'From image'), list);
         };
+        // The colour picker's "+ New palette" names it inline itself.
+        window.addNamedPalette = function (name, colours) {
+            const list = uniqueColors((colours || []).map(hexToFull)).filter(h => /^#[0-9A-F]{6}$/.test(h));
+            return addOwnPalette(freeName(String(name || '').trim() || 'Untitled'), list.length ? list : [pickerHex()]);
+        };
         function duplicatePalette(idx) {
             const colors = getPaletteColorsForIndex(idx);
             const i = addOwnPalette(freeName(getPaletteName(idx)), colors.length ? colors : [pickerHex()]);
@@ -545,7 +550,7 @@
             const list = paletteListEl;
             if (!list) return;
             if (e.target && e.target.tagName === 'INPUT') return;   // renaming
-            const items = Array.prototype.slice.call(list.querySelectorAll('.palette-new-btns button, .palette-option'));
+            const items = Array.prototype.slice.call(list.querySelectorAll('.palette-new-cap, .palette-new-btns:not([hidden]) button, .palette-option'));
             const at = items.indexOf(document.activeElement);
             const go = (i) => { const n = items[Math.max(0, Math.min(items.length - 1, i))]; if (n) { n.focus({ preventScroll: true }); n.scrollIntoView({ block: 'nearest' }); } };
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePaletteList(); }
@@ -570,12 +575,27 @@
             const PFI = window.PaletteFromImage;
             const newRow = document.createElement('div');
             newRow.className = 'palette-new-row';
-            const cap = document.createElement('div');
+            // A field of its own (Gabriel 2026-10-18: the heading looked
+            // clickable): it opens the three sources under it.
+            const cap = document.createElement('button');
+            cap.type = 'button';
             cap.className = 'palette-new-cap';
-            cap.textContent = '+ New palette';
+            cap.innerHTML = '<span>+ New palette</span><span class="palette-new-chev" aria-hidden="true">▾</span>';
+            cap.setAttribute('aria-expanded', 'false');
             newRow.appendChild(cap);
             const btns = document.createElement('div');
             btns.className = 'palette-new-btns btn-sm';
+            btns.id = 'paletteNewSources';
+            btns.hidden = true;
+            cap.setAttribute('aria-controls', btns.id);
+            cap.addEventListener('click', () => {
+                const open = btns.hidden;
+                btns.hidden = !open;
+                cap.setAttribute('aria-expanded', open ? 'true' : 'false');
+                newRow.classList.toggle('is-open', open);
+                if (open && btns.firstChild) btns.firstChild.focus({ preventScroll: true });
+                placePaletteList();
+            });
             [
                 { id: 'paletteNewBtn', label: 'Brush color', title: 'A new palette that starts with the brush color', fn: newPalette },
                 PFI ? { label: 'Image…', title: 'A new palette from a picture. You can also drop one on the Palettes section.', fn: () => PFI.pickFile() } : null,
@@ -1406,7 +1426,13 @@
             if (underbar) {
                 const ubcs = getComputedStyle(underbar);
                 if (ubcs.display !== 'none' && ubcs.visibility !== 'hidden') {
-                    const ubTop = underbar.getBoundingClientRect().top - areaRect.top;
+                    // Where it rests, not where a slide has it (js/21 brings
+                    // it back up from below on the way out of focus mode).
+                    let slide = 0;
+                    if (ubcs.transform && ubcs.transform !== 'none') {
+                        try { slide = new DOMMatrixReadOnly(ubcs.transform).m42; } catch (_) {}
+                    }
+                    const ubTop = underbar.getBoundingClientRect().top - slide - areaRect.top;
                     if (ubTop > 0) height = Math.min(height, ubTop);
                 }
             }

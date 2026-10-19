@@ -76,9 +76,9 @@ These models analyze images the user supplies (segmentation masks and
 depth maps). They do not generate imagery.
 
 
-7. Fonts: Michroma, Libre Franklin, Share Tech Mono
----------------------------------------------------
-The Walnut & Copper interface theme bundles three typefaces as woff2 files
+7. Fonts: Michroma, Libre Franklin, Share Tech Mono, Plus Jakarta Sans
+---------------------------------------------------------------------
+The Walnut & Copper interface theme bundles four typefaces (woff2, and TrueType for Plus Jakarta Sans)
 under assets/fonts/, each under the SIL Open Font License 1.1
 (https://openfontlicense.org). Their full licence texts ship beside them as
 assets/fonts/LICENSE-<font>.txt.
@@ -86,4 +86,6 @@ assets/fonts/LICENSE-<font>.txt.
 - Libre Franklin: Copyright 2020 The Libre Franklin Project Authors.
 - Share Tech Mono: Copyright (c) 2012 Carrois Type Design, Ralph du Carrois
   (Reserved Font Name "Share").
+- Plus Jakarta Sans: Copyright 2020 The Plus Jakarta Sans Project Authors
+  (https://github.com/tokotype/PlusJakartaSans); Bold and ExtraBold statics.
 Files taken from the Fontsource packages (@fontsource/*, 5.3.0).

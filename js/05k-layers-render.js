@@ -54,7 +54,7 @@
                                 <span class="layer-collapse-caret" aria-hidden="true"></span>
                                 <div class="layer-thumbnail"${o.thumbStyle ? ` style="${o.thumbStyle}"` : ''}>${o.thumbText || ''}</div>
                                 <div class="layer-info">
-                                    <input type="text" class="layer-title" value="${window.escHtml(o.title)}"${titleAttrs}>
+                                    <input type="text" class="layer-title" value="${window.escHtml(String(o.title || '').replace(/^\s*🧱\s*/u, ''))}"${titleAttrs}>
                                 </div>
                                 ${trash}
                                 <div class="layer-controls">

@@ -140,8 +140,29 @@
     // [data-idle-wake] stays for the length of the theme's fade-out, so the
     // theme can ease only that fade and keep every other colour change (a
     // hover) instant. Attribute writes per idle transition; nothing per frame.
-    var WAKE_FADE_MS = 1700;
+    //
+    // The fade-out is staggered top to bottom: on waking, each visible drawer
+    // name gets --egg-wake-delay by its place on screen, so the colour drains
+    // down the column one name after another. Hidden drawers are skipped so
+    // the cascade has no dead beats. WAKE_DUR_MS matches the theme's
+    // transition-duration (css/30, "Idle easter egg").
+    var WAKE_DUR_MS  = 1800;
+    var WAKE_STEP_MS = 110;
     var wakeT = 0;
+    function staggerWake() {
+        var titles = [].slice.call(nav.querySelectorAll('.sidebar-section[data-group] .section-title'));
+        var shown = [];
+        for (var i = 0; i < titles.length; i++) {
+            var r = titles[i].getBoundingClientRect();
+            if (r.width || r.height) shown.push({ el: titles[i], top: r.top });
+            else titles[i].style.removeProperty('--egg-wake-delay');
+        }
+        shown.sort(function (a, b) { return a.top - b.top; });
+        for (var j = 0; j < shown.length; j++) {
+            shown[j].el.style.setProperty('--egg-wake-delay', (j * WAKE_STEP_MS) + 'ms');
+        }
+        return WAKE_DUR_MS + Math.max(0, shown.length - 1) * WAKE_STEP_MS + 100;
+    }
     function markIdle(on) {
         if (!nav) return;
         clearTimeout(wakeT);
@@ -149,9 +170,10 @@
             nav.removeAttribute('data-idle-wake');
             nav.setAttribute('data-idle-glow', '');
         } else if (nav.hasAttribute('data-idle-glow')) {
+            var fadeMs = staggerWake();
             nav.removeAttribute('data-idle-glow');
             nav.setAttribute('data-idle-wake', '');
-            wakeT = setTimeout(function () { nav.removeAttribute('data-idle-wake'); }, WAKE_FADE_MS);
+            wakeT = setTimeout(function () { nav.removeAttribute('data-idle-wake'); }, fadeMs);
         }
     }
 

@@ -14,7 +14,7 @@
 // wishlist lives on the parent app, not the demo). "Keep painting" winds
 // the clock back, and every keep adds a minute to the next round (usertest
 // 2026-10-03): 5:00, then 6:00, 7:00... The ask counts the keeps, and from
-// the fifth on it offers "Leave me alone", which stops the ask and takes
+// the fifth on it gives in ("Ok, Ok...") with one answer, "Leave me alone", which stops the ask and takes
 // the clock away. Pressing "Wishlist on Steam" does the same once the ask
 // closes: Steam has no way to tell a game that someone wishlisted it, and
 // the press is the best sign there is. Those three facts persist under
@@ -53,8 +53,19 @@
     // A key or click already on its way when the ask appears must not answer
     // it — Space is Freeze, and would otherwise press the focused button.
     var ARM_DELAY_MS = 600;
-    var PITCH = 'The full game is this same canvas with no clock on it. ' +
-                'Wishlist it on Steam and you’ll hear the day it launches.';
+    // Gabriel's words (2026-10-18). {every} is the round just played: five,
+    // then a minute more for every keep, handed out like a coupon ("I threw
+    // in an extra minute on the house").
+    var TITLE = 'Thank you for trying Swirl Together!';
+    var PITCH = 'This demo is the full experience, but annoys you every {every}! ' +
+                'Wishlist on Steam and you’ll get notified for the full release, thank you again!';
+    var FINAL = 'Ok, Ok I get it you’re having fun, I’ll leave you alone.';
+    var WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+                 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+    function every(mins, keeps) {
+        var n = (WORDS[mins] || String(mins)) + ' minutes, sorry';
+        return keeps ? n + ' (I threw in ' + (keeps === 1 ? 'an extra minute' : keeps + ' extra minutes') + ' on the house)' : n;
+    }
     var MINUTE_MS = 60 * 1000;
     var QUIET_AFTER_KEEPS = 5;
     var DEMO_STATE_KEY = 'swirlDemoAsk.v1';
@@ -234,18 +245,14 @@
         var timeUp = kind === 'timeup';
         askKind = kind;
         var mins = Math.round(allowMs() / MINUTE_MS), keeps = askState.keeps;
-        els.title.textContent = timeUp
-            ? (keeps ? 'That’s your ' + mins + ' minutes' : 'That’s your five minutes')
-            : 'Enjoying Swirl Together?';
-        var count = '';
-        if (timeUp && keeps) {
-            count = ' You’ve kept going ' + (keeps === 1 ? 'once' : keeps + ' times') +
-                (keeps < QUIET_AFTER_KEEPS ? '. At ' + QUIET_AFTER_KEEPS + ', you can turn these off.' : '.');
-        }
-        els.msg.textContent = (timeUp ? 'Thanks for painting in the Swirl Together demo. '
-                                      : 'This demo runs ' + mins + ' minutes at a time. ') + PITCH + count;
+        els.title.textContent = TITLE;
+        // After the fifth keep it gives in: one line, one answer.
+        var final = timeUp && keeps >= QUIET_AFTER_KEEPS;
+        els.msg.textContent = final ? FINAL : PITCH.replace('{every}', every(mins, keeps));
         els.back.textContent = timeUp ? 'Keep painting, ' + (mins + 1) + ' minutes' : 'Back to painting';
-        els.quiet.hidden = !(timeUp && keeps >= QUIET_AFTER_KEEPS);
+        els.quiet.hidden = !final;
+        els.back.hidden = final;
+        els.go.hidden = final;
         fold();
         modal.classList.add('show');
         fold();
@@ -259,14 +266,15 @@
                 if (e.key === 'Escape') {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (performance.now() >= armedAt) close();
+                    // On the last ask Escape is its one answer, not another round.
+                    if (performance.now() >= armedAt) { if (!els.quiet.hidden) els.quiet.click(); else close(); }
                     return;
                 }
                 if (e.key !== 'Tab') e.stopPropagation();
             };
             document.addEventListener('keydown', keyHandler, true);
         }
-        hold = window.DialogFocus.hold(modal, { initial: els.go });   // Tab kept inside, focus back after (00b)
+        hold = window.DialogFocus.hold(modal, { initial: els.quiet.hidden ? els.go : els.quiet });   // Tab kept inside, focus back after (00b)
         render();
     }
 
@@ -401,7 +409,7 @@
     // runs straight through it. Change the number here when a new playtest
     // goes out (the itch zip is named after it; scripts/dist-playtest.js
     // keeps a matching app version).
-    var PLAYTEST_LABEL = '0.04 playtest';
+    var PLAYTEST_LABEL = '0.05 Demo';
     var playtest = null;
 
     // Floating on a desktop layout (Simple hides the bar), the canvas runs

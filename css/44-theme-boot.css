@@ -1,0 +1,75 @@
+/* ================================================================
+   css/44-theme-boot.css - Walnut & Copper: the boot screens.
+   The first impression: an art-deco sunrise of book-matched herringbone
+   veneer, cut from the painted walnut and toned blue
+   (assets/textures/deco-sunburst-2560.jpg, baked by
+   scripts/theme/bake-deco-sunburst.js). The herringbone comes back on the
+   sidebars (css/30), so the boot screens set up the motif the app keeps.
+
+   The photosensitivity warning shows this ground too, styled in index.html's
+   inline <style>: those rules are unlayered (the modal must render before
+   anything else), so a rule in this layer could never beat them.
+
+   Static: nothing here animates beyond the splash's existing entrance.
+   ================================================================ */
+
+@layer theme {
+
+html[data-theme="walnut-copper"] {
+    --boot-ground: url(../assets/textures/deco-sunburst-2560.jpg);
+}
+
+/* The rays fan up from a sun under the bottom edge. A dark plate sits behind
+   the words so the cream title reads over the veneer at any window shape;
+   the top fades to the room so the bar's edge never cuts a bright plank. */
+html[data-theme="walnut-copper"] #splash-screen {
+    background-color: #05080d;
+    background-image:
+        radial-gradient(ellipse 62% 34% at 50% 47%, rgba(4, 7, 12, 0.86), rgba(4, 7, 12, 0.62) 55%, rgba(4, 7, 12, 0) 100%),
+        linear-gradient(180deg, rgba(4, 7, 12, 0.72), rgba(4, 7, 12, 0.18) 45%, rgba(4, 7, 12, 0) 70%),
+        var(--boot-ground);
+    background-position: center, center, 50% 100%;
+    background-size: auto, auto, cover;
+    background-repeat: no-repeat;
+}
+
+html[data-theme="walnut-copper"] .splash-title {
+    font-family: var(--ui-font-display);
+    font-weight: 400;
+}
+
+/* Copper rules either side of the tagline, the deco "stepped" pair: a long
+   hairline over a short one. Drawn on the tagline so they arrive with it. */
+html[data-theme="walnut-copper"] .splash-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 1.4em;
+    font-family: var(--ui-font-display);
+    color: rgba(251, 236, 217, 0.62);
+}
+html[data-theme="walnut-copper"] #splash-screen.ready .splash-subtitle {
+    color: rgba(251, 236, 217, 0.78);
+}
+html[data-theme="walnut-copper"] .splash-subtitle::before,
+html[data-theme="walnut-copper"] .splash-subtitle::after {
+    content: "";
+    width: clamp(28px, 6vw, 72px);
+    height: 5px;
+    flex: none;
+    background:
+        linear-gradient(var(--cu), var(--cu)) 0 0 / 100% 1px no-repeat,
+        linear-gradient(var(--cu), var(--cu)) 50% 4px / 45% 1px no-repeat;
+    opacity: 0.85;
+}
+
+html[data-theme="walnut-copper"] .splash-progress {
+    background-color: rgba(196, 122, 75, 0.18);
+}
+
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] #splash-screen { background: Canvas; }
+    html[data-theme="walnut-copper"] .splash-subtitle::before,
+    html[data-theme="walnut-copper"] .splash-subtitle::after { background: CanvasText; }
+}
+
+} /* @layer theme */

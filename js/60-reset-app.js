@@ -196,7 +196,9 @@
 
     // opts.layers: Reset all (the player's layers, paths, masks and text go
     // too). Without it, Keep layers. opts.defaults: the shipped defaults
-    // even when there are saved settings.
+    // even when there are saved settings. opts.settingsOnly (Settings ->
+    // Load Defaults): the settings alone; the canvas, the view and the
+    // running state stay as they are.
     function reset(opts) {
         var saved = (opts && opts.defaults) ? null : savedLook();
         // 0. Reset all: the player's layers first, so nothing below re-reads them.
@@ -226,6 +228,10 @@
             rs.value = String(speed);
             rs.dispatchEvent(new Event('input', { bubbles: true }));
             rs.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        if (opts && opts.settingsOnly) {
+            if (typeof window.updateSliderValues === 'function') { try { window.updateSliderValues(); } catch (_) {} }
+            return true;
         }
         // 4. Running again.
         var fz = document.getElementById('freezeBtn');
@@ -437,5 +443,5 @@
         whenReady(hintWhenQuiet);
     })();
 
-    window.ResetApp = { reset: reset, ask: function () { if (!modalUp()) ask(); }, showHint: showHint, saveLook: saveLook };
+    window.ResetApp = { reset: reset, hasSaved: function () { return !!savedLook(); }, ask: function () { if (!modalUp()) ask(); }, showHint: showHint, saveLook: saveLook };
 })();

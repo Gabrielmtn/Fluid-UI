@@ -119,15 +119,53 @@
 
     function toggleFocus() {
         isFocused = !isFocused;
+        // The switch says the new state at once; the chrome then slides
+        // (slideFocus), and applyFocus syncs it again when it lands.
+        var cbNow = document.getElementById('focusModeToggle');
+        if (cbNow && cbNow.checked !== isFocused) cbNow.checked = isFocused;
         if (isFocused) {
             var a = document.activeElement;
             var byPointer = window.__pointerFocused ? window.__pointerFocused(a) : false;
             focusBefore = (a && a !== document.body && !byPointer) ? a : null;
         }
-        applyFocus();
+        slideFocus();
         if (!isFocused) giveFocusBack();
+        // Fullscreen is asked at once: browsers only grant it inside the
+        // key press or click itself.
         if (isFocused) borrowFullscreen();
         else returnFullscreen();
+    }
+
+    // The chrome slides away and back (Gabriel's tour, 2026-10-18: the jump
+    // felt janky): the top bar up, each sidebar out its own side, the
+    // underbar down, by transform (css/22 .fm-out). The layout changes ONCE,
+    // after the slide on the way in and before it on the way out, so the
+    // canvas refits once each way. One-shot transitions, nothing that runs
+    // on (the compositor note on #focus-mode-hint is about endless ones).
+    var SLIDE_MS = 333, slideTimer = 0;
+    var RM = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+    function slideFocus() {
+        var b = document.body;
+        clearTimeout(slideTimer);
+        if (RM.matches) { b.classList.remove('fm-out', 'fm-instant'); applyFocus(); return; }
+        if (isFocused) {
+            b.classList.remove('fm-instant');
+            b.classList.add('fm-out');
+            slideTimer = setTimeout(function () {
+                if (!isFocused) return;
+                applyFocus();
+                b.classList.add('fm-instant');
+                b.classList.remove('fm-out');
+                void b.offsetWidth;
+                b.classList.remove('fm-instant');
+            }, SLIDE_MS);
+        } else {
+            b.classList.add('fm-instant', 'fm-out');
+            applyFocus();
+            void b.offsetWidth;
+            b.classList.remove('fm-instant');
+            requestAnimationFrame(function () { b.classList.remove('fm-out'); });
+        }
     }
 
     // Saved wrapper geometry so we can restore after exiting focus mode
@@ -135,6 +173,9 @@
 
     function applyFocus() {
         var canvasWrapper = document.getElementById('canvas-wrapper');
+        // The canvas eases to full screen and back (Gabriel's tour: the snap
+        // felt janky), by the same FLIP as a format pick (flipTo below).
+        var fromRect = (canvasWrapper && !RM.matches) ? flipFrom(canvasWrapper) : null;
 
         if (isFocused && canvasWrapper) {
             // Save current wrapper geometry before CSS override
@@ -180,14 +221,21 @@
             savedWrapper = null;
         }
 
-        // Wait for CSS to fully apply, then update canvas resolution + framebuffers
-        requestAnimationFrame(function () {
+        if (fromRect && typeof window.updateCanvasSize === 'function') {
+            // The new box is laid out by the read inside updateCanvasSize, so
+            // the size lands now, once, and the ease draws over it.
+            window.updateCanvasSize();
+            flipTo(canvasWrapper, fromRect, SLIDE_MS, 0);
+        } else {
+            // Wait for CSS to fully apply, then update canvas resolution + framebuffers
             requestAnimationFrame(function () {
-                if (typeof window.updateCanvasSize === 'function') {
-                    window.updateCanvasSize();
-                }
+                requestAnimationFrame(function () {
+                    if (typeof window.updateCanvasSize === 'function') {
+                        window.updateCanvasSize();
+                    }
+                });
             });
-        });
+        }
 
         // Save state
         try {
@@ -223,13 +271,98 @@
         });
     }
 
+    // ─── FORMAT CHANGE, SEEN ────────────────────────────────────
+    // With the border off a format pick showed nothing happening (Gabriel's
+    // tour, 2026-10-18). The canvas takes its new size ONCE (one reinit);
+    // the wrapper is then drawn from the old rect to the new by translate +
+    // scale (FLIP, compositor only), and a hidden border fades in for it and
+    // back out after (css/22 .canvas-border-flash). A shown border stays.
+    // The individual translate/scale properties leave Zoom View's own
+    // transform (js/35) alone; while zoomed only the border flashes.
+    var EASE_MS = 300, FLASH_IN_MS = 150, FLASH_HOLD_MS = 120, flashTimer = 0, easeTimer = 0;
+
+    function flashBorder(holdMs) {
+        var b = document.body;
+        var cb = document.getElementById('showCanvasHandles');
+        if (!cb || cb.checked) return;
+        clearTimeout(flashTimer);
+        if (!b.classList.contains('canvas-border-flash')) {
+            b.classList.add('canvas-border-flash');
+            void b.offsetWidth;   // start from opacity 0
+        }
+        b.classList.add('canvas-border-flash-on');
+        flashTimer = setTimeout(function () {
+            b.classList.remove('canvas-border-flash-on');
+            flashTimer = setTimeout(function () { b.classList.remove('canvas-border-flash'); }, RM.matches ? 0 : 260);
+        }, holdMs);
+    }
+
+    // The visual resize, in two halves round the one real size change (a
+    // format pick here, focus mode in applyFocus). flipFrom: where the
+    // wrapper is on screen now, a running ease included, then that ease's
+    // offset dropped so the new layout measures clean. flipTo: draw the new
+    // box over the old one and let it ease home. #canvas-area clips, and the
+    // way out of focus starts the canvas bigger than the area, so the clip
+    // is lifted for the ease (Zoom View owns it while zoomed; no ease then).
+    var flipArea = null, flipToken = 0;
+    function flipFrom(w) {
+        flipToken++;
+        clearTimeout(easeTimer);
+        var r = w.getBoundingClientRect();
+        w.style.transition = 'none';
+        w.style.translate = '';
+        w.style.scale = '';
+        return r;
+    }
+
+    function flipTo(w, from, ms, delay) {
+        clearTimeout(easeTimer);
+        var to = w.getBoundingClientRect();
+        if (RM.matches || w.style.transform || !from || !from.width || !to.width
+            || (Math.abs(from.left - to.left) < 1 && Math.abs(from.top - to.top) < 1
+                && Math.abs(from.width - to.width) < 1 && Math.abs(from.height - to.height) < 1)) {
+            w.style.transition = '';
+            if (flipArea && flipArea.style.overflow === 'visible') flipArea.style.overflow = '';
+            flipArea = null;
+            return 0;
+        }
+        w.style.translate = ((from.left + from.width / 2) - (to.left + to.width / 2)) + 'px '
+            + ((from.top + from.height / 2) - (to.top + to.height / 2)) + 'px';
+        w.style.scale = (from.width / to.width) + ' ' + (from.height / to.height);
+        var area = w.parentElement;
+        if (area && !area.style.overflow) { area.style.overflow = 'visible'; flipArea = area; }
+        // The frame that lands the new size is the slow one (the new canvas
+        // buffer; on the way out of focus, the whole chrome back on screen):
+        // measured 50-70 ms headless. Started inside it, the ease lost a
+        // fifth of its run and jumped; started two frames on, it runs whole.
+        var token = ++flipToken;
+        requestAnimationFrame(function () { requestAnimationFrame(function () {
+            if (token !== flipToken) return;
+            var t = ms + 'ms cubic-bezier(0.2, 0.7, 0.2, 1) ' + delay + 'ms';
+            w.style.transition = 'translate ' + t + ', scale ' + t;
+            w.style.translate = '';
+            w.style.scale = '';
+            easeTimer = setTimeout(function () {
+                w.style.transition = '';
+                if (flipArea && flipArea.style.overflow === 'visible') flipArea.style.overflow = '';
+                flipArea = null;
+            }, delay + ms + 50);
+        }); });
+        return delay + ms + 33;
+    }
+
     // ─── FORMAT PRESETS ─────────────────────────────────────────
-    function applyFormat(format) {
+    // opts.ease: a pick by hand (the Format buttons) shows the change; a
+    // restore at boot or from a snapshot just lands.
+    function applyFormat(format, opts) {
         if (lockCheckbox && lockCheckbox.checked && activeFormat) return;
 
         var canvasWrapper = document.getElementById('canvas-wrapper');
         var canvasArea = document.getElementById('canvas-area');
         if (!canvasWrapper || !canvasArea) return;
+
+        var ease = !!(opts && opts.ease) && !isFocused;
+        var fromRect = ease ? flipFrom(canvasWrapper) : null;
 
         activeFormat = format;
 
@@ -258,6 +391,13 @@
         // Directly update canvas element resolution + reinit WebGL framebuffers
         if (typeof window.updateCanvasSize === 'function') {
             window.updateCanvasSize();
+        }
+
+        if (ease) {
+            flashBorder(RM.matches ? 600 : FLASH_IN_MS);
+            var easeMs = flipTo(canvasWrapper, fromRect, EASE_MS,
+                document.body.classList.contains('canvas-border-flash-on') ? FLASH_IN_MS : 0);
+            if (!RM.matches) flashBorder(easeMs + FLASH_HOLD_MS);
         }
 
         // Update active button state

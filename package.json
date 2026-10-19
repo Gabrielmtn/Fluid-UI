@@ -80,6 +80,8 @@
       "!comfyui-node/**",
       "!docs/**",
       "!notes/**",
+      "!prep/**",
+      "!design/**",
       "!sam-test.*",
       "!reset-pressure.html",
       "!server-relay.js",

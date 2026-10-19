@@ -405,6 +405,10 @@
                 // not carry it would come back as half the mark that was made.
                 // Omitted at 0, the common case.
                 mir: (window.__strokeMirrorPin | 0) || undefined,
+                // Mandala Overlay's fold (05g foldMandala): the wedge count
+                // the stroke was folded into, same class as `mir`. Omitted
+                // while the mode is off.
+                md: ((typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(window.__mandalaFold) : 0) || undefined,
                 // The Limit flow the dab painted with (see above). Omitted at
                 // full flow, so an ordinary dab is the size it was.
                 gf: (typeof gateFlow === 'number' && isFinite(gateFlow) && gateFlow >= 0 && gateFlow < 0.9995)
@@ -427,7 +431,7 @@
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
                      ap: ev.ap, atip: ev.atip ? Object.assign({}, ev.atip) : undefined,
-                     mir: ev.mir, gf: ev.gf, rnd: ev.rnd, fm: ev.fm, ra: ev.ra, ang: ev.ang };
+                     mir: ev.mir, md: ev.md, gf: ev.gf, rnd: ev.rnd, fm: ev.fm, ra: ev.ra, ang: ev.ang };
         }
         // Preserve Randomness: an event whose colour was rolled by random mode
         // carries rnd:1 (+ fm, the flow factor baked into its recorded colour).
@@ -638,6 +642,7 @@
                     // set; an older peer ignores it and sees the unmirrored
                     // half, which is the honest degradation.
                     if (ev.mir) o.mir = ev.mir | 0;
+                    if (ev.md) o.md = ev.md | 0;          // Mandala's fold, the same
                     // The Limit flow each dab painted with, so the room's
                     // replay lands as thin as the painter's. Sent only below
                     // full; an older peer ignores it and paints at full flow.
@@ -856,6 +861,10 @@
             var savedStrokeMir = window.__strokeMirrorPin;
             var _mir = (typeof ev.mir === 'number' && isFinite(ev.mir)) ? (ev.mir | 0) : 0;
             window.__strokeMirrorPin = (_mir >= 1 && _mir <= 3) ? _mir : 0;
+            // Mandala Overlay's fold, the same rule: a stroke painted without
+            // it replays unfolded even while the mode is on now.
+            var savedMandala = window.__mandalaFold;
+            window.__mandalaFold = (typeof window.mandalaFoldOf === 'function') ? window.mandalaFoldOf(ev.md) : 0;
             // Replayed events are not always ours: a peer's broadcast replay
             // arrives here as raw wire JSON (06 scheduleStrokeReplay). Coerce
             // against the known set before it touches config — splat() would
@@ -956,6 +965,7 @@
                 window.__armPushPin = savedArmPush;
                 window.__armTipPin = savedArmTip;
                 window.__strokeMirrorPin = savedStrokeMir;
+                window.__mandalaFold = savedMandala;
                 window.__armColorPin = savedArmColorPin;
             }
         }
@@ -1197,6 +1207,8 @@
                 // events too, so there is exactly one place that decides what
                 // a legal mirror code is.
                 mir: (typeof ev.mir === 'number' && isFinite(ev.mir)) ? (ev.mir | 0) : undefined,
+                // Mandala's fold, likewise checked in emitReplayDab.
+                md: (typeof ev.md === 'number' && isFinite(ev.md)) ? (ev.md | 0) : undefined,
                 // The painter's Limit flow per dab; emitReplayDab clamps it.
                 gf: (typeof ev.gf === 'number' && isFinite(ev.gf)) ? ev.gf : undefined
             }));

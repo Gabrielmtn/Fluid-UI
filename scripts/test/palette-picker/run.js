@@ -101,11 +101,12 @@ const STATE = `(function(){
         await sleep(300);
         await sleep(300);
         const bg = await d.ev(`(function(){var e=document.getElementById('backgroundColorPicker'); var sec=e.closest('.sidebar-section'); if(sec && window.openSidebarSection) window.openSidebarSection(sec); var sc=e.parentElement; while(sc && !(sc.scrollHeight > sc.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc=sc.parentElement; if(sc){ sc.scrollTop += e.getBoundingClientRect().top - sc.getBoundingClientRect().top - sc.clientHeight/2; } var r=e.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2,w:r.width};})()`);
-        await sleep(500);   // the sidebar scrolls smoothly: measure where it landed
-        const bg2 = await rectOf(d, '#backgroundColorPicker');
+        await sleep(900);   // the drawer slides open and the sidebar scrolls smoothly: measure where it landed
+        await d.ev("document.querySelector('.bg-color-btn:has(#backgroundColorPicker)').scrollIntoView({ block: 'center', behavior: 'instant' }), 1"); await sleep(200);
+        const bg2 = await rectOf(d, '.bg-color-btn:has(#backgroundColorPicker)');   // the well sits inside the Background Color button now
         await d.click(bg2.x, bg2.y); await sleep(250);
         const bgPop = await d.ev(`(function(){var p=document.querySelector('.cp-pop'); return p && p.querySelector('.cp-pop-title').textContent;})()`);
-        check('P5 the background well opens the same popover', bgPop === 'Background', bgPop);
+        check('P5 the background well opens the same popover', bgPop === 'Background', bgPop || { at: bg2, hit: await d.ev(`(function(){ var e = document.elementFromPoint(${bg2 && bg2.x}, ${bg2 && bg2.y}); return e ? e.tagName + '.' + e.className + '#' + e.id : null; })()`) });
         await d.tap('Escape', 'Escape', 27); await sleep(150);
 
         // ── Inline add under the palette's [+] ──
@@ -192,7 +193,7 @@ const STATE = `(function(){
         const trig = await rectOf(d, '#paletteSelect');
         await d.click(trig.x, trig.y); await sleep(250);
         const lst = await d.ev(`(function(){var l=document.querySelector('.palette-list'); if(!l) return null; var opts=l.querySelectorAll('.palette-option'); return {first:l.firstElementChild.className, n:opts.length, pals: window.curatedPalettes.length, strips:Array.prototype.every.call(opts,function(o){return o.querySelectorAll('.palette-option-strip span').length > 0;}), active:(l.querySelector('.palette-option.active .palette-option-name')||{}).textContent, focused: document.activeElement && document.activeElement.classList.contains('active')};})()`);
-        check('L1 the dropdown lists every palette over its colours, New palette first, the one in use marked and focused', lst && lst.first === 'palette-new-row' && lst.n === lst.pals && lst.strips && lst.active === 'Forest Serenity' && lst.focused, lst);
+        check('L1 the dropdown lists every palette over its colours, New palette first, the one in use marked and focused', lst && lst.first === 'palette-new-row' && lst.n === lst.pals && lst.strips && lst.active === "Ross' Forest" && lst.focused, lst);
         await d.tap('ArrowDown', 'ArrowDown', 40); await sleep(60);
         await d.tap('Enter', 'Enter', 13); await sleep(250);
         const l2 = await d.ev(`({open: !!document.querySelector('.palette-list'), name: document.querySelector('#paletteSelect .palette-select-name').textContent, idx: window.currentPaletteIndex, mode: window.multiArmColors[0].mode})`);

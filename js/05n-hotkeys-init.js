@@ -25,13 +25,31 @@
                 const t = li.textContent.trim();
                 const m = HK_SPLIT.exec(t);
                 if (!m || m.index <= 0) return;
-                const kbd = document.createElement('kbd');
-                kbd.textContent = t.slice(0, m.index);
+                // 2026-10-18: alternatives get a cap each ("Ctrl+Y / Ctrl+Shift+Z",
+                // "F1 or ?", "Ctrl+← / Ctrl+→ (or N)") so a long pair wraps
+                // between caps instead of squeezing the description to a word
+                // per line. "[ / ]" is one cap: both halves are single keys.
+                const keys = document.createElement('span');
+                keys.className = 'hk-keys';
+                const half = t.slice(0, m.index).replace(/\s*\(or (.+?)\)$/, ' or $1');
+                const parts = /^\S \/ \S$/.test(half) ? [half] : half.split(/ (\/|or) /);
+                parts.forEach((p, i) => {
+                    if (i % 2) {
+                        const s = document.createElement('span');
+                        s.className = 'hk-or';
+                        s.textContent = p;
+                        keys.appendChild(s);
+                    } else {
+                        const kbd = document.createElement('kbd');
+                        kbd.textContent = p;
+                        keys.appendChild(kbd);
+                    }
+                });
                 const d = document.createElement('span');
                 d.className = 'hk-desc';
                 d.textContent = t.slice(m.index + m[0].length);
                 li.textContent = '';
-                li.appendChild(kbd);
+                li.appendChild(keys);
                 li.appendChild(d);
             });
         }

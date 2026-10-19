@@ -34,6 +34,23 @@ body.focus-mode .playtest-label,
 body.focus-mode #canvas-wrapper .resize-handle { display: none !important; }
 body.focus-mode { padding-top: 0 !important; }
 
+/* A format pick with the border off shows the border for the change and
+   fades it back out (js/21 flashBorder). One-shot opacity transitions; the
+   handles take no clicks while borrowed. */
+body.canvas-border-flash:not(.focus-mode) #canvas-wrapper .resize-handle {
+    display: block !important;
+    opacity: 0;
+    pointer-events: none !important;
+    transition: opacity 250ms ease;
+}
+body.canvas-border-flash.canvas-border-flash-on:not(.focus-mode) #canvas-wrapper .resize-handle {
+    opacity: 1;
+    transition-duration: 150ms;
+}
+@media (prefers-reduced-motion: reduce) {
+    body.canvas-border-flash:not(.focus-mode) #canvas-wrapper .resize-handle { transition: none; }
+}
+
 body.focus-mode #main-area {
     width: 100vw !important;
     height: 100vh !important;

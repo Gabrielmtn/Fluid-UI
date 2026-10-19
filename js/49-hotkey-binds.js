@@ -555,6 +555,8 @@
     var hudEl = null, hudCap = null, hudName = null, hudVal = null;
     function hudShow() {
         if (!wheel) return;
+        // Settings → Show hotkey notifications off (js/12): the slider still moves.
+        if (window.hotkeyNoticesOn && !window.hotkeyNoticesOn()) { hudHide(); return; }
         if (!hudEl) {
             hudEl = document.createElement('div');
             hudEl.id = 'hkWheel';

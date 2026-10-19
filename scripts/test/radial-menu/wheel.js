@@ -67,7 +67,7 @@ const BS = 0, VISC = 2, CB = 4, MB = 5, TIME = 6, DENS = 7;
         check('T1 tap E opens and stays', await open());
         let W = await wedges();
         const names = W.map(w => w.t);
-        check('T1 nine slider wedges, in the top bar\'s order', W.length === 9 && names[0] === 'Brush Size' && names[4] === 'Laminar / Blend' && names[5] === 'Multi-Brush' && names[7] === 'Density' && names[8] === 'Velocity', names);
+        check('T1 nine slider wedges, in the top bar\'s order', W.length === 9 && names[0] === 'Brush Size' && names[4] === 'Laminar / Blend' && names[5] === 'Multi-Brush' && names[7] === 'Density Sustain' && names[8] === 'Velocity Sustain', names);
         const strip = await d.ev(`${JSON.stringify(IDS)}.map(function(id){ return window.HotkeyBinds.valueTextOf(document.getElementById(id)); })`);
         check('T1 each wedge reads what its fader reads', W.every((w, i) => w.v === strip[i]), W.map(w => w.v));
         const centre = await d.ev(`(function(){ var w = document.querySelector('.radial-wheel'); return [parseFloat(w.style.left), parseFloat(w.style.top)]; })()`);

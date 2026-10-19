@@ -33,7 +33,7 @@ const E = ['e', 'KeyE', 69];
     const d = await boot({ seed });
     try {
         const rect = (sel) => d.ev(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; var r = e.getBoundingClientRect(); var x = r.left + r.width/2, y = r.top + r.height/2; var top = document.elementFromPoint(x, y); return { x: x, y: y, l: r.left, w: r.width, h: r.height, hit: !!top && (top === e || e.contains(top)) }; })()`);
-        const clickSel = async (sel) => { const r = await rect(sel); if (!r || !r.hit) throw new Error('not clickable: ' + sel + ' ' + JSON.stringify(r)); await d.click(r.x, r.y); return r; };
+        const clickSel = async (sel) => { await d.ev(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); if (e) e.scrollIntoView({ block: "nearest", behavior: "instant" }); return 1; })()`); await sleep(120); const r = await rect(sel); if (!r || !r.hit) throw new Error('not clickable: ' + sel + ' ' + JSON.stringify(r)); await d.click(r.x, r.y); return r; };
         const items = () => d.ev('window.RadialMenu.items()');
         const note = () => d.ev(`(function(){ var n = document.querySelector('.radial-block > .hk-picker-note'); return n ? { text: n.textContent, hidden: n.hidden, tone: n.dataset.tone || '' } : null; })()`);
         const bar = () => d.ev(`(function(){ var b = document.getElementById('hkBindBar'); if (!b) return null; return { step: b.dataset.step, steps: [].map.call(b.querySelectorAll('.hk-step-label'), function(s){ return s.textContent; }), say: b.querySelector('.hk-say').textContent, chip: (b.querySelector('.hk-chip-name') || {}).textContent || null }; })()`);
@@ -61,7 +61,7 @@ const E = ['e', 'KeyE', 69];
         // Two left the top bar for the left sidebar (2026-10-04): Brush Size
         // heads the brush bar, Multi-Brush is a section of its own there.
         const HOME = { 'Brush Size': 'Brush bar', 'Multi-Brush': 'Multi-Brush' };
-        check('S1 nine rows, the main sliders, each saying where it lives', rows0.length === 9 && rows0[0][0] === 'Brush Size' && rows0[7][0] === 'Density' && rows0.every(r => r[1] === 'Slider · ' + (HOME[r[0]] || 'Top bar')), rows0);
+        check('S1 nine rows, the main sliders, each saying where it lives', rows0.length === 9 && rows0[0][0] === 'Brush Size' && rows0[7][0] === 'Density Sustain' && rows0.every(r => r[1] === 'Slider · ' + (HOME[r[0]] || 'Top bar')), rows0);
         check('S1 reset hidden while the list is the starting one', await d.ev(`document.querySelector('.radial-reset').hidden`));
 
         // Stroke and replay is still open from the door above: it lives in the
@@ -80,16 +80,12 @@ const E = ['e', 'KeyE', 69];
         // faders, so at 1300 every cell fits and More has nothing to hold.
         // At 1200 it shows under both themes.
         await d.send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false }); await sleep(800);
-        const more = await rect('.mixer-more-btn');
-        if (more && more.hit) {
-            await d.click(more.x, more.y); await sleep(300);
-            const m = await d.ev(`document.querySelector('.mixer-more-btn').getAttribute('aria-expanded')`);
-            check('A2 More opens as usual and adds nothing', m === 'true' && (await items()).length === 9 && (await bar()).step === '1', { expanded: m });
-            await d.click(more.x, more.y); await sleep(300);
-            check('A2 ...and closes as usual, still nothing', (await d.ev(`document.querySelector('.mixer-more-btn').getAttribute('aria-expanded')`)) === 'false' && (await items()).length === 9);
-        } else {
-            check('A2 More is on screen to test', false, more);
-        }
+        // Since 2026-10-18 the bar docks into the right sidebar as soon as it
+        // would wrap (js/13), so More never has a fader to hold: at 1200 the
+        // bar is docked, and docking adds nothing to the menu.
+        const docked = await d.ev(`document.body.classList.contains('compact-ui') && !!document.querySelector('#sidebar-right > #mixer-strip')`);
+        const why = docked ? null : await d.ev(`({ w: innerWidth, cls: document.body.className, inSide: !!document.querySelector('#sidebar-right > #mixer-strip') })`);
+        check('A2 at 1200 the top bar docks into the right sidebar and adds nothing', docked && (await items()).length === 9 && (await bar()).step === '1', { docked, why });
         await d.send('Emulation.clearDeviceMetricsOverride'); await sleep(800);
         await clickSel('#mixerPresetsTrigger'); await sleep(300);
         check('A2 the Presets menu opens and adds nothing', (await items()).length === 9 && (await bar()).step === '1' && !!(await d.ev(`!!document.querySelector('.mixer-presets-panel')`)));
@@ -113,6 +109,7 @@ const E = ['e', 'KeyE', 69];
         // Add another → a slider that is already on the wheel
         await d.ev(`[].filter.call(document.querySelectorAll('#hkBindBar .hk-actions button'), function(b){ return b.textContent === 'Add another'; })[0].click()`);
         await sleep(200);
+        await d.ev(`(function(){ var e = document.getElementById('colorBlendPerceptual'); if (e) e.scrollIntoView({ block: 'nearest', behavior: 'instant' }); return 1; })()`); await sleep(120);
         const cbr = await rect('#colorBlendPerceptual');   // the fader people see (js/20 FADER_CURVES)
         await d.move(cbr.x, cbr.y); await d.down(cbr.x, cbr.y); await sleep(40); await d.up(cbr.x, cbr.y); await sleep(250);
         const t1 = await toast();

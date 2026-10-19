@@ -290,6 +290,26 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-gro
     color: rgba(160, 138, 118, 0.55);
     text-shadow: none;
 }
+/* High Contrast forces the colour above to CanvasText and the rule above
+   already holds the row's opacity at 1, so a disabled row would read as an
+   enabled one. GrayText is the system's own "unavailable" colour, and an
+   author colour that is a system colour survives forced colours. */
+@media (forced-colors: active) {
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]:disabled) > label,
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(input[type=range]:disabled) > label .value-display {
+        color: GrayText;
+    }
+}
+/* The two longest labels that still fit a row ("Pressure Dissipation" with
+   its three-decimal value is 16 px more than the row has at the study's
+   tracking, "Pressure Iteration" under 1 px): tracking .18em -> .1em, a
+   4 px gap (a tighter word space made "Pressure Dissipation" one word), so each stays on its one line at the
+   type's own size. The label lengths decide it; named here because CSS
+   cannot ask a string how long it is. */
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .control-group:not(:where(#mixer-strip *)):has(#pressureDissipation, #pressureIteration) > label {
+    letter-spacing: 0.1em;
+    gap: 4px;
+}
 @media (pointer: coarse) {
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.control-group, .ch-fader):not(:where(#mixer-strip *)) input[type=range] { --input-py: 11px; }
 }

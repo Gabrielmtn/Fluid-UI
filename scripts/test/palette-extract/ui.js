@@ -81,13 +81,13 @@ async function waitFor(t, expr, ms) {
         await t.ev(MAKE_PICTURE);
         await t.ev(`window.PaletteFromImage.openFile(window.__pfiFile), 1`);
         await waitFor(t, `document.querySelectorAll('#paletteExtractHost .pfi-swatch').length === 5`);
-        await sleep(200);
+        await sleep(600);   // reveal() scrolls again at 400 ms, once the panel has its height
         let s = await t.ev(STATE);
         check('openFile: panel open, un-hidden, titled with the file', s.open && !s.hidden && s.layout && s.title === 'test-photo.png', s.title);
         check('openFile: 5 swatches and 5 markers', s.swatches.length === 5 && s.markers.length === 5);
         check('openFile: markers wear their swatch colours', s.markers.every((m, i) => m.bg === s.swatches[i]) && s.titles.every((h, i) => h === s.swatches[i]), s.swatches.join(' '));
         const inView = await t.ev(`(() => { const r = document.querySelector('#paletteExtractHost .pfi').getBoundingClientRect(); const sb = document.getElementById('sidebar-right').getBoundingClientRect(); return r.top >= sb.top - 1 && r.bottom <= sb.bottom + 1 && r.height > 200; })()`);
-        check('openFile: panel scrolled into view', inView);
+        check('openFile: panel scrolled into view', inView, await t.ev(`(() => { const r = document.querySelector('#paletteExtractHost .pfi').getBoundingClientRect(); const sb = document.getElementById('sidebar-right').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom), Math.round(r.height), Math.round(sb.top), Math.round(sb.bottom)].join(','); })()`));
 
         // Close-up for the eye.
         if (process.env.SHOT) {
@@ -218,9 +218,12 @@ async function waitFor(t, expr, ms) {
         if (r) {
             await t.click(r.x, r.y);
             await sleep(150);
+            // + New palette is a field now: it opens the three sources (2026-10-18).
+            const cap = await t.ev(rect('.palette-list .palette-new-cap'));
+            if (cap) { await t.click(cap.x, cap.y); await sleep(150); }
             const items = await t.ev(`[...document.querySelectorAll('.palette-list .palette-new-btns button')].map(b => b.textContent)`);
             const first = await t.ev(`(() => { const l = document.querySelector('.palette-list'); return l && l.firstElementChild && l.firstElementChild.className; })()`);
-            check('the palette list opens with New palette first: brush colour, image, canvas', first === 'palette-new-row' && items.join('|') === 'Brush colour|Image…|Canvas', { first, items });
+            check('the palette list opens with New palette first: brush colour, image, canvas', String(first).split(' ')[0] === 'palette-new-row' && items.join('|') === 'Brush color|Image…|Canvas', JSON.stringify({ first, items, cap: !!cap }));
             const ci = await t.ev(`(() => { const b = [...document.querySelectorAll('.palette-list .palette-new-btns button')].find(b => b.textContent === 'Canvas'); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             if (ci) await t.click(ci.x, ci.y);
         } else {

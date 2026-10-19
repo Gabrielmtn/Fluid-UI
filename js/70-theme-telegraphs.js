@@ -5,10 +5,11 @@
 // telegraphs", v19 1565-1708) over the top bar's Laminar / Blend and Time
 // cells. The face is presentation only: aria-hidden, pointer-events none.
 // The control is still the cell's own range input underneath (the
-// perceptual proxy), with the same value, step, keys and horizontal drag,
-// and the canonical inputs (#colorBlend, #timeScale) keep every reader and
-// writer they had. The study's Page-key order jumps and angle drag are NOT
-// ported: keyboard and pointer behaviour are frozen (prep/README.md).
+// perceptual proxy), with the same value, step and keys, and the canonical
+// inputs (#colorBlend, #timeScale) keep every reader and writer they had.
+// The study's Page-key order jumps are NOT ported (keys are frozen,
+// prep/README.md); the pointer is js/76's (press on the lever's angle, then
+// a two-way relative drag).
 //
 // The face follows the CANONICAL value. It is redrawn only when a value
 // changes: the canonical input's input/change events, plus a MutationObserver
@@ -22,9 +23,11 @@
 //                    (1 - v) / 2, BLEND with (1 + v) / 2, so both glow half
 //                    at 0 and a label lights while its half is more than half
 //                    lit; the nixies show |v| (0.00-1.00), the app's value;
-//                    the lever sits at the top for 0.
-//   Time             canonical 0.01..3, the study's square-root sweep and six
-//                    orders (STOP .. FLANK); the value under the hub, the
+//                    the lever sits at the top for 0; the plate reads LAMINAR,
+//                    NEUTRAL (exactly 0) or BLEND.
+//   Time             canonical 0.01..3, the study's square-root sweep and five
+//                    orders (SLOW, HALF, FULL, DOUBLE, TRIPLE); the value in
+//                    nixies under the hub, the
 //                    current order on the brass flag, which drops out and the
 //                    next drops in (text swap only under reduced motion).
 // ═══════════════════════════════════════════════════════════════════
@@ -40,14 +43,23 @@
         laminar: {
             key: 'Color Blend', canonical: 'colorBlend', proxy: 'colorBlendPerceptual',
             toF: function (v) { return (Math.max(-1, Math.min(1, v)) + 1) / 2; },
-            orders: [['LAMINAR', 0, 0.5], ['BLEND', 0.5, 1]]          // in f (sweep) units
+            orders: [['LAMINAR', 0, 0.5], ['BLEND', 0.5, 1]],         // in f (sweep) units
+            // The plate: NEUTRAL only at exactly 0 (Gabriel 2026-10-18).
+            plate: ['LAMINAR', 'NEUTRAL', 'BLEND'],
+            plateOf: function (v) { return v < 0 ? 0 : (v > 0 ? 2 : 1); }
         },
         time: {
             key: 'Time', canonical: 'timeScale', proxy: 'timeScalePerceptual',
             toF: function (v) { return Math.sqrt(Math.max(0, (v - 0.01) / 2.99)); },
-            orders: [['STOP', 0.01, 0.12], ['DEAD SLOW', 0.12, 0.35], ['SLOW', 0.35, 0.75], ['HALF', 0.75, 1.5], ['FULL', 1.5, 2.4], ['FLANK', 2.4, 3]]   // in value units
+            // Named by multiplier (Gabriel 2026-10-17): Full is on time.
+            orders: [['SLOW', 0.01, 0.35], ['HALF', 0.35, 0.75], ['FULL', 0.75, 1.5], ['DOUBLE', 1.5, 2.5], ['TRIPLE', 2.5, 3]]   // in value units
         }
     };
+
+    // The order plate and the value tubes, shared by both faces so their
+    // numbers are the same size. Plate text is fitted to the plate's width.
+    var PLATE = { w: 56, h: 14, y: 41, fs: 10.5 };
+    var TUBES = { cy: 27, w: 11, h: 17, fs: 14 };
 
     function ang(f) { return -120 + 240 * f; }
     function polar(r, a) { var t = (a - 90) * Math.PI / 180; return [r * Math.cos(t), r * Math.sin(t)]; }
@@ -55,6 +67,53 @@
         var p0 = polar(r1, a0), p1 = polar(r1, a1), p2 = polar(r0, a1), p3 = polar(r0, a0), lg = (a1 - a0) > 180 ? 1 : 0;
         return 'M' + p0[0].toFixed(2) + ' ' + p0[1].toFixed(2) + 'A' + r1 + ' ' + r1 + ' 0 ' + lg + ' 1 ' + p1[0].toFixed(2) + ' ' + p1[1].toFixed(2) +
             'L' + p2[0].toFixed(2) + ' ' + p2[1].toFixed(2) + 'A' + r0 + ' ' + r0 + ' 0 ' + lg + ' 0 ' + p3[0].toFixed(2) + ' ' + p3[1].toFixed(2) + 'Z';
+    }
+    // The thin rings run with the sweep only (-120..120 through the top), so
+    // nothing crosses the readout in the bottom gap.
+    function openRing(r) {
+        var a = polar(r, -120), b = polar(r, 120);
+        return 'M' + a[0].toFixed(2) + ' ' + a[1].toFixed(2) + 'A' + r + ' ' + r + ' 0 1 1 ' + b[0].toFixed(2) + ' ' + b[1].toFixed(2);
+    }
+    // The readout's copper lug: a plate under the tubes whose sides flow down
+    // into the bezel, so the readout is part of the iron, not a box inside it.
+    function lugD(half, yTop, rim) {
+        var xb = Math.max(6, half - 7), yb = Math.sqrt(rim * rim - xb * xb);
+        var f = function (n) { return n.toFixed(2); };
+        return 'M' + f(-half) + ' ' + f(yTop) + 'C' + f(-half) + ' ' + f(yTop + 6) + ' ' + f(-xb - 1.5) + ' ' + f(yb - 5) + ' ' + f(-xb) + ' ' + f(yb) +
+            'A' + rim + ' ' + rim + ' 0 0 0 ' + f(xb) + ' ' + f(yb) +
+            'C' + f(xb + 1.5) + ' ' + f(yb - 5) + ' ' + f(half) + ' ' + f(yTop + 6) + ' ' + f(half) + ' ' + f(yTop) + 'Z';
+    }
+    // Nixie tubes for the characters of a value: a tube per digit, the
+    // decimal point as a lit dot between two tubes.
+    function tubesSVG(id, text, cy, w, h, fs) {
+        var digits = [], dotAfter = -1;
+        String(text).split('').forEach(function (ch) {
+            if (/[0-9-]/.test(ch)) digits.push(ch);
+            else if (ch === '.' && digits.length) dotAfter = digits.length - 1;
+        });
+        if (!digits.length) return { svg: '', half: 0 };
+        var gap = 1.4, total = digits.length * w + (digits.length - 1) * gap, x0 = -total / 2, y = cy - h / 2;
+        var out = digits.map(function (d, n) {
+            var x = x0 + n * (w + gap);
+            return '<rect x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="' + w + '" height="' + h + '" rx="' + (w * 0.36).toFixed(2) + '" fill="url(#' + id + '-glass)" stroke="rgba(214,140,92,.85)" stroke-width=".8"/>' +
+                '<rect x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="' + w + '" height="' + h + '" rx="' + (w * 0.36).toFixed(2) + '" fill="url(#' + id + '-mesh)"/>' +
+                '<text class="nxg" style="font-size:' + fs + 'px" x="' + (x + w / 2).toFixed(2) + '" y="' + (y + h * 0.78).toFixed(2) + '" text-anchor="middle">8</text>' +
+                '<text class="nxd" style="font-size:' + fs + 'px" x="' + (x + w / 2).toFixed(2) + '" y="' + (y + h * 0.78).toFixed(2) + '" text-anchor="middle">' + d + '</text>';
+        }).join('');
+        if (dotAfter >= 0 && dotAfter < digits.length - 1) {
+            var dx = x0 + (dotAfter + 1) * (w + gap) - gap / 2;
+            out += '<circle class="nxp" cx="' + dx.toFixed(2) + '" cy="' + (y + h - 2.2).toFixed(2) + '" r="1.2"/>';
+        }
+        return { svg: out, half: total / 2 };
+    }
+    function defsSVG(id) {
+        return '<linearGradient id="' + id + '-lug" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d79b70"/><stop offset=".35" stop-color="#9a5a36"/><stop offset="1" stop-color="#5a2e17"/></linearGradient>' +
+            '<pattern id="' + id + '-mesh" width="4" height="6.928" patternUnits="userSpaceOnUse"><path d="M2 0L4 1.155V3.464L2 4.619L0 3.464V1.155ZM2 4.619V6.928" fill="none" stroke="rgba(255,220,190,.10)" stroke-width=".4"/></pattern>' +
+            '<radialGradient id="' + id + '-glass" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#1c1210"/><stop offset="1" stop-color="#070403"/></radialGradient>';
+    }
+    function lugSVG(id, half, yTop, rim) {
+        return '<path d="' + lugD(half, yTop, rim) + '" fill="url(#' + id + '-lug)" stroke="#3a1c0c" stroke-width=".6"/>' +
+            '<path d="M' + (-half + 1.5).toFixed(2) + ' ' + (yTop + 0.6).toFixed(2) + 'H' + (half - 1.5).toFixed(2) + '" stroke="rgba(255,225,195,.45)" stroke-width=".6"/>';
     }
     var roseD = '';
     for (var i = 0; i <= 120; i++) {
@@ -79,21 +138,15 @@
             var t0 = polar(58.5, a), t1 = polar(a % 30 ? 60.5 : 62, a);
             ticks += 'M' + t0[0].toFixed(2) + ' ' + t0[1].toFixed(2) + 'L' + t1[0].toFixed(2) + ' ' + t1[1].toFixed(2);
         }
-        var nix = '';
-        if (isLam) {
-            nix = '<g class="tnix">' + [-14.5, 1.5, 13.5].map(function (x, n) {
-                return '<rect x="' + (x - 5.6) + '" y="36" width="11.2" height="17.5" rx="4.2" fill="url(#' + id + '-glass)" stroke="rgba(214,140,92,.8)" stroke-width=".7"/>' +
-                    '<rect x="' + (x - 5.6) + '" y="36" width="11.2" height="17.5" rx="4.2" fill="url(#' + id + '-mesh)"/>' +
-                    '<text class="nxg" x="' + x + '" y="49.4" text-anchor="middle">8</text>' +
-                    '<text class="nxd" data-n="' + n + '" x="' + x + '" y="49.4" text-anchor="middle">0</text>';
-            }).join('') + '<circle class="nxp" cx="-6.5" cy="51.2" r="1.15"/></g>';
-        } else {
-            nix = '<text class="tval" text-anchor="middle" y="26">1.00×</text>' +
-                '<g class="slot"><rect x="-41.5" y="29.5" width="83" height="19" rx="3" fill="#050302" stroke="url(#' + id + '-cu)" stroke-width="1.6"/>' +
-                '<g clip-path="url(#' + id + '-clip)"><g class="flag"><rect x="-39.5" y="31.5" width="79" height="15" fill="url(#' + id + '-plate)"/>' +
-                '<path d="M-39.5 32.1H39.5" stroke="rgba(255,245,230,.6)" stroke-width=".5"/><text class="flagt" text-anchor="middle" y="42.6"></text></g>' +
-                '<rect x="-39.5" y="31.5" width="79" height="15" fill="url(#' + id + '-well)"/></g></g>';
-        }
+        // Both faces (Gabriel 2026-10-18): the value in tubes under the hub,
+        // the same size on both, and the order's plate below them, low in
+        // the bezel gap on a lug into the rim.
+        var nix = '<g class="tvalnix"></g>' +
+            lugSVG(id, 26, 53, 64) +
+            '<g class="slot"><rect x="-' + (PLATE.w / 2 + 1.5) + '" y="' + (PLATE.y - 1.5) + '" width="' + (PLATE.w + 3) + '" height="' + (PLATE.h + 3) + '" rx="2.4" fill="#050302" stroke="url(#' + id + '-cu)" stroke-width="1.4"/>' +
+            '<g clip-path="url(#' + id + '-clip)"><g class="flag"><rect x="-' + PLATE.w / 2 + '" y="' + PLATE.y + '" width="' + PLATE.w + '" height="' + PLATE.h + '" fill="url(#' + id + '-plate)"/>' +
+            '<path d="M-' + PLATE.w / 2 + ' ' + (PLATE.y + 0.5) + 'H' + PLATE.w / 2 + '" stroke="rgba(255,245,230,.6)" stroke-width=".5"/><text class="flagt" text-anchor="middle" y="' + (PLATE.y + PLATE.h * 0.77).toFixed(2) + '"></text></g>' +
+            '<rect x="-' + PLATE.w / 2 + '" y="' + PLATE.y + '" width="' + PLATE.w + '" height="' + PLATE.h + '" fill="url(#' + id + '-well)"/></g></g>';
         return '<svg viewBox="-70 -70 140 140" aria-hidden="true" focusable="false">' +
             '<defs>' +
             '<linearGradient id="' + id + '-cu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c98a62"/><stop offset=".5" stop-color="#9a5a36"/><stop offset="1" stop-color="#4a2512"/></linearGradient>' +
@@ -103,13 +156,14 @@
             '<radialGradient id="' + id + '-glass" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#1c1210"/><stop offset="1" stop-color="#070403"/></radialGradient>' +
             '<linearGradient id="' + id + '-plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4d3ad"/><stop offset=".45" stop-color="#d49a68"/><stop offset=".55" stop-color="#c0814f"/><stop offset="1" stop-color="#8a5532"/></linearGradient>' +
             '<linearGradient id="' + id + '-well" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(0,0,0,.75)"/><stop offset=".35" stop-color="rgba(0,0,0,0)"/><stop offset=".8" stop-color="rgba(0,0,0,0)"/><stop offset="1" stop-color="rgba(0,0,0,.45)"/></linearGradient>' +
-            '<clipPath id="' + id + '-clip"><rect x="-39.5" y="31.5" width="79" height="15" rx="1.6"/></clipPath>' +
+            '<clipPath id="' + id + '-clip"><rect x="-' + PLATE.w / 2 + '" y="' + PLATE.y + '" width="' + PLATE.w + '" height="' + PLATE.h + '" rx="1.4"/></clipPath>' +
+            '<linearGradient id="' + id + '-lug" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d79b70"/><stop offset=".35" stop-color="#9a5a36"/><stop offset="1" stop-color="#5a2e17"/></linearGradient>' +
             arcs + '</defs>' +
             '<circle r="70" fill="url(#' + id + '-sh)"/><circle r="66" fill="none" stroke="url(#' + id + '-cu)" stroke-width="4.2" opacity=".9"/><circle r="63.9" fill="none" stroke="rgba(255,215,180,.18)" stroke-width=".6"/>' +
             '<circle r="63" fill="url(#' + id + '-glass)"/><circle r="63" fill="url(#' + id + '-mesh)"/>' +
             '<circle r="63" fill="none" stroke="rgba(0,0,0,.7)" stroke-width="1.4"/>' +
-            '<circle r="57.6" fill="none" stroke="rgba(214,140,92,.7)" stroke-width=".7"/>' +
-            '<circle r="32.4" fill="none" stroke="rgba(214,140,92,.7)" stroke-width=".7"/>' +
+            '<path d="' + openRing(57.6) + '" fill="none" stroke="rgba(214,140,92,.7)" stroke-width=".7"/>' +
+            '<path d="' + openRing(32.4) + '" fill="none" stroke="rgba(214,140,92,.7)" stroke-width=".7"/>' +
             secs +
             '<path d="' + ticks + '" stroke="rgba(242,179,138,.75)" stroke-width=".7"/>' +
             labs + nix +
@@ -148,8 +202,7 @@
             lever: face.querySelector('.lever'),
             secs: [].slice.call(face.querySelectorAll('.sec')),
             labs: [].slice.call(face.querySelectorAll('.tlab')),
-            nix: [].slice.call(face.querySelectorAll('.nxd')),
-            tval: face.querySelector('.tval'),
+            tval: face.querySelector('.tvalnix'),
             flag: face.querySelector('.flag'),
             flagT: face.querySelector('.flagt'),
             shown: -1, busy: false, pending: -1, last: null
@@ -158,18 +211,24 @@
         function flagTo(i) {
             var first = o.shown < 0;
             o.shown = i;
-            var name = C.orders[i][0];
+            var name = C.plate ? C.plate[i] : C.orders[i][0];
             var set = function () {
                 o.flagT.textContent = name;
-                o.flagT.style.fontSize = Math.min(10.5, 76 / (name.length * 0.8)).toFixed(2) + 'px';
+                o.flagT.style.fontSize = PLATE.fs + 'px';
+                // Shrink a long name to the plate (the display face is wide).
+                var w = 0;
+                try { w = o.flagT.getComputedTextLength(); } catch (e) {}
+                if (!w) w = name.length * PLATE.fs * 0.86;   // not laid out yet
+                var room = PLATE.w - 5;
+                if (w > room) o.flagT.style.fontSize = (PLATE.fs * room / w).toFixed(2) + 'px';
             };
             if (first || RM.matches || !o.flag.animate) { set(); return; }
             o.busy = true;
-            var out = o.flag.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(17px)' }],
+            var out = o.flag.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(16px)' }],
                 { duration: 110, easing: 'cubic-bezier(.55,0,1,.45)', fill: 'forwards' });
             out.onfinish = function () {
                 set();
-                var inn = o.flag.animate([{ transform: 'translateY(-17px)' }, { transform: 'translateY(1.6px)', offset: 0.7 }, { transform: 'translateY(0)' }],
+                var inn = o.flag.animate([{ transform: 'translateY(-16px)' }, { transform: 'translateY(1.4px)', offset: 0.7 }, { transform: 'translateY(0)' }],
                     { duration: 260, easing: 'cubic-bezier(.25,.8,.35,1)' });
                 out.cancel();
                 inn.onfinish = function () {
@@ -217,14 +276,16 @@
                     t.setAttribute('fill', m > 0.5 ? '#fff0dc' : '#cbb59f');
                     t.style.filter = m > 0.5 ? 'drop-shadow(0 0 ' + (0.6 + 1.2 * m).toFixed(2) + 'px rgba(255,120,40,.85))' : 'none';
                 });
-                var d = Math.abs(v).toFixed(2).replace('.', '');
-                o.nix.forEach(function (t, n) { setText(t, d[n] || '0'); });
+                var cur = C.plateOf(v), tv = Math.abs(v).toFixed(2);
             } else {
-                var cur = orderOf(C, v);
+                var cur = orderOf(C, v), tv = v.toFixed(2);
                 o.secs.forEach(function (p, n) { p.setAttribute('fill', n === cur ? 'rgb(255 132 40 / .55)' : 'rgb(255 110 30 / .05)'); });
-                setText(o.tval, v.toFixed(2) + '×');
-                if (cur !== o.shown) { if (o.busy) o.pending = cur; else flagTo(cur); }
             }
+            if (o.tval && o.tval.getAttribute('data-v') !== tv) {
+                o.tval.setAttribute('data-v', tv);
+                o.tval.innerHTML = tubesSVG('wct-' + k, tv, TUBES.cy, TUBES.w, TUBES.h, TUBES.fs).svg;
+            }
+            if (cur !== o.shown) { if (o.busy) o.pending = cur; else flagTo(cur); }
         }
 
         canonical.addEventListener('input', draw);
@@ -236,10 +297,46 @@
         return true;
     }
 
+    // ── The four round dials' readouts (Gabriel 2026-10-17): the value in
+    // nixie tubes in the dial's own bottom gap (the dot arc spans -135..135),
+    // on the same copper lug into the rim, instead of a number under the
+    // dial. Redrawn only when the cell's readout text changes; the readout
+    // element stays for screen readers (visually hidden, css/33).
+    var DIALS = ['Viscosity', 'Isolation', 'Density', 'Velocity'];
+    function mountDial(key) {
+        var cell = document.querySelector('#mixer-strip > .mixer-channel[data-ui-key="' + key + '"]');
+        if (!cell) return false;
+        var fader = cell.querySelector('.ch-fader'), val = cell.querySelector('.ch-value');
+        if (!fader || !val) return false;
+        if (fader.querySelector('.wc-dialnix')) return true;
+        var id = 'wcd-' + key.toLowerCase();
+        var face = document.createElement('div');
+        face.className = 'wc-tele wc-dialnix';
+        face.setAttribute('aria-hidden', 'true');
+        face.innerHTML = '<svg viewBox="-70 -70 140 140" aria-hidden="true" focusable="false"><defs>' + defsSVG(id) + '</defs><g class="dnix"></g></svg>';
+        fader.appendChild(face);
+        cell.classList.add('wc-has-dialnix');
+        var g = face.querySelector('.dnix'), last = null;
+        function draw() {
+            var t = val.textContent.trim();
+            if (t === last) return;
+            last = t;
+            var n = (t.match(/[0-9-]/g) || []).length;
+            var w = Math.min(11.5, 64 / Math.max(1, n) - 1.4);
+            var tb = tubesSVG(id, t, 44, w, 18, Math.min(14, w * 1.3));
+            g.innerHTML = tb.svg ? lugSVG(id, tb.half + 3, 50, 69) + tb.svg : '';
+        }
+        new MutationObserver(draw).observe(val, { childList: true, characterData: true, subtree: true });
+        draw();
+        return true;
+    }
+
     // The strip is built ~800 ms after DOMContentLoaded (js/20).
     var tries = 0;
     (function attach() {
         var a = mount('laminar'), b = mount('time');
+        // mountDial is parked for the dial refactor (Gabriel 2026-10-18): the
+        // round dials keep their own readout until they are resized.
         if ((!a || !b) && tries++ < 80) setTimeout(attach, 250);
     })();
 })();

@@ -504,10 +504,22 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         const onMain = await main.eval('window.PenWindow.__state().mirror');
         const saved = await main.eval("window.settingsManager ? window.settingsManager.get('display.penWindowMirror', null) : 'nosm'");
         check('mirror Smooth: canvas back, 24/4 rates, setting persisted', !on.hidden && on.w > 0 && /Smooth/.test(on.sel) && onMain.running && onMain.activeFps === 24 && String(saved) === 'smooth', { on, onMain, saved });
-        // The toolbar button cycles the mode and the sidebar select follows.
-        const cyc = await pop.eval("document.getElementById('mirrorBtn').click(); new Promise(r=>setTimeout(()=>r(document.getElementById('mirrorBtn').textContent), 200))", { gesture: true });
+        // The toolbar Mirror button opens a list of every mode with its words,
+        // the current one ticked; one pick sets it and the sidebar select follows.
+        const mm = await pop.eval("(function(){ document.getElementById('mirrorBtn').dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1})); var m=document.getElementById('mirrorMenu'); var rs=[].slice.call(m.querySelectorAll('input[type=radio]')); return { open: !m.hidden, role: m.getAttribute('role'), label: m.getAttribute('aria-label'), expanded: document.getElementById('mirrorBtn').getAttribute('aria-expanded'), rows: rs.map(function(r){ return r.value + ':' + r.parentNode.textContent; }), checked: (m.querySelector('input:checked')||{}).value }; })()", { gesture: true });
+        check('Mirror menu lists Light / Smooth / Off with their words, Smooth ticked', mm.open && mm.role === 'radiogroup' && mm.label === 'Mirror' && mm.expanded === 'true'
+            && mm.rows.length === 3 && /^light:Light.*12 fps/.test(mm.rows[0]) && /^smooth:Smooth.*24 fps/.test(mm.rows[1]) && /^off:Off.*blank/.test(mm.rows[2]) && mm.checked === 'smooth', mm);
+        const cyc = await pop.eval("document.querySelector('#mirrorMenu input[value=off]').click(); new Promise(r=>setTimeout(()=>r({ btn: document.getElementById('mirrorBtn').textContent, open: !document.getElementById('mirrorMenu').hidden, blank: !document.getElementById('blank').hidden }), 200))", { gesture: true });
         const cycMain = await main.eval("({ sel: document.getElementById('penWindowMirror').value, st: window.PenWindow.__state().mirror })");
-        check('toolbar Mirror button cycles Smooth → Off, sidebar select follows', /Off/.test(cyc) && cycMain.sel === 'off' && !cycMain.st.running, { cyc, cycMain });
+        check('picking Off in the Mirror menu: menu closes, blank surface, sidebar select follows', /Off/.test(cyc.btn) && !cyc.open && cyc.blank && cycMain.sel === 'off' && !cycMain.st.running, { cyc, cycMain });
+        // Main window -> popup: the list ticks what the sidebar picked.
+        await main.eval("var s=document.getElementById('penWindowMirror'); s.value='light'; s.dispatchEvent(new Event('change',{bubbles:true})); 1");
+        await sleep(150);
+        const back = await pop.eval("({ checked: (document.querySelector('#mirrorMenu input:checked')||{}).value, btn: document.getElementById('mirrorBtn').textContent })");
+        check('sidebar select -> popup Mirror menu ticks Light', back.checked === 'light' && /Light/.test(back.btn), back);
+        // Keyboard: Enter on the button opens the list on the current mode; Escape closes it back to the button.
+        const kb = await pop.eval("(function(){ var b=document.getElementById('mirrorBtn'); b.focus(); b.click(); var a=document.activeElement; var r1={ open: !document.getElementById('mirrorMenu').hidden, focus: a && a.value }; a.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})); r1.closed = document.getElementById('mirrorMenu').hidden; r1.backOnBtn = document.activeElement === b; b.blur(); return r1; })()", { gesture: true });
+        check('Mirror menu by keyboard: opens on the current mode, Escape returns to the button', kb.open && kb.focus === 'light' && kb.closed && kb.backOnBtn, kb);
         await main.eval("var s=document.getElementById('penWindowMirror'); s.value='light'; s.dispatchEvent(new Event('change',{bubbles:true})); 1");
         await sleep(200);
 

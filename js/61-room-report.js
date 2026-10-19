@@ -158,30 +158,7 @@
         return Promise.resolve(viaElectron());
     }
 
-    // The last item of the room panel's ⋯ menu (06e), for host and guest
-    // alike. data-stay keeps the menu open after the press, so "Copied" can
-    // be read where it was asked for.
-    (function mount() {
-        var menu = document.getElementById('mpRoomMenu');
-        if (!menu) { setTimeout(mount, 500); return; }
-        if (document.getElementById('roomReportBtn')) return;
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.id = 'roomReportBtn';
-        b.className = 'btn--ghost mp-menu-item mp-room-report';
-        b.setAttribute('role', 'menuitem');
-        b.setAttribute('data-stay', '');
-        b.textContent = 'Copy room report';
-        b.title = 'Copies where recent strokes landed, sent and received, with this canvas’s size and settings. ' +
-            'If strokes show up in the wrong place for someone, both of you press this and send the two reports.';
-        b.addEventListener('click', function () {
-            copy().then(function (ok) {
-                b.textContent = ok ? 'Copied' : 'Could not copy';
-                setTimeout(function () { b.textContent = 'Copy room report'; }, 1600);
-            });
-        });
-        menu.appendChild(b);
-    })();
-
+    // No menu item (Gabriel 2026-10-18: no use to a player). The trace still
+    // runs; __roomTrace.copy() in the console puts the report on the clipboard.
     window.__roomTrace = { note: note, resize: resize, report: report, copy: copy };
 })();

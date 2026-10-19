@@ -6,7 +6,7 @@
 // closes the moment you click the canvas. That is also why the palette's
 // [+] could only add whatever the brush dot held. This replaces it
 // everywhere with one picker:
-//   · OKLCH (default), HSL or RGB sliders; each track shows the colours
+//   · HSL (default), OKLCH or RGB sliders; each track shows the colours
 //     that slider would give, hatched where the screen can't show them
 //   · hex field + copy, before/now swatch, recent colours
 //   · an eyedropper with a loupe that samples a frozen copy of the frame
@@ -162,7 +162,7 @@
             fits: function () { return true; }
         }
     };
-    function savedSpace() { var s = smGet(SPACE_KEY, 'oklch'); return SPACES[s] ? s : 'oklch'; }
+    function savedSpace() { var s = smGet(SPACE_KEY, 'hsl'); return SPACES[s] ? s : 'hsl'; }
 
     var hatchCache = null;
     function hatch(ctx) {
@@ -327,6 +327,21 @@
                 else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); paint(); num.blur(); }
             });
             num.addEventListener('change', applyNum);
+            // The wheel over a channel's track or number steps it like the
+            // arrows (Shift for ten); one commit once the wheel rests.
+            var wheelT = 0;
+            function onWheel(e) {
+                if (!e.deltaY || dragging) return;
+                e.preventDefault();
+                e.stopPropagation();
+                var c = space.ch[i], st = c.step * (e.shiftKey ? 10 : 1);
+                if (document.activeElement === num) num.blur();
+                setChannel(i, vals[i] + (e.deltaY < 0 ? st : -st));
+                clearTimeout(wheelT);
+                wheelT = setTimeout(commit, 250);
+            }
+            track.addEventListener('wheel', onWheel, { passive: false });
+            num.addEventListener('wheel', onWheel, { passive: false });
             return { row: row, lab: lab, track: track, cv: cv, thumb: thumb, num: num };
         }
 
@@ -473,8 +488,13 @@
         hexIn.addEventListener('change', commit);
         copyBtn.addEventListener('click', function () {
             var done = function () {
-                copyBtn.textContent = 'Copied';
-                setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1200);
+                // A green flash, not a new word: the label kept changing width.
+                copyBtn.classList.remove('is-copied');
+                void copyBtn.offsetWidth;
+                copyBtn.classList.add('is-copied');
+                copyBtn.setAttribute('aria-label', 'Copied ' + hex);
+                clearTimeout(copyBtn._t);
+                copyBtn._t = setTimeout(function () { copyBtn.classList.remove('is-copied'); copyBtn.removeAttribute('aria-label'); }, 900);
             };
             try {
                 navigator.clipboard.writeText(hex).then(done, function () { hexIn.focus(); hexIn.select(); });
@@ -492,6 +512,7 @@
             var on = sample({
                 owner: api,
                 current: hex,
+                surface: opts.surface ? opts.surface() : null,
                 onPick: function (h) { pick(h); if (opts.onSample) opts.onSample(h); },
                 onEnd: function () { dropBtn.classList.remove('active'); dropBtn.setAttribute('aria-pressed', 'false'); }
             });
@@ -549,6 +570,14 @@
         var sel = el('select', 'cp-pal-select', headRow);
         sel.setAttribute('aria-label', 'Palette');
         sel.title = 'Choosing a palette turns Palette mode on: a new palette color each stroke.';
+        // "+ New palette" swaps the list for a name field: Enter makes it
+        // with the colour you're on, Escape (or leaving it empty) backs out.
+        var nameIn = el('input', 'cp-pal-name', headRow);
+        nameIn.type = 'text';
+        nameIn.placeholder = 'Name the new palette';
+        nameIn.setAttribute('aria-label', 'New palette name');
+        nameIn.spellcheck = false;
+        nameIn.hidden = true;
         var row = el('div', 'cp-pal-row', box);
         var lastKey = '';
         function render(force) {
@@ -564,6 +593,7 @@
             if (!force && key === lastKey) return;
             lastKey = key;
             sel.innerHTML = '';
+            el('option', null, sel, '+ New palette').value = 'new';
             pals.forEach(function (p, i) {
                 var o = el('option', null, sel, p.name);
                 o.value = String(i);
@@ -583,8 +613,38 @@
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); api.pick(h); }
                 });
             });
+            // [+] at the row's end puts the colour you're on into this palette.
+            var add = el('button', 'cp-chip cp-chip-add', row);
+            add.type = 'button';
+            add.setAttribute('aria-label', 'Add this color to the palette');
+            add.title = 'Add the color you have here to this palette';
+            add.addEventListener('click', function () {
+                if (typeof window.addColorToPalette === 'function') window.addColorToPalette(M.normalizeHex(api.get()));
+                render(true);
+                var again = row.querySelector('.cp-chip-add');
+                if (again) again.focus();
+            });
         }
+        function naming(on) {
+            nameIn.hidden = !on;
+            sel.hidden = on;
+            if (on) { nameIn.value = ''; nameIn.focus(); }
+            else { sel.value = String(window.currentPaletteIndex | 0); sel.focus(); }
+        }
+        nameIn.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var name = nameIn.value.trim();
+                if (name && typeof window.addNamedPalette === 'function') window.addNamedPalette(name, [M.normalizeHex(api.get())]);
+                render(true);
+                naming(false);
+            } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); naming(false); }
+        });
+        nameIn.addEventListener('blur', function () {
+            if (!nameIn.hidden && !nameIn.value.trim()) { nameIn.hidden = true; sel.hidden = false; sel.value = String(window.currentPaletteIndex | 0); }
+        });
         sel.addEventListener('change', function () {
+            if (sel.value === 'new') { naming(true); return; }
             var i = parseInt(sel.value, 10);
             if (typeof window.applyPalette === 'function' && !isNaN(i)) window.applyPalette(i);
             render(true);
@@ -630,6 +690,7 @@
             onInput: function (h) { if (pop) pop.picked = true; writeInput(input, h, 'input'); },
             onCommit: function (h) { if (pop) pop.picked = true; writeInput(input, h, 'change'); },
             onSample: function (h) { addRecent(h); },
+            surface: surfaces.has(input) ? surfaces.get(input) : null,
             extra: isBrush ? brushPaletteStrip : null
         });
         wrap.appendChild(picker.el);
@@ -862,24 +923,32 @@
     // GL canvas itself (instant), then the export compositor's frame with
     // picture layers and text, which replaces it and is shown over the
     // canvas so what you see is what you sample.
+    //
+    // A well inside a modal that shows its own picture (the mask editor)
+    // registers a surface instead: { area, image, map(clientX, clientY) ->
+    // {px, py} in image pixels or null }. The pick then reads that picture
+    // where it already is, and the frame is left alone.
     var sampling = null;
     var LOUPE_N = 11, LOUPE_CELL = 12;
+    var surfaces = new WeakMap();
 
     function sample(o) {
         o = o || {};
         if (sampling) cancelSampling();
-        var sim = document.getElementById('canvas');
+        var surf = o.surface && o.surface.area && o.surface.image ? o.surface : null;
+        var sim = surf ? surf.image : document.getElementById('canvas');
         if (!sim || !sim.width || !sim.height) return false;
         var s = {
             owner: o.owner || null, onPick: o.onPick, onEnd: o.onEnd,
             pressing: !!o.press, current: M.normalizeHex(o.current) || M.normalizeHex((brushInput() || {}).value) || '#000000',
             sim: sim, snap: document.createElement('canvas'), data: null, w: 0, h: 0,
             hex: null, x: o.press ? o.press.clientX : lastPointer.x, y: o.press ? o.press.clientY : lastPointer.y,
-            veil: null
+            veil: null, surface: surf
         };
         sampling = s;
         grab(s, sim);
-        if (window.fluidExport && typeof window.fluidExport.captureFrame === 'function') {
+        if (surf) surf.area.classList.add('cp-surface');
+        else if (window.fluidExport && typeof window.fluidExport.captureFrame === 'function') {
             try {
                 window.fluidExport.captureFrame().then(function (comp) {
                     if (sampling !== s || !comp || !comp.width) return;
@@ -952,6 +1021,11 @@
         lp.hidden = true;
     }
     function pointToPixel(s, x, y) {
+        if (s.surface) {
+            var q = s.surface.map(x, y);
+            if (!q || q.px < 0 || q.py < 0 || q.px >= s.w || q.py >= s.h) return null;
+            return { px: Math.floor(q.px), py: Math.floor(q.py) };
+        }
         var r = s.sim.getBoundingClientRect();
         if (!r.width || !r.height) return null;
         var u = (x - r.left) / r.width, v = (y - r.top) / r.height;
@@ -969,10 +1043,42 @@
         // A transparent frame (transparent mode) reads over black.
         return M.rgbToHex([d[o] * a / 255, d[o + 1] * a / 255, d[o + 2] * a / 255]);
     }
+    // Over a picker the dropper reads the picker's own colours: a track's
+    // canvas where it is, or a chip / swatch's own background. Anything
+    // else on the picker (its panel) is not a colour and reads nothing.
+    function uiHex(x, y) {
+        var els = document.elementsFromPoint(x, y);
+        for (var k = 0; k < els.length; k++) {
+            var e = els[k];
+            if (e.closest('.cp-loupe, .cp-veil')) continue;
+            if (!e.closest('.cp')) return null;
+            if (e.classList.contains('cp-track-canvas') && e.width && e.height) {
+                var r = e.getBoundingClientRect();
+                var px = Math.min(e.width - 1, Math.max(0, Math.floor((x - r.left) / r.width * e.width)));
+                var py = Math.min(e.height - 1, Math.max(0, Math.floor((y - r.top) / r.height * e.height)));
+                try {
+                    var d = e.getContext('2d').getImageData(px, py, 1, 1).data;
+                    return M.rgbToHex([d[0] / 255, d[1] / 255, d[2] / 255]);
+                } catch (_) { return null; }
+            }
+            for (var n = e; n && n.classList && !n.classList.contains('cp'); n = n.parentNode) {
+                var bg = n.style && (n.style.backgroundColor || n.style.background);
+                if (bg) {
+                    var m = getComputedStyle(n).backgroundColor.match(/[\d.]+/g);
+                    if (m && m.length >= 3) return M.rgbToHex([m[0] / 255, m[1] / 255, m[2] / 255]);
+                }
+            }
+            return null;
+        }
+        return null;
+    }
     function update(x, y) {
         var s = sampling;
         if (!s) return;
         s.x = x; s.y = y;
+        var uh = s.surface ? null : uiHex(x, y);
+        s.ui = !!uh;
+        if (uh) { flatLoupe(s, uh, x, y); return; }
         var p = pointToPixel(s, x, y);
         if (!p) { s.hex = null; s.loupe.hidden = true; return; }
         var h = pixelHex(s, p.px, p.py);
@@ -1004,6 +1110,20 @@
         s.loupeCanvas.style.borderColor = h;
         s.loupeNew.style.background = h;
         s.loupeHex.textContent = h;
+        placeLoupe(s, x, y);
+    }
+    function flatLoupe(s, h, x, y) {
+        s.hex = h;
+        s.loupe.hidden = false;
+        var ctx = s.loupeCanvas.getContext('2d'), W = s.loupeCanvas.width;
+        ctx.fillStyle = h;
+        ctx.fillRect(0, 0, W, W);
+        s.loupeCanvas.style.borderColor = h;
+        s.loupeNew.style.background = h;
+        s.loupeHex.textContent = h;
+        placeLoupe(s, x, y);
+    }
+    function placeLoupe(s, x, y) {
         // Up and to the right of the pointer, flipped near an edge.
         var lw = s.loupe.offsetWidth || 140, lh = s.loupe.offsetHeight || 180;
         var lx = x + 22, ly = y - lh - 22;
@@ -1013,6 +1133,7 @@
         s.loupe.style.top = ly + 'px';
     }
     function overCanvas(e) {
+        if (sampling && sampling.surface) return !!(e.target && sampling.surface.area.contains(e.target));
         var area = document.getElementById('canvas-area');
         return !!(area && e.target && area.contains(e.target)) || !!(sampling && sampling.veil && sampling.veil.contains(e.target));
     }
@@ -1026,7 +1147,7 @@
         var s = sampling;
         if (!s) return;
         if (e.button !== 0) { stop(e); cancelSampling(); return; }
-        if (!overCanvas(e)) {
+        if (!overCanvas(e) && !(!s.surface && uiHex(e.clientX, e.clientY))) {
             // The eyedropper button toggles itself off in its own handler.
             if (s.owner && e.target.closest && e.target.closest('.cp-drop')) return;
             cancelSampling();
@@ -1065,6 +1186,7 @@
         document.body.classList.remove('cp-sampling');
         if (s.loupe && s.loupe.parentNode) s.loupe.parentNode.removeChild(s.loupe);
         if (s.veil && s.veil.parentNode) s.veil.parentNode.removeChild(s.veil);
+        if (s.surface) s.surface.area.classList.remove('cp-surface');
         s.data = null;
         if (s.onEnd) s.onEnd();
     }
@@ -1105,6 +1227,10 @@
         inlineOpen: function () { return !!inline; },
         onPaletteRender: onPaletteRender,
         sample: sample,
+        // provider() is asked at each pick, so it can freeze the picture then.
+        setSurface: function (input, provider) {
+            if (provider) surfaces.set(input, provider); else surfaces.delete(input);
+        },
         isSampling: isSampling,
         cancelSampling: cancelSampling,
         recents: recents,

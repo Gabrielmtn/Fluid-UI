@@ -795,7 +795,7 @@
         aBar.id = 'text-arrange-bar';
         aBar.dataset.group = 'expressive';
         aBar.innerHTML =
-            '<span class="ba-title">✋ Arrange text</span>' +
+            '<span class="ba-title">Arrange text</span>' +
             '<span class="ba-hint">click to select · drag to move · corners resize · ↻ rotate · painting paused</span>' +
             '<button id="textArrangeDone" type="button">Done</button>';
         document.body.appendChild(aBar);

@@ -60,6 +60,8 @@
     // not guessed. Same spot and ground as the hotkey toast (js/49).
     var pill = null, cells = {}, hint = null, hideTimer = 0;
     function show(t, later) {
+        // Settings → Show hotkey notifications off (js/12): the key still steps.
+        if (window.hotkeyNoticesOn && !window.hotkeyNoticesOn()) { if (pill) pill.hidden = true; return; }
         if (!pill) {
             pill = document.createElement('div');
             pill.id = 'brushTypePill';

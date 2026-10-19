@@ -192,8 +192,8 @@
                                 <input type="range" id="colliderSize" min="1" max="30" step="0.5" value="11" data-no-scale="1">
                                 <span id="colliderSizeVal">11</span>
                             </label>
-                            <button id="colliderUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last collider stroke (Ctrl+Z)">↶</button>
-                            <button id="colliderRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo (Ctrl+Shift+Z)">↷</button>
+                            <button id="colliderUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last collider stroke (Ctrl+Z)" aria-label="Undo">Undo</button>
+                            <button id="colliderRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">Redo</button>
                             <label class="collider-size-label" title="Show the artwork as it looks right now behind the collider - a snapshot taken when ticked, for placing walls against the picture">
                                 <input type="checkbox" id="colliderViewArt"> View on canvas
                             </label>
@@ -230,6 +230,13 @@
                             <button class="mask-tool-btn" data-shape="hexagon" title="Stamp a Hexagon">⬡</button>
                             <button class="mask-tool-btn" data-shape="star" title="Stamp a Star">★</button>
                         </div>
+                        <!-- The selected stamp's turn: a sidebar-style row
+                             (label over the slider), shown once a shape is
+                             selected (updateRotationControl). -->
+                        <div class="control-group mask-slider" id="maskRotationControl" style="display: none;">
+                            <label for="maskRotationSlider">Rotation <span id="maskRotationValue" class="value-display">0°</span></label>
+                            <input type="range" id="maskRotationSlider" min="0" max="360" value="0" data-no-scale="1">
+                        </div>
                     </div>
                     <!-- Filter: the layer panel's Mask slider, brought into the
                          flow and given the background control it always needed
@@ -239,9 +246,9 @@
                             Set the background color, then use the slider to raise filter value to cut everything out from that background color.
                         </div>
                         <div class="mask-filter-row">
-                            <span class="mask-filter-label">Background</span>
-                            <input type="color" id="filterBgColor" value="#000000" title="The color being cut away">
-                            <button type="button" id="filterPickBtn" class="mask-action-btn" title="Then click the background on the image">Pick</button>
+                            <!-- One pane like Display's Background Color; its picker's eyedropper
+                                 reads this image, so there is no separate Pick (Gabriel 2026-10-18). -->
+                            <label class="btn ch-color-btn bg-color-btn mask-bg-color-btn" title="The color being cut away. The picker's eyedropper can take it from the image"><span class="ch-color-word">Background Color</span><input type="color" id="filterBgColor" value="#000000"></label>
                             <button type="button" id="filterAutoBtn" class="mask-action-btn" title="Guess it from the edges of the image">Auto</button>
                             <label class="mask-filter-check" title="Keep the background and drop the subject instead">
                                 <input type="checkbox" id="filterInvert"> Invert
@@ -284,14 +291,16 @@
                          missed the handle". -->
                     <div id="touchUpTools" class="mask-collider-tools" style="display:none;">
                         <div class="mask-collider-row">
-                            <button id="touchUpEraseBtn" class="mask-mode-btn collider-tool-btn active" title="Erase mask - wipe away stray bits the AI included">Erase</button>
-                            <button id="touchUpDrawBtn" class="mask-mode-btn collider-tool-btn" title="Add mask - paint in a piece the AI missed">Add</button>
-                            <label class="collider-size-label">Size
+                            <div class="mask-seg" role="group" aria-label="Touch-up brush">
+                                <button id="touchUpEraseBtn" class="mask-mode-btn collider-tool-btn active" title="Erase mask - wipe away stray bits the AI included">Erase</button>
+                                <button id="touchUpDrawBtn" class="mask-mode-btn collider-tool-btn" title="Add mask - paint in a piece the AI missed">Add</button>
+                            </div>
+                            <div class="control-group mask-slider">
+                                <label for="touchUpSize">Size <span id="touchUpSizeVal" class="value-display">14</span></label>
                                 <input type="range" id="touchUpSize" min="2" max="60" step="1" value="14" data-no-scale="1">
-                                <span id="touchUpSizeVal">14</span>
-                            </label>
-                            <button id="touchUpUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last touch-up stroke">↶</button>
-                            <button id="touchUpRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo">↷</button>
+                            </div>
+                            <button id="touchUpUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last touch-up stroke" aria-label="Undo">Undo</button>
+                            <button id="touchUpRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo" aria-label="Redo">Redo</button>
                             <button id="touchUpDespeckBtn" class="mask-mode-btn collider-tool-btn" title="Delete every disconnected speck smaller than a twentieth of the main shape">Remove specks</button>
                         </div>
                         <div class="mask-collider-hint" id="touchUpHint">Right-drag does the opposite of the selected tool. Shift+drag pans, scroll zooms.</div>
@@ -299,23 +308,15 @@
                     <!-- Step 3: soften (the layer's Feather, brought into the
                          flow) + the optional collider hand-off. -->
                     <div id="featherStep" class="mask-feather-step" style="display:none;">
-                        <label class="mask-feather-row">
-                            <span class="mask-feather-label">Soften edge</span>
+                        <div class="control-group mask-slider" id="maskFeatherRow">
+                            <label for="maskFeatherSlider">Soften edge <span id="maskFeatherValue" class="value-display">0%</span></label>
                             <input type="range" id="maskFeatherSlider" min="0" max="100" step="1" value="0" data-no-scale="1">
-                            <span id="maskFeatherValue" class="mask-feather-value">0%</span>
-                        </label>
-                        <div class="mask-feather-hint" id="maskFeatherHint">
-                            0% is a hard cut-out. Raise it for a soft edge - the same Feather that lives on the layer, set here so you never have to go back for it.
                         </div>
-                        <label class="mask-collider-opt" id="maskColliderOpt" style="display:none;">
-                            <input type="checkbox" id="maskMakeCollider"> Also make this a collision layer the fluid flows around
-                        </label>
-                    </div>
-                    <div class="mask-rotation-control" id="maskRotationControl" style="display: none; padding: 8px 12px; background: rgba(88, 166, 255, 0.05); border-radius: 6px; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #c9d1d9;">
-                            <span style="min-width: 70px;">Rotation:</span>
-                            <input type="range" id="maskRotationSlider" min="0" max="360" value="0" style="flex: 1;">
-                            <span id="maskRotationValue" style="min-width: 50px; text-align: right; font-weight: 600; color: #58a6ff;">0°</span>
+                        <div class="mask-feather-hint" id="maskFeatherHint">
+                            0% is a hard edge, increase to feather the mask edge.
+                        </div>
+                        <label class="mask-check-pane" id="maskColliderOpt" style="display:none;" title="Also make a collision layer from this mask - the fluid flows around it">
+                            <input type="checkbox" id="maskMakeCollider"> Duplicate Mask as a collider layer
                         </label>
                     </div>
                 </div>
@@ -449,6 +450,11 @@
                 invalidateFilterPreview();
                 scheduleMaskRender();
             });
+            // The picker's eyedropper reads the picture in this editor rather
+            // than veiling it with a frozen frame of the fluid.
+            if (window.ColourPicker && window.ColourPicker.setSurface) {
+                window.ColourPicker.setSurface(fBg, filterSampleSurface);
+            }
         }
         const fPick = overlay.querySelector('#filterPickBtn');
         if (fPick) {
@@ -2375,6 +2381,38 @@
         } catch (_) { return null; }
     }
 
+    // For the colour picker's eyedropper: the filter's source at its own
+    // size, and a map from the editor canvas on screen to its pixels.
+    function filterSampleSurface() {
+        const canvas = document.getElementById('maskEditorCanvas');
+        const el = filterSourceElement();
+        if (!canvas || !el) return null;
+        const sw = el.naturalWidth || el.videoWidth || el.width || 0;
+        const sh = el.naturalHeight || el.videoHeight || el.height || 0;
+        if (!sw || !sh) return null;
+        const image = document.createElement('canvas');
+        image.width = sw; image.height = sh;
+        try { image.getContext('2d').drawImage(el, 0, 0, sw, sh); } catch (_) { return null; }
+        return {
+            area: canvas,
+            image: image,
+            map: function (clientX, clientY) {
+                const rect = canvas.getBoundingClientRect();
+                if (!rect.width || !rect.height) return null;
+                if (clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) return null;
+                const screenX = (clientX - rect.left) * (canvas.width / rect.width);
+                const screenY = (clientY - rect.top) * (canvas.height / rect.height);
+                const p = fromLayerView(
+                    (screenX - maskState.panX) / maskState.zoom,
+                    (screenY - maskState.panY) / maskState.zoom,
+                    canvas
+                );
+                const ext = maskExtent();
+                return { px: (p.x / ext.w) * sw, py: (p.y / ext.h) * sh };
+            }
+        };
+    }
+
     function filterHex() {
         const bg = maskState.filterBg || { r: 0, g: 0, b: 0 };
         const h = (v) => ('0' + Math.max(0, Math.min(255, v | 0)).toString(16)).slice(-2);
@@ -2723,7 +2761,7 @@
         tu.tint = null;
         renderMaskEditor();
         setStepHint('<strong style="color:#3fb950;">Removed ' + removed + ' stray ' +
-            (removed === 1 ? 'speck' : 'specks') + '</strong> - ↶ puts them back.', 3200);
+            (removed === 1 ? 'speck' : 'specks') + '</strong> - Undo puts them back.', 3200);
     }
 
     // Fold the brushed coverage back into maskState.shapes (one soft
@@ -2956,11 +2994,11 @@
 
         // Feather only exists where a consumer honours it
         const canFeather = wizardSupportsFeather();
-        wizardSetDisplay(overlay, '.mask-feather-row', canFeather);
+        wizardSetDisplay(overlay, '#maskFeatherRow', canFeather);
         const fHint = overlay.querySelector('#maskFeatherHint');
         if (fHint) {
             fHint.textContent = canFeather
-                ? '0% is a hard cut-out. Raise it for a soft edge - this is the same Feather that lives on the layer, set here so you never have to go back for it.'
+                ? '0% is a hard edge, increase to feather the mask edge.'
                 : 'This mask is tested per point, so it has no soft edge to set. Check the shape below, then apply.';
         }
 
@@ -3303,7 +3341,7 @@
                 if (el) el.style.display = on ? 'none' : '';
             });
         // Live edits — there is nothing to "apply", and Cancel cannot undo
-        // GPU strokes (the ↶ button does that).
+        // GPU strokes (the Undo button does that).
         var cancelBtn = overlay.querySelector('.mask-cancel-btn');
         if (cancelBtn) cancelBtn.style.display = on ? 'none' : '';
         var applyBtn = overlay.querySelector('.mask-apply-btn');

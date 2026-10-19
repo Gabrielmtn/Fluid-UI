@@ -365,7 +365,9 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
 /* The hub: the yin-yang filigree, on the input's ::after so it can turn.
    It is the dial's atom (study atomD at the dial centre): js/71 spins it
    with the flywheel when the dial changes (--wc-rot, written only while it
-   moves) and it coasts to rest. Reduced motion: it stays still. */
+   moves) and it coasts to rest. Reduced motion: it stays still.
+   The art's centre is (48.02, 49.96), not (50, 50), so the viewBox is
+   shifted onto it; at 0 0 it wobbled 1.2 px as it turned. */
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
     [data-ui-key="Viscosity"], [data-ui-key="Isolation"], [data-ui-key="Density"], [data-ui-key="Velocity"]) input[type=range] {
     position: relative;
@@ -381,7 +383,7 @@ html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is(
     height: 30px;
     margin: -15px 0 0 -15px;
     pointer-events: none;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23f2b38a' stroke='%23f2b38a' stroke-width='0.9' stroke-linejoin='round'%3E %3Cpath vector-effect='non-scaling-stroke' d='M49.51 2.99C50.39 3.38 51.07 3.65 51.71 3.98C54.9 5.61 56.57 8.69 56 11.84C55.57 14.18 53.58 16.01 51.25 16.19C49.07 16.36 47.05 15.01 46.34 12.92C45.46 10.34 47.43 7.65 49.97 7.98C51.68 8.2 52.81 10.06 52.07 11.45C51.95 11.67 51.83 11.96 51.5 11.83C51.19 11.7 51.37 11.46 51.46 11.26C51.79 10.46 51.67 9.73 51.04 9.16C50.37 8.55 49.57 8.4 48.71 8.72C47.29 9.25 46.44 10.98 46.88 12.52C47.35 14.14 48.46 15.15 50.11 15.46C51.87 15.78 53.36 15.18 54.43 13.75C55.81 11.89 55.81 9.86 54.78 7.86C53.16 4.7 48.64 2.62 45.2 3.47C39.75 4.83 35.41 7.84 32.21 12.45C30.61 14.75 29.54 17.3 28.85 20.15C29.33 19.79 29.44 19.35 29.67 18.99C30.65 17.48 31.82 16.17 33.58 15.6C35.43 14.99 37.16 15.27 38.58 16.65C39.96 17.99 40.35 19.66 39.83 21.51C39.32 23.29 37.54 24.57 35.71 24.55C34.07 24.52 32.69 23.44 32.27 21.84C31.83 20.22 32.82 18.58 34.44 18.24C35.98 17.93 37.48 19.22 37.25 20.67C37.21 20.91 37.22 21.25 36.88 21.26C36.46 21.27 36.6 20.93 36.6 20.7C36.57 19.58 36.04 18.94 35.08 18.85C34.17 18.76 33.21 19.46 32.91 20.42C32.34 22.25 34.24 24.22 36.24 23.88C38.01 23.59 39.37 22 39.44 20.18C39.5 18.3 38.05 16.42 36.19 16.06C33.79 15.6 32.1 16.79 30.76 18.57C29.46 20.29 28.67 22.26 28.49 24.41C28.15 28.54 29.22 32.35 31.28 35.9C31.39 36.09 31.42 36.39 31.74 36.42C31.75 36.38 31.78 36.35 31.77 36.32C31.74 36.06 31.69 35.81 31.65 35.56C31.41 33.77 31.69 32.09 32.86 30.67C34.28 28.95 36.13 28.31 38.28 28.85C40.25 29.34 41.43 30.68 41.68 32.69C41.87 34.15 41.42 35.44 40.17 36.32C39.03 37.11 37.81 37.27 36.55 36.56C35.21 35.79 34.77 34 35.64 32.83C36.29 31.95 37.6 31.7 38.36 32.31C38.56 32.47 38.83 32.65 38.66 32.94C38.46 33.31 38.26 33.01 38.05 32.89C37.12 32.36 36.17 32.75 35.89 33.78C35.68 34.54 35.95 35.17 36.5 35.69C37.83 36.95 40.11 36.3 40.82 34.47C41.6 32.48 40.5 30.26 38.39 29.54C35.07 28.41 31.72 31.48 32.23 35.21C32.55 37.5 33.67 39.36 35.36 40.9C38.98 44.18 43.23 45.95 48.11 46.3C58.03 47.02 65.89 51.48 70.99 60.01C77.06 70.13 76.39 80.38 70.52 90.44C70.37 90.69 70.23 90.95 69.97 91.43C72.13 90.25 73.93 89.03 75.63 87.67C92.55 74.1 98.5 50.79 89.82 30.91C83.14 15.62 71.77 5.92 54.95 3.26C53.23 2.99 51.49 2.86 49.51 2.99ZM94.34 52.01C93.76 67.28 86.9 81.09 72.35 90.76C71.37 91.41 70.31 91.96 69.28 92.54C69.02 92.68 68.71 93 68.44 92.63C68.2 92.31 68.56 92.11 68.71 91.9C71.28 88.34 73.09 84.45 73.92 80.13C76.25 68.09 70.89 56.52 60.22 50.46C56.2 48.17 51.84 47.27 47.29 46.85C36.24 45.82 27.83 36.53 27.73 25.42C27.63 14.63 34.68 5.33 44.84 2.89C49.17 1.85 53.52 2.22 57.81 3.09C68.93 5.35 77.74 11.32 84.5 20.29C91.12 29.07 94.25 39.08 94.34 52.01Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M6.61 70.22C11.28 80.35 18.52 87.94 28.56 92.8C28.56 92.64 28.5 92.52 28.43 92.42C25.46 88.42 24.38 83.93 24.98 79.02C25.08 78.21 24.6 78.39 24.19 78.39C20.08 78.41 16.29 77.3 12.77 75.22C10.46 73.86 8.49 72.1 6.61 70.22ZM2.51 54.66C2.74 58.55 3.52 62.33 4.8 66C5 66.58 5.22 67.14 5.59 67.64C10.36 74.15 16.63 77.82 24.86 77.74C25.61 77.74 25.76 77.93 25.65 78.68C24.94 83.67 26.02 88.22 29.09 92.26C29.82 93.21 30.67 93.89 31.8 94.29C33.98 95.07 36.17 95.75 38.47 96.18C34.28 94.14 31.05 91.16 29.48 86.73C27.92 82.34 28.02 77.98 30.54 73.85C30.24 73.92 29.94 74 29.63 74.07C22.09 75.81 15.55 74.04 10.11 68.46C6.95 65.22 4.73 61.39 3.28 57.12C3 56.3 2.77 55.48 2.51 54.66ZM8.42 26.14C7.35 27.88 6.46 29.71 5.69 31.59C3.54 36.9 2.13 42.42 2.28 48.14C2.47 55.54 5.16 62.08 10.15 67.6C18.67 77 30.95 74.91 37.04 69.66C38.34 68.53 39.47 67.28 40.19 65.7C41.64 62.48 40.27 58.57 37.18 57.06C34.27 55.63 30.65 56.89 29.04 59.88C28.03 61.77 28.41 64 29.99 65.39C31.16 66.43 32.69 66.56 33.78 65.72C34.79 64.94 34.93 63.48 34.06 62.81C33.83 62.63 33.3 62.56 33.59 62.16C33.86 61.79 34.24 62.11 34.5 62.33C34.96 62.72 35.21 63.23 35.25 63.84C35.35 65.43 34.2 66.72 32.55 66.87C30.27 67.07 28.22 65.26 27.91 62.78C27.4 58.57 31.96 54.86 36.22 56.02C40.84 57.27 42.85 62.73 40.25 66.98C39.09 68.87 37.48 70.31 35.63 71.52C35.35 71.71 34.97 71.79 34.82 72.19C35.61 72.31 36.34 72.52 36.99 72.96C38.47 73.98 39.09 76.02 38.32 77.43C37.9 78.19 37.28 78.65 36.38 78.63C35.57 78.6 35 78.18 34.62 77.48C34.5 77.26 34.33 77 34.64 76.81C34.93 76.64 35 76.92 35.11 77.11C35.48 77.76 36.02 78.14 36.77 77.94C37.55 77.74 37.88 77.11 37.99 76.37C38.21 74.85 37.12 73.37 35.5 72.97C33.17 72.39 30.66 73.97 29.86 76.63C28.95 79.63 28.82 82.7 29.79 85.72C31.62 91.38 35.77 94.66 41.22 96.47C44.99 97.72 48.84 95.84 50.34 92.15C51.23 89.95 50.76 87.53 49.12 85.94C46.77 83.64 43.05 84.25 41.69 87.14C40.94 88.72 41.39 90.52 42.77 91.52C43.9 92.35 45.33 92.32 46.31 91.44C47.23 90.61 47.27 89.68 46.43 88.3C46.32 88.12 46.23 87.96 46.42 87.8C46.57 87.68 46.73 87.76 46.86 87.85C47.19 88.08 47.39 88.41 47.53 88.77C47.93 89.83 47.72 90.82 47.01 91.65C46.23 92.57 45.18 92.94 43.99 92.72C40.83 92.13 39.63 88.36 41.78 85.77C43.09 84.2 44.8 83.62 46.78 84.01C49.08 84.46 50.47 85.98 51.17 88.15C52.09 90.99 50.64 94.36 47.76 96.25C47.43 96.46 47 96.56 46.77 96.98C58.09 96.33 65.54 87.39 66.58 79.9C66.01 80.75 65.53 81.53 64.98 82.26C64.01 83.55 62.77 84.48 61.15 84.83C58.9 85.31 56.66 84.14 55.74 81.99C54.88 79.99 55.53 77.64 57.29 76.43C59.4 74.98 62.2 75.82 62.99 78.14C63.51 79.65 62.85 81.29 61.47 81.86C60.57 82.24 59.7 82.13 58.93 81.54C58.29 81.05 58.03 80.39 58.12 79.59C58.15 79.32 58.21 79.03 58.53 79.06C58.84 79.08 58.77 79.35 58.75 79.58C58.68 80.51 59.11 81.14 60 81.37C60.91 81.6 61.65 81.23 62.15 80.46C62.76 79.52 62.67 78.56 62.06 77.66C61.4 76.69 60.44 76.21 59.25 76.37C57.19 76.64 55.76 78.56 56.04 80.66C56.33 82.9 58.41 84.56 60.59 84.28C62.77 83.99 64.1 82.53 65.21 80.83C67.39 77.51 67.6 73.87 66.71 70.11C66.08 67.45 65.1 64.94 63.33 62.51C63.45 63.21 63.55 63.66 63.6 64.13C63.8 65.94 63.33 67.57 62.13 68.95C59.86 71.58 55.63 71.22 54.04 68.28C52.77 65.92 53.91 63.12 56.4 62.53C57.56 62.25 58.58 62.56 59.37 63.45C60.06 64.23 60.2 65.17 59.82 66.15C59.33 67.37 57.73 67.88 56.79 67.13C56.6 66.98 56.31 66.8 56.52 66.51C56.69 66.28 56.92 66.43 57.11 66.57C57.66 66.95 58.21 66.91 58.73 66.55C59.29 66.17 59.41 65.57 59.35 64.93C59.29 64.24 58.92 63.74 58.32 63.41C56.7 62.52 54.59 63.66 54.25 65.6C53.92 67.49 55.19 69.42 57.09 69.94C60.09 70.76 63.05 68.23 63 64.86C62.97 62.54 61.94 60.65 60.31 59.09C56.68 55.62 52.27 53.91 47.31 53.58C35.33 52.77 25.19 44.76 21.79 33.21C19.4 25.1 20.76 17.43 24.86 10.15C25.06 9.8 25.34 9.48 25.42 8.95C19.1 14.17 13.83 21.53 11.57 29.45C10.54 33.06 9.98 36.72 10.61 40.46C11.05 43.06 11.96 45.44 14.32 46.93C16.01 47.99 17.84 48.19 19.61 47.18C21.29 46.21 22.15 44.68 22.14 42.72C22.13 40.74 20.62 38.96 18.72 38.62C17.3 38.37 15.86 39.13 15.33 40.41C14.8 41.68 15.15 42.74 16.41 43.61C16.59 43.73 16.86 43.81 16.73 44.1C16.57 44.46 16.31 44.27 16.08 44.17C14.88 43.67 14.2 42.09 14.56 40.68C15.21 38.21 18.07 37.18 20.38 38.57C22.51 39.85 23.35 42.47 22.4 44.87C21.35 47.52 18.69 48.95 15.94 48.27C12.9 47.53 11.31 45.32 10.44 42.51C9.46 39.32 9.54 36.06 10.13 32.8C11.65 24.41 15.84 17.45 21.74 11.43C21.94 11.22 22.26 11.08 22.32 10.74C22.16 10.61 22.07 10.73 21.97 10.8C15.11 15.61 10.06 21.74 7.98 30.02C6.46 36.06 6.4 42.01 9.14 47.77C9.26 48.01 9.51 48.34 9.14 48.51C8.76 48.68 8.69 48.26 8.55 48.03C8.44 47.84 8.37 47.62 8.28 47.42C6.09 42.42 5.93 37.24 6.88 31.96C7.23 29.98 7.86 28.07 8.42 26.14ZM1.51 49.96C1.9 33.91 8.04 20.68 20.89 10.78C22.62 9.45 24.48 8.3 26.41 7.28C26.67 7.14 26.96 6.78 27.26 7.06C27.62 7.4 27.2 7.7 27.02 7.96C24.51 11.55 22.78 15.48 21.86 19.76C18.59 34.99 29.48 50.56 44.86 52.65C47.05 52.95 49.26 53.01 51.42 53.54C60.35 55.75 67.02 63.47 67.75 72.65C68.5 82.16 65 89.64 56.75 94.63C51.85 97.59 46.46 98.15 40.87 97.32C21.53 94.46 5.71 78.83 2.22 58.5C1.73 55.69 1.5 52.85 1.51 49.96Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M66.47 12.02C69.62 12.12 72.41 13.27 74.94 15.05C80.6 19.03 84.38 24.46 86.96 30.79C87.35 31.74 87.67 32.71 88 33.68C88.09 33.96 88.37 34.35 87.89 34.48C87.52 34.58 87.48 34.14 87.4 33.89C86.64 31.36 85.57 28.97 84.29 26.67C81.87 22.29 78.76 18.51 74.64 15.62C72.38 14.04 69.91 12.95 67.12 12.67C64.05 12.37 61.43 13.71 60.33 16.16C58.92 19.33 61.12 22.86 64.46 22.8C66.2 22.76 67.74 21.43 68.01 19.72C68.2 18.53 67.62 17.34 66.6 16.8C65.58 16.27 64.69 16.47 63.7 17.48C63.55 17.63 63.42 17.9 63.17 17.7C62.95 17.53 63.1 17.29 63.2 17.09C63.67 16.17 65.05 15.66 66.23 15.97C68 16.45 69.05 18.27 68.6 20.11C68.01 22.56 65.55 23.97 63.09 23.25C61.03 22.65 59.68 21.29 59.34 19.17C58.95 16.76 59.83 14.75 61.83 13.31C63.2 12.32 64.8 12 66.47 12.02Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M47.96 30.52C50.97 30.5 53.44 28.09 53.46 25.13C53.48 21.92 50.96 19.33 47.87 19.38C44.89 19.42 42.38 21.98 42.39 24.96C42.41 28.04 44.9 30.53 47.96 30.52ZM41.76 24.93C41.74 21.53 44.49 18.76 47.91 18.75C51.37 18.73 54.08 21.47 54.09 24.99C54.1 28.43 51.41 31.15 47.96 31.18C44.55 31.22 41.78 28.42 41.76 24.93Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M47.51 80.51C50.6 80.52 53.09 78.05 53.1 74.97C53.12 71.93 50.59 69.37 47.56 69.36C44.52 69.34 42.01 71.88 42.01 74.96C42.02 77.97 44.53 80.51 47.51 80.51ZM41.38 74.87C41.38 71.45 44.11 68.74 47.55 68.73C50.96 68.72 53.71 71.46 53.73 74.88C53.75 78.39 51.06 81.15 47.61 81.18C44.15 81.21 41.38 78.4 41.38 74.87Z'/%3E %3C/svg%3E") center / contain no-repeat;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1.98 -0.04 100 100' fill='%23f2b38a' stroke='%23f2b38a' stroke-width='0.9' stroke-linejoin='round'%3E %3Cpath vector-effect='non-scaling-stroke' d='M49.51 2.99C50.39 3.38 51.07 3.65 51.71 3.98C54.9 5.61 56.57 8.69 56 11.84C55.57 14.18 53.58 16.01 51.25 16.19C49.07 16.36 47.05 15.01 46.34 12.92C45.46 10.34 47.43 7.65 49.97 7.98C51.68 8.2 52.81 10.06 52.07 11.45C51.95 11.67 51.83 11.96 51.5 11.83C51.19 11.7 51.37 11.46 51.46 11.26C51.79 10.46 51.67 9.73 51.04 9.16C50.37 8.55 49.57 8.4 48.71 8.72C47.29 9.25 46.44 10.98 46.88 12.52C47.35 14.14 48.46 15.15 50.11 15.46C51.87 15.78 53.36 15.18 54.43 13.75C55.81 11.89 55.81 9.86 54.78 7.86C53.16 4.7 48.64 2.62 45.2 3.47C39.75 4.83 35.41 7.84 32.21 12.45C30.61 14.75 29.54 17.3 28.85 20.15C29.33 19.79 29.44 19.35 29.67 18.99C30.65 17.48 31.82 16.17 33.58 15.6C35.43 14.99 37.16 15.27 38.58 16.65C39.96 17.99 40.35 19.66 39.83 21.51C39.32 23.29 37.54 24.57 35.71 24.55C34.07 24.52 32.69 23.44 32.27 21.84C31.83 20.22 32.82 18.58 34.44 18.24C35.98 17.93 37.48 19.22 37.25 20.67C37.21 20.91 37.22 21.25 36.88 21.26C36.46 21.27 36.6 20.93 36.6 20.7C36.57 19.58 36.04 18.94 35.08 18.85C34.17 18.76 33.21 19.46 32.91 20.42C32.34 22.25 34.24 24.22 36.24 23.88C38.01 23.59 39.37 22 39.44 20.18C39.5 18.3 38.05 16.42 36.19 16.06C33.79 15.6 32.1 16.79 30.76 18.57C29.46 20.29 28.67 22.26 28.49 24.41C28.15 28.54 29.22 32.35 31.28 35.9C31.39 36.09 31.42 36.39 31.74 36.42C31.75 36.38 31.78 36.35 31.77 36.32C31.74 36.06 31.69 35.81 31.65 35.56C31.41 33.77 31.69 32.09 32.86 30.67C34.28 28.95 36.13 28.31 38.28 28.85C40.25 29.34 41.43 30.68 41.68 32.69C41.87 34.15 41.42 35.44 40.17 36.32C39.03 37.11 37.81 37.27 36.55 36.56C35.21 35.79 34.77 34 35.64 32.83C36.29 31.95 37.6 31.7 38.36 32.31C38.56 32.47 38.83 32.65 38.66 32.94C38.46 33.31 38.26 33.01 38.05 32.89C37.12 32.36 36.17 32.75 35.89 33.78C35.68 34.54 35.95 35.17 36.5 35.69C37.83 36.95 40.11 36.3 40.82 34.47C41.6 32.48 40.5 30.26 38.39 29.54C35.07 28.41 31.72 31.48 32.23 35.21C32.55 37.5 33.67 39.36 35.36 40.9C38.98 44.18 43.23 45.95 48.11 46.3C58.03 47.02 65.89 51.48 70.99 60.01C77.06 70.13 76.39 80.38 70.52 90.44C70.37 90.69 70.23 90.95 69.97 91.43C72.13 90.25 73.93 89.03 75.63 87.67C92.55 74.1 98.5 50.79 89.82 30.91C83.14 15.62 71.77 5.92 54.95 3.26C53.23 2.99 51.49 2.86 49.51 2.99ZM94.34 52.01C93.76 67.28 86.9 81.09 72.35 90.76C71.37 91.41 70.31 91.96 69.28 92.54C69.02 92.68 68.71 93 68.44 92.63C68.2 92.31 68.56 92.11 68.71 91.9C71.28 88.34 73.09 84.45 73.92 80.13C76.25 68.09 70.89 56.52 60.22 50.46C56.2 48.17 51.84 47.27 47.29 46.85C36.24 45.82 27.83 36.53 27.73 25.42C27.63 14.63 34.68 5.33 44.84 2.89C49.17 1.85 53.52 2.22 57.81 3.09C68.93 5.35 77.74 11.32 84.5 20.29C91.12 29.07 94.25 39.08 94.34 52.01Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M6.61 70.22C11.28 80.35 18.52 87.94 28.56 92.8C28.56 92.64 28.5 92.52 28.43 92.42C25.46 88.42 24.38 83.93 24.98 79.02C25.08 78.21 24.6 78.39 24.19 78.39C20.08 78.41 16.29 77.3 12.77 75.22C10.46 73.86 8.49 72.1 6.61 70.22ZM2.51 54.66C2.74 58.55 3.52 62.33 4.8 66C5 66.58 5.22 67.14 5.59 67.64C10.36 74.15 16.63 77.82 24.86 77.74C25.61 77.74 25.76 77.93 25.65 78.68C24.94 83.67 26.02 88.22 29.09 92.26C29.82 93.21 30.67 93.89 31.8 94.29C33.98 95.07 36.17 95.75 38.47 96.18C34.28 94.14 31.05 91.16 29.48 86.73C27.92 82.34 28.02 77.98 30.54 73.85C30.24 73.92 29.94 74 29.63 74.07C22.09 75.81 15.55 74.04 10.11 68.46C6.95 65.22 4.73 61.39 3.28 57.12C3 56.3 2.77 55.48 2.51 54.66ZM8.42 26.14C7.35 27.88 6.46 29.71 5.69 31.59C3.54 36.9 2.13 42.42 2.28 48.14C2.47 55.54 5.16 62.08 10.15 67.6C18.67 77 30.95 74.91 37.04 69.66C38.34 68.53 39.47 67.28 40.19 65.7C41.64 62.48 40.27 58.57 37.18 57.06C34.27 55.63 30.65 56.89 29.04 59.88C28.03 61.77 28.41 64 29.99 65.39C31.16 66.43 32.69 66.56 33.78 65.72C34.79 64.94 34.93 63.48 34.06 62.81C33.83 62.63 33.3 62.56 33.59 62.16C33.86 61.79 34.24 62.11 34.5 62.33C34.96 62.72 35.21 63.23 35.25 63.84C35.35 65.43 34.2 66.72 32.55 66.87C30.27 67.07 28.22 65.26 27.91 62.78C27.4 58.57 31.96 54.86 36.22 56.02C40.84 57.27 42.85 62.73 40.25 66.98C39.09 68.87 37.48 70.31 35.63 71.52C35.35 71.71 34.97 71.79 34.82 72.19C35.61 72.31 36.34 72.52 36.99 72.96C38.47 73.98 39.09 76.02 38.32 77.43C37.9 78.19 37.28 78.65 36.38 78.63C35.57 78.6 35 78.18 34.62 77.48C34.5 77.26 34.33 77 34.64 76.81C34.93 76.64 35 76.92 35.11 77.11C35.48 77.76 36.02 78.14 36.77 77.94C37.55 77.74 37.88 77.11 37.99 76.37C38.21 74.85 37.12 73.37 35.5 72.97C33.17 72.39 30.66 73.97 29.86 76.63C28.95 79.63 28.82 82.7 29.79 85.72C31.62 91.38 35.77 94.66 41.22 96.47C44.99 97.72 48.84 95.84 50.34 92.15C51.23 89.95 50.76 87.53 49.12 85.94C46.77 83.64 43.05 84.25 41.69 87.14C40.94 88.72 41.39 90.52 42.77 91.52C43.9 92.35 45.33 92.32 46.31 91.44C47.23 90.61 47.27 89.68 46.43 88.3C46.32 88.12 46.23 87.96 46.42 87.8C46.57 87.68 46.73 87.76 46.86 87.85C47.19 88.08 47.39 88.41 47.53 88.77C47.93 89.83 47.72 90.82 47.01 91.65C46.23 92.57 45.18 92.94 43.99 92.72C40.83 92.13 39.63 88.36 41.78 85.77C43.09 84.2 44.8 83.62 46.78 84.01C49.08 84.46 50.47 85.98 51.17 88.15C52.09 90.99 50.64 94.36 47.76 96.25C47.43 96.46 47 96.56 46.77 96.98C58.09 96.33 65.54 87.39 66.58 79.9C66.01 80.75 65.53 81.53 64.98 82.26C64.01 83.55 62.77 84.48 61.15 84.83C58.9 85.31 56.66 84.14 55.74 81.99C54.88 79.99 55.53 77.64 57.29 76.43C59.4 74.98 62.2 75.82 62.99 78.14C63.51 79.65 62.85 81.29 61.47 81.86C60.57 82.24 59.7 82.13 58.93 81.54C58.29 81.05 58.03 80.39 58.12 79.59C58.15 79.32 58.21 79.03 58.53 79.06C58.84 79.08 58.77 79.35 58.75 79.58C58.68 80.51 59.11 81.14 60 81.37C60.91 81.6 61.65 81.23 62.15 80.46C62.76 79.52 62.67 78.56 62.06 77.66C61.4 76.69 60.44 76.21 59.25 76.37C57.19 76.64 55.76 78.56 56.04 80.66C56.33 82.9 58.41 84.56 60.59 84.28C62.77 83.99 64.1 82.53 65.21 80.83C67.39 77.51 67.6 73.87 66.71 70.11C66.08 67.45 65.1 64.94 63.33 62.51C63.45 63.21 63.55 63.66 63.6 64.13C63.8 65.94 63.33 67.57 62.13 68.95C59.86 71.58 55.63 71.22 54.04 68.28C52.77 65.92 53.91 63.12 56.4 62.53C57.56 62.25 58.58 62.56 59.37 63.45C60.06 64.23 60.2 65.17 59.82 66.15C59.33 67.37 57.73 67.88 56.79 67.13C56.6 66.98 56.31 66.8 56.52 66.51C56.69 66.28 56.92 66.43 57.11 66.57C57.66 66.95 58.21 66.91 58.73 66.55C59.29 66.17 59.41 65.57 59.35 64.93C59.29 64.24 58.92 63.74 58.32 63.41C56.7 62.52 54.59 63.66 54.25 65.6C53.92 67.49 55.19 69.42 57.09 69.94C60.09 70.76 63.05 68.23 63 64.86C62.97 62.54 61.94 60.65 60.31 59.09C56.68 55.62 52.27 53.91 47.31 53.58C35.33 52.77 25.19 44.76 21.79 33.21C19.4 25.1 20.76 17.43 24.86 10.15C25.06 9.8 25.34 9.48 25.42 8.95C19.1 14.17 13.83 21.53 11.57 29.45C10.54 33.06 9.98 36.72 10.61 40.46C11.05 43.06 11.96 45.44 14.32 46.93C16.01 47.99 17.84 48.19 19.61 47.18C21.29 46.21 22.15 44.68 22.14 42.72C22.13 40.74 20.62 38.96 18.72 38.62C17.3 38.37 15.86 39.13 15.33 40.41C14.8 41.68 15.15 42.74 16.41 43.61C16.59 43.73 16.86 43.81 16.73 44.1C16.57 44.46 16.31 44.27 16.08 44.17C14.88 43.67 14.2 42.09 14.56 40.68C15.21 38.21 18.07 37.18 20.38 38.57C22.51 39.85 23.35 42.47 22.4 44.87C21.35 47.52 18.69 48.95 15.94 48.27C12.9 47.53 11.31 45.32 10.44 42.51C9.46 39.32 9.54 36.06 10.13 32.8C11.65 24.41 15.84 17.45 21.74 11.43C21.94 11.22 22.26 11.08 22.32 10.74C22.16 10.61 22.07 10.73 21.97 10.8C15.11 15.61 10.06 21.74 7.98 30.02C6.46 36.06 6.4 42.01 9.14 47.77C9.26 48.01 9.51 48.34 9.14 48.51C8.76 48.68 8.69 48.26 8.55 48.03C8.44 47.84 8.37 47.62 8.28 47.42C6.09 42.42 5.93 37.24 6.88 31.96C7.23 29.98 7.86 28.07 8.42 26.14ZM1.51 49.96C1.9 33.91 8.04 20.68 20.89 10.78C22.62 9.45 24.48 8.3 26.41 7.28C26.67 7.14 26.96 6.78 27.26 7.06C27.62 7.4 27.2 7.7 27.02 7.96C24.51 11.55 22.78 15.48 21.86 19.76C18.59 34.99 29.48 50.56 44.86 52.65C47.05 52.95 49.26 53.01 51.42 53.54C60.35 55.75 67.02 63.47 67.75 72.65C68.5 82.16 65 89.64 56.75 94.63C51.85 97.59 46.46 98.15 40.87 97.32C21.53 94.46 5.71 78.83 2.22 58.5C1.73 55.69 1.5 52.85 1.51 49.96Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M66.47 12.02C69.62 12.12 72.41 13.27 74.94 15.05C80.6 19.03 84.38 24.46 86.96 30.79C87.35 31.74 87.67 32.71 88 33.68C88.09 33.96 88.37 34.35 87.89 34.48C87.52 34.58 87.48 34.14 87.4 33.89C86.64 31.36 85.57 28.97 84.29 26.67C81.87 22.29 78.76 18.51 74.64 15.62C72.38 14.04 69.91 12.95 67.12 12.67C64.05 12.37 61.43 13.71 60.33 16.16C58.92 19.33 61.12 22.86 64.46 22.8C66.2 22.76 67.74 21.43 68.01 19.72C68.2 18.53 67.62 17.34 66.6 16.8C65.58 16.27 64.69 16.47 63.7 17.48C63.55 17.63 63.42 17.9 63.17 17.7C62.95 17.53 63.1 17.29 63.2 17.09C63.67 16.17 65.05 15.66 66.23 15.97C68 16.45 69.05 18.27 68.6 20.11C68.01 22.56 65.55 23.97 63.09 23.25C61.03 22.65 59.68 21.29 59.34 19.17C58.95 16.76 59.83 14.75 61.83 13.31C63.2 12.32 64.8 12 66.47 12.02Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M47.96 30.52C50.97 30.5 53.44 28.09 53.46 25.13C53.48 21.92 50.96 19.33 47.87 19.38C44.89 19.42 42.38 21.98 42.39 24.96C42.41 28.04 44.9 30.53 47.96 30.52ZM41.76 24.93C41.74 21.53 44.49 18.76 47.91 18.75C51.37 18.73 54.08 21.47 54.09 24.99C54.1 28.43 51.41 31.15 47.96 31.18C44.55 31.22 41.78 28.42 41.76 24.93Z'/%3E %3Cpath vector-effect='non-scaling-stroke' d='M47.51 80.51C50.6 80.52 53.09 78.05 53.1 74.97C53.12 71.93 50.59 69.37 47.56 69.36C44.52 69.34 42.01 71.88 42.01 74.96C42.02 77.97 44.53 80.51 47.51 80.51ZM41.38 74.87C41.38 71.45 44.11 68.74 47.55 68.73C50.96 68.72 53.71 71.46 53.73 74.88C53.75 78.39 51.06 81.15 47.61 81.18C44.15 81.21 41.38 78.4 41.38 74.87Z'/%3E %3C/svg%3E") center / contain no-repeat;
     transform: rotate(var(--wc-rot));
 }
 
@@ -462,24 +464,38 @@ html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-channel[data-ui-key="Co
     text-transform: uppercase;
     white-space: nowrap;
 }
-html[data-theme="walnut-copper"] #mixer-strip .ch-toggle-row { gap: 8px; align-items: center; }
-html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch { gap: 8px; background: none; border: 0; box-shadow: none; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-toggle-row { gap: 16px; align-items: center; }
+/* One / Random / Palette: one pick-one choice, so one joined strip (the
+   sidebars' joined pairs, css/37 section 5): no gap, square inner corners,
+   the seam is the panes' own copper rims. Limit stands 16 px off it, a
+   separate switch. */
+html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch { flex: 0 0 auto; gap: 0; background: none; border: 0; box-shadow: none; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-toggle-row > .ch-seg-switch > button:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-toggle-row > .ch-seg-switch > button:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] { gap: 8px; background: transparent; border-right-color: transparent; }
 html[data-theme="walnut-copper"] #mixer-strip .mixer-stack { gap: 8px; }
 html[data-theme="walnut-copper"] #mixer-strip :is(.mixer-actions, .transport-row) { gap: 8px; }
 /* Widths snapped to the 24 px module (min 48), fixed here so the bar is final
    at first layout: One / Random / Palette share the widest (RANDOM, 98 px
    natural -> 120); Limit 65 -> 72; Clear 77 -> 96; Stop 67 -> 72. */
-html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch > button { width: 120px; }
+/* 108, not 120 (Gabriel 2026-10-18): the cell reads flush with the row
+   under it (Color under One, Ignite colors to Palette's edge, the lock
+   under Limit). */
+html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch > button { width: 108px; }
 html[data-theme="walnut-copper"] #mixer-strip .ch-gate-toggle { width: 72px; }
 html[data-theme="walnut-copper"] #mixer-strip .mixer-actions > button.btn--destructive { width: 96px; }
 html[data-theme="walnut-copper"] #mixer-strip #freezeBtn { width: 72px; }
 /* Limit: the word, lit while the limit is on (aria-pressed); no On / Off. */
 html[data-theme="walnut-copper"] #mixer-strip .ch-gate-toggle .gate-state { display: none; }
-/* Ignite fills its row; the lock is the 40 px square pane. */
-html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { flex: 1 1 auto; min-width: 120px; }
-html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { --wc-wr: 60px; }   /* its label well (below) only as wide as the word */
-html[data-theme="walnut-copper"] #mixer-strip .ch-ignite-lock { width: 40px; min-width: 40px; padding: 0; }
+/* Second row: Color (the lamp in a button, as wide as One above it), then
+   Ignite filling the row to its lock, which ends under Limit's right edge
+   (Gabriel, 2026-10-18). */
+html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-row { gap: 8px; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-color-btn { width: 108px; gap: 10px; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { flex: 1 1 auto; width: auto; min-width: 0; }
+html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-btn { --wc-wr: 128px; }   /* its label well (below) only as wide as the word */
+html[data-theme="walnut-copper"] #mixer-strip .ch-ignite-lock { width: 72px; min-width: 72px; padding: 0; }   /* as wide as Limit above it */
+html[data-theme="walnut-copper"] #mixer-strip .ch-nudge-row > .ch-ignite-lock { margin-left: 8px; }   /* 16 px off Ignite, as Limit is off Palette */
 html[data-theme="walnut-copper"] #mixer-strip #pauseBtn { width: 40px; min-width: 40px; padding: 0; }   /* study .navbar .cap.sq */
 /* At 1200 px and below js/46 parks the faders, and the colour and scene
    clusters must still fit a 769 px window (the narrowest that isn't
@@ -487,6 +503,7 @@ html[data-theme="walnut-copper"] #mixer-strip #pauseBtn { width: 40px; min-width
    so RANDOM (78 + 16) rounds to 96 on the 24 px module instead of 120. */
 @media (max-width: 1200px) {
     html[data-theme="walnut-copper"] #mixer-strip .ch-seg-switch > button { width: 96px; padding: 0 8px; }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-color-btn { width: 96px; padding: 0 8px; gap: 8px; }
 }
 /* At 1701 px and up the study's full tracking fits the module widths above. */
 @media (min-width: 1701px) {
@@ -643,10 +660,8 @@ html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"
     -webkit-mask: radial-gradient(circle closest-side, #000 70.7%, rgba(0, 0, 0, 0.3) 99%, transparent 100%);
     mask: radial-gradient(circle closest-side, #000 70.7%, rgba(0, 0, 0, 0.3) 99%, transparent 100%);
 }
-html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] input[type="color"]:focus-visible {
-    outline: 2px solid var(--ui-focus);
-    outline-offset: 3px;
-}
+/* The ring is the Color button's (css/20); the lamp inside keeps none. */
+html[data-theme="walnut-copper"] #mixer-strip .mixer-channel[data-ui-key="Color"] input[type="color"]:focus-visible { outline: none; }
 /* The bar wraps when its groups do not fit, wrapped rows centred (theme doc:
    "at 1430 px and below the bar wraps"; here it wraps whenever needed). With
    nothing overflowing, js/46 has nothing to park in More, so every control
@@ -663,32 +678,76 @@ html[data-theme="walnut-copper"] #mixer-strip #mixerPresetsTrigger .mixer-preset
 /* At 1200 px and below the strip keeps its single row and js/46's More panel
    (the old UI already parked cells at 1366; now every control stays on the bar down to 1201). */
 
-/* ── The bar's framing: the console's light on the wood ─────────────────
-   The study lights its bar with one fixed key light 30 % across, 10 % down
-   and 520 px above the glass (shader: inverse-square fall-off, plus the
-   column sheen that peaks under it), so the wood pools warm there and falls
-   to about half 420 px away and to under a third at the far end. A CSS
-   stand-in with this stack in place of css/30's --key-light: the warm pool
-   under the column sheen (so the slats keep their contrast in it), and a
-   black fall-off on top (black at alpha a multiplies by 1 - a). Stops are
-   the study's profile measured at 1920 (the bare wood, controls hidden), in
-   screen px like the study's light (--k undoes the bar's --ui-scale zoom).
+/* ── The bar's framing: book-matched halves, lit in the middle ─────────
+   The bar's wood is css/30's carcass in two halves: ::before the left half
+   (veneer from the window's left edge), ::after the right (its mirror from
+   the right edge). Both anchor to the bar's bottom edge, where the columns'
+   wood begins, so the grain runs on into each sidebar. They meet down the
+   middle at a faint copper inlay: a double rule with a diamond at each end,
+   each half drawing its own side of it.
+   Light, on both halves as one picture (each half shows its side of the
+   same layers, sized off the whole bar): a warm pool in the middle (Gabriel 2026-10-18: the
+   study's key light, which sat 30 % across, moved to the centre and grew),
+   and an even shade at the ends equal to the columns' --wc-col-tone across
+   their widths (288 / 320 px, css/34, in the bar's own zoomed units, the
+   same zoom as the columns), so where the bar meets a column the two are
+   one shade and the polish has gone (the pool stops at the inner edge of
+   those zones, see --bar-pool below). z-index -1 inside the bar's stacking context
+   (its translateZ(0)): over the bar's ground, under its controls.
    No drop shadow under the bar: it sits above both sidebars (z 150 over
    100) and would darken their tops rather than fall on the canvas. */
 html[data-theme="walnut-copper"] #mixer-strip {
-    --k: calc(1px / var(--ui-scale, 1));
-    background-image:
-        radial-gradient(circle at 30% 10%, transparent 0 calc(300 * var(--k)), rgba(8, 4, 2, 0.26) calc(400 * var(--k)),
-            rgba(8, 4, 2, 0.34) calc(500 * var(--k)), rgba(8, 4, 2, 0.42) calc(600 * var(--k)), rgba(8, 4, 2, 0.52) calc(800 * var(--k)),
-            rgba(8, 4, 2, 0.6) calc(1000 * var(--k)), rgba(8, 4, 2, 0.63) calc(1200 * var(--k)), rgba(8, 4, 2, 0.66) calc(1400 * var(--k))),
-        var(--sheen-bar),
-        radial-gradient(circle at 30% 10%, rgba(255, 150, 60, 0.42) 0, rgba(255, 150, 60, 0.34) calc(100 * var(--k)),
-            rgba(255, 150, 60, 0.2) calc(200 * var(--k)), rgba(255, 150, 60, 0.06) calc(280 * var(--k)), transparent calc(330 * var(--k))),
-        var(--wood-herringbone);
-    background-size: auto, auto, auto, 679px 679px;
-    background-position: 0 0, -31.84px 0, 0 0, 0 0;
+    /* The edge shade spans the whole bar (200 % of a half). The pool and
+       its brighter heart span only the stretch between the two sidebar
+       zones: their box is calc(200 % - 720 px) of a half, set 360 px in
+       from the outer edge (the 288 / 320 px zones plus a margin), and the
+       pool is farthest-side in it, so its edge lands at the zones' inner
+       edges at any width. (Chromium rejects calc() and min() in a
+       gradient's own size, which dropped the whole background; in
+       background-size calc() is fine.) */
+    --bar-shade: linear-gradient(90deg, rgba(8, 4, 2, var(--wc-col-tone-a)) 0 288px, rgba(8, 4, 2, 0) 44%,
+        rgba(8, 4, 2, 0) 56%, rgba(8, 4, 2, var(--wc-col-tone-a)) calc(100% - 320px) 100%);
+    --bar-pool: radial-gradient(farthest-side at 50% 38%, rgba(255, 160, 72, 0.34) 0,
+        rgba(255, 150, 60, 0.22) 32%, rgba(255, 150, 60, 0.08) 66%, transparent 100%);
+    --bar-heart: radial-gradient(ellipse 30% 120% at 50% 30%, rgba(255, 214, 160, 0.12), transparent 100%);
     box-shadow: none;
 }
+html[data-theme="walnut-copper"] #mixer-strip::before,
+html[data-theme="walnut-copper"] #mixer-strip::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+}
+html[data-theme="walnut-copper"] #mixer-strip::before {
+    left: 0;
+    right: 50%;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='12' viewBox='0 0 10 12'%3E%3Cpath d='M10 .5L1 6L10 11.5' fill='%231c0f08' stroke='%23d68c5c' stroke-opacity='.55'/%3E%3Cpath d='M10 3.6L6 6L10 8.4' fill='none' stroke='%23d68c5c' stroke-opacity='.45'/%3E%3C/svg%3E"),
+        linear-gradient(rgba(214, 140, 92, 0.32), rgba(214, 140, 92, 0.32)),
+        var(--bar-shade), var(--bar-pool), var(--bar-heart), var(--sheen-l), var(--wood-herringbone);
+    background-size: 10px 12px, 1px 100%, 200% 100%, calc(200% - 720px) 100%, calc(200% - 720px) 100%, 70.75px 100%, 566px 566px;
+    background-position: right 0 bottom 3px, right 1.5px top 0, left top, left 360px top 0, left 360px top 0, -26.55px 0, left bottom;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+}
+html[data-theme="walnut-copper"] #mixer-strip::after {
+    left: 50%;
+    right: 0;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='12' viewBox='0 0 10 12'%3E%3Cpath d='M0 .5L9 6L0 11.5' fill='%231c0f08' stroke='%23d68c5c' stroke-opacity='.55'/%3E%3Cpath d='M0 3.6L4 6L0 8.4' fill='none' stroke='%23d68c5c' stroke-opacity='.45'/%3E%3C/svg%3E"),
+        linear-gradient(rgba(214, 140, 92, 0.32), rgba(214, 140, 92, 0.32)),
+        var(--bar-shade), var(--bar-pool), var(--bar-heart), var(--sheen-r), var(--wood-herringbone-r);
+    background-size: 10px 12px, 1px 100%, 200% 100%, calc(200% - 720px) 100%, calc(200% - 720px) 100%, 70.75px 100%, 566px 566px;
+    background-position: left 0 bottom 3px, left 1.5px top 0, right top, right 360px top 0, right 360px top 0, right -26.55px top 0, right bottom;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+}
+/* In a small window the strip lives in the right column, on the column's
+   own wood (below): no halves there. */
+html[data-theme="walnut-copper"] body.compact-ui #mixer-strip::before,
+html[data-theme="walnut-copper"] body.compact-ui #mixer-strip::after { display: none; }
 /* The study draws no frame or rule between groups; the dividers keep their
    box (js/43 and js/46 show and hide them) but paint nothing. Nor is a
    group framed while another player's change fades: in the bar the faces
@@ -758,17 +817,17 @@ html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip >
     flex-basis: 100%;
 }
 
-/* Colour: One / Random / Palette share the first row; Limit, the colour
-   lamp, Ignite and its lock the second, in reading (and Tab) order. Both
+/* Colour: One / Random / Palette share the first row; Limit, the Color
+   button, Ignite and its lock the second, in reading (and Tab) order. Both
    toggle rows dissolve so their children are the grid's items (css/21 did
    this for the Ignite row already; the hold classes still cascade). */
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip > .mixer-channel[data-ui-key="Color"] {
     flex-basis: 100%;
     display: grid;
-    grid-template-columns: auto 24px minmax(0, 1fr) 32px;
+    grid-template-columns: auto auto minmax(0, 1fr) 32px;
     grid-template-areas:
         "modes modes modes modes"
-        "limit lamp ignite lock";
+        "limit color ignite lock";
     align-items: center;
     gap: 8px;
     padding: 0;
@@ -778,12 +837,13 @@ html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .
     grid-area: modes;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    gap: 0;
     width: auto;
 }
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-seg-switch > button { width: auto; }
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-gate-toggle { grid-area: limit; width: 64px; }
-html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide input[type="color"] { grid-area: lamp; justify-self: center; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-color-btn { grid-area: color; width: auto; height: 32px; min-height: 32px; }
+html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-color-btn > input[type="color"] { width: 20px; height: 20px; }
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-nudge-btn { grid-area: ignite; width: auto; min-width: 0; }
 html[data-theme="walnut-copper"] body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-ignite-lock { grid-area: lock; width: 32px; min-width: 32px; }
 
@@ -928,6 +988,91 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-sel
 }
 html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option {
     color: #1a120c; background: #f2e6d8; text-transform: none; letter-spacing: 0;
+}
+/* The open list as the sidebar fields' cathode panes (css/37 .wc-opt), where
+   the browser can style a select's popup (appearance: base-select; Electron
+   39 / Chrome 135+). Still the same native <select>: id, value, events,
+   keyboard and the width js/20 writes are untouched. The closed field keeps
+   its look: block box, the same padding, our chevron, no picker icon.
+   Elsewhere the cream list above stays. (Polish pass 2026-10-17.) */
+@supports (appearance: base-select) {
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select,
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select::picker(select) {
+        appearance: base-select;
+    }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select {
+        /* base-select lays its value out like a button's content: a flex
+           row keeps the word centred top to bottom, as the native one was. */
+        display: flex;
+        align-items: center;
+        border: 0;
+        padding: 0 46px 0 16px;
+        line-height: inherit;
+        text-align: left;
+    }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select::picker-icon { display: none; }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select::picker(select) {
+        margin-top: 6px;
+        padding: 6px;
+        border: 0;
+        border-radius: 7px;
+        min-width: anchor-size(width);
+        background:
+            var(--mesh-dim) center / 3.5px 6.06px,
+            linear-gradient(170deg, #1a1210, #090605);
+        box-shadow: 0 0 0 1px var(--cu), 0 0 0 2px rgba(0, 0, 0, 0.6), 0 10px 28px rgba(0, 0, 0, 0.6);
+    }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option {
+        --ce: 0;
+        --gc: 255 110 30;
+        position: relative;
+        display: flex;
+        align-items: center;
+        min-height: 32px;
+        margin: 0 0 5px;
+        padding: 6px 12px 6px 27px;
+        border-radius: 5px;
+        cursor: pointer;
+        font: 400 12.857px/11.7px var(--ui-font-display);
+        font-variant-caps: all-small-caps;
+        letter-spacing: 1.08px;
+        text-transform: none;
+        color: color-mix(in oklab, var(--lit) calc(var(--ce) * 100%), var(--unlit));
+        text-shadow: 0 0 calc(1px + var(--ce) * 5px) rgb(var(--gc) / calc(var(--ce) * 0.95));
+        background:
+            radial-gradient(ellipse 80% 95% at 50% 50%, rgb(var(--gc) / calc(var(--ce) * 0.34)), transparent 75%),
+            var(--mesh-pane) center / 7px 12.12px,
+            linear-gradient(170deg, #1a1210, #090605);
+        box-shadow:
+            0 0 0 1px rgba(0, 0, 0, 0.6),
+            inset 0 0 0 1.5px var(--cu),
+            inset 0 1px 0 1.5px rgba(255, 210, 170, 0.18),
+            inset 0 0 0 2.5px rgba(0, 0, 0, 0.55),
+            0 0 calc(var(--ce) * 14px) rgb(var(--gc) / calc(var(--ce) * 0.2));
+    }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option:last-child { margin-bottom: 0; }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option:hover { --ce: 0.45; }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option:checked { --ce: 1; }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -1px; }
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option::checkmark { display: none; }
+    /* The round cathode, lit for the chosen material. */
+    html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option::before {
+        content: "";
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        width: 9px;
+        height: 9px;
+        margin-top: -4.5px;
+        border-radius: 50%;
+        background: radial-gradient(circle closest-side, rgb(255 176 110 / var(--ce)) 0 54%, rgb(var(--gc) / calc(var(--ce) * 0.45)) 62%, transparent 100%);
+        box-shadow: 0 0 0 1.3px color-mix(in oklab, #ff9a50 calc(var(--ce) * 100%), #6b5546), 0 0 calc(var(--ce) * 8px) rgb(var(--gc) / calc(var(--ce) * 0.7));
+    }
+    @media (forced-colors: active) {
+        html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select::picker(select) { border: 1px solid CanvasText; background: Canvas; }
+        html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option { border: 1px solid ButtonText; background: ButtonFace; color: ButtonText; }
+        html[data-theme="walnut-copper"] #mixer-strip .ch-label select.material-mode-select option:checked { border: 3px solid Highlight; }
+    }
 }
 /* Head row: the slider's label (the scale row's text) left, its value right. */
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel[data-ui-key="Fluid"] .ch-fader { margin-top: 6px; }

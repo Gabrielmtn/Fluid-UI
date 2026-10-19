@@ -244,10 +244,14 @@
          cells by measured width and keeps them parked without clear room, so
          a boot that measured before the fonts landed could park a different
          cell than one that measured after. -->
-    <link rel="preload" href="assets/fonts/michroma-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/plus-jakarta-sans-700.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="preload" href="assets/fonts/share-tech-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="assets/fonts/libre-franklin-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="assets/fonts/libre-franklin-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <!-- The boot screens' ground (css/44, the warning's inline style): asked
+         for here so the web build's first paint has it sooner; the desktop
+         build also waits on its decode before the window fades up (js/00a). -->
+    <link rel="preload" href="assets/textures/deco-sunburst-2560.jpg" as="image">
     <link rel="stylesheet" href="css/30-theme-walnut-copper.css">
     <link rel="stylesheet" href="css/31-theme-components.css">
     <link rel="stylesheet" href="css/32-theme-remap.css">
@@ -259,6 +263,10 @@
     <link rel="stylesheet" href="css/38-theme-brush-screens.css">
     <link rel="stylesheet" href="css/39-theme-room.css">
     <link rel="stylesheet" href="css/40-theme-overlays.css">
+    <link rel="stylesheet" href="css/41-theme-polish-fields.css">
+    <link rel="stylesheet" href="css/42-theme-polish-layers.css">
+    <link rel="stylesheet" href="css/43-theme-polish-brush.css">
+    <link rel="stylesheet" href="css/44-theme-boot.css">
 </head>
 <body>
     <!-- Photosensitivity warning: static markup + synchronous inline script so
@@ -276,6 +284,15 @@
         color: #e8ecf2;
       }
       #photoWarn[hidden] { display: none; }
+      /* At launch the warning waits for the intro to finish (Gabriel
+         2026-10-18: let it fade to the UI before any modal). While it waits
+         it is not [hidden], so every other startup dialog still queues
+         behind it; it just isn't drawn. Then it comes up over the UI on a
+         scrim, fading in (no motion under reduced motion). */
+      #photoWarn.pw-wait { display: none !important; }
+      #photoWarn.pw-in { animation: pw-in 0.45s ease-out both; }
+      @keyframes pw-in { from { opacity: 0; } to { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { #photoWarn.pw-in { animation: none; } }
       #photoWarn .pw-card {
         max-width: 430px; max-height: 92vh; overflow-y: auto; margin: 16px; padding: 26px 28px 22px;
         background: #12161d; border: 1px solid rgba(140, 170, 220, 0.25);
@@ -317,6 +334,90 @@
         background: #d9a521; border-color: #d9a521; color: #14161a;
       }
       #photoWarn button:focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+
+      /* ── Walnut & Copper (data-theme on <html>) ──
+         Kept here, not in css/44: these rules must outrank the unlayered
+         ones above, and the modal must not wait on a stylesheet. Official
+         first: an opaque navy card, body text at 13:1 or better, the copper
+         only on frames, rules and the primary button. The deco sunrise
+         (css/44's ground) sits behind, darkened well down: a page of
+         high-contrast stripes would be its own trigger on this of all
+         screens, so neighbouring planks stay within a few % of each other. */
+      html[data-theme="walnut-copper"] #photoWarn {
+        /* A scrim over the UI it now follows (it used to stand alone over a
+           full-screen sunburst ground, before the app had appeared). */
+        background-color: rgba(4, 7, 12, 0.78);
+        background-image: radial-gradient(ellipse 48% 60% at 50% 50%, rgba(3, 6, 10, 0.55), rgba(3, 6, 10, 0) 75%);
+        font-family: "Libre Franklin", "Segoe UI", system-ui, sans-serif;
+        color: #eef0f4;
+      }
+      html[data-theme="walnut-copper"] #photoWarn .pw-card {
+        position: relative; max-width: 470px; padding: 30px 32px 24px;
+        background: #0b111b; border: 1px solid #c47a4b; border-radius: 3px;
+        /* The deco double frame: a hairline copper rule 5 px inside the edge. */
+        box-shadow: inset 0 0 0 5px #0b111b, inset 0 0 0 6px rgba(196, 122, 75, 0.45),
+                    0 18px 60px rgba(0, 0, 0, 0.7);
+        scrollbar-color: #5a2e17 transparent;
+      }
+      /* A small fan of rays over the heading: the sunrise again, in copper. */
+      html[data-theme="walnut-copper"] #photoWarn .pw-card::before {
+        content: ""; position: absolute; top: -1px; left: 50%; width: 72px; height: 22px;
+        transform: translateX(-50%);
+        background:
+          repeating-conic-gradient(from 270deg at 50% 0, rgba(196, 122, 75, 0.85) 0 4deg, transparent 4deg 15deg) 0 0 / 100% 100%;
+        -webkit-mask: radial-gradient(circle at 50% 0, #000 0 21px, transparent 22px);
+                mask: radial-gradient(circle at 50% 0, #000 0 21px, transparent 22px);
+        pointer-events: none;
+      }
+      html[data-theme="walnut-copper"] #photoWarn h1 {
+        margin: 4px 0 14px; padding-bottom: 12px;
+        font-family: "WC Label", "Plus Jakarta Sans", "Segoe UI", sans-serif;
+        /* Small caps at 15 px / 0.7 look like the old capitals and keep the
+           heading's accessible name in sentence case (prep/HANDOFF rules). */
+        font-size: 21px; font-weight: 700; letter-spacing: 0.1em; line-height: 1.3;
+        text-transform: none; font-variant-caps: all-small-caps;
+        color: #ffc861;
+        border-bottom: 1px solid rgba(196, 122, 75, 0.5);
+      }
+      html[data-theme="walnut-copper"] #photoWarn p { font-size: 15px; line-height: 1.5; color: #e4e7ec; }
+      html[data-theme="walnut-copper"] #photoWarn p b { color: #fff; }
+      html[data-theme="walnut-copper"] #photoWarn .pw-check {
+        margin: 16px 0; padding: 12px 14px;
+        background: rgba(196, 122, 75, 0.08);
+        border: 1px solid rgba(196, 122, 75, 0.28); border-left: 3px solid #c47a4b; border-radius: 2px;
+      }
+      html[data-theme="walnut-copper"] #photoWarn .pw-check input { width: 18px; height: 18px; accent-color: #e08a52; }
+      html[data-theme="walnut-copper"] #photoWarn .pw-check b { font-size: 15px; color: #fbecd9; }
+      html[data-theme="walnut-copper"] #photoWarn .pw-check span { font-size: 14px; color: #b9c2cf; }
+      html[data-theme="walnut-copper"] #photoWarn .pw-unprotected { color: #ffc861; }
+      html[data-theme="walnut-copper"] #photoWarn .pw-exit-line { color: #f2b0a4; }
+      html[data-theme="walnut-copper"] #photoWarn a { color: #9cc4ff; }
+      html[data-theme="walnut-copper"] #photoWarn .pw-buttons {
+        margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(196, 122, 75, 0.3);
+      }
+      html[data-theme="walnut-copper"] #photoWarn button {
+        padding: 10px 18px; font-size: 14px; border-radius: 2px;
+        font-family: "WC Label", "Plus Jakarta Sans", "Segoe UI", sans-serif; font-weight: 400;
+        border: 1px solid rgba(196, 122, 75, 0.7); background: #121a26; color: #fbecd9;
+      }
+      html[data-theme="walnut-copper"] #photoWarn button:hover { background: #1a2433; }
+      html[data-theme="walnut-copper"] #photoWarn #pwContinue {
+        background: linear-gradient(180deg, #e3965f, #c47a4b); border-color: #f2b38a;
+        color: #1a0c04; font-weight: 700;
+      }
+      html[data-theme="walnut-copper"] #photoWarn #pwContinue:hover { background: linear-gradient(180deg, #eea36c, #cf8452); }
+      html[data-theme="walnut-copper"] #photoWarn.pw-off #pwContinue {
+        background: #e0ab24; border-color: #ffd76a; color: #14100a;
+      }
+      html[data-theme="walnut-copper"] #photoWarn a:focus-visible,
+      html[data-theme="walnut-copper"] #photoWarn button:focus-visible,
+      html[data-theme="walnut-copper"] #photoWarn .pw-check input:focus-visible {
+        outline: 2px solid #ffb547; outline-offset: 3px;
+      }
+      @media (forced-colors: active) {
+        html[data-theme="walnut-copper"] #photoWarn { background: Canvas; }
+        html[data-theme="walnut-copper"] #photoWarn .pw-card::before { display: none; }
+      }
     </style>
     <div id="photoWarn" role="dialog" aria-modal="true" aria-labelledby="pwTitle" aria-describedby="pwDesc">
       <div class="pw-card">
@@ -531,7 +632,23 @@
       }
       window.__showPhotoWarn = function (opts) { show(opts, false); };
       if (acked) { modal.hidden = true; return; }
-      show(null, true);
+      /* Not over the intro: wait until the UI is built and the splash /
+         desktop title card is gone, then a beat for its fade (the other
+         startup dialogs use the same test and queue behind this one, which
+         counts as up the whole time). Capped, so it always appears. */
+      modal.classList.add('pw-wait');
+      (function waitForIntro(n) {
+        var built = !!document.getElementById('sidebar-right') && !!window.__scriptsReady;
+        var splashUp = !!document.getElementById('splash-screen');
+        if ((!built || splashUp) && n < 150) { setTimeout(function () { waitForIntro(n + 1); }, 100); return; }
+        setTimeout(function () {
+          modal.classList.remove('pw-wait');
+          /* Acknowledged while it waited (another window, or a harness). */
+          try { if (localStorage.getItem(KEY_ACK) === '1') { modal.hidden = true; return; } } catch (e) {}
+          modal.classList.add('pw-in');
+          show(null, true);
+        }, 350);
+      })(0);
     })();
     </script>
     <!-- Splash Screen -->
@@ -947,7 +1064,7 @@
         </div>
         <div class="control-group checkbox-group feature-head">
             <input type="checkbox" id="mandalaToggle" role="switch">
-            <label for="mandalaToggle" style="margin: 0">Mandala Overlay</label>
+            <label for="mandalaToggle" style="margin: 0" title="Paint beautiful mirrored mandala patterns">Mandala Overlay</label>
         </div>
         <div id="mandalaPanel" class="collapsible feature-body" style="display:none;">
             <div class="control-group">
@@ -973,23 +1090,6 @@
             <div class="control-group checkbox-group">
                 <input type="checkbox" id="zoomModeToggle">
                 <label for="zoomModeToggle" style="margin: 0" title="Activates Zoom mode (hotkey: Z). When active the wheel zooms and dragging pans instead of painting. 0 resets the view.">Zoom Mode&nbsp;<span style="opacity:.5">(Z)</span></label>
-            </div>
-            <div class="mandala-sub">Paint feel</div>
-            <div class="control-group">
-                <label for="mandalaDensity" title="1.000 = paint never fades.">Density Sustain <span id="mandalaDensityValue" class="value-display">0.9900</span></label>
-                <input type="range" id="mandalaDensity" min="0.85" max="1.005" value="0.99" step="0.0001">
-            </div>
-            <div class="control-group">
-                <label for="mandalaIsolation" title="High = new strokes don't shove the paint already down.">Motion Isolation <span id="mandalaIsolationValue" class="value-display">2.000</span></label>
-                <input type="range" id="mandalaIsolation" min="1" max="5" value="2" step="0.001">
-            </div>
-            <div class="control-group">
-                <label for="mandalaWet" title="High = dry paint sets hard and holds its edge.">Drying <span id="mandalaWetValue" class="value-display">1.00</span></label>
-                <input type="range" id="mandalaWet" min="0" max="1" value="1" step="0.01">
-            </div>
-            <div class="control-group">
-                <label for="mandalaDryTime" title="Seconds for paint to set. Low = holds almost immediately.">Dry Time <span id="mandalaDryTimeValue" class="value-display">0.5s</span></label>
-                <input type="range" id="mandalaDryTime" min="0.5" max="20" value="0.5" step="0.5">
             </div>
             <div class="control-group">
                 <button id="mandalaCaptureBtn" style="width:100%" title="Save a PNG of the mandala as you see it.">Save picture</button>
@@ -1044,8 +1144,9 @@
             </div>
         </div>
         <div class="control-group" style="margin-top: 10px;">
-            <label for="backgroundColorPicker">Background Color</label>
-            <input type="color" id="backgroundColorPicker" value="#000000">
+            <!-- A Background Color button like the top bar's Color one: the word and
+                 the colour lamp in one pane; a click anywhere opens the picker. -->
+            <label class="btn ch-color-btn bg-color-btn" title="Background color: the colour under the paint"><span class="ch-color-word">Background Color</span><input type="color" id="backgroundColorPicker" value="#000000"></label>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
                 <input type="checkbox" id="transparentMode">
                 <label for="transparentMode" style="margin: 0">Transparent Background</label>
@@ -1074,7 +1175,6 @@
         </div>
         <div class="control-group">
             <button id="photoWarnShowBtn" type="button" style="width:100%">Show photosensitivity warning</button>
-            <a class="photo-warn-learn" href="https://www.epilepsy.com/what-is-epilepsy/seizure-triggers/photosensitivity" target="_blank" rel="noopener">Learn more about photosensitivity (Epilepsy Foundation)</a>
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="cursorToggle" checked>
@@ -1358,12 +1458,18 @@
                 <!-- "Save settings", not "Save" (2026-09-14): the bare word next to
                      Export → Save picture and the preset Save read as the same thing. -->
                 <button id="saveSettingsBtn" style="flex: 1;" title="Save current settings to be loaded by default upon reset. Can be reset">Save settings</button>
-                <button id="loadSettingsBtn" style="flex: 1;" title="Bring back the settings you saved">Load</button>
+                <button id="loadSettingsBtn" style="flex: 1;" title="Bring back your saved settings, or the ones Swirl Together starts with if you have not saved any">Load Defaults</button>
                 <button class="btn--destructive" id="clearSettingsBtn" style="flex: 1;" title="Forget the saved settings">Clear</button>
             </div>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
                 <input type="checkbox" id="autoloadSettings">
                 <label for="autoloadSettings" style="margin: 0">Load saved on start</label>
+            </div>
+            <!-- The pills a key press flashes (js/59 ~ brush type, js/49 a held
+                 slider key's value). Wired in js/12 next to autoload. -->
+            <div class="control-group checkbox-group" style="margin-top: 8px;">
+                <input type="checkbox" id="hotkeyNoticesToggle" checked>
+                <label for="hotkeyNoticesToggle" style="margin: 0">Show hotkey notifications</label>
             </div>
         </div>
         <div class="control-group" id="presetsGroup">
@@ -1492,7 +1598,7 @@
                 </div>
 
                 <!-- ⋯ menu, on <body> like the popover. Ticked items are
-                     switches; 61 adds Copy room report at its foot. -->
+                     switches. -->
                 <div id="mpRoomMenu" class="brush-shape-menu mp-pop mp-room-menu" role="menu" aria-label="Room options" hidden>
                     <button type="button" id="lockRoomBtn" class="btn--ghost mp-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
                 </div>
@@ -1563,7 +1669,7 @@
         </div>
         <div class="control-group checkbox-group" style="margin-top: 6px;">
             <input type="checkbox" id="detachCaptureToggle">
-            <label for="detachCaptureToggle" style="margin: 0">Detach Capture Area</label>
+            <label for="detachCaptureToggle" style="margin: 0">Show Capture Layer</label>
         </div>
         <input type="file" id="imageUpload" accept="image/png,image/jpeg,image/jpg,image/webp" style="display: none;">
         <button id="uploadBtn" style="width: 100%; margin-top: 10px;">Upload Image Layer</button>
@@ -1585,10 +1691,10 @@
             <div class="rec-strip-row rec-strip-length">
                 <span id="recMiniTime" class="rec-strip-time" title="">0:00 / 0:08</span>
                 <div class="rec-strip-chips btn-sm" role="radiogroup" aria-label="Length">
-                    <button type="button" id="recLen4" role="radio" aria-checked="false" title="Record up to 4 seconds">4 s</button>
-                    <button type="button" id="recLen8" role="radio" aria-checked="false" title="Record up to 8 seconds">8 s</button>
-                    <button type="button" id="recLen15" role="radio" aria-checked="false" title="Record up to 15 seconds">15 s</button>
-                    <button type="button" id="recLen30" role="radio" aria-checked="false" title="Record up to 30 seconds">30 s</button>
+                    <button type="button" id="recLen4" role="radio" aria-checked="false" title="Record up to 4 seconds">4 sec</button>
+                    <button type="button" id="recLen8" role="radio" aria-checked="false" title="Record up to 8 seconds">8 sec</button>
+                    <button type="button" id="recLen15" role="radio" aria-checked="false" title="Record up to 15 seconds">15 sec</button>
+                    <button type="button" id="recLen30" role="radio" aria-checked="false" title="Record up to 30 seconds">30 sec</button>
                 </div>
             </div>
             <div class="rec-strip-row rec-strip-source">
@@ -1681,7 +1787,7 @@
                         <li>~ - cycles between Fluid → Pressure → Collider</li>
                         <li>[ / ] - Brush Size − / +</li>
                         <li>Scroll - Brush Size up / down</li>
-                        <li>Hold right-click (Replay)</li>
+                        <li>Hold right-click - Replay</li>
                         <li>Middle-click - Radial Menu</li>
                         <li>Shift+Scroll - Rotate Brush Angle</li>
                     </ul>
@@ -1733,11 +1839,12 @@
             </div>
             <div class="hotkey-footer">
                 <span>Swirl Together <span id="app-version"></span> · GPU: <span id="app-gpu-info">detecting…</span></span>
-                <span class="hotkey-credits">Fluid sim after
+                <span class="hotkey-credits">Fluid sim originally created by
                     <a href="https://github.com/PavelDoGreat/WebGL-Fluid-Simulation" target="_blank" rel="noopener">Pavel Dobryakov</a> (MIT),
                     <a href="https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu" target="_blank" rel="noopener">Mark Harris</a> (GPU Gems ch. 38),
                     <a href="https://github.com/mharrys/fluids-2d" target="_blank" rel="noopener">Mattias Harrysson</a> (fluids-2d) and
                     <a href="https://github.com/haxiomic/GPU-Fluid-Experiments" target="_blank" rel="noopener">George Corney</a> </span>
+                <span class="hotkey-credits hotkey-testers">Much Gratitude and Credit to the brave usability testers: Gary D. Pryor, Fred The Harmless Monster, and Lucinda Zaharris</span>
             </div>
         </div>
     </div>
@@ -1796,6 +1903,13 @@
         var progressBar = document.getElementById('splash-progress-bar');
         var loaded = 0;
         var total = scripts.length;
+        // A chunk that misses once is retried before anyone hears about it: a
+        // file briefly held by a scanner or an aborted request used to put a
+        // "Failed to load" card on a healthy first launch.
+        var RETRY_MS = [150, 600];
+        var attempt = 0;
+        var leaving = false;
+        window.addEventListener('pagehide', function() { leaving = true; });
         function updateProgress(pct) {
             if (progressBar) progressBar.style.width = pct + '%';
         }
@@ -1819,13 +1933,22 @@
                 return;
             }
             var s = document.createElement('script');
-            s.src = scripts[loaded];
+            s.src = scripts[loaded] + (attempt ? '?retry=' + attempt : '');
             s.onload = function() {
+                attempt = 0;
                 loaded++;
                 updateProgress((loaded / total) * 100);
                 loadNext();
             };
             s.onerror = function() {
+                // A page on its way out aborts its own requests; that is not a fault.
+                if (leaving) return;
+                s.remove();
+                if (attempt < RETRY_MS.length) {
+                    setTimeout(loadNext, RETRY_MS[attempt++]);
+                    return;
+                }
+                attempt = 0;
                 // Surface the failure — a missing chunk means a half-initialized
                 // app; silent continue was hiding corrupt/incomplete installs.
                 if (window.__reportError) {
@@ -2015,6 +2138,8 @@
     <script src="js/73-theme-brush-screens.js"></script>
     <script src="js/74-theme-room.js"></script>
     <script src="js/75-theme-overlays.js"></script>
+    <script src="js/76-dial-control.js"></script>
+    <script src="js/77-theme-rails.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">

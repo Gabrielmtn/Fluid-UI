@@ -869,6 +869,14 @@ body.compact-ui #sidebar-right > #mixer-strip .ch-wide input[type="color"] {
     height: 44px;
     justify-self: center;
 }
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-color-btn {
+    grid-area: well;
+    height: 26px;
+}
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-color-btn > input[type="color"] {
+    width: 18px;
+    height: 18px;
+}
 body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-nudge-btn {
     grid-area: ignite;
     width: 100%;

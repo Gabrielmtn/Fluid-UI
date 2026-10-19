@@ -192,7 +192,10 @@
         return {
             h: gaussRandom() * strength * 0.3,
             s: gaussRandom() * strength * 0.3,
-            l: gaussRandom() * strength * 0.2
+            l: gaussRandom() * strength * 0.2,
+            // The hue a grey or white brush takes (shiftColor).
+            hue: Math.random(),
+            strength: strength
         };
     }
 
@@ -207,6 +210,15 @@
         }
         // Convert to HSL, shift, convert back
         var hsl = rgbToHsl(r, g, b);
+        // A grey has no hue to turn and white's lightness is clamped, so a
+        // white brush (arm 0's colour when Random goes off) mutated to white
+        // forever: a near-grey takes the variant's hue, at a strength-scaled
+        // saturation and a lightness the colour shows at.
+        if (Math.max(r, g, b) - Math.min(r, g, b) < 20 && typeof shift.hue === 'number') {
+            hsl[0] = shift.hue;
+            hsl[1] = 0.35 + (shift.strength || 0.3) * 0.8;
+            if (hsl[2] > 0.7) hsl[2] = 0.7;
+        }
         hsl[0] = ((hsl[0] + shift.h) % 1 + 1) % 1;
         hsl[1] = Math.max(0, Math.min(1, hsl[1] + shift.s));
         hsl[2] = Math.max(0.05, Math.min(0.95, hsl[2] + shift.l));
