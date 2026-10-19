@@ -919,6 +919,9 @@ html[data-theme="walnut-copper"] #mixer-strip .ch-label {
     color: var(--engrave);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5);
 }
+/* "Density Sustain" and "Velocity Sustain" ran into each other at the full
+   spacing (their cells are 139 px); tighter spacing keeps each inside. */
+html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:is([data-ui-key="Density"], [data-ui-key="Velocity"]) .ch-label { letter-spacing: 0.04em; }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel:not([data-ui-key="Fluid"]) .ch-header { justify-content: center; text-align: center; }
 /* Values under the dials and telegraphs: the study's .knob-val. */
 html[data-theme="walnut-copper"] #mixer-strip .ch-value {
