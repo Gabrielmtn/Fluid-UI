@@ -65,3 +65,8 @@ scripts/bake-headless.log
 
 # Personal working notes: kept on this machine, never committed
 notes/
+
+# Personal / exploration files kept out of the repo
+NEXTFEST-TRACKER.xlsx
+/Design system breakdown exploration/
+/Design system breakdown exploration.zip
