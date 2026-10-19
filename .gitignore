@@ -70,3 +70,10 @@ notes/
 NEXTFEST-TRACKER.xlsx
 /Design system breakdown exploration/
 /Design system breakdown exploration.zip
+/interaction-design-concept/
+/docs/
+/sam-test.*
+/reset-pressure.html
+/restart-electron*
+/prep/baseline/*
+!/prep/baseline/theme-lint.json
