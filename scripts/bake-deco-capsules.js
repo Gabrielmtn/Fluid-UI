@@ -11,6 +11,7 @@
 //   store     header 920x430   small 462x174   main 1232x706   vertical 748x896
 //   library   capsule 600x900  header 920x430 (= the store header)
 //             hero 3840x1240   logo 1280 wide, transparent
+//   web       og 1200x630 (swirltogether.com's link preview card)
 //   icon      shortcut 512x512 PNG, app icon 184x184 JPG, build/icon.ico
 //
 // THE PICTURE is the splash as the app draws it (css/44-theme-boot.css,
@@ -60,6 +61,10 @@ const SLOTS = {
                 copies: [[LIB_DIR, 'library_header_920x430.png']] },
     small:    { dir: STORE_DIR, file: 'capsule_small_462x174.png', slot: [462, 174], textW: 0.86, sub: 0 },
     main:     { dir: STORE_DIR, file: 'capsule_main_1232x706.png', slot: [1232, 706], textW: 0.60, sub: 0.28 },
+    // swirltogether.com's social card (og:image / twitter:image in index.html
+    // and phone/index.html). Crawlers cache cards by URL: when the picture
+    // changes, change this filename and the two <head>s with it.
+    og:       { dir: path.join(REPO, 'assets', 'og'), file: 'swirl-together-splash.png', slot: [1200, 630], textW: 0.60, sub: 0.28 },
     vertical: { dir: STORE_DIR, file: 'capsule_vertical_748x896.png', slot: [748, 896], textW: 0.70, sub: 0.24, wrap: true,
                 swirlScale: 0.62, swirlY: 0.45 },
     capsule:  { dir: LIB_DIR, file: 'library_capsule_600x900.png', slot: [600, 900], textW: 0.74, sub: 0.24, wrap: true,

@@ -19,10 +19,10 @@
 (function() {
     // ── Accidental page-zoom guard (every touch device: a Windows touch
     // laptop, or a tablet past the phone redirect with ?full=1) ──────────
-    // The viewport meta already says user-scalable=no, but iOS Safari has
-    // ignored that since iOS 10: any pinch or double-tap landing on the
-    // sidebars or buttons zooms the whole PAGE — fixed-position UI then
-    // breaks and it's fiddly to pinch back. touch-action protects only the
+    // The viewport meta leaves zoom allowed (user-scalable=no fails
+    // Lighthouse, and iOS Safari has ignored it since iOS 10): any pinch or
+    // double-tap landing on the sidebars or buttons would zoom the whole
+    // PAGE — fixed-position UI then breaks and it's fiddly to pinch back. touch-action protects only the
     // canvas (styles.css), so guard the rest here:
     // - gesturestart/gesturechange are iOS's pinch events; preventDefault
     //   reliably blocks page pinch-zoom. The canvas never sees them anyway
