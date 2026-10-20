@@ -71,7 +71,6 @@ const SLOTS = {
     // .ico is the exe's own icon at every size Windows asks for.
     icon:     { dir: STORE_DIR, file: 'shortcut_icon_512x512.png', slot: [512, 512], noText: true, medallion: true,
                 swirlScale: 0.72, swirlOpacity: 1, look: { turns: 3, stir: 90, dab: 0.0013 },
-                monogram: [{ ch: 'S', x: 0.33, y: 0.42, size: 0.62 }, { ch: 'T', size: 0.46, y: 0.64, gap: 0.06 }],
                 jpg: [STORE_DIR, 'app_icon_184x184.jpg', 184],
                 ico: [BUILD_DIR, 'icon.ico', [256, 128, 64, 48, 32, 24, 16]],
                 // The demo and playtest builds wear the same mark.
@@ -228,37 +227,6 @@ const SHOW = function (o) {
         hide.id = 'capsule-hide';
         hide.textContent = 'body > *:not(#splash-screen) { visibility: hidden !important; }';
         document.head.appendChild(hide);
-    }
-    if (o.monogram) {
-        // The icon's ST: a big S and a smaller T set lower and to the right,
-        // in the splash title's cream and the label face's ExtraBold, with a
-        // dark edge so each letter holds over copper and teal alike.
-        // A letter with a gap is placed by INK, that far right of the last
-        // letter's ink, so the two never touch.
-        let lastRight = 0;
-        o.monogram.forEach((m) => {
-            const L = document.createElement('div');
-            L.textContent = m.ch;
-            L.style.cssText = 'position:absolute;z-index:1;left:' + (m.x * 100) + '%;top:' + (m.y * 100) + '%;' +
-                'transform:translate(-50%,-50%);line-height:1;font-family:var(--ui-font-display);font-weight:800;' +
-                'font-size:' + (m.size * innerHeight) + 'px;color:rgb(251,236,217);' +
-                'text-shadow:0 0 ' + (innerHeight * 0.012) + 'px rgba(4,7,12,0.95),0 0 ' + (innerHeight * 0.035) + 'px rgba(4,7,12,0.8),0 0 ' + (innerHeight * 0.06) + 'px rgba(242,179,138,0.35)';
-            s.appendChild(L);
-            const ink = (el) => {
-                const c = document.createElement('canvas').getContext('2d');
-                const cs = getComputedStyle(el);
-                c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
-                const t = c.measureText(m.ch);
-                const r = el.getBoundingClientRect();
-                const x0 = r.left + r.width / 2 - t.width / 2;    // the glyph's origin, centred in its box
-                return { left: x0 - t.actualBoundingBoxLeft, right: x0 + t.actualBoundingBoxRight };
-            };
-            if (m.gap != null) {
-                const k = ink(L);
-                L.style.left = (parseFloat(getComputedStyle(L).left) + lastRight + m.gap * innerWidth - k.left) + 'px';
-            }
-            lastRight = ink(L).right;
-        });
     }
     if (o.noText) { t.remove(); sub.remove(); return 0; }
     if (!o.sub) sub.remove();
