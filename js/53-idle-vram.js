@@ -188,11 +188,13 @@
     function updateStatusLine() {
         var el = document.getElementById('stat-idlevram');
         if (!el) return;
-        if (!enabled) { el.textContent = 'off'; return; }
-        if (asleep) { el.textContent = 'asleep - ' + stats.lastFreedMB + ' MB freed'; return; }
         var why = document.hidden ? busyReason() : null;
-        el.textContent = why ? 'held (' + why + ')'
+        var s = !enabled ? 'off'
+            : asleep ? 'asleep - ' + stats.lastFreedMB + ' MB freed'
+            : why ? 'held (' + why + ')'
             : (stats.sleeps ? 'awake - slept ' + stats.sleeps + '×' : 'awake');
+        // Same text most seconds; a write would restyle the window for nothing.
+        if (el.textContent !== s) el.textContent = s;
     }
     setInterval(updateStatusLine, 1000);
 

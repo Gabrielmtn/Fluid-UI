@@ -239,15 +239,18 @@
         };
         return true;
     }
+    // Only write what changed: a text write restyles the window (the
+    // theme's :has() rules re-check ancestors), and this runs every second.
+    function setText(el, s) { s = String(s); if (el.textContent !== s) el.textContent = s; }
     function renderStats() {
         if (!ensureSection()) return;
-        rows.dropped.textContent = totals.dropped;
-        rows.tasks.textContent = totals.longTasks;
-        rows.worst.textContent = totals.worstTask ? Math.round(totals.worstTask) + 'ms' : '--';
+        setText(rows.dropped, totals.dropped);
+        setText(rows.tasks, totals.longTasks);
+        setText(rows.worst, totals.worstTask ? Math.round(totals.worstTask) + 'ms' : '--');
         var last = interactions[interactions.length - 1];
-        rows.last.textContent = last
+        setText(rows.last, last
             ? last.label.slice(0, 30) + ' — +' + last.excess + ' excess / ' + last.longTasks + ' task'
-            : '--';
+            : '--');
     }
     setInterval(renderStats, 1000);
 

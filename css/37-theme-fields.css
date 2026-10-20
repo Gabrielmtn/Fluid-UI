@@ -912,11 +912,11 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-radio
     background: none;
     box-shadow: none;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:has(> .control-group #brushVelStrength) > .brush-mode-row {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) div:not(#wc-none) > .brush-mode-row.pressure-mode-row {
     gap: 8px;
     margin: 0 0 8px;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button {
     --gc: var(--tgc, 255 110 30);
     position: relative;
     isolation: isolate;
@@ -949,15 +949,15 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-r
         inset 0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.3)),
         0 0 calc(var(--ci) * 14px) rgb(var(--gc) / calc(var(--ci) * 0.2));
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button[data-wc-fit="tight"] { letter-spacing: 0.06em !important; }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row) > button {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button[data-wc-fit="tight"] { letter-spacing: 0.06em !important; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row) > button {
     flex: 0 0 112px;
     width: 112px;
 }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .stream-format-grid > button { width: 100%; min-width: 0; }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:hover { opacity: 1; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:hover { opacity: 1; }
 /* The round cathode: ring, glow and the lit dot in one element. */
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button::before {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button::before {
     --ci: inherit;
     content: "";
     position: absolute;
@@ -975,7 +975,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-r
         0 0 calc(var(--ci) * 8px) rgb(var(--gc) / calc(var(--ci) * 0.7));
 }
 /* The lit mesh (study .cp::before). */
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button::after {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button::after {
     --ci: inherit;
     content: "";
     position: absolute;
@@ -1000,14 +1000,14 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .rec-strip-l
     margin: 0;
 }
 /* (Written on the bank's own selector plus the ids, so it outweighs it.) */
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is(#recLen4, #recLen8, #recLen15, #recLen30) {
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is(#recLen4, #recLen8, #recLen15, #recLen30) {
     width: 100%;
     padding: 6px 6px 6px 21px !important;
     font-size: 8.5px !important;
     letter-spacing: 0.06em !important;
     white-space: nowrap !important;
 }
-html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is(#recLen4, #recLen8, #recLen15, #recLen30)::before { left: 7px; }
+html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is(#recLen4, #recLen8, #recLen15, #recLen30)::before { left: 7px; }
 
 
 /* Native radios (Kaleidoscope > Mandala > Fill: Off / Fit / Full): the
@@ -1201,7 +1201,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
 /* Main tier: a section's own mode (Replay: Stroke | Time; Interface:
    Simple | Everything). */
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
-        .brush-section-label + .brush-mode-row:has(> .brush-mode-btn[data-mode]),
+        .brush-section-label + .brush-mode-row.replay-mode-row:not(.wc-none),
         .ch-seg-switch.ui-vis-presets) > button {
     height: 48px !important;
     min-height: 48px !important;
@@ -1209,10 +1209,10 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
     letter-spacing: 0.16em !important;
 }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
-        .brush-section-label + .brush-mode-row:has(> .brush-mode-btn[data-mode]),
+        .brush-section-label + .brush-mode-row.replay-mode-row:not(.wc-none),
         .ch-seg-switch.ui-vis-presets) > button:first-child { border-radius: 7px 0 0 7px; }
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(
-        .brush-section-label + .brush-mode-row:has(> .brush-mode-btn[data-mode]),
+        .brush-section-label + .brush-mode-row.replay-mode-row:not(.wc-none),
         .ch-seg-switch.ui-vis-presets) > button:last-child { border-radius: 0 7px 7px 0; }
 /* Rows around the strips. */
 html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .brush-section-label + .brush-mode-row:not(.brush-radio-row) { margin: 0 0 8px; }
@@ -1531,13 +1531,13 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-gr
     }
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(input[type="checkbox"], input[type="radio"])::after { content: none; }
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(select:not(.material-mode-select):not([aria-hidden="true"]), :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head),
-            :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea), :is(.checkbox-group > input[type="checkbox"] + label, .control-group > .brush-ghost-head > .wc-cb-txt, .checkbox-group > label:has(> input[type="checkbox"]), .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis, .mandala-radio > label), :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button, :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button, .hk-picker-key, .hk-picker-clear) {
+            :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea), :is(.checkbox-group > input[type="checkbox"] + label, .control-group > .brush-ghost-head > .wc-cb-txt, .checkbox-group > label:has(> input[type="checkbox"]), .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis, .mandala-radio > label), :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button, :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button, .hk-picker-key, .hk-picker-clear) {
         border: 1px solid ButtonText !important;
     }
     html[data-theme="walnut-copper"] .wc-opt { border: 1px solid ButtonText; }
     /* Chosen: a thick inner edge. */
     html[data-theme="walnut-copper"] .wc-opt[aria-selected="true"],
-    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is([aria-checked="true"], [aria-pressed="true"], .active),
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button:is([aria-checked="true"], [aria-pressed="true"], .active),
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button:is([aria-checked="true"], [aria-pressed="true"], .active),
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group:has(> input:checked) > label, .control-group > .brush-ghost-head:has(> input:checked) > .wc-cb-txt,
             :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis, .mandala-radio > label):has(> input:checked)) {
@@ -1545,7 +1545,7 @@ html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) .checkbox-gr
     }
     /* Focus: an outline outside the pane. */
     html[data-theme="walnut-copper"] .wc-opt.wc-act,
-    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(select:not(.material-mode-select), :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head), :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea), :is(.brush-radio-row:not(.arm-mode-wrap), div:has(> .control-group #brushVelStrength) > .brush-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button, :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button, .hk-picker-key, .hk-picker-clear):focus-visible,
+    html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(select:not(.material-mode-select), :is(.ui-vis-trigger, .hk-list-trigger, .anim-lib-head), :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], textarea), :is(.brush-radio-row:not(.arm-mode-wrap), div:not(#wc-none) > .brush-mode-row.pressure-mode-row, .stream-format-grid, .rec-strip-length > .rec-strip-chips) > button, :is(.brush-section-label + .brush-mode-row:not(.brush-radio-row), .ch-seg-switch.mutation-scope-seg, .ch-seg-switch.ui-vis-presets, .rec-strip-source > .rec-strip-chips) > button, .hk-picker-key, .hk-picker-clear):focus-visible,
     html[data-theme="walnut-copper"] :is(#sidebar-left, #sidebar-right) :is(.checkbox-group > input:focus-visible + label, .control-group > .brush-ghost-head:has(> input:focus-visible) > .wc-cb-txt,
             :is(.checkbox-group > label, .mutation-lock-chip, .ui-vis-row, .audio-mini-enable, .layer-check, .layer-vis, .mandala-radio > label):has(> input:focus-visible)) {
         outline: 2px solid Highlight !important;
@@ -1817,9 +1817,12 @@ html[data-theme="walnut-copper"] #sidebar-left .brush-radio-row:not(.arm-mode-wr
 html[data-theme="walnut-copper"] #sidebar-left .brush-radio-row:not(.arm-mode-wrap):not(#wc-none):not(#wc-none) > .brush-mode-btn[role="radio"]:not(:last-child) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 /* Brush ghost's opacity only means something while the ghost is on: the
    slider and its readout step aside while the box is unticked (Gabriel's
-   tour, 2026-10-18). */
-html[data-theme="walnut-copper"] #sidebar-left .brush-ghost-group:has(#brushGhostToggle:not(:checked)) > :not(label),
-html[data-theme="walnut-copper"] #sidebar-left .brush-ghost-group:has(#brushGhostToggle:not(:checked)) #brushGhostOpacityValue {
+   tour, 2026-10-18). Matched from the label, not the group: a :has()
+   that searches descendants makes Chromium re-check every ancestor on any
+   text change in the window, and with the rows below it cost a 33 ms
+   restyle each second the stats ticked. */
+html[data-theme="walnut-copper"] #sidebar-left .brush-ghost-group > .brush-ghost-head:has(> #brushGhostToggle:not(:checked)) ~ :not(label),
+html[data-theme="walnut-copper"] #sidebar-left .brush-ghost-group > .brush-ghost-head:has(> #brushGhostToggle:not(:checked)) > #brushGhostOpacityValue {
     display: none !important;
 }
 /* Keep a take reads as the confirm it is: a green lamp, in the Animations

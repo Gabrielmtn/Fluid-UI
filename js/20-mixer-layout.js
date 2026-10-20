@@ -5209,7 +5209,7 @@
         body.appendChild(modeLabel);
 
         var modeRow = document.createElement('div');
-        modeRow.className = 'brush-mode-row';
+        modeRow.className = 'brush-mode-row replay-mode-row';
 
         var strokeBtn = document.createElement('button');
         strokeBtn.type = 'button';
@@ -5953,7 +5953,9 @@
         var pModeBtns = {};
         PRESSURE_MODES.forEach(function (pair) {
             var row = document.createElement('div');
-            row.className = 'brush-mode-row';
+            // pressure-mode-row: the theme styles these by class (37), not
+            // by a :has() search for the Strength fader beside them.
+            row.className = 'brush-mode-row pressure-mode-row';
             pair.forEach(function (m) {
                 var b = document.createElement('button');
                 b.type = 'button'; b.className = 'brush-mode-btn';
