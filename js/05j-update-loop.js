@@ -784,7 +784,33 @@
                             const _credit = _c0 + _rate * paceDt;
                             let _n = Math.floor(_credit);
                             if (_n > _dabBudget) _n = _dabBudget;   // spike guard
-                            if (_n > 0) {
+                            // Held still: pour the frame's exact credit, not a whole
+                            // number of dabs. 250/s on a 144Hz panel is 1.74 dabs a
+                            // frame, so the count ran 2,2,1,2,2,1 and the dye left
+                            // the tip in beats the flow carried off as rings. The
+                            // dye goes out as one share (split only past a full dab,
+                            // where normalizePaintFlow stops scaling); the clock's
+                            // total per simulated second is unchanged. Only in the
+                            // continuous range: past the floor's reference Interval
+                            // the pulses are the point.
+                            const _sx = _steadyHead ? _steadyHead.x : pointer.x;
+                            const _sy = _steadyHead ? _steadyHead.y : pointer.y;
+                            const _sl = window.__contFlowLast;
+                            const _slRef = (typeof config.BRUSH_HOSE_FLOOR_REF_MS === 'number' && config.BRUSH_HOSE_FLOOR_REF_MS > 0)
+                                ? config.BRUSH_HOSE_FLOOR_REF_MS : 8;
+                            if (_sl && _ivl <= _slRef && config.BRUSH_DAB_INTERP !== false
+                                && (_sx - _sl.x) * (_sx - _sl.x) + (_sy - _sl.y) * (_sy - _sl.y) < 1e-6) {
+                                const _share = _k * _credit;
+                                const _pours = Math.min(_dabBudget, Math.max(1, Math.ceil(_share)));
+                                for (let si = 0; si < _pours; si++) {
+                                    _dabs.push({ x: _sx, y: _sy, dx: 0, dy: 0, p: 1, k: _share / _pours });
+                                }
+                                window.__contFlowCredit = 0;
+                                if (recEnabled && typeof recRecordInteraction === 'function') {
+                                    recRecordInteraction(_sx, _sy, 0, 0, pointer.color,
+                                        window.__recLiveFlow ? window.__recLiveFlow() : 1);
+                                }
+                            } else if (_n > 0) {
                                 // Steady: the hose pours at the head, not the hand.
                                 const cx = _steadyHead ? _steadyHead.x : pointer.x;
                                 const cy = _steadyHead ? _steadyHead.y : pointer.y;
