@@ -20,7 +20,8 @@
 // settings, material and tip (12's full apply of the defaults look, at the
 // current look generation so nothing is filled from an older one); the
 // brush drawer's engine settings, which the registry keeps no default for
-// (Spacing, Interval, Texture, Flow... from 04a's literal); Replay Speed;
+// (Spacing, Interval, Texture, Flow... from 04a's literal); Gravity
+// Direction, which no look carries (2026-10-20); Replay Speed;
 // running again (unfrozen, unpaused); the view (zoom back to 1:1, Zoom
 // Mode off); Motion Detail (2026-10-13: Gabriel wants the shipped default
 // after a reset, not whatever was left); and a clean canvas, pressure
@@ -97,6 +98,16 @@
             if (typeof S[k] !== 'function' || want[k] === undefined) return;
             try { S[k](want[k]); } catch (err) { console.warn('[ResetApp] brush setting', k, err); }
         });
+    }
+
+    // Gravity Direction (Effects) is not in the look either, so a reset left
+    // it pulling. Through 20's setGravityField: config, pad, switch and the
+    // saved setting together. saved: the saved settings' gravity.
+    function resetGravity(saved) {
+        var D = window.__CONFIG_DEFAULTS;
+        if (typeof window.setGravityField !== 'function' || !D) return;
+        var g = saved || { on: D.AMBIENT_FORCE, x: D.AMBIENT_FORCE_X, y: D.AMBIENT_FORCE_Y };
+        window.setGravityField(!!g.on, +g.x || 0, +g.y || 0);
     }
 
     // Zoom is not a setting the look carries, so it outlived every reset:
@@ -180,6 +191,7 @@
                 tip: c.BRUSH_TIP | 0, angle: c.BRUSH_ANGLE || 0,
                 shape: (shapes && shapes.activeId && shapes.activeId()) || null
             }),
+            gravity: { on: !!c.AMBIENT_FORCE, x: c.AMBIENT_FORCE_X || 0, y: c.AMBIENT_FORCE_Y || 0 },
             motionDetail: motion > 0 ? motion : null,
             replaySpeed: rs ? parseFloat(rs.value) : 1
         });
@@ -218,8 +230,10 @@
                 window.setActiveBrushColorMode('random');
             }
         }
-        // 2. The brush drawer's engine settings, and Motion Detail.
+        // 2. The brush drawer's engine settings, Gravity Direction and
+        //    Motion Detail.
         resetBrushDrawer(saved && saved.drawer);
+        resetGravity(saved && saved.gravity);
         resetMotionDetail(saved && saved.motionDetail);
         // 3. Replay Speed (kept per player, outside the look).
         var speed = (saved && saved.replaySpeed > 0) ? saved.replaySpeed : 1;
