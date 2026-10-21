@@ -12,6 +12,12 @@
       "autoPort": true
     },
     {
+      "name": "repo-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", ".", "-c-1", "-s"],
+      "autoPort": true
+    },
+    {
       "name": "web",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
@@ -54,6 +60,15 @@
         "8787"
       ],
       "port": 8787
+    },
+    {
+      "name": "polish-tour",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/polish-tour.js"
+      ],
+      "port": 3997,
+      "url": "http://127.0.0.1:3997"
     }
   ]
 }

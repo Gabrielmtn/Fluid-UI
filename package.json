@@ -12,6 +12,7 @@
     "party": "partykit dev",
     "serve": "npx http-server -p 8080 -c-1",
     "copy-sink": "node scripts/copy-sink.js serve",
+    "polish-tour": "node scripts/polish-tour.js",
     "copy-check": "node scripts/copy-sink.js check",
     "electron": "electron .",
     "electron-build": "electron-builder",

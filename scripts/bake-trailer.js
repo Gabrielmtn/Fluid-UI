@@ -6,6 +6,10 @@
 //   node scripts/bake-trailer.js clips [key ...]    record scenes (default: all)
 //   node scripts/bake-trailer.js assemble [key ...] join clips/<key>.mp4 in order
 //   node scripts/bake-trailer.js all                clips, then assemble
+//   node scripts/bake-trailer.js splash             screenshot the boot screen (title + end use it)
+//   node scripts/bake-trailer.js stills [key ...]   store screenshots: no captions, PNGs → stills/
+//   CAPTIONS=1 ... stills [key ...]                 the same, each scene's caption kept
+//   MUSIC=<audio> ... assemble                      cuts land on the track's strong beats (scripts/trailer-beats.js)
 //
 // One throwaway-profile headless Chrome (WebGL on the discrete GPU, the
 // page always "visible") at exactly 1920×1080, Focus mode, the app served
@@ -107,9 +111,10 @@ function serve() {
                 const chunks = [];
                 req.on('data', (c) => chunks.push(c));
                 req.on('end', () => {
-                    fs.mkdirSync(CLIPS, { recursive: true });
                     const buf = Buffer.concat(chunks);
-                    fs.writeFileSync(path.join(put[1].endsWith('.png') ? OUT : CLIPS, put[1]), buf);
+                    const dir = put[1].startsWith('still-') ? path.join(OUT, 'stills') : put[1].endsWith('.png') ? OUT : CLIPS;
+                    fs.mkdirSync(dir, { recursive: true });
+                    fs.writeFileSync(path.join(dir, put[1]), buf);
                     log('saved', put[1], (buf.length / 1e6).toFixed(1) + ' MB');
                     res.writeHead(200); res.end('ok');
                 });
@@ -234,25 +239,69 @@ async function assemble(keys) {
     const files = keys.map((k) => path.join(CLIPS, k + '.mp4')).filter((f) => fs.existsSync(f));
     if (!files.length) throw new Error('no clips in ' + CLIPS);
     const XF = 0.6;   // crossfade seconds
+    const DIP_INTO = new Set(['textkeys', 'paste']);
     const durs = [];
     for (const f of files) durs.push(await probeDuration(f));
+    // With music (MUSIC=<audio>, beats from scripts/trailer-beats.js), each
+    // crossfade's midpoint lands on a strong bass note: a clip gives up to
+    // MAX_TRIM s (from its start; the title from its end, so the splash
+    // holds) or holds its last frame up to MAX_HOLD s.
+    const music = process.env.MUSIC ? path.resolve(process.env.MUSIC) : null;
+    const trims = durs.map(() => ({ head: 0, tail: 0, hold: 0 }));
+    if (music) {
+        const MAX_TRIM = 1.6, MAX_HOLD = 0.8;
+        const map = JSON.parse(fs.readFileSync(music + '.beats.json', 'utf8'));
+        const strong = map.strong.map((b) => b.t);
+        let start = 0;
+        for (let i = 0; i < files.length - 1; i++) {
+            const mid = start + durs[i] - XF / 2;            // where this clip's crossfade centres untouched
+            const early = strong.filter((b) => b <= mid && b >= mid - MAX_TRIM).pop();
+            const late = strong.find((b) => b > mid && b <= mid + MAX_HOLD);
+            // No strong bass note in reach: the nearest plain beat (never far).
+            const any = map.beats.reduce((m, x) => Math.abs(x - mid) < Math.abs(m - mid) && x - mid <= MAX_HOLD ? x : m, -1e9);
+            const b = early !== undefined ? early : late !== undefined ? late : any;
+            const len = b + XF / 2 - start;
+            if (len < durs[i]) trims[i][i === 0 ? 'tail' : 'head'] = durs[i] - len;
+            else trims[i].hold = len - durs[i];
+            durs[i] = len;
+            log('cut', path.basename(files[i], '.mp4'), '->', b.toFixed(2) + ' s', (strong.indexOf(b) < 0 ? '(plain beat)' : ''),
+                trims[i].head ? 'head -' + trims[i].head.toFixed(2) : '', trims[i].tail ? 'tail -' + trims[i].tail.toFixed(2) : '',
+                trims[i].hold ? 'hold +' + trims[i].hold.toFixed(2) : '');
+            start = b - XF / 2;
+        }
+    }
     const args = ['-y', '-hide_banner'];
     files.forEach((f) => args.push('-i', f));
+    if (music) args.push('-i', music);
     // Every clip to the same shape first, then a chain of xfades. Each
     // offset is the running length minus the overlap so far.
-    let filter = files.map((_, i) => '[' + i + ':v]scale=' + W + ':' + H + ':force_original_aspect_ratio=decrease,pad=' + W + ':' + H + ':(ow-iw)/2:(oh-ih)/2,fps=60,format=yuv420p,setsar=1[v' + i + ']').join(';');
+    let filter = files.map((_, i) => {
+        const tr = trims[i];
+        const cut = tr.head ? 'trim=start=' + tr.head.toFixed(3) + ',setpts=PTS-STARTPTS,'
+            : tr.tail ? 'trim=duration=' + durs[i].toFixed(3) + ','
+            : tr.hold ? 'tpad=stop_mode=clone:stop_duration=' + tr.hold.toFixed(3) + ',' : '';
+        return '[' + i + ':v]' + cut + 'scale=' + W + ':' + H + ':force_original_aspect_ratio=decrease,pad=' + W + ':' + H + ':(ow-iw)/2:(oh-ih)/2,fps=60,format=yuv420p,setsar=1[v' + i + ']';
+    }).join(';');
     let prev = 'v0', t = durs[0];
     for (let i = 1; i < files.length; i++) {
         const out = i === files.length - 1 ? 'vx' : 'x' + i;
-        filter += ';[' + prev + '][v' + i + ']xfade=transition=fade:duration=' + XF + ':offset=' + (t - XF).toFixed(3) + '[' + out + ']';
+        // Into a scene that starts by clearing, a dip through black reads as
+        // the clear (Gabriel 2026-10-19); everywhere else a plain crossfade.
+        const into = path.basename(files[i], '.mp4');
+        const how = DIP_INTO.has(into) ? 'fadeblack' : 'fade';
+        filter += ';[' + prev + '][v' + i + ']xfade=transition=' + how + ':duration=' + XF + ':offset=' + (t - XF).toFixed(3) + '[' + out + ']';
         t += durs[i] - XF;
         prev = out;
     }
     if (files.length === 1) filter += ';[v0]null[vx]';
     // Fade in from black at the start and out at the end.
     filter += ';[vx]fade=t=in:st=0:d=0.5,fade=t=out:st=' + Math.max(0, t - 0.8).toFixed(3) + ':d=0.8[vout]';
+    // The music from its first note, faded out under the end card.
+    if (music) filter += ';[' + files.length + ':a]atrim=0:' + t.toFixed(3) + ',afade=t=out:st=' + Math.max(0, t - 3).toFixed(3) + ':d=3[aout]';
     const dest = path.join(OUT, 'swirl-together-draft.mp4');
-    args.push('-filter_complex', filter, '-map', '[vout]', '-c:v', 'libx264', '-preset', 'slow', '-crf', '16',
+    args.push('-filter_complex', filter, '-map', '[vout]');
+    if (music) args.push('-map', '[aout]', '-c:a', 'aac', '-b:a', '256k');
+    args.push('-c:v', 'libx264', '-preset', 'slow', '-crf', '16',
         '-pix_fmt', 'yuv420p', '-r', '60', '-movflags', '+faststart', dest);
     log('assembling', files.length, 'clips,', t.toFixed(1) + ' s');
     await run(FFMPEG, args);
@@ -267,9 +316,12 @@ async function assemble(keys) {
 // and steps one frame (its dabs flush to the relay), a short wait for the
 // relay, then the recorder steps and captures. Date.now is synced across
 // the pages at the start of each scene (see syncClock in the scenes file).
-const ARTIST_NAMES = ['Mira', 'Jun', 'Sol', 'Kit'];
+// The painters' names are Gabriel's (2026-10-18), set the way the desktop
+// app sets a Steam name. The recorder is Gabe; each artist Chrome is one of
+// these, and a scene names which of them paint in it (artists[].name).
+const REC_NAME = 'Gabe', ARTIST_NAMES = ['Vivi', 'Sarah', 'Gary', 'Hex'];
 async function openRoom(rec, artists) {
-    await rec.page.eval("window.SWIRL_STEAM_NAME = 'Ari'; createRoom(); 1");
+    await rec.page.eval("window.SWIRL_STEAM_NAME = " + JSON.stringify(REC_NAME) + "; createRoom(); 1");
     let code = null;
     for (let i = 0; i < 80 && !code; i++) {
         code = await rec.page.eval("(typeof isMultiplayerEnabled !== 'undefined' && isMultiplayerEnabled && clientId && currentRoom) || null").catch(() => null);
@@ -280,12 +332,18 @@ async function openRoom(rec, artists) {
         await artists[j].page.eval("window.SWIRL_STEAM_NAME = " + JSON.stringify(ARTIST_NAMES[j]) + "; joinRoom(" + JSON.stringify(code) + "); 1");
     }
     await sleep(3000);                                   // joins, names, welcome onto the room's settings
+    const names = [];
+    for (const a of artists) names.push(await a.page.eval('shortName(clientId)'));
+    await rec.page.eval('(function(n){ var N = window.__trailer.names; N.length = 0; n.forEach(function(x){ N.push(x); }); return N.length; })(' + JSON.stringify(names) + ')');
+    log('artists', names.join(', '));
     log('room', code, 'with', artists.length, 'artists');
     return code;
 }
-async function recordTogether(rec, artists, key, n) {
+async function recordTogether(rec, artists, key, who) {
     const k = JSON.stringify(key);
-    const crew = artists.slice(0, n);
+    const n = who.length;
+    const crew = who.map((name) => artists[ARTIST_NAMES.indexOf(name)]);
+    if (crew.some((a) => !a)) throw new Error(key + ': no artist page for one of ' + who.join(', '));
     await rec.page.eval('window.__trailer.recPrep(' + k + ')', { timeoutMs: 120000 });
     for (let j = 0; j < n; j++) await crew[j].page.eval('window.__trailer.artistPrep(' + k + ',' + j + ')', { timeoutMs: 60000 });
     if (process.env.MP_DEBUG) {
@@ -330,16 +388,33 @@ async function recordTogether(rec, artists, key, n) {
             const shot = await app.page.send('Page.captureScreenshot', { format: 'png' });
             fs.writeFileSync(path.join(OUT, 'probe.png'), Buffer.from(shot.data, 'base64'));
             log('shot', path.join(OUT, 'probe.png'));
+        } else if (mode === 'splash') {
+            // The app's own boot screen, put back and screenshotted at video
+            // size, plus where its title sits (the title and end scenes lay
+            // the canvas title exactly under it).
+            await app.page.eval('window.__trailer.showSplash()');
+            await sleep(1500);                           // the entrance animations settle
+            const title = await app.page.eval('window.__trailer.splashTitle()');
+            const shot = await app.page.send('Page.captureScreenshot', { format: 'png' });
+            fs.writeFileSync(path.join(OUT, 'splash.png'), Buffer.from(shot.data, 'base64'));
+            fs.writeFileSync(path.join(OUT, 'splash.json'), JSON.stringify({ title: title }, null, 1));
+            await app.page.eval('window.__trailer.hideSplash()');
+            log('splash', JSON.stringify(title));
         } else if (mode === 'eval') {
             // node scripts/bake-trailer.js eval "<page expression>"   (for tuning)
             const out = await app.page.eval(keysArg.join(' '), { timeoutMs: 120000 });
             console.log(JSON.stringify(out, null, 1));
-        } else if (mode === 'clips' || mode === 'all') {
+        } else if (mode === 'clips' || mode === 'all' || mode === 'stills') {
+            // stills: the same takes, no captions or splash, lossless PNGs
+            // at a few phases each, into notes/trailer-draft/stills/.
+            // CAPTIONS=1 keeps each scene's caption (still-cap-<key>-NN.png).
+            if (mode === 'stills') await app.page.eval('window.__trailer.stillMode(true, null, ' + (process.env.CAPTIONS === '1') + ')');
             const all = await app.page.eval('window.__trailer.order');
             const keys = keysArg.length ? keysArg : all;
             const crewOf = {};
-            for (const key of keys) crewOf[key] = await app.page.eval('((window.__trailer.scenes[' + JSON.stringify(key) + '] || {}).artists || []).length');
-            const most = Math.max(0, ...Object.values(crewOf));
+            for (const key of keys) crewOf[key] = await app.page.eval('((window.__trailer.scenes[' + JSON.stringify(key) + '] || {}).artists || []).map(function (a) { return a.name; })');
+            // Every name any scene uses gets its page (pages go in ARTIST_NAMES order).
+            const most = Math.max(0, ...Object.values(crewOf).flat().map((nm) => ARTIST_NAMES.indexOf(nm) + 1));
             if (most > 0) {
                 relay = await startRelay();
                 for (let j = 0; j < most; j++) {
@@ -348,8 +423,8 @@ async function recordTogether(rec, artists, key, n) {
                 await openRoom(app, artists);
             }
             for (const key of keys) {
-                log('scene', key, crewOf[key] ? '(' + crewOf[key] + ' artists)' : '');
-                const r = crewOf[key]
+                log('scene', key, crewOf[key].length ? '(' + crewOf[key].join(', ') + ')' : '');
+                const r = crewOf[key].length
                     ? await recordTogether(app, artists, key, crewOf[key])
                     : await app.page.eval('window.__trailer.record(' + JSON.stringify(key) + ')', { timeoutMs: 900000 });
                 log('done', key, JSON.stringify(r));
@@ -359,6 +434,7 @@ async function recordTogether(rec, artists, key, n) {
             for (const a of artists.splice(0)) await a.close();
             await app.close(); app = null;
             if (relay) { relay.close(); relay = null; }
+            if (mode === 'stills') return;
             for (const name of Object.keys(splits)) await split(name, splits[name][0], splits[name][1]);
             if (!keysArg.length) fs.writeFileSync(path.join(CLIPS, 'order.json'), JSON.stringify(cut));
             if (mode === 'all') await assemble(cut);
