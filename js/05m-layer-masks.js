@@ -137,17 +137,27 @@
                     }
                 });
             };
+            // No img = the coverage alone, white: a collider's film, whose
+            // wall is the mask and nothing else (the obstacle never reads
+            // the picture the collider was cut from).
             if (layer.mask.mode === 'show') {
                 // For SHOW mode: Draw shapes first, then composite image on top
                 ctx.clearRect(0, 0, baseW, baseH);
                 // Draw all mask shapes as white (shapes stored in original canvas coordinates)
                 stampShapes();
                 // Now composite the image only where shapes exist
-                ctx.globalCompositeOperation = 'source-in';
-                ctx.drawImage(img, 0, 0, baseW, baseH);
+                if (img) {
+                    ctx.globalCompositeOperation = 'source-in';
+                    ctx.drawImage(img, 0, 0, baseW, baseH);
+                }
             } else {
                 // For HIDE mode: Draw image first, then cut out shapes
-                ctx.drawImage(img, 0, 0, baseW, baseH);
+                if (img) {
+                    ctx.drawImage(img, 0, 0, baseW, baseH);
+                } else {
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, baseW, baseH);
+                }
                 // Cut out the mask shapes
                 ctx.globalCompositeOperation = 'destination-out';
                 stampShapes();
@@ -185,26 +195,33 @@
                 }
                 return;
             }
-            // Load and draw the original image
-            const img = new Image();
-            img.onload = () => {
-                const maskCanvas = composeMaskedLayer(layer, img);
-                if (layer.isCollision) {
-                    // One flat colour through the wall's shape, so it reads as
-                    // an obstacle, not artwork: the collider's own colour (23
-                    // colourOf, the swatch in its Collision group), exactly the
-                    // one picked. It was an orange glaze over the source
-                    // picture, which no picked colour would ever match.
-                    const ctx = maskCanvas.getContext('2d');
-                    ctx.globalCompositeOperation = 'source-in';
-                    ctx.fillStyle = (window.collisionLayers && window.collisionLayers.colourOf)
-                        ? window.collisionLayers.colourOf(layer) : '#ff3b30';
-                    ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-                    ctx.globalCompositeOperation = 'source-over';
-                }
-                layerDiv.style.backgroundImage = `url(${maskCanvas.toDataURL()})`;
-            };
-            img.src = layer.originalData || layer.data;
+            if (layer.isCollision) {
+                // A bound collider (Paint Collider, Live) collides off its GPU
+                // surface and 23 keeps its film in step with that; its shapes
+                // are the stale snapshot from when it was made.
+                if (layer.collisionSource) return;
+                // The film is the wall: the mask's coverage in one flat colour
+                // (23 colourOf, the swatch in its Collision group). Cut through
+                // the source picture as well, anything an edit added where the
+                // picture is transparent collided without showing.
+                const film = composeMaskedLayer(layer, null);
+                const ctx = film.getContext('2d');
+                ctx.globalCompositeOperation = 'source-in';
+                ctx.fillStyle = (window.collisionLayers && window.collisionLayers.colourOf)
+                    ? window.collisionLayers.colourOf(layer) : '#ff3b30';
+                ctx.fillRect(0, 0, film.width, film.height);
+                ctx.globalCompositeOperation = 'source-over';
+                // Save and undo restore filmData, so it has to follow edits.
+                layer.filmData = film.toDataURL();
+                layerDiv.style.backgroundImage = `url(${layer.filmData})`;
+            } else {
+                // Load and draw the original image
+                const img = new Image();
+                img.onload = () => {
+                    layerDiv.style.backgroundImage = `url(${composeMaskedLayer(layer, img).toDataURL()})`;
+                };
+                img.src = layer.originalData || layer.data;
+            }
             // This layer's mask is a clip SOURCE for any other layer bound to
             // it (05o ClipSources), so a mask edit has to push through to them
             // — otherwise you'd repaint a silhouette and the layers clipped by

@@ -1497,8 +1497,9 @@ class DepthEstimator {
     // here. Memoized on the layer; null when the mask has no such shapes.
     function _shapeCoverage(layer, canvasEl) {
         if (typeof window._drawMaskShape !== 'function') return null;
+        var withDepth = _depthViaShapes(layer);
         var shapes = (layer.mask.shapes || []).filter(function (s) {
-            return s && s.type !== 'depth-mask';
+            return s && (withDepth || s.type !== 'depth-mask');
         });
         if (!shapes.length) return null;
 
@@ -1509,10 +1510,18 @@ class DepthEstimator {
         // collision layer is dragged. The shapes array is replaced wholesale
         // on every save (cloneMaskShapes), so its identity is a sound key;
         // the layer transform is applied at draw time and never invalidates.
-        var key = [shapes.length, mode, feather, bufW, bufH].join(':');
+        // A depth map's cut is edited in place (Threshold, Invert, a re-bake),
+        // so those ride in the key too.
+        var dd = [];
+        var key = [shapes.length, mode, feather, bufW, bufH].concat(shapes.map(function (s) {
+            if (s.type !== 'depth-mask') return '';
+            dd.push(s.depthData);
+            return [s.threshold || 128, s.invert ? 1 : 0, s.depthWidth, s.depthHeight].join(',');
+        })).join(':');
         var memo = layer.__shapeColliderMemo;
         var cov;
-        if (memo && memo.key === key && memo.shapes === layer.mask.shapes) {
+        if (memo && memo.key === key && memo.shapes === layer.mask.shapes
+            && memo.dd.length === dd.length && memo.dd.every(function (d, i) { return d === dd[i]; })) {
             cov = memo.canvas;
         } else {
             var scale = Math.min(1, COLLISION_MAP_MAX / Math.max(bufW, bufH));
@@ -1552,9 +1561,18 @@ class DepthEstimator {
                 var fr = Math.max(1, Math.round((feather / 100) * 20 * scale));
                 try { window._featherMaskAlpha(cctx, tw, th, fr); } catch (_) {}
             }
-            layer.__shapeColliderMemo = { key: key, shapes: layer.mask.shapes, canvas: cov };
+            layer.__shapeColliderMemo = { key: key, shapes: layer.mask.shapes, dd: dd, canvas: cov };
         }
         return cov;
+    }
+
+    // Hide mode and Feather are layer-wide: the depth map is one of the
+    // shapes they act on, so it has to rasterize with the rest — the film
+    // (05m applyLayerMask) does. Cut on its own it stayed a solid wall in
+    // Hide mode, under a full-canvas wall where the film showed none.
+    function _depthViaShapes(layer) {
+        return (layer.mask.mode || 'show') !== 'show'
+            || ((typeof layer.threshold === 'number') ? layer.threshold : 0) > 0;
     }
 
     // The depth-mask cut: one depth map → RGBA bytes, colour r,g,b and
@@ -1645,9 +1663,10 @@ class DepthEstimator {
             return fbo ? _gpuCoverage(layer, fbo) : { none: true };
         }
         var dms = [], others = false;
+        var depthViaShapes = _depthViaShapes(layer);
         (layer.mask.shapes || []).forEach(function (s) {
             if (!s) return;
-            if (s.type !== 'depth-mask') { others = true; return; }
+            if (s.type !== 'depth-mask' || depthViaShapes) { others = true; return; }
             if (s.depthData && s.depthWidth && s.depthHeight) dms.push(s);
         });
         if (!dms.length && !others) return { none: true };
@@ -1828,8 +1847,9 @@ class DepthEstimator {
             var st = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
             if (st > strengthMax) strengthMax = st;
 
+            var depthViaShapes = _depthViaShapes(layer);
             layer.mask.shapes.forEach(function (shape) {
-                if (shape.type !== 'depth-mask') return;
+                if (shape.type !== 'depth-mask' || depthViaShapes) return;
                 if (!shape.depthData || !shape.depthWidth || !shape.depthHeight) return;
 
                 hasAny = true;
