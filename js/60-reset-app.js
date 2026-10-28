@@ -355,8 +355,8 @@
             btn.type = 'button';
             btn.id = 'resetAppBtn';
             btn.className = 'btn--ghost reset-app-btn';
-            btn.textContent = 'Reset app';
-            btn.title = 'Reset app to either the default, or the baseline you saved in settings. Asks whether your layers stay.';
+            btn.textContent = 'Reset Settings';
+            btn.title = 'Reset settings to either the default, or the baseline you saved in settings. Asks whether your layers stay.';
             btn.addEventListener('click', function () { if (!modalUp()) ask(); });
         }
         if (btn.parentElement !== bar) {

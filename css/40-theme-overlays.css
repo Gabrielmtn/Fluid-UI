@@ -1574,10 +1574,20 @@ html[data-theme="walnut-copper"] #quality-underbar .qub-size-val {
     color: var(--vfd);
     text-shadow: 0 0 6px rgba(114, 242, 212, 0.55), 0 1px 2px rgba(0, 0, 0, 0.85);
 }
-/* Reset app: a ghost pane, engraved. */
-html[data-theme="walnut-copper"] #quality-underbar .reset-app-btn {
+/* Reset Settings: a white ghost (css/22), past the theme's ghost reset. */
+html[data-theme="walnut-copper"] #quality-underbar .reset-app-btn.btn--ghost {
     border-radius: 5px;
+    color: rgba(255, 255, 255, 0.92);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
+html[data-theme="walnut-copper"] #quality-underbar .reset-app-btn.btn--ghost:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    border-color: #fff;
+}
+html[data-theme="walnut-copper"] #quality-underbar .reset-app-btn.btn--ghost:active { background: rgba(255, 255, 255, 0.2); }
 /* The playtest label: engraved, in legacy's face and size. Its width sets
    where Reset app and that button's one-time note sit (js/60 places the
    note from the button), so it must not grow: a wider label moved the note

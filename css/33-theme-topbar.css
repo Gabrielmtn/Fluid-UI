@@ -440,6 +440,7 @@ html[data-theme="walnut-copper"] .wc-tele .nxg { font: 400 13.5px var(--ui-font-
 html[data-theme="walnut-copper"] .wc-tele .nxp { fill: #ffc68a; filter: drop-shadow(0 0 1.5px rgba(255, 110, 30, 0.95)); }
 html[data-theme="walnut-copper"] .wc-tele .flagt { font-family: var(--ui-font-display); letter-spacing: 0.06em; fill: #24130a; }
 html[data-theme="walnut-copper"] .wc-tele .flag { transform-box: view-box; }
+html[data-theme="walnut-copper"] .wc-tele .sfill { fill: #ffc68a; filter: drop-shadow(0 0 1.2px rgba(255, 110, 30, 0.9)); }
 html[data-theme="walnut-copper"] #mixer-strip > .mixer-channel.wc-has-tele input[type=range]:focus-visible {
     outline: 2px solid var(--ui-focus);
     outline-offset: calc(4px + (var(--face) - var(--dial)) / 2);

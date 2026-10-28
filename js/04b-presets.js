@@ -166,9 +166,17 @@
                 // back to the one that shipped before the defaults moved.
                 const base = (typeof window.baselineLookSnapshot === 'function') ? window.baselineLookSnapshot() : null;
                 if (base) { snap.paletteIndex = base.paletteIndex; snap.brushState = base.brushState; }
+                // The physics looks carry no colour of their own, and the
+                // legacy fill's arm 0 is 'main' white, so they painted all
+                // white. They start on Random Colors instead; the curated
+                // looks below bring their own arms and switches.
+                if (!(preset.ui && preset.ui.armColors)) {
+                    snap.armColors = [{ mode: 'random', color: '#ffffff', stepIndex: 0, push: false }];
+                    snap.checkboxes = { randomColor: true, stepPalette: false };
+                }
                 if (preset.ui) {
                     if (preset.ui.sliders) Object.assign(snap.sliders, preset.ui.sliders);
-                    if (preset.ui.checkboxes) snap.checkboxes = Object.assign({}, preset.ui.checkboxes);
+                    if (preset.ui.checkboxes) snap.checkboxes = Object.assign({}, snap.checkboxes, preset.ui.checkboxes);
                     if (preset.ui.selects) snap.selects = Object.assign({}, preset.ui.selects);
                     // Curated looks carry colour and composition sections too —
                     // the same sections a saved user preset carries, so the

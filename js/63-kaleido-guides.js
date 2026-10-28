@@ -70,11 +70,14 @@
         };
     }
 
-    function shows() {
-        if (!cb.checked || !window.kaleidoEnabled) return false;
+    // Whether there is a fold on screen to mark at all.
+    function active() {
+        if (!window.kaleidoEnabled) return false;
         if (num(window.kaleidoMode, 1) === 0) return false;      // Mode: Off
         return num(window.kBlend, 1) > 0;                        // nothing mirrored on screen otherwise
     }
+    // Over the main canvas: only while Show Guides is ticked.
+    function shows() { return cb.checked && active(); }
 
     // Px per paint unit and the fold-frame radius past every corner.
     function frameOf(s, W, H) {
@@ -265,6 +268,7 @@
     let svg = null, root = null;
     let box = null;          // the canvas's CSS box, re-read after a resize or restyle
     let pending = false;     // a frame is asked for
+    let wanted = false;      // another surface (47) draws them, ticked here or not
     const frameListeners = [];
 
     function ensure() {
@@ -310,12 +314,12 @@
         }
     }
 
-    // Once a frame while the box is ticked: the fold follows kAngle however
+    // Once a frame while the box is ticked (or 47 wants them): the fold follows kAngle however
     // it moves (spin, slider, audio, a preset, a room's look), and every
     // other input is one comparison. Unticked, the loop stops.
     function frame() {
         pending = false;
-        if (!cb.checked) { hide(); tellFrame(); return; }
+        if (!cb.checked && !wanted) { hide(); tellFrame(); return; }
         if (shows()) draw(); else hide();
         tellFrame();
         schedule();
@@ -331,7 +335,8 @@
         setTimeout(function () { requestAnimationFrame(frame); }, 0);
     }
     function kick() {
-        if (cb.checked) schedule(); else hide();
+        if (cb.checked || wanted) schedule();
+        if (!cb.checked) hide();
     }
 
     const restyle = function () { box = null; };
@@ -354,19 +359,22 @@
     });
     kick();
 
-    // For other surfaces (the Pen Input Window, 47). Show Guides is the ask
-    // for these guides anywhere; that window can still hide them for itself.
-    //   shown()                whether they are up right now
+    // For other surfaces (the Pen Input Window, 47). Show Guides is for the
+    // main canvas only; that window has its own Guides menu, so it draws
+    // them whenever the kaleidoscope is folding (Gabriel, 2026-10-24).
+    //   shown()                whether they are up on the main canvas
     //   paint(g, W, H, angle?) draw them into group g for a W×H box over the
-    //                          canvas; false (g untouched) while not shown
-    //   onFrame(fn)            fn after each frame's guides, while ticked
+    //                          canvas; false (g untouched) while nothing folds
+    //   onFrame(fn)            fn after each frame's guides, while ticked or wanted
+    //   want(on)               keep the frame loop running for that surface
     window.KaleidoGuides = {
         shown: shows,
         paint: function (g, W, H, angle) {
-            if (!g || !(W > 0) || !(H > 0) || !shows()) return false;
+            if (!g || !(W > 0) || !(H > 0) || !active()) return false;
             paintInto(g, W, H, angle);
             return true;
         },
-        onFrame: function (fn) { if (typeof fn === 'function') frameListeners.push(fn); }
+        onFrame: function (fn) { if (typeof fn === 'function') frameListeners.push(fn); },
+        want: function (on) { wanted = !!on; kick(); }
     };
 })();

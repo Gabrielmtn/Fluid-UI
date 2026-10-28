@@ -241,8 +241,8 @@ async function openPopup(env) {
         await main.eval("window.StrokeLock.release('angle'); 1");
 
         // ── Kaleidoscope guide (2026-10-06) ──
-        // Drawn here while the main window's Show Guides is ticked; this
-        // window's menu can still hide it. Its fold turns with a spin: to the
+        // Drawn here whenever the kaleidoscope folds, whatever the main
+        // window's Show Guides says (2026-10-24); this window's menu hides it. Its fold turns with a spin: to the
         // angle of the frame the mirror last copied, or every frame with the
         // mirror off.
         const POP_ANGLE = "(function(){ var g=document.querySelector('#guide-kaleido > g'); var f=g && g.children[1]; var t=f && f.getAttribute('transform'); if (!t) return null; var m=t.slice(7, -1).split(' ').map(Number); return Math.atan2(-m[1], m[0]); })()";
@@ -250,7 +250,8 @@ async function openPopup(env) {
         await main.eval("(function(){ window._kaleidoBootstrapped = true; var k=document.getElementById('kaleidoToggle'); if (!k.checked) { k.checked=true; k.dispatchEvent(new Event('change',{bubbles:true})); } return 1; })()");
         await sleep(400);
         const k0 = await pop.eval("document.getElementById('guide-kaleido').style.display");
-        check("Kaleido on, main 'Show Guides' off: no kaleidoscope guide here", k0 !== 'block', k0);
+        const k0m = await main.eval("(function(){ var s=document.getElementById('kaleidoGuides'); return s ? s.style.display : 'none'; })()");
+        check("Kaleido on, main 'Show Guides' off: guide here, none on the main canvas", k0 === 'block' && k0m !== 'block', { k0, k0m });
         await setMain('kaleidoShowGuides', true);
         await sleep(500);
         const k1 = await pop.eval("(function(){ var s=document.getElementById('guide-kaleido'), r=s.querySelector('g'); return { disp: s.style.display, vb: s.getAttribute('viewBox'), paths: r.querySelectorAll('path').length, seams: " + SEAMS + "(r) }; })()");
@@ -293,7 +294,8 @@ async function openPopup(env) {
         await setMain('kaleidoShowGuides', false);
         await sleep(400);
         const k7 = await pop.eval("document.getElementById('guide-kaleido').style.display");
-        check("main 'Show Guides' unticked: gone here too", k7 === 'none', k7);
+        const k7m = await main.eval("document.getElementById('kaleidoGuides').style.display");
+        check("main 'Show Guides' unticked: gone on the main canvas, still here", k7 === 'block' && k7m === 'none', { k7, k7m });
         await setMain('kaleidoShowGuides', true);
         await sleep(400);
 

@@ -730,14 +730,30 @@
         (function firstRunHint() {
             try {
                 if (localStorage.getItem('fluidFirstRunDone')) return;
-                var show = function () {
+                // The bar's pills are built a beat after the reveal: give it
+                // a few seconds to arrive before floating the hint instead.
+                var show = function (tries) {
+                    var b = document.getElementById('quality-underbar');
+                    if (!(b && b.getClientRects().length && b.querySelector('.qub-size, .reset-app-btn')) && (tries || 0) < 15) {
+                        setTimeout(function () { show((tries || 0) + 1); }, 300);
+                        return;
+                    }
                     var hint = document.createElement('div');
-                    hint.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:9000;' +
-                        'background:rgba(13,17,23,.92);color:#e6edf3;border:1px solid rgba(255,255,255,.18);' +
-                        'border-radius:10px;padding:12px 22px;font:14px/1.5 "Segoe UI",sans-serif;' +
-                        'box-shadow:0 8px 32px rgba(0,0,0,.55);pointer-events:none;transition:opacity .6s';
+                    hint.className = 'first-run-hint';
+                    hint.setAttribute('role', 'status');
                     hint.textContent = 'Drag on the canvas to paint · F1 for shortcuts';
-                    document.body.appendChild(hint);
+                    // On the underbar, between the canvas size and Reset
+                    // Settings, so it no longer sits over the painting. With
+                    // the bar hidden (focus mode, a compact window) it floats
+                    // above the canvas's bottom edge as before (css/22).
+                    var bar = document.getElementById('quality-underbar');
+                    // (The bar is position:fixed, so offsetParent is always null.)
+                    if (bar && bar.getClientRects().length) {
+                        bar.insertBefore(hint, bar.querySelector('.reset-app-btn, .demo-clock, .playtest-label'));
+                    } else {
+                        hint.classList.add('floating');
+                        document.body.appendChild(hint);
+                    }
                     var done = false;
                     var dismiss = function () {
                         if (done) return; done = true;

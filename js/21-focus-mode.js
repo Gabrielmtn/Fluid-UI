@@ -171,6 +171,43 @@
     // Saved wrapper geometry so we can restore after exiting focus mode
     var savedWrapper = null;
 
+    // display:none drops every scroll position inside the hidden chrome (the
+    // sidebars, their brush grids, the strip popups), so the panels came back
+    // scrolled to the top. Kept on the way in, put back on the way out.
+    var HIDDEN_CHROME = '#mixer-strip, #sidebar-right, #sidebar-left, .title-bar, #statsPanel, ' +
+        '.arm-colors-panel, .brush-settings-panel, .mixer-presets-panel, #mixer-more-panel';
+    var savedScrolls = null;
+    function keepScrolls() {
+        savedScrolls = [];
+        var roots = document.querySelectorAll(HIDDEN_CHROME);
+        for (var i = 0; i < roots.length; i++) {
+            var els = [roots[i]].concat(Array.prototype.slice.call(roots[i].querySelectorAll('*')));
+            for (var j = 0; j < els.length; j++) {
+                var el = els[j];
+                if (el.scrollTop || el.scrollLeft) savedScrolls.push([el, el.scrollTop, el.scrollLeft]);
+            }
+        }
+    }
+    function putScrollsBack() {
+        var list = savedScrolls;
+        savedScrolls = null;
+        if (!list || !list.length) return;
+        function put() {
+            var missed = false;
+            for (var i = 0; i < list.length; i++) {
+                var s = list[i];
+                if (!s[0].isConnected) continue;
+                s[0].scrollTop = s[1];
+                s[0].scrollLeft = s[2];
+                if (s[0].scrollTop !== s[1] || s[0].scrollLeft !== s[2]) missed = true;
+            }
+            return missed;
+        }
+        // A panel that rebuilds as it shows again is not tall enough yet:
+        // one more go once it has laid out.
+        if (put()) requestAnimationFrame(put);
+    }
+
     function applyFocus() {
         var canvasWrapper = document.getElementById('canvas-wrapper');
         // The canvas eases to full screen and back (Gabriel's tour: the snap
@@ -187,7 +224,10 @@
             };
         }
 
+        var wasFocused = document.body.classList.contains('focus-mode');
+        if (isFocused && !wasFocused) keepScrolls();
         document.body.classList.toggle('focus-mode', isFocused);
+        if (!isFocused && wasFocused) putScrollsBack();
 
         if (isFocused) flashHint();
         else if (hint) { clearTimeout(hintTimer); hint.classList.remove('visible'); }

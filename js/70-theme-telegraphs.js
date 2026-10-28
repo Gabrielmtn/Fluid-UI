@@ -8,8 +8,8 @@
 // perceptual proxy), with the same value, step and keys, and the canonical
 // inputs (#colorBlend, #timeScale) keep every reader and writer they had.
 // The study's Page-key order jumps are NOT ported (keys are frozen,
-// prep/README.md); the pointer is js/76's (press on the lever's angle, then
-// a two-way relative drag).
+// prep/README.md); the pointer is js/76's (the slot under the plate is a slider:
+// press on it to jump, drag left / right across the dial's width).
 //
 // The face follows the CANONICAL value. It is redrawn only when a value
 // changes: the canonical input's input/change events, plus a MutationObserver
@@ -60,6 +60,7 @@
     // numbers are the same size. Plate text is fitted to the plate's width.
     var PLATE = { w: 56, h: 14, y: 41, fs: 10.5 };
     var TUBES = { cy: 27, w: 11, h: 17, fs: 14 };
+    var TRACK = { w: 36, h: 2.8, y: 58 };    // the slider's slot, on the lug under the plate
 
     function ang(f) { return -120 + 240 * f; }
     function polar(r, a) { var t = (a - 90) * Math.PI / 180; return [r * Math.cos(t), r * Math.sin(t)]; }
@@ -146,7 +147,11 @@
             '<g class="slot"><rect x="-' + (PLATE.w / 2 + 1.5) + '" y="' + (PLATE.y - 1.5) + '" width="' + (PLATE.w + 3) + '" height="' + (PLATE.h + 3) + '" rx="2.4" fill="#050302" stroke="url(#' + id + '-cu)" stroke-width="1.4"/>' +
             '<g clip-path="url(#' + id + '-clip)"><g class="flag"><rect x="-' + PLATE.w / 2 + '" y="' + PLATE.y + '" width="' + PLATE.w + '" height="' + PLATE.h + '" fill="url(#' + id + '-plate)"/>' +
             '<path d="M-' + PLATE.w / 2 + ' ' + (PLATE.y + 0.5) + 'H' + PLATE.w / 2 + '" stroke="rgba(255,245,230,.6)" stroke-width=".5"/><text class="flagt" text-anchor="middle" y="' + (PLATE.y + PLATE.h * 0.77).toFixed(2) + '"></text></g>' +
-            '<rect x="-' + PLATE.w / 2 + '" y="' + PLATE.y + '" width="' + PLATE.w + '" height="' + PLATE.h + '" fill="url(#' + id + '-well)"/></g></g>';
+            '<rect x="-' + PLATE.w / 2 + '" y="' + PLATE.y + '" width="' + PLATE.w + '" height="' + PLATE.h + '" fill="url(#' + id + '-well)"/></g></g>' +
+            // The control's slider (js/76): a slot in the lug under the
+            // plate, filled from the left to the lever's share of the sweep.
+            '<g class="strack"><rect x="-' + TRACK.w / 2 + '" y="' + TRACK.y + '" width="' + TRACK.w + '" height="' + TRACK.h + '" rx="' + TRACK.h / 2 + '" fill="#050302" stroke="#3a1c0c" stroke-width=".5"/>' +
+            '<rect class="sfill" x="-' + (TRACK.w / 2 - 0.5) + '" y="' + (TRACK.y + 0.5) + '" width="0" height="' + (TRACK.h - 1) + '" rx="' + (TRACK.h - 1) / 2 + '"/></g>';
         return '<svg viewBox="-70 -70 140 140" aria-hidden="true" focusable="false">' +
             '<defs>' +
             '<linearGradient id="' + id + '-cu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c98a62"/><stop offset=".5" stop-color="#9a5a36"/><stop offset="1" stop-color="#4a2512"/></linearGradient>' +
@@ -205,6 +210,7 @@
             tval: face.querySelector('.tvalnix'),
             flag: face.querySelector('.flag'),
             flagT: face.querySelector('.flagt'),
+            fill: face.querySelector('.sfill'),
             shown: -1, busy: false, pending: -1, last: null
         };
 
@@ -246,8 +252,12 @@
         function nrm(v) { return k === 'laminar' ? (Math.max(-1, Math.min(1, v)) + 1) / 2 : Math.max(0, Math.min(1, (v - 0.01) / 2.99)); }
         function setLever(n) {
             var v = k === 'laminar' ? n * 2 - 1 : 0.01 + n * 2.99;
-            var a = 'rotate(' + ang(Math.max(0, Math.min(1, C.toF(v)))).toFixed(2) + ')';
-            if (a !== lev.last) { o.lever.setAttribute('transform', a); lev.last = a; }
+            var f = Math.max(0, Math.min(1, C.toF(v)));
+            var a = 'rotate(' + ang(f).toFixed(2) + ')';
+            if (a !== lev.last) {
+                o.lever.setAttribute('transform', a); lev.last = a;
+                o.fill.setAttribute('width', (f * (TRACK.w - 1)).toFixed(2));
+            }
         }
         function stepLever(dt) { lev.sp.step(dt); setLever(lev.sp.x); return lev.sp.settled(); }
         function leverTo(v) {

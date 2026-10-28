@@ -152,7 +152,7 @@
     // every mark per frame would be the wrong price for that.
     var GUIDES = [
         { id: 'kaleido', name: 'Kaleidoscope',
-          about: "The mirror lines and the area the copies come from, while Kaleido's Show Guides is ticked.",
+          about: 'The mirror lines and the area the copies come from, while the kaleidoscope is on.',
           paint: function (g, W, H) {
               var K = window.KaleidoGuides;
               if (!K || typeof K.paint !== 'function') return false;
@@ -1394,6 +1394,13 @@
         }
         L.paintHand(g.hand, box.w, box.h);
     }
+    // The fold turns every frame, so 63 keeps its frame loop going for us
+    // while this window is open with the guide ticked, whatever the main
+    // window's Show Guides says.
+    function kaleidoWant() {
+        var K = window.KaleidoGuides;
+        if (K && typeof K.want === 'function') K.want(isOpen() && guideOn('kaleido'));
+    }
     function hookGuides() {
         var K = window.KaleidoGuides;
         if (!kaleidoHook && K && typeof K.onFrame === 'function') {
@@ -1440,6 +1447,7 @@
                 guidesOn[id] = !!cb.checked;
                 saveGuideSettings();
                 syncGuidesBtn();
+                kaleidoWant();
                 guidesSync();
                 cb.blur();
             });
@@ -1810,6 +1818,7 @@
         cursorReturnSync();
         showBar();
         hookGuides();
+        kaleidoWant();
         guidesSync();
         clearInterval(guideTimer);
         // Mandala Overlay has no change events to follow (a wedge count, the
@@ -1857,6 +1866,7 @@
         clearInterval(ringTimer); ringTimer = 0; ringState = null;
         var w = pop;
         pop = null; pdoc = null; ui = null; childWin = null;
+        kaleidoWant();        // closed → 63's loop stops unless Show Guides is ticked
         cursorReturnSync();   // closed → the main-process half stops sampling
         if (w && !w.closed && reason !== 'closed') { try { w.close(); } catch (_) {} }
         syncButton();

@@ -38,6 +38,18 @@
             e.preventDefault();
         }, { passive: false });
         el.addEventListener('pointerdown', function (e) { self.drag(e); });
+        // Focus mode slides the column by transform (js/21, css/35), which
+        // moves its box but fires no resize: a rail placed mid-slide stayed
+        // stranded over the middle of the column. Hidden while it slides,
+        // placed again where it lands.
+        col.addEventListener('transitionrun', function (e) {
+            if (e.target === col && e.propertyName === 'transform') { self.sliding = true; el.removeAttribute('data-on'); }
+        });
+        function landed(e) {
+            if (e.target === col && e.propertyName === 'transform') { self.sliding = false; self.schedule(); }
+        }
+        col.addEventListener('transitionend', landed);
+        col.addEventListener('transitioncancel', landed);
         if (typeof ResizeObserver === 'function') {
             this.ro = new ResizeObserver(function () { self.schedule(); });
             this.ro.observe(col);
@@ -65,7 +77,7 @@
         var col = this.col, el = this.el;
         var max = col.scrollHeight - col.clientHeight;
         var r = col.getBoundingClientRect();
-        var shown = max > 1 && r.width > 48 && r.height > 48 && col.offsetParent !== null;
+        var shown = !this.sliding && max > 1 && r.width > 48 && r.height > 48 && col.offsetParent !== null;
         if (!shown) { el.removeAttribute('data-on'); this.geo = null; return; }
         // scrollHeight / clientHeight / scrollTop share the column's own
         // units, so their ratios hold in window px.

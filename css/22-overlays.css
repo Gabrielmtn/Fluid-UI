@@ -2469,6 +2469,64 @@ body.text-arrange-active #canvas-size-display {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
 }
 .reset-app-btn:hover { text-shadow: none; }
+/* A white ghost: no plate, but a white outline at rest so it reads as a
+   button beside the bar's readouts. The dark halo keeps the outline on
+   light dye. Repeated for the walnut theme in css/40. */
+#quality-underbar > .reset-app-btn {
+    color: rgba(255, 255, 255, 0.92);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+#quality-underbar > .reset-app-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    border-color: #fff;
+}
+#quality-underbar > .reset-app-btn:active { background: rgba(255, 255, 255, 0.2); }
+
+/* ── First-run hint (js/05n) ──
+   "Drag on the canvas to paint · F1 for shortcuts", once. On the pills'
+   line its auto margin and Reset Settings' split the bar's empty middle, so
+   it sits centred between the canvas size and that button. It takes no
+   clicks: the bar under it still lets painting through. */
+.first-run-hint {
+    font-size: 12px;
+    line-height: 22px;
+    white-space: nowrap;
+    color: rgba(230, 237, 243, 0.85);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
+    transition: opacity .6s;
+}
+#quality-underbar > .first-run-hint {
+    order: 97;
+    margin-left: auto;
+    align-self: flex-end;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+@container underbar (max-width: 700px) {
+    #quality-underbar > .first-run-hint { display: none; }
+}
+.first-run-hint.floating {
+    position: fixed;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    z-index: 9000;
+    padding: 12px 22px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #e6edf3;
+    text-shadow: none;
+    background: rgba(13, 17, 23, .92);
+    border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .55);
+    pointer-events: none;
+}
 
 /* ── Slowdown button (js/08a-quality-governor.js) ──
    On the pills' line after the Canvas readout, before Reset app's auto
