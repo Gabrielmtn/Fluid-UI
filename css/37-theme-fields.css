@@ -320,7 +320,9 @@ html[data-theme="walnut-copper"] .wc-lbx-out { pointer-events: none; }
 html[data-theme="walnut-copper"] .wc-lbx-in {
     display: grid;
     gap: 5px;
-    padding: 5px 0 2px;
+    /* 8 below: the next row keeps the column's 8 px gap (see Rhythm above)
+       whether this list is open or not. */
+    padding: 5px 0 8px;
 }
 html[data-theme="walnut-copper"] .wc-lbx-in.wc-scroll {
     overflow-y: auto;
