@@ -6110,7 +6110,7 @@
         tipHead.type = 'button';
         tipHead.className = 'brush-fold-head btn--ghost';
         tipHead.innerHTML = '<span class="brush-fold-chev" aria-hidden="true">▾</span>'
-            + '<span class="brush-section-label">Tip</span><span class="brush-fold-sum"></span>';
+            + '<span class="brush-section-label">Brush Tips</span><span class="brush-fold-sum"></span>';
         var tipSum = tipHead.querySelector('.brush-fold-sum');
         var tipBody = document.createElement('div');
         tipBody.className = 'brush-fold-body';
