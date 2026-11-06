@@ -256,6 +256,10 @@
     // Case rows) climbs out of it first: inside the row the list became a
     // flex item and pushed its neighbours aside (Gabriel's tour, 2026-10-18);
     // under the row it opens underneath, like every other field.
+    // A bare field stacked with rows after it (Splat In / Out in the section
+    // body, Mouse buttons above their option rows) has no row of its own: its
+    // parent's end is past those rows, even out of the section, so the list
+    // goes straight under the field.
     function isRow(el) {
         if (!el) return false;
         var cs = getComputedStyle(el);
@@ -264,7 +268,11 @@
         return false;
     }
     function anchorOf(sel) {
-        var a = sel.closest('.control-group, .hk-picker, .qub-dd') || sel.parentElement;
+        var a = sel.closest('.control-group, .hk-picker, .qub-dd');
+        if (!a) {
+            a = sel.parentElement;
+            if (sel.nextElementSibling && !isRow(a)) return sel;
+        }
         for (var n = 0; n < 4 && a.parentElement && !a.parentElement.matches('.section-body, .sidebar-section, body') && isRow(a.parentElement); n++) a = a.parentElement;
         return a;
     }
@@ -345,7 +353,7 @@
         b.items.forEach(function (o) { setFit(o, !o.hasAttribute('data-wc-face') && tooLong(o.textContent, 9, room)); });
         var full = b.inner.offsetHeight;
         if (b.items.length > MAXV) {
-            var cap = MAXV * 37 + 7;
+            var cap = MAXV * 37 + 13;
             b.inner.style.maxHeight = cap + 'px';
             full = Math.min(full, cap);
         }
