@@ -4050,6 +4050,11 @@
                     clear.addEventListener('click', e => {
                         e.stopPropagation();
                         slots[idx] = null;
+                        // The slot was its stop button: a copy still looping
+                        // with no slot showing it could only be stopped from
+                        // the library. Another slot holding it keeps it going.
+                        const stillSlotted = slots.some(o => o && o.kind === 'preset' && o.name === s.name);
+                        if (!stillSlotted && window.recStopSavedAnimation) window.recStopSavedAnimation(s.name);
                         saveSlots();
                         renderSlots();
                     });
@@ -7308,7 +7313,8 @@
             fontSel.value = ov.fontFamily;
             fontPreview.style.fontFamily = ov.fontFamily;
             contentInput.style.setProperty('font-family', ov.fontFamily, 'important');
-            sizeInput.value = String(ov.fontSize);
+            // Unrounded underneath: the size follows the canvas (23 fitOne).
+            sizeInput.value = String(Math.round(ov.fontSize * 10) / 10);
             weightSel.value = String(ov.fontWeight);
             italicBtn.classList.toggle('active', ov.fontStyle === 'italic');
             setAlignActive(ov.align);
@@ -7320,8 +7326,8 @@
             bgToggle.checked = !!ov.bgEnabled;
             bgColorPick.value = ov.bgColor;
             bgOpacitySlider.setValue(ov.bgOpacity);
-            padInput.value = String(ov.padding);
-            radInput.value = String(ov.radius);
+            padInput.value = String(Math.round(ov.padding));
+            radInput.value = String(Math.round(ov.radius));
             shadowRow.input.checked = !!ov.shadow;
             colliderRow.input.checked = !!ov.collider;
             colliderModeSel.value = ov.colliderMode || 'block';

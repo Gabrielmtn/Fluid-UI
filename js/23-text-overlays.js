@@ -216,6 +216,7 @@
         // redraw, and a collider wall is in SIM px so it has to be re-rasterised
         // against the new area->wrapper mapping.
         window.addEventListener('resize', function () {
+            fitAll();
             if (arranging) { sizeArrangeCanvas(); drawArrange(); }
             // A window drag is a stream too — same coalescing as a text edit.
             syncCollidersSoon();
@@ -280,6 +281,10 @@
         // One key, one line. A copy (Duplicate) arrives without the key its
         // source holds, rather than firing alongside it.
         if (hotkeyHolder(overlay.hotkey)) overlay.hotkey = '';
+        // A snapshot (preset, Duplicate) names the canvas it was laid out
+        // on; a fresh line is laid out on this one.
+        if (validFit(opts.fit)) overlay.fit = opts.fit;
+        fitOne(overlay, fitGeom());
         overlays.push(overlay);
         renderOverlay(overlay);
         save(); emitChange(); syncColliders();
@@ -375,6 +380,8 @@
         if (typeof id === 'string') return updateRoomLine(id, props);
         var ov = findOverlay(id);
         if (!ov) return null;
+        // props are in today's canvas, so the line is brought to it first.
+        fitOne(ov, fitGeom());
         for (var key in props) if (props.hasOwnProperty(key)) ov[key] = props[key];
         renderOverlay(ov);
         // syncCollidersSoon, not syncColliders: the panel commits on every
@@ -454,6 +461,62 @@
         } catch (_) {}
     }
 
+    // ─── FIT TO THE CANVAS ──────────────────────────────────────
+    // A line's x/y are fractions of #canvas-area and its type is CSS px, but
+    // everything it has to line up with follows the CANVAS: dye stretches
+    // with it, a recorded dab lands at a fraction of it and is sized from its
+    // height (05d0). So when the canvas changes size (focus mode, the
+    // sidebar, a resize handle, a window of another shape) a line stayed put
+    // in px while a recorded text pour grew around it, and the wall no
+    // longer matched the paint. Each line remembers the geometry it is
+    // expressed in (`fit`); a new one keeps the same spot on the canvas and
+    // scales its px by the canvas height, as a dab does. Unrounded and
+    // unclamped, so a trip into focus and back lands where it started.
+    var FIT_PX = ['fontSize', 'letterSpacing', 'padding', 'radius'];
+    function fitGeom() {
+        var g = colliderGeom();
+        if (!g) return null;
+        var r = function (v) { return Math.round(v * 100) / 100; };
+        return { aw: r(g.areaW), ah: r(g.areaH), cw: r(g.cssW), ch: r(g.cssH), ox: r(g.offX), oy: r(g.offY) };
+    }
+    function validFit(f) {
+        return !!f && f.aw > 0 && f.ah > 0 && f.cw > 0 && f.ch > 0 &&
+            typeof f.ox === 'number' && typeof f.oy === 'number';
+    }
+    // Brings one line to geometry g. True when anything moved.
+    function fitOne(ov, g) {
+        if (!g) return false;
+        var f = ov.fit;
+        if (!validFit(f)) { ov.fit = g; return false; }
+        if (f.aw === g.aw && f.ah === g.ah && f.cw === g.cw && f.ch === g.ch && f.ox === g.ox && f.oy === g.oy) return false;
+        var cx = (ov.x * f.aw - f.ox) / f.cw;
+        var cy = (ov.y * f.ah - f.oy) / f.ch;
+        ov.x = (g.ox + cx * g.cw) / g.aw;
+        ov.y = (g.oy + cy * g.ch) / g.ah;
+        var k = g.ch / f.ch;
+        for (var i = 0; i < FIT_PX.length; i++) {
+            if (typeof ov[FIT_PX[i]] === 'number') ov[FIT_PX[i]] *= k;
+        }
+        ov.fit = g;
+        return true;
+    }
+    var fitSaveTimer = null;
+    function fitAll() {
+        var g = fitGeom();
+        if (!g) return;
+        var moved = false;
+        for (var i = 0; i < overlays.length; i++) {
+            if (fitOne(overlays[i], g)) { moved = true; renderOverlay(overlays[i]); }
+        }
+        if (!moved) return;
+        if (arranging) { sizeArrangeCanvas(); drawArrange(); }
+        emitChange();
+        // A resize streams (a focus transition, a window drag): one write
+        // once it settles.
+        if (fitSaveTimer) clearTimeout(fitSaveTimer);
+        fitSaveTimer = setTimeout(function () { fitSaveTimer = null; save(); }, 300);
+    }
+
     // Fills in every field a saved overlay predates, and drops the image/QR
     // overlays the branding era could create (their bitmaps were never stored,
     // so they could only ever come back as empty boxes).
@@ -475,6 +538,7 @@
         ov.hotkey = hotkeyOf(o.hotkey);
         ov.hotkeyAction = hotkeyActionOf(o.hotkeyAction);
         ov.hotkeyAt = hotkeyAtOf(o.hotkeyAt);
+        if (validFit(o.fit)) ov.fit = o.fit;
         return ov;
     }
 
@@ -494,6 +558,7 @@
                 renderOverlay(ov);
             }
             if (migrated) save();
+            fitAll();
         } catch (_) {}
     }
 
@@ -1731,6 +1796,7 @@
     function watchLayout() {
         if (typeof ResizeObserver !== 'function') return;
         var ro = new ResizeObserver(function () {
+            fitAll();
             if (colliderInstalled) syncCollidersSoon();
             // A room's lines stand at fractions of the CANVAS, and so do the
             // positions ours are sent at — both move when the canvas moves
