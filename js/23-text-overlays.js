@@ -283,6 +283,7 @@
         if (hotkeyHolder(overlay.hotkey)) overlay.hotkey = '';
         // A snapshot (preset, Duplicate) names the canvas it was laid out
         // on; a fresh line is laid out on this one.
+        overlay.sx = stretchOf(opts);
         if (validFit(opts.fit)) overlay.fit = opts.fit;
         fitOne(overlay, fitGeom());
         overlays.push(overlay);
@@ -307,7 +308,7 @@
         el.style.left = (ov.x * 100) + '%';
         el.style.top = (ov.y * 100) + '%';
         el.style.transformOrigin = 'center center';
-        el.style.transform = 'translate(-50%,-50%) rotate(' + (ov.rotation || 0) + 'deg)';
+        el.style.transform = 'translate(-50%,-50%) scale(' + stretchOf(ov) + ',1) rotate(' + (ov.rotation || 0) + 'deg)';
         el.style.zIndex = '51';
         styleTextEl(el, ov);
         // Hidden, and only up while it is arranged (ARRANGE MODE): faded.
@@ -473,21 +474,55 @@
     // scales its px by the canvas height, as a dab does. Unrounded and
     // unclamped, so a trip into focus and back lands where it started.
     var FIT_PX = ['fontSize', 'letterSpacing', 'padding', 'radius'];
-    function fitGeom() {
-        var g = colliderGeom();
-        if (!g) return null;
-        var r = function (v) { return Math.round(v * 100) / 100; };
-        return { aw: r(g.areaW), ah: r(g.areaH), cw: r(g.cssW), ch: r(g.cssH), ox: r(g.offX), oy: r(g.offY) };
+    // The line's width over its height, beyond its type's own: the canvas
+    // stretches like a sheet (dye, image layers, a recorded stroke's x is a
+    // fraction of its width), so a line stretches with it rather than keeping
+    // its letterforms and drifting off the paint around it. Applied in canvas
+    // axes, after the rotation, wherever the line is drawn.
+    function stretchOf(o) {
+        var v = o && o.sx;
+        return (typeof v === 'number' && isFinite(v) && v > 0.05 && v < 20) ? v : 1;
     }
+    function stretchCtx(ctx, o) {
+        var sx = stretchOf(o);
+        if (sx !== 1) ctx.scale(sx, 1);
+    }
+    // LAYOUT geometry, not getBoundingClientRect: a transform (Zoom View
+    // scales #canvas-wrapper, boot and focus transitions animate) changes
+    // the rect without any resize event, so a fit measured through one was
+    // left stale and the next real change, or a reload, moved the line.
+    // offset* ignore transforms; the line's own CSS % is against the area's
+    // padding box, which is clientWidth/Height.
+    function fitGeom() {
+        var area = document.getElementById('canvas-area');
+        var cv = document.getElementById('canvas');
+        if (!area || !cv) return null;
+        var aw = area.clientWidth, ah = area.clientHeight;
+        var cw = cv.offsetWidth, ch = cv.offsetHeight;
+        if (!(aw > 0 && ah > 0 && cw > 0 && ch > 0)) return null;
+        var ox = 0, oy = 0, el = cv;
+        while (el && el !== area) {
+            ox += el.offsetLeft; oy += el.offsetTop;
+            var p = el.offsetParent;
+            if (!p) return null;
+            if (p !== area) { ox += p.clientLeft; oy += p.clientTop; }
+            el = p;
+        }
+        if (el !== area) return null;
+        var r = function (v) { return Math.round(v * 100) / 100; };
+        return { v: 2, aw: r(aw), ah: r(ah), cw: r(cw), ch: r(ch), ox: r(ox), oy: r(oy) };
+    }
+    // v2: a fit measured through the on-screen rect (the first version)
+    // may be stale, so it is dropped and the line adopts today's canvas.
     function validFit(f) {
-        return !!f && f.aw > 0 && f.ah > 0 && f.cw > 0 && f.ch > 0 &&
+        return !!f && f.v === 2 && f.aw > 0 && f.ah > 0 && f.cw > 0 && f.ch > 0 &&
             typeof f.ox === 'number' && typeof f.oy === 'number';
     }
     // Brings one line to geometry g. True when anything moved.
     function fitOne(ov, g) {
         if (!g) return false;
         var f = ov.fit;
-        if (!validFit(f)) { ov.fit = g; return false; }
+        if (!validFit(f)) { ov.fit = g; return true; }
         if (f.aw === g.aw && f.ah === g.ah && f.cw === g.cw && f.ch === g.ch && f.ox === g.ox && f.oy === g.oy) return false;
         var cx = (ov.x * f.aw - f.ox) / f.cw;
         var cy = (ov.y * f.ah - f.oy) / f.ch;
@@ -497,6 +532,7 @@
         for (var i = 0; i < FIT_PX.length; i++) {
             if (typeof ov[FIT_PX[i]] === 'number') ov[FIT_PX[i]] *= k;
         }
+        ov.sx = stretchOf(ov) * (g.cw / f.cw) / k;
         ov.fit = g;
         return true;
     }
@@ -538,6 +574,7 @@
         ov.hotkey = hotkeyOf(o.hotkey);
         ov.hotkeyAction = hotkeyActionOf(o.hotkeyAction);
         ov.hotkeyAt = hotkeyAtOf(o.hotkeyAt);
+        ov.sx = stretchOf(o);
         if (validFit(o.fit)) ov.fit = o.fit;
         return ov;
     }
@@ -602,7 +639,7 @@
         return {
             cx: ov.x * W,
             cy: ov.y * H,
-            hw: el.offsetWidth / 2,
+            hw: el.offsetWidth / 2 * stretchOf(ov),   // exact unrotated; near enough turned
             hh: el.offsetHeight / 2,
             rot: (ov.rotation || 0) * Math.PI / 180
         };
@@ -635,7 +672,7 @@
         return {
             cx: (g.offX + pl.cx * g.cssW) * kx,
             cy: (g.offY + pl.cy * g.cssH) * ky,
-            hw: pl.el.offsetWidth / 2 * (g.cssW / pl.cw) * kx,
+            hw: pl.el.offsetWidth / 2 * (g.cssW / pl.cw) * stretchOf(pl) * kx,
             hh: pl.el.offsetHeight / 2 * (g.cssH / pl.ch) * ky,
             rot: (pl.rotation || 0) * Math.PI / 180
         };
@@ -971,6 +1008,7 @@
             try {
                 ctx.globalAlpha = ov.opacity;
                 ctx.translate(ov.x * areaW - offX, ov.y * areaH - offY);
+                stretchCtx(ctx, ov);
                 ctx.rotate((ov.rotation || 0) * Math.PI / 180);
                 paintOverlay(ctx, ov, false);
             } catch (e) {
@@ -995,6 +1033,7 @@
                     var xa = (g.offX + pl.cx * g.cssW) / g.areaW, ya = (g.offY + pl.cy * g.cssH) / g.areaH;
                     ctx.translate(xa * areaW - offX, ya * areaH - offY);
                     ctx.scale(g.cssW / pl.cw, g.cssH / pl.ch);
+                    stretchCtx(ctx, pl);
                     ctx.rotate((pl.rotation || 0) * Math.PI / 180);
                     paintOverlay(ctx, pl, false);
                 } catch (e) {
@@ -1222,7 +1261,7 @@
         var rot = (ov.rotation || 0) * Math.PI / 180;
         var c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
         return {
-            W: Math.max(1, Math.min(dye.w * 2, Math.ceil((bw * c + bh * s) * kx) + 2)),
+            W: Math.max(1, Math.min(dye.w * 2, Math.ceil((bw * c + bh * s) * stretchOf(ov) * kx) + 2)),
             H: Math.max(1, Math.min(dye.h * 2, Math.ceil((bw * s + bh * c) * ky) + 2))
         };
     }
@@ -1247,6 +1286,7 @@
         var ctx = cv.getContext('2d');
         ctx.translate(ox, oy);
         ctx.scale(kx, ky);
+        stretchCtx(ctx, ov);
         ctx.rotate(rot);
         ctx.globalAlpha = (typeof ov.opacity === 'number') ? ov.opacity : 1;
         paintOverlay(ctx, ov, false);
@@ -1282,7 +1322,7 @@
     function pushShape(ov) {
         var box = measureBox(ov, false);
         var rot = (ov.rotation || 0) * Math.PI / 180;
-        return { a: box.w / 2, b: box.h / 2, ux: Math.cos(rot), uy: Math.sin(rot) };
+        return { a: box.w / 2, b: box.h / 2, ux: Math.cos(rot), uy: Math.sin(rot), sx: stretchOf(ov) };
     }
 
     // One push centred on (cx, cy) carrying (vx, vy) of travel, all in CSS px
@@ -1293,9 +1333,10 @@
         var cv = document.getElementById('canvas');
         if (!cv || !cv.width || !cv.height || !(g.cssW > 0) || !(g.cssH > 0)) return false;
         var kx = cv.width / g.cssW, ky = cv.height / g.cssH;
-        var ax = shape.ux * kx, ay = shape.uy * ky, al = Math.hypot(ax, ay) || 1;
+        var ks = kx * (shape.sx || 1);   // the line's stretch widens its shape, not its travel
+        var ax = shape.ux * ks, ay = shape.uy * ky, al = Math.hypot(ax, ay) || 1;
         return !!window.__pushEllipse(cx * kx, cy * ky, 10 * vx * kx, 10 * vy * ky,
-            shape.a * al, shape.b * Math.hypot(shape.uy * kx, shape.ux * ky), ax / al, ay / al);
+            shape.a * al, shape.b * Math.hypot(shape.uy * ks, shape.ux * ky), ax / al, ay / al);
     }
 
     // The pre-stamp path: the line painted into a dye-sized canvas at its
@@ -1318,6 +1359,7 @@
         try {
             ctx.translate(cx * kx, cy * ky);
             ctx.scale(kx, ky);
+            stretchCtx(ctx, ov);
             ctx.rotate((ov.rotation || 0) * Math.PI / 180);
             ctx.globalAlpha = (typeof ov.opacity === 'number') ? ov.opacity : 1;
             paintOverlay(ctx, ov, false);
@@ -1578,6 +1620,7 @@
             sc.clearRect(0, 0, obsW, obsH);
             sc.translate(tx, ty);
             sc.scale(kx, ky);
+            stretchCtx(sc, ov);
             sc.rotate((ov.rotation || 0) * Math.PI / 180);
             paintOverlay(sc, ov, '#ffffff');
             sc.restore();
@@ -1671,7 +1714,7 @@
             if (!isWallSource(o)) continue;
             // Every field paintOverlay reads. Miss one and that property's
             // changes stop resyncing, which is the bug class this guards.
-            parts.push(o.id, o.x.toFixed(5), o.y.toFixed(5), o.rotation || 0,
+            parts.push(o.id, o.x.toFixed(5), o.y.toFixed(5), o.rotation || 0, stretchOf(o).toFixed(5),
                 o.content, o.textCase, o.fontFamily, o.fontSize, o.fontWeight,
                 o.fontStyle, o.letterSpacing, o.lineHeight, o.align,
                 o.bgEnabled ? 1 : 0, o.bgOpacity, o.padding, o.radius,
@@ -2197,7 +2240,7 @@
     // cleanLook before it can reach the DOM, a canvas, or the obstacle.
     var LOOK_KEYS = ['content', 'textCase', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle',
         'letterSpacing', 'lineHeight', 'align', 'color', 'opacity', 'shadow',
-        'bgEnabled', 'bgColor', 'bgOpacity', 'padding', 'radius', 'rotation'];
+        'bgEnabled', 'bgColor', 'bgOpacity', 'padding', 'radius', 'rotation', 'sx'];
     var TEXT_WIRE_MAX = 2000;       // characters of one line a room carries
     var PEER_LINES_PER_OWNER = 64;  // a room is 8 people; this is plenty and bounds a flood
     var PEER_STAMPS_MAX = 12;       // pour bitmaps kept on the GPU, oldest dropped first
@@ -2295,7 +2338,8 @@
             bgOpacity: num(src.bgOpacity, 0, 1, DEFAULTS.bgOpacity),
             padding: num(src.padding, 0, 200, DEFAULTS.padding),
             radius: num(src.radius, 0, 200, DEFAULTS.radius),
-            rotation: num(src.rotation, -36000, 36000, 0)
+            rotation: num(src.rotation, -36000, 36000, 0),
+            sx: num(src.sx, 0.06, 19, 1)
         };
     }
 
@@ -2425,7 +2469,7 @@
         pl.y = (g.offY + pl.cy * g.cssH) / g.areaH;
         el.style.left = (pl.x * 100) + '%';
         el.style.top = (pl.y * 100) + '%';
-        el.style.transform = 'translate(-50%,-50%) scale(' + (g.cssW / pl.cw).toFixed(4) + ',' +
+        el.style.transform = 'translate(-50%,-50%) scale(' + (g.cssW / pl.cw * stretchOf(pl)).toFixed(4) + ',' +
             (g.cssH / pl.ch).toFixed(4) + ') rotate(' + (pl.rotation || 0) + 'deg)';
     }
 
