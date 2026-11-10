@@ -183,7 +183,7 @@ html[data-theme="walnut-copper"] .section-title::before {
 /* No chevron: the lamp and the lift carry the state. */
 html[data-theme="walnut-copper"] .section-chevron { display: none; }
 
-/* Badges on a front (Audio's "Under construction"): study .dtag. */
+/* Badges on a section front: study .dtag. */
 html[data-theme="walnut-copper"] .section-header .section-badge {
     font: 400 9px/1 var(--ui-font-mono);
     letter-spacing: 0.06em;

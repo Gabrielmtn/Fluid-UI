@@ -97,16 +97,6 @@
     color: rgba(255,255,255,0.4);
     margin-left: 6px;
 }
-/* Audio's "Under construction" (20 underConstructionBadge): held beside the
-   title in the space-between header, and warm so it reads as a status. */
-.section-header > .audio-construction-badge { margin-right: auto; }
-.audio-construction-badge {
-    background: rgba(255, 170, 60, 0.14);
-    color: rgba(255, 196, 120, 0.9);
-    letter-spacing: 0.04em;
-}
-.audio-construction-note { margin: 2px 0 8px; }
-.audio-construction-note .section-badge { margin-left: 0; }
 
 .section-chevron {
     font-size: 10px;
@@ -1954,8 +1944,7 @@ body.rec-open #sidebar-right {
 }
 #audioDrawerPanel .fader-scale { display: none; }
 #audioDrawerPanel > .control-group,
-#audioDrawerPanel > .audio-drawer-enable,
-#audioDrawerPanel > .audio-construction-note { max-width: 680px; }
+#audioDrawerPanel > .audio-drawer-enable { max-width: 680px; }
 /* The cue editor spans the drawer: a timeline wants the width. */
 .audio-cue-editor-host { margin: 6px 0 10px; }
 .ace-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
