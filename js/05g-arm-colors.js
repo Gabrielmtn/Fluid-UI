@@ -727,15 +727,24 @@
             const tapArms = (tap && !exactColor) ? {} : null;
             const relX = x - centerX;
             const relY = y - centerY;
-            for (let i = 0; i < transforms.length; i++) {
+            // Concentricity: N rings of the arms, ring k at k/N of each arm's
+            // distance from the centre, so they space evenly out to the stroke
+            // and the innermost keeps a gap of 1/N round the centre. A ring is
+            // the stroke scaled about the centre, so its push scales with it:
+            // an inner ring travels less, and a full-strength push would
+            // smear it past its own path.
+            const rings = Math.max(1, Math.min(6, (config.CONCENTRICITY | 0) || 1));
+            for (let ri = 0; ri < transforms.length * rings; ri++) {
+                const i = ri % transforms.length;
+                const rs = (rings - Math.floor(ri / transforms.length)) / rings;
                 const m = transforms[i].m;
-                const finalX = (m[0] * relX + m[1] * relY + m[2]) + centerX;
-                const finalY = (m[3] * relX + m[4] * relY + m[5]) + centerY;
+                const finalX = rs * (m[0] * relX + m[1] * relY + m[2]) + centerX;
+                const finalY = rs * (m[3] * relX + m[4] * relY + m[5]) + centerY;
                 // Linear part only: velocity is a direction, so it must not
                 // pick up the translation (rake) — but it MUST take the flip
                 // (mirrors), or the reflected dye swims the wrong way.
-                const armDx = m[0] * dx + m[1] * dy;
-                const armDy = m[3] * dx + m[4] * dy;
+                const armDx = rs * (m[0] * dx + m[1] * dy);
+                const armDy = rs * (m[3] * dx + m[4] * dy);
                 const armColor = exactColor ? color : resolveArmColor(transforms[i].arm, color);
                 if (tapArms) tapArms[transforms[i].arm] = armColor;
                 // Two things splat() cannot work out for itself, published for

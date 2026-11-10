@@ -8932,6 +8932,9 @@
         // actually are. The element is authored in index.html and MOVED here,
         // not cloned — a clone would leave the persisted #symmetryMode id
         // pointing at a stale hidden copy.
+        // Rings first: they multiply the arm count right above the panel.
+        var concGroup = document.getElementById('concentricityGroup');
+        if (concGroup) panel.appendChild(concGroup);
         var symGroup = document.getElementById('symmetryModeGroup');
         if (symGroup) {
             symGroup.style.padding = '';

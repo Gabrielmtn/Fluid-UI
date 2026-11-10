@@ -1047,6 +1047,12 @@
         <!-- Hold symmetry (05j pass 2d): keeps the arms' flows mirror images
              of each other. Moved into the Multi-Brush dropdown with the two
              groups above. -->
+        <!-- Rings of the arms, moved into the Multi-Brush panel under the arm
+             count (20 buildArmColorsDropdown); 05g multiSplat paints them. -->
+        <div class="control-group" id="concentricityGroup">
+            <label for="concentricity" title="Adds rings of brushes between the center and your stroke, evenly spaced, so the innermost ring keeps a gap around the center.">Concentricity <span id="concentricityValue" class="value-display">1</span></label>
+            <input type="range" id="concentricity" min="1" max="6" value="1" step="1">
+        </div>
         <div class="control-group" id="symmetryHoldGroup">
             <label for="symmetryHold" title="Strength of symmetry assist force near center of the canvas, weaker at edges.">Hold symmetry <span id="symmetryHoldValue" class="value-display">0.00</span></label>
             <input type="range" id="symmetryHold" min="0" max="1" value="0" step="0.01">

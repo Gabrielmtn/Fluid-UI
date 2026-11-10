@@ -613,6 +613,10 @@
             panel.insertBefore(chan, scr);
             MB.chan = chan;
         }
+        // Concentricity rides directly under the count: both say how many
+        // brushes a stroke lays.
+        var conc = document.getElementById('concentricityGroup');
+        if (conc && chan && conc.parentNode === panel) panel.insertBefore(conc, scr);
 
         var mini = document.createElement('div');
         mini.className = 'wcb-scr wcb-mini';

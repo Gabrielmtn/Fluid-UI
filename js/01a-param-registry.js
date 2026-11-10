@@ -77,6 +77,11 @@
         // arms' symmetry (05j pass 2d). Default 0 skips the pass, so presets
         // saved before it existed land exactly as they did. No `mut`, as for
         // symmetryMode: it changes how every later stroke evolves.
+        // Concentricity (2026-11-10, Multi-Brush panel): rings of the arms,
+        // each a smaller copy of the stroke about the canvas centre (05g
+        // multiSplat). Default 1 = the arms alone, so older presets land as
+        // they did. Brush category: personal in a room, like the arm count.
+        concentricity: {configKey: "CONCENTRICITY", ui: {min: 1, max: 6, step: 1}, hard: {min: 1, max: 6}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: true},
         symmetryHold: {configKey: "SYMMETRY_HOLD", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 0, simSlider: true},
         // Color Blend (2026-09-29): colours blend where they meet while the
         // paint is wet, more where the fluid stirs them (05j pass 8d).

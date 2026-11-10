@@ -1176,6 +1176,10 @@
                                       // arm — this is what stops it whipping. 0 disables.
             SYM_RAKE_SPACING: 1.0,    // 'rake' bristle gap in brush diameters, so the rake
                                       // opens and closes with the Size fader
+            CONCENTRICITY: 1,         // Multi-Brush rings (05g multiSplat): N copies of the
+                                      // arms at 1/N, 2/N ... N/N of the stroke's distance
+                                      // from the centre. 1 = the arms alone. #concentricity
+                                      // in the Multi-Brush panel.
             SYMMETRY_HOLD: 0,         // Hold symmetry (05j pass 2d, 05b symmetryHoldFrag): keeps
                                       // the Multi-Brush arms' flows mirror images of each other.
                                       // The fader, 0 = off (pass skipped), 1 = exact every step;
