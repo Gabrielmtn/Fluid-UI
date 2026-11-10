@@ -30,7 +30,7 @@
     "steamworks.js": "^0.4.0"
   },
   "devDependencies": {
-    "electron": "^39.1.2",
+    "electron": "^45.2.3",
     "electron-builder": "^26.0.12",
     "partykit": "^0.0.115",
     "partyserver": "^0.5.10",
