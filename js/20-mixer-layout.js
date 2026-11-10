@@ -4740,8 +4740,12 @@
             if (group) { group.style.cssText = ''; body.appendChild(group); }
         }
 
-        // Canvas opacity
-        moveControlGroup('canvasOpacity', body);
+        // Canvas opacity lives on the Sim layer's row now (05k
+        // wireSimOpacitySlider). Its input stays, hidden where index.html
+        // put it: settings, presets, look links and Mutate find it by id.
+        var simOpacityGroup = document.getElementById('canvasOpacity');
+        simOpacityGroup = simOpacityGroup && simOpacityGroup.closest('.control-group');
+        if (simOpacityGroup) { simOpacityGroup.hidden = true; simOpacityGroup.style.display = 'none'; }
 
         // Preserve fluid opacity
         moveCheckboxGroup('preserveFluidOpacity', body);

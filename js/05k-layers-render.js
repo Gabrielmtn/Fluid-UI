@@ -181,6 +181,49 @@
             const o = layerOpacityOf(layer);
             div.style.opacity = (o < 1 || layer.isCollision) ? String(o) : '';
         };
+        // The Sim's Opacity. #canvasOpacity (its old home in Display, now
+        // hidden) stays the one value: settings, presets, look links and
+        // Mutate all read and write it by id, and its input handler (05e)
+        // fades the canvas. This row drives it and follows it.
+        function simOpacityPct() {
+            const src = document.getElementById('canvasOpacity');
+            const v = src ? parseInt(src.value, 10) : 100;
+            return Number.isFinite(v) ? v : 100;
+        }
+        function wireSimOpacitySlider(element) {
+            const slider = mountLayerSlider(element, 'layer-row-opacity',
+                { min: 0, max: 100, value: simOpacityPct() },
+                (s, valueEl) => {
+                    const src = document.getElementById('canvasOpacity');
+                    if (valueEl) valueEl.textContent = s.value + '%';
+                    if (!src) return;
+                    src.value = s.value;
+                    src.style.setProperty('--val', s.value);
+                    src.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            if (!slider) return;
+            slider.classList.add('sim-opacity-slider');
+            slider.addEventListener('change', () => {
+                const src = document.getElementById('canvasOpacity');
+                if (src) src.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        }
+        // A preset, a look link or Mutate moving #canvasOpacity moves the row.
+        if (!window.__simOpacityFollowInstalled) {
+            window.__simOpacityFollowInstalled = true;
+            const follow = (e) => {
+                if (!e.target || e.target.id !== 'canvasOpacity') return;
+                const row = document.querySelector('#layersPanel .layer-item[data-layer-type="sim"] .layer-row-opacity');
+                if (!row) return;
+                const s = row.querySelector('.sim-opacity-slider');
+                const v = simOpacityPct();
+                if (s && String(s.value) !== String(v)) { s.value = v; s.style.setProperty('--val', v); }
+                const out = row.querySelector('.layer-slider-value');
+                if (out) out.textContent = v + '%';
+            };
+            document.addEventListener('input', follow, true);
+            document.addEventListener('change', follow, true);
+        }
         function wireOpacitySlider(element, layer) {
             let before = null;
             const slider = mountLayerSlider(element, 'layer-row-opacity',
@@ -296,9 +339,12 @@
                         visible: canvas.style.display !== 'none',
                         thumbStyle: 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:600; letter-spacing:.1em; color:rgba(255,255,255,.9);',
                         thumbText: 'SIM'
-                    });
+                    }) + `<div class="layer-item-body">
+                                ${sliderRowHTML('layer-row-opacity', 'Opacity', simOpacityPct() + '%', 'How much of the fluid shows over the layers below it.')}
+                            </div>`;
                     const headerElSim = element.querySelector('.layer-item-header');
                     if (headerElSim) headerElSim.draggable = true;
+                    wireSimOpacitySlider(element);
                     const titleInput = element.querySelector('.layer-title');
                     if (titleInput) {
                         const prev = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
@@ -768,10 +814,28 @@
             if (item && item.dataset.sliderActive === '1') { e.preventDefault(); return; }
             // Do not start drag from interactive controls
             if (e.target && e.target.closest && (e.target.closest('button') || e.target.closest('input') || e.target.closest('select'))) { e.preventDefault(); return; }
-            draggedElement = item || this;
-            if (draggedElement && draggedElement.classList) draggedElement.classList.add('dragging');
-            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-            startDragUX();
+            const dragged = draggedElement = item || this;
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                // The ghost is the header as it sits under the hand, held at
+                // the point that was pressed.
+                const head = e.currentTarget;
+                if (head && head.getBoundingClientRect && e.dataTransfer.setDragImage) {
+                    const r = head.getBoundingClientRect();
+                    try { e.dataTransfer.setDragImage(head, e.clientX - r.left, e.clientY - r.top); } catch (_) {}
+                }
+            }
+            // Nothing in the panel moves until the drag is under way. Chromium
+            // snapshots the source when dragstart returns, and the drag layout
+            // grows the drop zones above the rows (0 px at rest in the
+            // walnut-copper theme) and folds the other rows: done here, the
+            // row jumped out from under the cursor mid-snapshot and the drag
+            // carried a slab of the panel, or died outright.
+            setTimeout(() => {
+                if (draggedElement !== dragged) return;   // already let go
+                if (dragged.classList) dragged.classList.add('dragging');
+                startDragUX();
+            }, 0);
         }
         function handleDragOver(e) {
             // Not an internal row drag (e.g. an OS file drag) — let it bubble
