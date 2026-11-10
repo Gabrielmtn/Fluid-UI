@@ -551,6 +551,33 @@
         wheelEnd();
     }, true);
 
+    // On the underbar, in the empty stretch between its left readouts and its
+    // right-hand buttons, so a notice never sits over the painting. With the
+    // bar off screen (hidden, focus mode, a compact window) or that stretch
+    // too narrow, the inline place is cleared and css/22's spot above the
+    // canvas's bottom edge stands. Call after the element is shown.
+    function placeOnUnderbar(el) {
+        if (!el) return;
+        el.style.left = ''; el.style.bottom = '';
+        var bar = document.getElementById('quality-underbar');
+        if (!bar || !bar.getClientRects().length) return;
+        var br = bar.getBoundingClientRect();
+        if (br.height < 1 || br.top >= window.innerHeight - 1) return;
+        var mid = br.left + br.width / 2, lo = br.left, hi = br.right;
+        Array.prototype.forEach.call(bar.children, function (c) {
+            if (c === el || !c.getClientRects().length) return;
+            var r = c.getBoundingClientRect();
+            if (r.width < 1) return;
+            if (r.left + r.width / 2 < mid) lo = Math.max(lo, r.right);
+            else hi = Math.min(hi, r.left);
+        });
+        var w = el.offsetWidth, h = el.offsetHeight;
+        if (hi - lo < w + 16) return;
+        el.style.left = Math.round((lo + hi) / 2) + 'px';
+        el.style.bottom = Math.max(0, Math.round(window.innerHeight - (br.top + br.height / 2) - h / 2)) + 'px';
+    }
+    window.__placeOnUnderbar = placeOnUnderbar;
+
     // The pill: key cap, the slider's name, its value as its readout shows it.
     var hudEl = null, hudCap = null, hudName = null, hudVal = null;
     function hudShow() {
@@ -571,6 +598,7 @@
         hudName.textContent = wheel.b.name;
         hudVal.textContent = valueTextOf(wheel.el);
         hudEl.hidden = false;
+        placeOnUnderbar(hudEl);
         if (toastEl) toastEl.hidden = true;
     }
     function hudHide() { if (hudEl) hudEl.hidden = true; }
@@ -1566,6 +1594,7 @@
         }
         toastEl.textContent = msg;
         toastEl.hidden = false;
+        placeOnUnderbar(toastEl);
         clearTimeout(toastTimer);
         toastTimer = setTimeout(function () { toastEl.hidden = true; }, 2400);
     }

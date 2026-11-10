@@ -86,6 +86,7 @@
         ORDER.forEach(function (k) { cells[k].classList.toggle('on', k === t); });
         hint.hidden = !later;
         pill.hidden = false;
+        if (window.__placeOnUnderbar) window.__placeOnUnderbar(pill);
         var toast = document.getElementById('hkToast');
         if (toast) toast.hidden = true;
         clearTimeout(hideTimer);
