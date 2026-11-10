@@ -396,6 +396,16 @@
             // instead of landing back on itself.
             var vpx = W * 0.5, vpy = H * 0.5;
             var maxR = minDim * 0.52, minR = minDim * 0.04;
+            // A ring travels on past maxR until its whole band is off the
+            // canvas: the half-diagonal reaches the corners, plus 3 sigma of
+            // the widest band (thickness is a gaussian width² in canvas-height
+            // units, see 05i ringSplat). Stopping at maxR left a ring ending
+            // mid-canvas, which read small on a wide window.
+            var farR = Math.hypot(W, H) * 0.5 + 3 * Math.sqrt(0.00085) * H;
+            // The extra reach adds travel time instead of speeding the ring
+            // up: with r growing as t², stretching the duration by
+            // sqrt(reach ratio) keeps r(time) inside maxR exactly as before.
+            var stretch = Math.sqrt((farR - minR) / (maxR - minR));
             // Volume: the feel dial — scales ring energy (thickness, speed,
             // travel time) and dye brightness together
             var vol = (typeof o.volume === 'number') ? o.volume : 1;
@@ -415,12 +425,17 @@
             F.spawnEmitter({
                 // Speed alone sets the travel time (loudness used to shorten it
                 // too, to 0.48 s); energy sets thickness, push and colour.
-                duration: RING_MS / speed,
+                duration: RING_MS * stretch / speed,
                 update: function (t) {
-                    // Ring scale s: fraction of maxR. 'out' recedes 1→0
-                    // accelerating away; 'in' erupts 0→1 rushing past.
-                    var s = dir === 'out' ? 1 - t * t : t * t;
-                    var r = minR + (maxR - minR) * s;
+                    // Ring travel u: 0 at the vanishing point, 1 fully off the
+                    // canvas. 'out' recedes 1→0 accelerating away; 'in' erupts
+                    // 0→1 rushing past.
+                    var u = dir === 'out' ? 1 - t * t : t * t;
+                    var r = minR + (farR - minR) * u;
+                    // Perspective scale s: fraction of maxR, held at 1 past it,
+                    // so a ring keeps its old squash and thickness inside maxR
+                    // and leaves the canvas as a full-width circle.
+                    var s = Math.min(1, (r - minR) / (maxR - minR));
                     var squash = 0.5 + 0.5 * s;      // ellipse squash near the vanishing point
                     if (!spin && typeof window.applyRingSplat === 'function') {
                         // Solid band (default): ONE ring-stamp draw paints the
