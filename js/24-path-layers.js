@@ -1327,9 +1327,26 @@
             pathLayers = [];
             pathNextId = 1;
             data.forEach(d => {
-                const layer = createPathLayer(d.name);
+                if (!d || typeof d !== 'object') return;
+                const layer = createPathLayer(typeof d.name === 'string' ? d.name.slice(0, 200) : '');
+                // Field by field, each to its own type: this data can come
+                // from a file someone else made, and the panel prints speed,
+                // brush and flow into its markup. Anything missing or of the
+                // wrong type keeps createPathLayer's default. The id stays the
+                // one createPathLayer just minted.
+                const num = (v, lo, hi, dflt) => (typeof v === 'number' && isFinite(v)) ? Math.min(hi, Math.max(lo, v)) : dflt;
+                layer.visible = d.visible !== false;
+                if (d.playMode === 'loop' || d.playMode === 'pingpong' || d.playMode === 'once') layer.playMode = d.playMode;
+                layer.speed = num(d.speed, 0.1, 5, layer.speed);
+                layer.brushSize = num(d.brushSize, 0.002, 0.05, layer.brushSize);
+                layer.flow = num(d.flow, 0.05, 1, layer.flow);
+                if (Array.isArray(d.color) && d.color.length >= 3) {
+                    layer.color = [num(d.color[0], 0, 1, 0), num(d.color[1], 0, 1, 0), num(d.color[2], 0, 1, 0)];
+                }
+                layer.collapsed = !!d.collapsed;
                 // Old saves carry `points` only — the alias setter routes it into paths[0]
-                Object.assign(layer, d);
+                if (Array.isArray(d.paths)) layer.paths = d.paths;
+                else if (Array.isArray(d.points)) layer.points = d.points;
                 normalizeLayerPaths(layer);
                 layer.isPlaying = false;
             });

@@ -1522,7 +1522,16 @@
 
                 // Step 2: Restore each layer
                 snapshot.layers.forEach(function(ld) {
-                    if (!ld.data) return;
+                    if (!ld || typeof ld.data !== 'string' || !ld.data) return;
+                    // A snapshot can come from a file someone else made
+                    // (.fluid, .fluidpresets). The layer index is written
+                    // into the panel's markup and into element ids, so it
+                    // has to be a plain whole number before anything uses
+                    // it; the same goes for threshold, which the row prints.
+                    var _ix = Number(ld.index);
+                    if (!(_ix >= 0 && _ix <= 1e6 && Math.floor(_ix) === _ix)) return;
+                    var _th = Number(ld.threshold);
+                    ld = Object.assign({}, ld, { index: _ix, threshold: isFinite(_th) ? _th : 0 });
 
                     var layerDiv;
                     if (ld.isRaster) {
@@ -1672,8 +1681,13 @@
                 // Step 3: Restore exact layer order if provided
                 if (snapshot.layerOrder && Array.isArray(snapshot.layerOrder)) {
                     window.layerOrder.length = 0;
+                    // Rebuilt entry by entry, never pushed as found: only
+                    // the two shapes the panel knows, with a numeric id.
                     snapshot.layerOrder.forEach(function(item) {
-                        window.layerOrder.push(item);
+                        if (!item) return;
+                        if (item.type === 'sim') { window.layerOrder.push({ type: 'sim' }); return; }
+                        var _oid = Number(item.id);
+                        if (item.type === 'layer' && isFinite(_oid)) window.layerOrder.push({ type: 'layer', id: _oid });
                     });
                 }
 

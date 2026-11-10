@@ -110,7 +110,7 @@
             return `<div class="layer-threshold layer-prop ${cls}"${title ? ` title="${title}"` : ''}>
                                 <span class="layer-prop-label">${label}</span>
                                 <div class="layer-slider-host"></div>
-                                <span class="layer-slider-value">${value}</span>
+                                <span class="layer-slider-value">${window.escHtml(value)}</span>
                             </div>`;
         }
         function fieldRowHTML(cls, label, controlHTML, title) {
@@ -353,6 +353,12 @@
                 } else {
                     const layer = layers.find(l => l.index === item.id);
                     if (!layer) return; // Skip if layer not found
+                    // layer.index is written straight into the markup below
+                    // (onclick="...(${layer.index})", data-*), so a row is
+                    // only built for a real number. Loads coerce it (12
+                    // applyPresetSnapshot); this is the backstop for any
+                    // other way a layer gets here.
+                    if (typeof layer.index !== 'number' || !isFinite(layer.index)) return;
                     element.dataset.layerIndex = layer.index;
                     if (layer.isRaster) {
                         // D2 raster paint layer: GPU-backed (composited in
