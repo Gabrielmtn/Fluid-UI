@@ -165,23 +165,24 @@
                 return smoothstep(0.30, 0.55, obsTexCoverage(t, sMax)) * obsTexPresence(t, sMax);
             }
         `;
-        const splatFrag = `#version 300 es
+        // The splat shader's body, shared by splatFrag (one dab per draw) and
+        // splatBatchFrag (every copy of a Multi-Brush dab in one draw, 05i
+        // splatBatch). perCopy declares the five values that differ between
+        // copies: uniforms for the single dab, plain globals the batch loop
+        // fills in. Everything else is one set of uniforms for the whole dab.
+        const splatApplyGLSL = (perCopy) => `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTarget;
             uniform sampler2D uObstacle;
-            uniform vec2 point;
-            uniform vec3 color;
+            ${perCopy}
             uniform float radius, aspectRatio, velocityInfluence;
             uniform float velocityScale;
             uniform float dyeRadiusFloor; // dye pass only: the narrowest footprint the grid can hold (radius units); 0 = off
             uniform float stampNoise;  // 0 = classic gaussian splat; >0 blends in the clay stamp
             uniform float stampTipOn;  // 1 = explicit brush tip: the SHAPE is absolute and stampNoise is grain only
-            uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
             uniform int stampShape;    // 0 = blob, 1 = chisel (square press), 2 = streak (elongated smear)
-            uniform float stampAngle;  // brush rotation (radians, screen space) for chisel/streak; 0 = upright
-            uniform float stampFlip;   // 1 = print the custom stamp mirrored across its own vertical axis (a mirrored Multi-Brush arm)
             uniform float ringRadius;  // >0: thin ring-band stamp at this radius (aspect-corrected UV); 0 = classic blob
             uniform float ringSquash;  // ring ellipse squash (1 = circle, <1 = flattened vertically)
             uniform float barHalfW;    // >0: crisp bar stamp this half-width wide (aspect-corrected UV); EQ lane slabs
@@ -190,7 +191,6 @@
             uniform sampler2D uStampTex; // custom brush-shape stamp (alpha = coverage), bound on unit 2
             uniform float stampTexOn;    // 1 = the dye footprint comes from the stamp texture
             uniform float stampAspect;   // stamp width/height, so non-square stamps keep their aspect
-            uniform vec2 stampHold;      // (lo, hi): this same stamp already landed on this spot, so refill only coverage above the window; hi 0 = off
             uniform sampler2D uWetness;  // the Drying map (sim res): 1 at a dab, halves every Dry Time; unit 3
             uniform float wetPickup;     // how much of the fresh paint under a dab the dab takes on; 0 = off
             uniform float wetPickupAmount; // 1 = under Gate the dab takes on the paint's amount as well as its hue
@@ -215,10 +215,13 @@
                 return mix(mix(sn_hash(i),                  sn_hash(i + vec2(1.0, 0.0)), f.x),
                            mix(sn_hash(i + vec2(0.0, 1.0)), sn_hash(i + vec2(1.0, 1.0)), f.x), f.y);
             }
-            void main() {
+            // One dab applied to src, the target texel as it stands. main()
+            // below hands it the texture; splatBatchFrag hands it the result
+            // of the copies before this one.
+            vec4 splatApply(vec4 src) {
                 vec2 p = vUv - point;
                 p.x *= aspectRatio;
-                vec3 base = texture(uTarget, vUv).xyz;
+                vec3 base = src.xyz;
                 // Don't inject paint or velocity inside collision masks: the
                 // damped velocity field pins whatever lands there, so injected
                 // dye lingers as a burned-in imprint of the mask shape.
@@ -326,7 +329,7 @@
                     float velShield = smoothstep(0.0, 0.001, existingVelMag);
                     float impactReduction = 1.0 - (velShield * isolationStrength * 0.85);
                     impactReduction = max(0.15, impactReduction); // Minimum 15% impact always allowed
-                    fragColor = vec4(base + splat * impactReduction * obsBlock, 1.0);
+                    return vec4(base + splat * impactReduction * obsBlock, 1.0);
                 } else {
                     // A dab narrower than the grid (2026-10-11). Below about
                     // half a texel the gaussian falls between texel centres:
@@ -446,8 +449,24 @@
                         // picked would be undefined for exactly the fragments
                         // at the stamp's own edge. Hoisting the fetch out costs
                         // nothing and makes the mip level well defined.
+                        // The batched splat runs this inside a loop that skips
+                        // copies per fragment, where implicit derivatives are
+                        // undefined (D3D falls back to the top mip). suv is an
+                        // affine function of the fragment position, so its
+                        // per-pixel step is exact and textureGrad picks the LOD
+                        // the hardware would have, from inside any branch.
+                        // dyeTexel is one dye texel: this branch is dye only.
+                        vec2 gx = vec2(dyeTexel.x * aspectRatio, 0.0) / sqrt(rEff);
+                        vec2 gy = vec2(0.0, dyeTexel.y) / sqrt(rEff);
+                        if (stampAngle != 0.0) {
+                            float ca = cos(stampAngle), sa = sin(stampAngle);
+                            gx = vec2(gx.x * ca - gx.y * sa, gx.x * sa + gx.y * ca);
+                            gy = vec2(gy.x * ca - gy.y * sa, gy.x * sa + gy.y * ca);
+                        }
+                        if (stampFlip > 0.5) { gx.x = -gx.x; gy.x = -gy.x; }
+                        gx /= 2.0 * he; gy /= 2.0 * he;
                         float inStamp = float(all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0))));
-                        float cov = texture(uStampTex, clamp(suv, 0.0, 1.0)).a * inStamp;
+                        float cov = textureGrad(uStampTex, clamp(suv, 0.0, 1.0), gx, gy).a * inStamp;
                         // A stamp held still (2026-09-30). Gate converges by
                         // coverage, so the soft edge of a stamp is a RATE, not
                         // a level: the hose lays 250 dabs a second on one spot
@@ -528,7 +547,7 @@
                     // dim stroke over a bright one must be remembered dim, or
                     // Ignite would resurrect the colour underneath), additive
                     // keeps the running peak.
-                    float baseMem = texture(uTarget, vUv).w;
+                    float baseMem = src.w;
                     float newMem;
                     if (gateColor == 1) {
                         // Gate: paint COVERS — dye converges to the stroke's own
@@ -553,8 +572,106 @@
                         result = base + shape * dabColor * obsBlockDye;
                         newMem = max(baseMem, max(result.r, max(result.g, result.b)));
                     }
-                    fragColor = vec4(result, newMem);
+                    return vec4(result, newMem);
                 }
+            }
+        `;
+
+        const splatFrag = splatApplyGLSL(`uniform vec2 point;
+            uniform vec3 color;
+            uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
+            uniform float stampAngle;  // brush rotation (radians, screen space) for chisel/streak; 0 = upright
+            uniform float stampFlip;   // 1 = print the custom stamp mirrored across its own vertical axis (a mirrored Multi-Brush arm)
+            uniform vec2 stampHold;      // (lo, hi): this same stamp already landed on this spot, so refill only coverage above the window; hi 0 = off`) + `
+            void main() {
+                fragColor = splatApply(texture(uTarget, vUv));
+            }
+        `;
+        // ── Batched splat (05i splatBatch) ───────────────────────────────
+        // Multi-Brush × Concentricity lays up to 48 copies of one dab, and as
+        // single draws each copy cost three passes, each with its own state
+        // changes, draw and region copy: measured 2026-11-17 at ~10-30 µs a
+        // pass in the GPU process, with the GPU itself idle. Here a chunk of
+        // copies is one instanced draw: a quad per copy over its scissor box,
+        // and every fragment applies, in order, each copy whose box holds it.
+        // That is what the copies did one draw at a time, except that the
+        // running value stays in a register between copies instead of being
+        // rounded to the texture's precision. Where boxes overlap, the quads
+        // write the same value twice.
+        const SPLAT_BATCH_MAX = 32;
+        const splatBatchVert = `#version 300 es
+            uniform highp vec4 uBR[${SPLAT_BATCH_MAX}]; // copy boxes in texels: x0, y0, x1, y1
+            uniform vec2 uTexSize;
+            // uUnion = 1 draws one quad over uUnionBox instead of one per copy:
+            // where the boxes pile up, a quad per copy would run every copy
+            // once per overlapping quad (05i splatBatch picks).
+            uniform int uUnion;
+            uniform highp vec4 uUnionBox;
+            out vec2 vUv;
+            const vec2 C[6] = vec2[6](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0),
+                                      vec2(0.0, 1.0), vec2(1.0, 0.0), vec2(1.0, 1.0));
+            void main() {
+                vec4 r = (uUnion == 1) ? uUnionBox : uBR[gl_InstanceID];
+                vUv = mix(r.xy, r.zw, C[gl_VertexID]) / uTexSize;
+                gl_Position = vec4(vUv * 2.0 - 1.0, 0.0, 1.0);
+            }
+        `;
+        const splatBatchFrag = splatApplyGLSL(
+            'vec2 point; vec3 color; vec2 stampSeed; float stampAngle; float stampFlip; vec2 stampHold;') + `
+            uniform highp vec4 uBR[${SPLAT_BATCH_MAX}];
+            uniform vec4 uBP[${SPLAT_BATCH_MAX}]; // point.xy, stampAngle, stampFlip
+            uniform vec4 uBC[${SPLAT_BATCH_MAX}]; // colour (dye pass) or push (velocity pass)
+            uniform vec4 uBS[${SPLAT_BATCH_MAX}]; // stampSeed.xy, stampHold.xy
+            uniform int uBN;
+            void main() {
+                vec4 cur = texture(uTarget, vUv);
+                vec2 fc = gl_FragCoord.xy;
+                for (int k = 0; k < ${SPLAT_BATCH_MAX}; k++) {
+                    if (k >= uBN) break;
+                    vec4 r = uBR[k];
+                    if (fc.x < r.x || fc.y < r.y || fc.x >= r.z || fc.y >= r.w) continue;
+                    point = uBP[k].xy; stampAngle = uBP[k].z; stampFlip = uBP[k].w;
+                    color = uBC[k].xyz; stampSeed = uBS[k].xy; stampHold = uBS[k].zw;
+                    cur = splatApply(cur);
+                    // Velocity is an RG texture: the next copy would read
+                    // back z = 0, w = 1, so hand it exactly that.
+                    if (isVelocity == 1) cur.zw = vec2(0.0, 1.0);
+                }
+                fragColor = cur;
+            }
+        `;
+        // wetSplatFrag's deposit, every copy in one draw (same loop).
+        const wetBatchFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTarget;
+            uniform float aspectRatio, radius, amount;
+            uniform highp vec4 uBR[${SPLAT_BATCH_MAX}];
+            uniform vec4 uBP[${SPLAT_BATCH_MAX}];
+            uniform int uBN;
+            void main() {
+                float cur = texture(uTarget, vUv).r;
+                vec2 fc = gl_FragCoord.xy;
+                for (int k = 0; k < ${SPLAT_BATCH_MAX}; k++) {
+                    if (k >= uBN) break;
+                    vec4 r = uBR[k];
+                    if (fc.x < r.x || fc.y < r.y || fc.x >= r.z || fc.y >= r.w) continue;
+                    vec2 p = vUv - uBP[k].xy;
+                    p.x *= aspectRatio;
+                    cur = clamp(max(cur, exp(-dot(p, p) / radius) * amount), 0.0, 1.0);
+                }
+                fragColor = vec4(cur, 0.0, 0.0, 1.0);
+            }
+        `;
+        // Copies the batch's boxes from .write back into .read, texel for
+        // texel: the instanced stand-in for splatPass's blitFramebuffer.
+        const batchCopyFrag = `#version 300 es
+            precision ${PRECISION} float;
+            out vec4 fragColor;
+            uniform sampler2D uSrc;
+            void main() {
+                fragColor = texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0);
             }
         `;
         // ─── Pigment-memory refresh (splat-scissor companion) ───────────

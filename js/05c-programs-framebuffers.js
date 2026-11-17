@@ -12,6 +12,10 @@
         // (No lighting program: Light Source is lit inside displayFrag since
         // 2026-09-14, as Surface Shading's key light and the pool — 05a.)
         const splatProg = new Program(baseVert, splatFrag);
+        // Multi-Brush copies in one draw (05b SPLAT_BATCH_MAX, 05i splatBatch).
+        const splatBatchProg = new Program(splatBatchVert, splatBatchFrag);
+        const wetBatchProg = new Program(splatBatchVert, wetBatchFrag);
+        const batchCopyProg = new Program(splatBatchVert, batchCopyFrag);
         const memRefreshProg = new Program(baseVert, memRefreshFrag); // splat-scissor memory companion (05b)
         const advectionProg = new Program(baseVert, advectionFrag);
         const macAdvectProg = new Program(baseVert, macAdvectFrag);

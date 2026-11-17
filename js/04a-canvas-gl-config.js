@@ -210,6 +210,12 @@
             SPLAT_SCISSOR_K: 6.0,     // Bounding half-width in units of √SPLAT_RADIUS; 6 keeps the clipped
                                       // gaussian tail below fp16's smallest subnormal with margin — measured
                                       // dye bit-identical, velocity ≤1-ulp on a handful of texels (console-tunable)
+            SPLAT_BATCH: true,        // Multi-Brush copies of a dab (arms × Concentricity) in a few instanced draws
+                                      // (05i splatBatch); ~10× faster at 8 arms × 6 rings, measured 2026-11-17.
+                                      // Overlaps keep fp32 between copies, so not bit-identical where copies meet.
+                                      // false = one splat() per copy
+            SPLAT_BATCH_UNION: true,  // Heavily overlapping copy boxes draw as one quad over their union, so each
+                                      // texel runs each copy once (GPU cost); false = always a quad per copy
 
             MP_INBOUND_QUEUE: true,   // Drain peer dabs on the frame under BRUSH_DAB_BUDGET instead of
                                       // applying them inside the WebSocket handler (06 enqueueRemoteSplat).

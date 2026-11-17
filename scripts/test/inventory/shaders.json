@@ -1,6 +1,6 @@
 {
   "generated": "node scripts/test/gen-shader-inventory.js",
-  "shaders": 48,
+  "shaders": 49,
   "collisionGroups": 2,
   "table": {
     "uTexture": {
@@ -19,11 +19,17 @@
         }
       ]
     },
-    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kIsotropic|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|scatterSmooth|segments|shadeDetailGain|shadeGloss|shadeInvert|shadeRaised|shadeRelief|shadeTexelSize|shadeWallRim|shadeWalls|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uShadeWall|uTexture": {
+    "backgroundTransparency|displayShading|ditherCell|ditherLevels|ditherOn|ditherOrigin|ditherPattern|ditherTone|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kIsotropic|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|scatterSmooth|segments|shadeDetailGain|shadeGloss|shadeInvert|shadeRaised|shadeRelief|shadeTexelSize|shadeWallRim|shadeWalls|texelSize|uDitherTile|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uShadeWall|uTexture": {
       "name": "display",
       "uniforms": [
         "backgroundTransparency",
         "displayShading",
+        "ditherCell",
+        "ditherLevels",
+        "ditherOn",
+        "ditherOrigin",
+        "ditherPattern",
+        "ditherTone",
         "gateVibrance",
         "gateWhite",
         "glowEnabled",
@@ -60,6 +66,7 @@
         "shadeWallRim",
         "shadeWalls",
         "texelSize",
+        "uDitherTile",
         "uGlow",
         "uMaskOverlay",
         "uRaster0",
@@ -101,41 +108,21 @@
         "vibrance"
       ]
     },
-    "aspectRatio|barHalfW|barPoint|color|dyeTexel|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampFlip|stampHold|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|uWetness|velocityInfluence|velocityScale|wetPickup|wetPickupAmount": {
-      "name": "splat",
+    "amount|aspectRatio|radius|uBN|uBP|uTarget": {
+      "name": "wetBatch",
       "uniforms": [
+        "amount",
         "aspectRatio",
-        "barHalfW",
-        "barPoint",
-        "color",
-        "dyeTexel",
-        "gateColor",
-        "gateFlow",
-        "hasObstacle",
-        "isVelocity",
-        "point",
         "radius",
-        "ringRadius",
-        "ringSquash",
-        "stampAngle",
-        "stampAspect",
-        "stampFlip",
-        "stampHold",
-        "stampNoise",
-        "stampSeed",
-        "stampShape",
-        "stampTexOn",
-        "stampTipOn",
-        "uObsMax",
-        "uObstacle",
-        "uStampTex",
-        "uTarget",
-        "uVelCovBlock",
-        "uWetness",
-        "velocityInfluence",
-        "velocityScale",
-        "wetPickup",
-        "wetPickupAmount"
+        "uBN",
+        "uBP",
+        "uTarget"
+      ]
+    },
+    "uSrc": {
+      "name": "batchCopy",
+      "uniforms": [
+        "uSrc"
       ]
     },
     "uDye": {
@@ -154,7 +141,7 @@
         }
       ]
     },
-    "bloomCeiling|decayDt|dissipation|dt|dyeRoundNearest|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|hfFloorDyeWall|hfFloorFine|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelToUv|uVelocity": {
+    "bloomCeiling|decayDt|dissipation|dt|dyeRoundNearest|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|hfFloorDyeWall|hfFloorFine|hfFloorFineCrisp|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelToUv|uVelocity": {
       "name": "advection",
       "uniforms": [
         "bloomCeiling",
@@ -171,6 +158,7 @@
         "hfFloorDye",
         "hfFloorDyeWall",
         "hfFloorFine",
+        "hfFloorFineCrisp",
         "isDensity",
         "macMode",
         "memDiss",
@@ -203,7 +191,7 @@
         "uVelocity"
       ]
     },
-    "deband|dt|hasObstacle|srcTexelSize|texelSize|uForward|uLaminar|uObstacle|uSource|uVelToUv|uVelocity": {
+    "deband|dt|hasObstacle|srcTexelSize|texelSize|uForward|uLaminar|uObstacle|uRoundNearest|uSource|uVelToUv|uVelocity": {
       "name": "macCorrect",
       "uniforms": [
         "deband",
@@ -214,6 +202,7 @@
         "uForward",
         "uLaminar",
         "uObstacle",
+        "uRoundNearest",
         "uSource",
         "uVelToUv",
         "uVelocity"

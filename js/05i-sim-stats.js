@@ -89,6 +89,314 @@
             const hi = (typeof config.STAMP_HOLD_HI === 'number') ? config.STAMP_HOLD_HI : 0.9;
             return [lo, Math.max(hi, lo + 0.001)];
         }
+        // ── Dab state shared by splat() and splatBatch() ─────────────────
+        // One place for each uniform a whole dab shares, so the single-draw
+        // path and the batched one cannot drift apart.
+        function setSplatShape(prog, aspectRatio, baseRadius, brushTip) {
+            gl.uniform1f(prog.uniforms.aspectRatio, aspectRatio);
+            // Material modes may scale the dab (clay Depth): applies to both the
+            // dye footprint and the velocity push so they stay congruent.
+            gl.uniform1f(prog.uniforms.radius, baseRadius);
+            gl.uniform1f(prog.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 2);
+            gl.uniform1f(prog.uniforms.velocityScale,
+                1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
+            // Clay stamp (material modes): 0 = classic gaussian. The caller
+            // sends a fresh seed per splat so consecutive stamps get distinct
+            // notch patterns.
+            if (brushTip >= 1 && brushTip <= 3) {
+                // Blob/chisel/streak tips reuse the clay stamp machinery:
+                // shape from the tip, roughness from the Texture slider.
+                const tex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 1;
+                gl.uniform1f(prog.uniforms.stampNoise, Math.max(0, Math.min(1, tex)));
+                gl.uniform1i(prog.uniforms.stampShape, brushTip - 1);
+                // The tip's footprint is absolute: Texture roughens it, it never
+                // fades it back to the gaussian circle (splatFrag stampTipOn).
+                gl.uniform1f(prog.uniforms.stampTipOn, 1);
+            } else {
+                gl.uniform1f(prog.uniforms.stampNoise, config.STAMP_NOISE || 0);
+                gl.uniform1i(prog.uniforms.stampShape, config.STAMP_SHAPE || 0);
+                gl.uniform1f(prog.uniforms.stampTipOn, 0); // material clay stamp: legacy blend
+            }
+            gl.uniform1f(prog.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
+            gl.uniform1f(prog.uniforms.barHalfW, 0);   // ...or a stale bar stamp
+        }
+        // Brush rotation: degrees → radians for chisel/streak stamps (inert on
+        // round shapes, and on the material clay stamp when stampNoise is 0,
+        // so it never fights other splats).
+        // A Multi-Brush arm turns the tip with it (05g armStampTurn): φ + angle,
+        // or on a mirrored arm the tip mirrored at φ − angle. armTurn null =
+        // the brush's own angle. __faceTurn (Stay oriented to the center, 05g
+        // faceCenterTurn) is the source dab's bearing from the centre, part of
+        // "angle". Returns [angle, flip].
+        function splatStampPose(armTurn, armFlip) {
+            let ang = (config.BRUSH_ANGLE || 0) * Math.PI / 180, flip = 0;
+            if (typeof window.__faceTurn === 'number') ang += window.__faceTurn;
+            if (typeof armTurn === 'number') {
+                if (armFlip) { ang = armTurn - ang; flip = 1; }
+                else ang = armTurn + ang;
+            }
+            return [ang, flip];
+        }
+        // Custom brush shape (user-authored alpha stamp): user strokes only,
+        // same __brushTipOn gate as the tips. The shader block lives in the
+        // dye branch, so the velocity pass stays gaussian by construction.
+        // An active shape overrides the built-in tips (incl. Ring).
+        // __remoteStroke exempts peer strokes and replays: the stamp is
+        // viewer-LOCAL (its bitmap can't ride the wire), so without the
+        // gate a peer's stroke printed in whatever shape THIS client had
+        // selected. Built-in tips still apply — they mirror by design.
+        function splatActiveStamp() {
+            if (window.__brushTipOn && !window.__remoteStroke &&
+                window.BrushShapes && typeof window.BrushShapes.getActiveStamp === 'function') {
+                return window.BrushShapes.getActiveStamp(); // {texture, aspect} | null
+            }
+            return null;
+        }
+        function setSplatSurface(prog, stampTex) {
+            gl.uniform1f(prog.uniforms.stampTexOn, stampTex ? 1 : 0);
+            if (stampTex) {
+                gl.uniform1i(prog.uniforms.uStampTex, 2);
+                gl.uniform1f(prog.uniforms.stampAspect, stampTex.aspect || 1);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, stampTex.texture);
+                // The Texture slider grains custom stamps too (the shader
+                // multiplies cov by the stampNoise grain) — drive stampNoise
+                // from it regardless of which tip is nominally selected, or
+                // the slider is inert with the Soft/Ring tips and material
+                // modes override it.
+                const stex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 1;
+                gl.uniform1f(prog.uniforms.stampNoise, Math.max(0, Math.min(1, stex)));
+            }
+            gl.uniform1i(prog.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
+            // Gate flow: scales the convergence (see splatFrag). window.__splatFlow
+            // is set per-dab by the paint loop and defaults to 1 (full) for every
+            // programmatic/press splat that doesn't set it, so this is inert unless
+            // a Gate stroke explicitly asks for partial flow.
+            gl.uniform1f(prog.uniforms.gateFlow,
+                (typeof window.__splatFlow === 'number') ? Math.max(0.0, Math.min(1.0, window.__splatFlow)) : 1.0);
+            // Block injection inside collision masks (prevents burned-in dye)
+            const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
+            gl.uniform1i(prog.uniforms.hasObstacle, obsActive ? 1 : 0);
+            if (obsActive) {
+                gl.uniform1f(prog.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                // Velocity injection blocked by wall coverage like dye
+                // (default; the s³ leak was the "dye producer" pump — see
+                // splatFrag). config.OBS_VEL_COVERAGE_BLOCK=false = legacy.
+                gl.uniform1f(prog.uniforms.uVelCovBlock,
+                    config.OBS_VEL_COVERAGE_BLOCK === false ? 0.0 : 1.0);
+                gl.uniform1i(prog.uniforms.uObstacle, 1);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            }
+        }
+        // The narrowest dab the grid can hold (splatFrag dyeRadiusFloor):
+        // σ of half a dye texel or half a canvas px, whichever is wider,
+        // in the shader's radius units (2σ², canvas-height-normalized).
+        // Read from the live sizes, so it follows the boot ramp and the
+        // governor. config.SPLAT_DYE_FLOOR=false turns it off.
+        function splatDyeFloor(aspectRatio) {
+            const dyeTexP = Math.max(1 / dyeTexHeight, aspectRatio / dyeTexWidth);
+            const floorSigma = 0.5 * Math.max(dyeTexP, 1 / canvas.height);
+            return (config.SPLAT_DYE_FLOOR === false) ? 0 : 2 * floorSigma * floorSigma;
+        }
+        // Wet pickup (splatFrag): the dab takes on the fresh paint it lands
+        // in, by Color Blend x COLOR_BLEND_PICKUP.
+        function splatPickupAmount() {
+            const pickK = (typeof config.COLOR_BLEND_PICKUP === 'number') ? Math.max(0, config.COLOR_BLEND_PICKUP) : 0.8;
+            return ((config.COLOR_BLEND || 0) > 0 && typeof wetness !== 'undefined' && wetness)
+                ? Math.max(0, Math.min(1, config.COLOR_BLEND)) * pickK : 0;
+        }
+        // The Drying map rides unit 3 whether or not it is read, so the
+        // sampler never points at a stale texture (the sub-step feedback
+        // trap, 05j 8d). Leaves unit 0 active.
+        function setSplatPickup(prog, pick) {
+            gl.uniform1f(prog.uniforms.wetPickup, pick);
+            gl.uniform1f(prog.uniforms.wetPickupAmount, config.COLOR_BLEND_PICKUP_AMOUNT === false ? 0 : 1);
+            gl.uniform2f(prog.uniforms.dyeTexel, 1 / dyeTexWidth, 1 / dyeTexHeight);
+            gl.uniform1i(prog.uniforms.uWetness, 3);
+            gl.activeTexture(gl.TEXTURE3);
+            gl.bindTexture(gl.TEXTURE_2D, (typeof wetness !== 'undefined' && wetness) ? wetness.read.texture : density.read.texture);
+            gl.activeTexture(gl.TEXTURE0);
+        }
+        // P15-1: a stroke wets the paper, while Wet Influence or Color Blend
+        // needs the Drying map.
+        function splatWetsPaper() {
+            return ((config.WET_INFLUENCE || 0) > 0 || (config.COLOR_BLEND || 0) > 0)
+                && typeof wetness !== 'undefined' && !!wetness;
+        }
+        function splatWetK(stampTex, brushTip) {
+            return stampTex ? 4 : (brushTip >= 1 && brushTip <= 3) ? 2 : 1;
+        }
+
+        // ── Batched splat ─────────────────────────────────────────────────
+        // Every copy of one Multi-Brush dab (arms × Concentricity rings) in a
+        // few instanced draws instead of three passes per copy (05b
+        // splatBatchFrag has the why and the measurements). 05g multiSplat
+        // calls it only for dabs it can take, see splatBatchable(); anything
+        // else goes through splat() one copy at a time, as before.
+        // copies: [{x, y, dx, dy, color, ang, flip}], canvas px like splat().
+        // Returns false, having drawn nothing, when it cannot take the dab.
+        function splatBatchable() {
+            if (config.SPLAT_BATCH === false) return false;
+            if (config.SPLAT_SCISSOR === false) return false;       // the batch IS the scissored path
+            if (!window.__brushTipOn) return true;                  // programmatic dye: gaussian, no push
+            if (!window.__remoteStroke && window.BrushShapes        // a stamp still uploading: splat()
+                && typeof window.BrushShapes.stampPending === 'function' // drops the dab, so let it
+                && window.BrushShapes.stampPending()) return false;
+            if (config.BRUSH_VELOCITY_ONLY) return false;           // Pressure brush
+            // Ring tip: its own dye-pass uniforms. A custom stamp overrides
+            // the Ring, so the two together are fine.
+            if ((config.BRUSH_TIP | 0) === 4 && !splatActiveStamp()) return false;
+            if (splatPickupAmount() > 0) return false;              // pickup reads neighbours mid-dab
+            return true;
+        }
+        function splatBatch(copies) {
+            if (!copies.length) return true;
+            gl.disable(gl.BLEND); // same baseline splat() asserts
+            const aspectRatio = canvas.width / canvas.height;
+            const baseRadius = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
+            const scK = (typeof config.SPLAT_SCISSOR_K === 'number') ? config.SPLAT_SCISSOR_K : 6.0;
+            const brushTip = window.__brushTipOn ? (config.BRUSH_TIP | 0) : 0;
+            const stampTex = splatActiveStamp();
+            const holdWin = stampTex ? stampHoldWindow() : null;
+            const dHalf = scK * Math.sqrt(Math.max(baseRadius, 0));
+            const n = copies.length;
+            const P = new Float32Array(4 * n), V = new Float32Array(4 * n), C = new Float32Array(4 * n),
+                  S = new Float32Array(4 * n);
+            for (let i = 0; i < n; i++) {
+                const c = copies[i];
+                P[4 * i] = c.x / canvas.width; P[4 * i + 1] = 1.0 - c.y / canvas.height;
+                P[4 * i + 2] = c.ang; P[4 * i + 3] = c.flip;
+                V[4 * i] = c.dx; V[4 * i + 1] = -c.dy; V[4 * i + 2] = 1.0;
+                C[4 * i] = c.color[0]; C[4 * i + 1] = c.color[1]; C[4 * i + 2] = c.color[2];
+                // Two draws per copy, in copy order: the seeds splat() would
+                // have drawn, so a seeded run gets the same notch patterns.
+                S[4 * i] = c.seed[0]; S[4 * i + 1] = c.seed[1];
+                // A custom stamp held still refills only its solid inside
+                // (splatFrag stampHold): asked per copy, in copy order, the
+                // way each copy's splat() asked it.
+                if (holdWin && stampHeldHere(stampTex.texture, c.x, c.y, baseRadius, c.ang, c.flip)) {
+                    S[4 * i + 2] = holdWin[0]; S[4 * i + 3] = holdWin[1];
+                }
+            }
+            // Each copy's box at one target's size, as splatPass would have
+            // clipped it: null drops the copy from that pass, 'full' is the
+            // whole texture.
+            function boxes(half, W, H) {
+                const R = [], idx = [];
+                let clipped = false;
+                for (let i = 0; i < n; i++) {
+                    const r = splatScissorRect(P[4 * i], P[4 * i + 1], half, aspectRatio, W, H);
+                    if (r === null) continue;
+                    if (r === 'full') R.push(0, 0, W, H);
+                    else { clipped = true; R.push(r[0], r[1], r[0] + r[2], r[1] + r[3]); }
+                    idx.push(i);
+                }
+                return { R: R, idx: idx, clipped: clipped };
+            }
+            // Draws one pass over pair, chunk by chunk: the copies into .write,
+            // then their boxes back into .read. upload(prog, ids) sets the
+            // per-copy arrays for the copies in ids.
+            function pass(prog, pair, W, H, b, upload) {
+                for (let s = 0; s < b.idx.length; s += SPLAT_BATCH_MAX) {
+                    const ids = b.idx.slice(s, s + SPLAT_BATCH_MAX);
+                    const R = new Float32Array(b.R.slice(4 * s, 4 * (s + ids.length)));
+                    // Every fragment under a quad runs the whole chunk, so a
+                    // pixel under k overlapping quads does the work k times.
+                    // Once the boxes overlap by more than a quarter, one quad
+                    // over their union is cheaper: each pixel then applies each
+                    // copy at most once, no more GPU work than one draw per copy.
+                    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, sum = 0;
+                    for (let j = 0; j < ids.length; j++) {
+                        const q = 4 * j;
+                        x0 = Math.min(x0, R[q]); y0 = Math.min(y0, R[q + 1]);
+                        x1 = Math.max(x1, R[q + 2]); y1 = Math.max(y1, R[q + 3]);
+                        sum += (R[q + 2] - R[q]) * (R[q + 3] - R[q + 1]);
+                    }
+                    const union = config.SPLAT_BATCH_UNION !== false && sum > 1.25 * (x1 - x0) * (y1 - y0);
+                    const instances = union ? 1 : ids.length;
+                    function quads(p) {
+                        gl.uniform4fv(p.uniforms['uBR[0]'], R);
+                        gl.uniform2f(p.uniforms.uTexSize, W, H);
+                        gl.uniform1i(p.uniforms.uUnion, union ? 1 : 0);
+                        if (union) gl.uniform4f(p.uniforms.uUnionBox, x0, y0, x1, y1);
+                    }
+                    prog.bind();
+                    quads(prog);
+                    gl.uniform1i(prog.uniforms.uBN, ids.length);
+                    upload(prog, ids);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, pair.read.texture);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, pair.write.fbo);
+                    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, instances);
+                    batchCopyProg.bind();
+                    quads(batchCopyProg);
+                    gl.uniform1i(batchCopyProg.uniforms.uSrc, 0);
+                    gl.bindTexture(gl.TEXTURE_2D, pair.write.texture);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, pair.read.fbo);
+                    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, instances);
+                }
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            }
+            function gather(src, ids) {
+                const out = new Float32Array(4 * ids.length);
+                for (let j = 0; j < ids.length; j++) out.set(src.subarray(4 * ids[j], 4 * ids[j] + 4), 4 * j);
+                return out;
+            }
+            function uploadCopies(colours) {
+                return function (prog, ids) {
+                    gl.uniform4fv(prog.uniforms['uBP[0]'], gather(P, ids));
+                    gl.uniform4fv(prog.uniforms['uBC[0]'], gather(colours, ids));
+                    gl.uniform4fv(prog.uniforms['uBS[0]'], gather(S, ids));
+                };
+            }
+
+            const prog = splatBatchProg;
+            prog.bind();
+            setSplatShape(prog, aspectRatio, baseRadius, brushTip);
+            setSplatSurface(prog, stampTex);
+            gl.uniform1i(prog.uniforms.uTarget, 0);
+
+            // Velocity, at physics resolution.
+            gl.viewport(0, 0, simTexWidth, simTexHeight);
+            gl.uniform1i(prog.uniforms.isVelocity, 1);
+            pass(prog, velocity, simTexWidth, simTexHeight,
+                boxes(dHalf, simTexWidth, simTexHeight), uploadCopies(V));
+
+            // Dye, at dye resolution. A floored dab is wider than its radius
+            // says: clip to the wider one, as splat() does.
+            prog.bind();
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            gl.uniform1i(prog.uniforms.isVelocity, 0);
+            const dyeFloor = splatDyeFloor(aspectRatio);
+            gl.uniform1f(prog.uniforms.dyeRadiusFloor, dyeFloor);
+            setSplatPickup(prog, 0);
+            const dyeBoxes = boxes((dyeFloor > baseRadius) ? scK * Math.sqrt(dyeFloor) : dHalf,
+                dyeTexWidth, dyeTexHeight);
+            pass(prog, density, dyeTexWidth, dyeTexHeight, dyeBoxes, uploadCopies(C));
+            // Pigment memory: see splat() — any clipped additive copy queues
+            // the whole-texture refresh.
+            if (!config.COLOR_GATE && dyeBoxes.clipped) window.__memRefreshPending = true;
+
+            // Wetness, at physics resolution.
+            if (splatWetsPaper()) {
+                const wetR = baseRadius * splatWetK(stampTex, brushTip);
+                wetBatchProg.bind();
+                gl.viewport(0, 0, simTexWidth, simTexHeight);
+                gl.uniform1f(wetBatchProg.uniforms.aspectRatio, aspectRatio);
+                gl.uniform1f(wetBatchProg.uniforms.radius, wetR);
+                gl.uniform1f(wetBatchProg.uniforms.amount, 1.0);
+                gl.uniform1i(wetBatchProg.uniforms.uTarget, 0);
+                pass(wetBatchProg, wetness, simTexWidth, simTexHeight,
+                    boxes(scK * Math.sqrt(Math.max(wetR, 0)), simTexWidth, simTexHeight),
+                    function (p, ids) { gl.uniform4fv(p.uniforms['uBP[0]'], gather(P, ids)); });
+            }
+            return true;
+        }
+        window.__splatBatch = splatBatch;
+        window.__splatBatchable = splatBatchable;
+        window.__splatStampPose = splatStampPose;
+
         function splat(x, y, dx, dy, color) {
             // Hold this dab while a selected brush shape's stamp is still
             // uploading (2026-08-18). The custom-shape block below only fires
@@ -257,97 +565,15 @@
                 }
             }
             splatProg.bind();
-            gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform2f(splatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
-            // Material modes may scale the dab (clay Depth): applies to both the
-            // dye footprint and the velocity push so they stay congruent.
-            gl.uniform1f(splatProg.uniforms.radius, baseRadius);
-            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 2);
-            gl.uniform1f(splatProg.uniforms.velocityScale,
-                1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
-            // Clay stamp (material modes): 0 = classic gaussian. Fresh seed per
-            // splat so consecutive stamps get distinct notch patterns.
-            if (brushTip >= 1 && brushTip <= 3) {
-                // Blob/chisel/streak tips reuse the clay stamp machinery:
-                // shape from the tip, roughness from the Texture slider.
-                const tex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 1;
-                gl.uniform1f(splatProg.uniforms.stampNoise, Math.max(0, Math.min(1, tex)));
-                gl.uniform1i(splatProg.uniforms.stampShape, brushTip - 1);
-                // The tip's footprint is absolute: Texture roughens it, it never
-                // fades it back to the gaussian circle (splatFrag stampTipOn).
-                gl.uniform1f(splatProg.uniforms.stampTipOn, 1);
-            } else {
-                gl.uniform1f(splatProg.uniforms.stampNoise, config.STAMP_NOISE || 0);
-                gl.uniform1i(splatProg.uniforms.stampShape, config.STAMP_SHAPE || 0);
-                gl.uniform1f(splatProg.uniforms.stampTipOn, 0); // material clay stamp: legacy blend
-            }
+            setSplatShape(splatProg, aspectRatio, baseRadius, brushTip);
             gl.uniform2f(splatProg.uniforms.stampSeed, Math.random() * 19.7, Math.random() * 23.3);
-            // Brush rotation: degrees → radians for chisel/streak stamps (inert on
-            // round shapes, and on the material clay stamp when stampNoise is 0,
-            // so it never fights other splats).
-            // A Multi-Brush arm turns the tip with it (05g armStampTurn,
-            // published per dab as __armTurn): φ + angle, or on a mirrored arm
-            // the tip mirrored at φ − angle. Null = the brush's own angle.
-            // __faceTurn (Stay oriented to the center, 05g faceCenterTurn) is
-            // the source dab's bearing from the centre, part of "angle".
-            let _stampAng = (config.BRUSH_ANGLE || 0) * Math.PI / 180, _stampFlip = 0;
-            if (typeof window.__faceTurn === 'number') _stampAng += window.__faceTurn;
-            if (typeof window.__armTurn === 'number') {
-                if (window.__armFlip) { _stampAng = window.__armTurn - _stampAng; _stampFlip = 1; }
-                else _stampAng = window.__armTurn + _stampAng;
-            }
+            const _pose = splatStampPose(window.__armTurn, window.__armFlip);
+            const _stampAng = _pose[0], _stampFlip = _pose[1];
             gl.uniform1f(splatProg.uniforms.stampAngle, _stampAng);
             gl.uniform1f(splatProg.uniforms.stampFlip, _stampFlip);
-            gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
-            gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
-            // Custom brush shape (user-authored alpha stamp): user strokes only,
-            // same __brushTipOn gate as the tips. The shader block lives in the
-            // dye branch, so the velocity pass stays gaussian by construction.
-            // An active shape overrides the built-in tips (incl. Ring below).
-            // __remoteStroke exempts peer strokes and replays: the stamp is
-            // viewer-LOCAL (its bitmap can't ride the wire), so without the
-            // gate a peer's stroke printed in whatever shape THIS client had
-            // selected. Built-in tips still apply — they mirror by design.
-            let stampTex = null;
-            if (window.__brushTipOn && !window.__remoteStroke &&
-                window.BrushShapes && typeof window.BrushShapes.getActiveStamp === 'function') {
-                stampTex = window.BrushShapes.getActiveStamp(); // {texture, aspect} | null
-            }
-            gl.uniform1f(splatProg.uniforms.stampTexOn, stampTex ? 1 : 0);
-            if (stampTex) {
-                gl.uniform1i(splatProg.uniforms.uStampTex, 2);
-                gl.uniform1f(splatProg.uniforms.stampAspect, stampTex.aspect || 1);
-                gl.activeTexture(gl.TEXTURE2);
-                gl.bindTexture(gl.TEXTURE_2D, stampTex.texture);
-                // The Texture slider grains custom stamps too (the shader
-                // multiplies cov by the stampNoise grain) — drive stampNoise
-                // from it regardless of which tip is nominally selected, or
-                // the slider is inert with the Soft/Ring tips and material
-                // modes override it.
-                const stex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 1;
-                gl.uniform1f(splatProg.uniforms.stampNoise, Math.max(0, Math.min(1, stex)));
-            }
-            gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
-            // Gate flow: scales the convergence (see splatFrag). window.__splatFlow
-            // is set per-dab by the paint loop and defaults to 1 (full) for every
-            // programmatic/press splat that doesn't set it, so this is inert unless
-            // a Gate stroke explicitly asks for partial flow.
-            gl.uniform1f(splatProg.uniforms.gateFlow,
-                (typeof window.__splatFlow === 'number') ? Math.max(0.0, Math.min(1.0, window.__splatFlow)) : 1.0);
-            // Block injection inside collision masks (prevents burned-in dye)
-            const _splatObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
-            gl.uniform1i(splatProg.uniforms.hasObstacle, _splatObsActive ? 1 : 0);
-            if (_splatObsActive) {
-                gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
-                // Velocity injection blocked by wall coverage like dye
-                // (default; the s³ leak was the "dye producer" pump — see
-                // splatFrag). config.OBS_VEL_COVERAGE_BLOCK=false = legacy.
-                gl.uniform1f(splatProg.uniforms.uVelCovBlock,
-                    config.OBS_VEL_COVERAGE_BLOCK === false ? 0.0 : 1.0);
-                gl.uniform1i(splatProg.uniforms.uObstacle, 1);
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-            }
+            const stampTex = splatActiveStamp();
+            setSplatSurface(splatProg, stampTex);
             // Write velocity at physics resolution (with isolation applied)
             gl.viewport(0, 0, simTexWidth, simTexHeight);
             gl.uniform1i(splatProg.uniforms.isVelocity, 1); // Velocity pass
@@ -389,14 +615,7 @@
             gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
             gl.uniform3fv(splatProg.uniforms.color, color);
-            // The narrowest dab the grid can hold (splatFrag dyeRadiusFloor):
-            // σ of half a dye texel or half a canvas px, whichever is wider,
-            // in the shader's radius units (2σ², canvas-height-normalized).
-            // Read from the live sizes, so it follows the boot ramp and the
-            // governor. config.SPLAT_DYE_FLOOR=false turns it off.
-            const _dyeTexP = Math.max(1 / dyeTexHeight, aspectRatio / dyeTexWidth);
-            const _floorSigma = 0.5 * Math.max(_dyeTexP, 1 / canvas.height);
-            const _dyeFloor = (config.SPLAT_DYE_FLOOR === false) ? 0 : 2 * _floorSigma * _floorSigma;
+            const _dyeFloor = splatDyeFloor(aspectRatio);
             gl.uniform1f(splatProg.uniforms.dyeRadiusFloor, _dyeFloor);
             // Down here, past the Push return: only a dab that lays dye counts
             // as a landing.
@@ -406,20 +625,7 @@
                 if (_win && stampHeldHere(stampTex.texture, x, y, baseRadius, _stampAng, _stampFlip)) _hold = _win;
             }
             gl.uniform2f(splatProg.uniforms.stampHold, _hold ? _hold[0] : 0, _hold ? _hold[1] : 0);
-            // Wet pickup (splatFrag): the dab takes on the fresh paint it lands
-            // in, by Color Blend x COLOR_BLEND_PICKUP. The Drying map rides
-            // unit 3 whether or not it is read, so the sampler never points at
-            // a stale texture (the sub-step feedback trap, 05j 8d).
-            const _pickK = (typeof config.COLOR_BLEND_PICKUP === 'number') ? Math.max(0, config.COLOR_BLEND_PICKUP) : 0.8;
-            const _pick = ((config.COLOR_BLEND || 0) > 0 && typeof wetness !== 'undefined' && wetness)
-                ? Math.max(0, Math.min(1, config.COLOR_BLEND)) * _pickK : 0;
-            gl.uniform1f(splatProg.uniforms.wetPickup, _pick);
-            gl.uniform1f(splatProg.uniforms.wetPickupAmount, config.COLOR_BLEND_PICKUP_AMOUNT === false ? 0 : 1);
-            gl.uniform2f(splatProg.uniforms.dyeTexel, 1 / dyeTexWidth, 1 / dyeTexHeight);
-            gl.uniform1i(splatProg.uniforms.uWetness, 3);
-            gl.activeTexture(gl.TEXTURE3);
-            gl.bindTexture(gl.TEXTURE_2D, (typeof wetness !== 'undefined' && wetness) ? wetness.read.texture : density.read.texture);
-            gl.activeTexture(gl.TEXTURE0);
+            setSplatPickup(splatProg, splatPickupAmount());
             if (brushTip === 4 && !stampTex) {
                 // Ring tip: thin dye band at ~the gaussian's visible radius
                 // (≈√radius in p-space) — dye pass ONLY, so the ring uniform
@@ -452,8 +658,7 @@
             // ring/tip radius) keeps the wet footprint aligned with the paint.
             // Color Blend reads the wetness too (wet paint blends), so either
             // feature keeps it.
-            if (((config.WET_INFLUENCE || 0) > 0 || (config.COLOR_BLEND || 0) > 0)
-                && typeof wetness !== 'undefined' && wetness) {
+            if (splatWetsPaper()) {
                 wetSplatProg.bind();
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
                 gl.uniform1f(wetSplatProg.uniforms.aspectRatio, aspectRatio);
@@ -466,14 +671,19 @@
                 // Color Blend and the wet pickup skipped them (the fuzzy
                 // two-arm overlap, 2026-10-01). Widen it to read ~0.5 at
                 // the footprint's edge instead.
-                const _wetK = stampTex ? 4 : (brushTip >= 1 && brushTip <= 3) ? 2 : 1;
+                const _wetK = splatWetK(stampTex, brushTip);
                 gl.uniform1f(wetSplatProg.uniforms.radius, baseRadius * _wetK);
                 gl.uniform1f(wetSplatProg.uniforms.amount, 1.0);
                 gl.uniform1i(wetSplatProg.uniforms.uTarget, 0);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, wetness.read.texture);
-                blit(wetness.write.fbo);
-                wetness.swap();
+                // Scissored like the velocity and dye passes. This pass was the
+                // one left fullscreen, so every arm × ring × dab repainted the
+                // whole wetness texture. max(src, g) leaves src untouched where
+                // g has rounded to zero, so the box is exact.
+                splatPass(wetness, simTexWidth, simTexHeight,
+                    _scOn ? splatScissorRect(_u, _v, _scK * Math.sqrt(Math.max(baseRadius * _wetK, 0)),
+                        aspectRatio, simTexWidth, simTexHeight) : 'full');
             }
         }
         // Ring-band splat: paints a thin elliptical band of dye and pushes it

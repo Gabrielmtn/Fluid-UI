@@ -734,6 +734,22 @@
             // an inner ring travels less, and a full-strength push would
             // smear it past its own path.
             const rings = Math.max(1, Math.min(6, (config.CONCENTRICITY | 0) || 1));
+            // Two or more copies with nothing per-arm in the way go to the
+            // batched splat (05i splatBatch): one set of instanced draws for
+            // the whole dab instead of three passes per copy. Per-arm push
+            // and per-arm tips change the shader's state between copies, so
+            // those dabs stay one splat() per copy.
+            let batch = null;
+            if (transforms.length * rings > 1 && armPushMask === 0
+                && typeof window.__splatBatchable === 'function' && window.__splatBatchable()) {
+                batch = [];
+                if (armTips) {
+                    for (let t = 0; t < transforms.length; t++) {
+                        const tip = armTips[transforms[t].arm];
+                        if (tip !== undefined && tip !== null) { batch = null; break; }
+                    }
+                }
+            }
             for (let ri = 0; ri < transforms.length * rings; ri++) {
                 const i = ri % transforms.length;
                 const rs = (rings - Math.floor(ri / transforms.length)) / rings;
@@ -747,6 +763,15 @@
                 const armDy = rs * (m[3] * dx + m[4] * dy);
                 const armColor = exactColor ? color : resolveArmColor(transforms[i].arm, color);
                 if (tapArms) tapArms[transforms[i].arm] = armColor;
+                if (batch) {
+                    // What splat() would work out for this copy, in the order
+                    // it would: the pose, then the two seed draws.
+                    const flip = (m[0] * m[4] - m[1] * m[3]) < 0;
+                    const pose = window.__splatStampPose(armStampTurn(m), flip);
+                    batch.push({ x: finalX, y: finalY, dx: armDx, dy: armDy, color: armColor,
+                        ang: pose[0], flip: pose[1], seed: [Math.random() * 19.7, Math.random() * 23.3] });
+                    continue;
+                }
                 // Two things splat() cannot work out for itself, published for
                 // the length of this one dab and cleared in the finally:
                 //  · __armVelOnly — true forces the velocity-only path for a
@@ -777,6 +802,7 @@
                     finally { unpinArmTip(tipSaved); }
                 }
             }
+            if (batch) window.__splatBatch(batch);
             if (tap) {
                 // What decided this dab, as multiSplat resolved it: the arm
                 // mask, tips and mirror after their pins, the face pose, the
