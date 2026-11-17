@@ -237,7 +237,7 @@
     var ACTIONS = ['none', 'splat', 'burst', 'scatter', 'orbit', 'spiral', 'grid', 'ring', 'color', 'spin'];
     var ACTION_LABEL = {
         none: 'Nothing', splat: 'Splat', burst: 'Burst', scatter: 'Scatter', orbit: 'Orbit',
-        spiral: 'Spiral', grid: 'Grid', ring: 'Tunnel ring', color: 'Next colour', spin: 'Spin kaleido'
+        spiral: 'Spiral', grid: 'Grid', ring: 'Tunnel ring', color: 'Next color', spin: 'Spin kaleido'
     };
     // Splat actions are 22's auto-splat patterns, by name.
     var ACTION_GEN = { splat: 'center', burst: 'radialBurst', scatter: 'random', orbit: 'circular', spiral: 'spiral', grid: 'grid' };
